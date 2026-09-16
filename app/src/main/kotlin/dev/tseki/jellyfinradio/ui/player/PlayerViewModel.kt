@@ -31,6 +31,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 data class PlayerUiState(
     val episodeId: EpisodeId? = null,
     val title: String = "",
@@ -77,12 +79,21 @@ class PlayerViewModel @Inject constructor(
         }
     }
     /**
-     * 指定の回を開く。同じ番組のキューが既に積まれていればその中でシークし、
-     * 既にその回を再生中なら何もしない（画面に戻ってきただけ）。
+     * 指定の回を開く。同じ番組のキューが既に積まれていればその中でシークする。
+     * 既にその回を再生中なら何もしない（画面に戻ってきただけ）。その回で止まっている
+     * （一時停止・再生終了）なら、再生開始として再開位置の規則を適用してから再生する。
      */
     private suspend fun open(player: Player, episodeId: EpisodeId) {
         if (EpisodeMediaItems.episodeId(player.currentMediaItem) == episodeId && player.playbackState != Player.STATE_IDLE) {
-            player.play()
+            if (!player.isPlaying) {
+                val runtime = player.duration.takeIf { it != C.TIME_UNSET }
+                    ?: player.currentMediaItem?.mediaMetadata?.durationMs
+                if (runtime != null && runtime > 0) {
+                    val resume = PlaybackRules.resumePosition(player.currentPosition.milliseconds, runtime.milliseconds)
+                    if (resume == Duration.ZERO) player.seekTo(0)
+                }
+                player.play()
+            }
             return
         }
         val target = library.getEpisode(episodeId)
