@@ -82,8 +82,10 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 
 - ライブラリ一覧: `/UserViews`。`CollectionType = music` のものだけ選択できる（他は理由付きでグレーアウト）
 - 番組一覧: `/Items?ParentId={libraryId}&IncludeItemTypes=MusicAlbum&Recursive=true`（1 回）
-- 各回一覧: `/Items?ParentId={libraryId}&IncludeItemTypes=Audio&Recursive=true&Fields=MediaSources,DateCreated,PremiereDate&SortBy=DateCreated&SortOrder=Descending&StartIndex=…&Limit=500`
-  （ライブラリ全体を 500 件ずつ。番組ごとには呼ばない。`AlbumId` で番組に結び付け、どの番組にも属さない Audio は取り込まない）
+- 各回一覧: `/Items?ParentId={libraryId}&IncludeItemTypes=Audio&Recursive=true&Fields=DateCreated,ParentId&SortBy=DateCreated&SortOrder=Descending&StartIndex=…&Limit=500`
+  （ライブラリ全体を 500 件ずつ。番組ごとには呼ばない。`AlbumId` で番組に結び付け、どの番組にも属さない Audio は取り込まない。
+  **`Fields=MediaSources` は付けない**: SDK 1.9 は `MediaStream.IsOriginal` を必須と見なすが 10.11 は返さず、デコードで落ちる。
+  ファイルサイズは M3 のダウンロード時に確定させる）
 - 原本ダウンロード: `/Items/{itemId}/Download`（トランスコードは使わない。direct play 前提）
 - 再生位置・再生済みの送信: **`POST /UserItems/{itemId}/UserData`**（`UpdateUserItemDataDto` の
   `PlaybackPositionTicks` / `Played` / `LastPlayedDate`）。`/Sessions/Playing/*` は使わない

@@ -116,7 +116,9 @@ class SdkJellyfinGateway @Inject constructor(
                     parentId = parent,
                     recursive = true,
                     includeItemTypes = listOf(BaseItemKind.AUDIO),
-                    fields = listOf(ItemFields.MEDIA_SOURCES, ItemFields.DATE_CREATED, ItemFields.PARENT_ID),
+                    // MediaSources は要求しない: SDK 1.9（Jellyfin 12 向け）は MediaStream.IsOriginal を必須と
+                    // 見なすが、10.11 はそれを返さずデコードに失敗する。サイズは M3 のダウンロード時に取る
+                    fields = listOf(ItemFields.DATE_CREATED, ItemFields.PARENT_ID),
                     sortBy = listOf(ItemSortBy.DATE_CREATED),
                     sortOrder = listOf(SortOrder.DESCENDING),
                     startIndex = start,
@@ -137,16 +139,16 @@ class SdkJellyfinGateway @Inject constructor(
     private fun BaseItemDto.toServerEpisode(): ServerEpisode? {
         val albumId = albumId ?: return null
         val created = dateCreated ?: return null
-        val source = mediaSources?.firstOrNull()
         return ServerEpisode(
             serverId = ServerItemId(id.toString()),
             programServerId = ServerItemId(albumId.toString()),
             title = name.orEmpty(),
             airedAt = serverAiredAt(premiereDate?.toKotlinLocalDate(), created.toKotlinLocalDate()),
             addedAt = created.toInstantUtc(),
-            runtime = (runTimeTicks ?: source?.runTimeTicks)?.let(Ticks::toDuration) ?: Duration.ZERO,
-            sizeBytes = source?.size ?: 0L,
-            container = source?.container ?: container ?: "",
+            runtime = runTimeTicks?.let(Ticks::toDuration) ?: Duration.ZERO,
+            // ファイルサイズは基本フィールドに無い（MediaSources を避けるため）。M3 のダウンロードで確定する
+            sizeBytes = 0L,
+            container = container ?: "",
         )
     }
 
