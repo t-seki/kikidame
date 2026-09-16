@@ -18,11 +18,14 @@ import dev.tseki.jellyfinradio.ui.PlayerRoute
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -54,12 +57,9 @@ class PlayerViewModel @Inject constructor(
     /** 再生中の回の再生済みフラグ。Room を正として表示する。 */
     val played: StateFlow<Boolean> = _uiState
         .map { it.episodeId }
+        .distinctUntilChanged()
         .flatMapLatest { id -> if (id == null) flowOf(false) else playbackStates.observe(id).map { it?.played == true } }
-        .let { flow ->
-            val state = MutableStateFlow(false)
-            viewModelScope.launch { flow.collect { state.value = it } }
-            state
-        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
     private var controller: MediaController? = null
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) = refresh(player)
