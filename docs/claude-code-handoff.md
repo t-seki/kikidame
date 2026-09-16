@@ -102,8 +102,8 @@ M2 は毎回フル走査（2,000 件規模なら数ページ）。差分検出�
 サーバ ID を持たない行（M1 のシード、孤児化した行）は正規の状態。
 
 ```kotlin
-@Entity(indices = [Index("serverItemId", unique = true), Index("stationName", "name", unique = true)])
-data class ProgramEntity(          // 番組 = MusicAlbum。(放送局, 番組名) はシードの同一性キー
+@Entity(indices = [Index("serverItemId", unique = true), Index("stationName", "name")])
+data class ProgramEntity(          // 番組 = MusicAlbum。(放送局, 番組名) はシード・突合のキーだが一意ではない（v2）
   @PrimaryKey(autoGenerate = true) val id: Long = 0,
   val serverItemId: String?,
   val name: String,
