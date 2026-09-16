@@ -270,7 +270,8 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
     **ログアウト**（認証情報だけ消す。手元のデータは残る）、**別のサーバに接続**（確認の上ローカルデータを全部消す）。
     デバッグ用シードはここに移す（接続画面にもデバッグ節として置く）
   - 401 はログアウトと同じ処理をして接続画面へ（URL とユーザー名は入力済み）
-- **認証情報**: `Client="Jellyfin Radio"`, `Device=Build.MODEL`, `DeviceId=` 初回生成 UUID, `Version=versionName`。
+- **認証情報**: `Client="Jellyfin Radio"`, `Version=versionName`。`Device` / `DeviceId` は jellyfin-sdk-kotlin の Android 既定
+  （端末のモデル名 / `ANDROID_ID` 由来）に任せ、自前の UUID は持たない（実装時に変更。保存する値が 1 つ減る）。
   トークンは Keystore の鍵で AES-GCM 暗号化して Preferences DataStore に保存（`EncryptedSharedPreferences` は使わない）。
   パスワードは保存しない。`SessionStore`（`:core:data`）が持つ
 - **取得の起点**: ログイン直後と、番組一覧・各回一覧の「引っ張って更新」だけ。自動取得は M3 の同期と一緒に入れる。
@@ -283,7 +284,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
   番組一覧は「手元 M / 全 N 回」。連続再生のキューは手元にある回だけ（手元に無い回は飛ばす）
 - **ライブラリ切替**: 同じサーバなので手元の行は触らない。旧ライブラリの番組は M3 の判断保留と同じ扱いになる
 - **コードの置き場**: `:core:domain` にサーバのスナップショット型（`ServerProgram` / `ServerEpisode`）と突合の純粋関数
-  `matchLibrary`（JUnit 5）。`:core:data` に `JellyfinGateway` インターフェース（`login` / `listLibraries` / `fetchLibrary`）と
+  `LibraryMatching.match`（JUnit 5）。`:core:data` に `JellyfinGateway` インターフェース（`signIn` / `listLibraries` / `fetchLibrary`）と
   jellyfin-sdk-kotlin 実装、`SessionStore`。Repository が突合結果を 1 トランザクションで Room に適用。テストはフェイクのゲートウェイ。
   モジュールは 3 つのまま
 

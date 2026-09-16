@@ -76,14 +76,14 @@ fun JellyfinRadioNavHost(sessionViewModel: SessionViewModel = hiltViewModel()) {
             val fromSettings = navController.previousBackStackEntry != null
             LibraryPickScreen(
                 onDone = {
-                    if (fromSettings) navController.popBackStack() else navController.navigate(ProgramListRoute) { popUpTo(0) }
+                    if (fromSettings) navController.popIfNotRoot() else navController.navigate(ProgramListRoute) { popUpTo(0) }
                 },
-                onBack = if (fromSettings) ({ navController.popBackStack() }) else null,
+                onBack = if (fromSettings) navController::popIfNotRoot else null,
             )
         }
         composable<SettingsRoute> {
             SettingsScreen(
-                onBack = { navController.popBackStack() },
+                onBack = navController::popIfNotRoot,
                 onChangeLibrary = { navController.navigate(LibraryPickRoute) },
             )
         }
@@ -96,13 +96,21 @@ fun JellyfinRadioNavHost(sessionViewModel: SessionViewModel = hiltViewModel()) {
         composable<EpisodeListRoute> {
             EpisodeListScreen(
                 onEpisodeClick = { navController.navigate(PlayerRoute(it.value)) },
-                onBack = { navController.popBackStack() },
+                onBack = navController::popIfNotRoot,
             )
         }
         composable<PlayerRoute> {
-            PlayerScreen(onBack = { navController.popBackStack() })
+            PlayerScreen(onBack = navController::popIfNotRoot)
         }
     }
+}
+
+/**
+ * 戻り先があるときだけポップする。← の連打などで唯一の画面までポップするとバックスタックが空になり、
+ * NavHost が何も描かない（真っ暗な画面）まま Activity が残る。
+ */
+private fun NavHostController.popIfNotRoot() {
+    if (previousBackStackEntry != null) popBackStack()
 }
 
 private fun SessionState.startDestination(): Any = when (this) {

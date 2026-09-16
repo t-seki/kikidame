@@ -51,6 +51,10 @@ class LibraryPickViewModel @Inject constructor(
                 val preselected = current?.takeIf { id -> music.any { it.id == id } }
                     ?: music.singleOrNull()?.id
                 _uiState.update { it.copy(libraries = libraries, selectedId = preselected, isLoading = false) }
+            } catch (e: ServerException.Unauthorized) {
+                // 401 はログアウトと同じ扱い。セッション状態が変わり、NavHost が接続画面へ導く
+                _uiState.update { it.copy(isLoading = false, error = e.toUserMessage()) }
+                sessionRepository.signOut()
             } catch (e: ServerException) {
                 _uiState.update { it.copy(isLoading = false, error = e.toUserMessage()) }
             }

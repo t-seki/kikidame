@@ -21,7 +21,8 @@ data class ServerEpisode(
     val airedAt: Instant,
     val addedAt: Instant?,
     val runtime: Duration,
-    val sizeBytes: Long,
+    /** サーバが返さない場合は null（手元の値を残す）。 */
+    val sizeBytes: Long?,
     val container: String,
 )
 

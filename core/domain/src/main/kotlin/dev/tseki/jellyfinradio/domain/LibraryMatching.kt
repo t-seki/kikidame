@@ -49,7 +49,10 @@ object LibraryMatching {
         val localProgramsByKey = localPrograms
             .filter { it.serverItemId == null }
             .groupBy { it.stationName to it.name }
-        val serverProgramsByKey = server.programs.groupBy { it.stationName to it.name }
+        // サーバ ID で同一視できる行は突合の対象外なので、曖昧判定の分母にも入れない
+        val serverProgramsByKey = server.programs
+            .filter { it.serverId !in knownProgramIds }
+            .groupBy { it.stationName to it.name }
 
         val programLinks = HashMap<ProgramId, ServerItemId>()
         val newPrograms = ArrayList<ServerProgram>()
@@ -79,7 +82,9 @@ object LibraryMatching {
         val localEpisodesByKey = localEpisodes
             .filter { it.serverItemId == null }
             .groupBy { it.programId to it.title }
-        val serverEpisodesByKey = server.episodes.groupBy { it.programServerId to it.title }
+        val serverEpisodesByKey = server.episodes
+            .filter { it.serverId !in knownEpisodeIds }
+            .groupBy { it.programServerId to it.title }
 
         val episodeLinks = HashMap<EpisodeId, ServerItemId>()
         val newEpisodes = ArrayList<ServerEpisode>()

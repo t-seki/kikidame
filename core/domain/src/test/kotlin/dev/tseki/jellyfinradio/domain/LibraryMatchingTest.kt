@@ -23,6 +23,21 @@ class LibraryMatchingTest {
         container = "m4a",
     )
 
+    @Test
+    fun `server rows that are already linked do not make a name ambiguous`() {
+        val match = LibraryMatching.match(
+            localPrograms = listOf(lp(1, "dup", server = "P1"), lp(2, "dup")),
+            localEpisodes = listOf(le(20, 2, "x"), le(10, 1, "x", server = "E1")),
+            server = ServerSnapshot(
+                programs = listOf(sp("P1", "dup"), sp("P2", "dup")),
+                episodes = listOf(se("E1", "P1", "x"), se("E2", "P2", "x")),
+            ),
+        )
+        assertEquals(mapOf(ProgramId(2) to ServerItemId("P2")), match.programLinks)
+        assertEquals(mapOf(EpisodeId(20) to ServerItemId("E2")), match.episodeLinks)
+        assertTrue(match.newPrograms.isEmpty() && match.newEpisodes.isEmpty())
+    }
+
     private fun lp(id: Long, name: String, station: String? = "TBSラジオ", server: String? = null) =
         LocalProgramKey(ProgramId(id), server?.let(::ServerItemId), station, name)
 

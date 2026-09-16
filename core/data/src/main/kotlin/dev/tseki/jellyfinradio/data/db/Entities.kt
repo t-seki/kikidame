@@ -44,7 +44,7 @@ data class EpisodeEntity(
     val title: String,
     /** 放送日。 */
     val airedAt: Instant,
-    /** 取り込み日時。シード由来は null。 */
+    /** 取り込み日時。サーバと突合されるまでは null（シード由来）。 */
     val addedAt: Instant?,
     /** 1 tick = 100ns。ticks は Entity とサーバ境界にだけ現れる。 */
     val runtimeTicks: Long,

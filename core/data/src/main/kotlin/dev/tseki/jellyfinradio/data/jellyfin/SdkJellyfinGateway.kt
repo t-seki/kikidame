@@ -10,9 +10,11 @@ import dev.tseki.jellyfinradio.domain.ServerItemId
 import dev.tseki.jellyfinradio.domain.ServerProgram
 import dev.tseki.jellyfinradio.domain.ServerSnapshot
 import dev.tseki.jellyfinradio.domain.Session
+import dev.tseki.jellyfinradio.domain.AiredAt
 import dev.tseki.jellyfinradio.domain.Ticks
 import dev.tseki.jellyfinradio.domain.serverAiredAt
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.toLocalDateTime
 import org.jellyfin.sdk.Jellyfin
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.exception.ApiClientException
@@ -147,7 +149,7 @@ class SdkJellyfinGateway @Inject constructor(
             addedAt = created.toInstantUtc(),
             runtime = runTimeTicks?.let(Ticks::toDuration) ?: Duration.ZERO,
             // ファイルサイズは基本フィールドに無い（MediaSources を避けるため）。M3 のダウンロードで確定する
-            sizeBytes = 0L,
+            sizeBytes = null,
             container = container ?: "",
         )
     }
@@ -179,9 +181,12 @@ class SdkJellyfinGateway @Inject constructor(
     }
 }
 
-/** サーバの日時は UTC のナイーブな `LocalDateTime` で来る。 */
-private fun java.time.LocalDateTime.toKotlinLocalDate(): LocalDate =
-    LocalDate(year, monthValue, dayOfMonth)
+/**
+ * サーバの日時は UTC のナイーブな `LocalDateTime` で来る。日付を切り出す前に JST へ直す
+ * （`DateCreated` が JST 9:00 前だと UTC では前日になる。`PremiereDate` は UTC 0 時で来るので同じ日付のまま）。
+ */
+internal fun java.time.LocalDateTime.toKotlinLocalDate(): LocalDate =
+    toInstantUtc().toLocalDateTime(AiredAt.ZONE).date
 
-private fun java.time.LocalDateTime.toInstantUtc(): Instant =
+internal fun java.time.LocalDateTime.toInstantUtc(): Instant =
     toInstant(java.time.ZoneOffset.UTC).toKotlinInstant()

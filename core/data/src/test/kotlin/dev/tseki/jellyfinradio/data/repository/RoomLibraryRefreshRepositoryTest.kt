@@ -52,7 +52,7 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
         airedAt = Instant.parse(aired),
         addedAt = Instant.parse("2026-09-16T02:00:00Z"),
         runtime = runtime.minutes,
-        sizeBytes = 32_000_000,
+        sizeBytes = null,
         container = "m4a",
     )
 
@@ -118,6 +118,7 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
         assertEquals("audio-2", relinked.episode.serverItemId?.value)
         assertEquals(24.minutes, relinked.playback?.position, "playback state survives matching")
         assertEquals(60.minutes, relinked.episode.runtime, "server metadata overwrites the seeded values")
+        assertEquals(1024, relinked.episode.sizeBytes, "a value the server does not send keeps the seeded one")
         assertEquals(Instant.parse("2026-09-16T02:00:00Z"), relinked.episode.addedAt)
         assertTrue(relinked.localFile?.pinned == true)
 

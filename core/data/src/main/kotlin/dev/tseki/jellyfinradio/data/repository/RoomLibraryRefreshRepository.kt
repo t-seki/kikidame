@@ -23,7 +23,7 @@ import kotlin.time.Clock
 
 /**
  * サーバのライブラリ全体を取得し、突合（[LibraryMatching]）して Room に 1 トランザクションで適用する。
- * サーバ由来の各回はサーバの値で上書きし、`LocalFile` / `PlaybackState` は触らない。
+ * サーバ由来の各回はサーバの値で上書きし（サーバが返さない値は手元の値を残す）、`LocalFile` / `PlaybackState` は触らない。
  * サーバの一覧に無い行は何もしない（削除・判断保留は M3）。
  */
 @Singleton
@@ -74,9 +74,9 @@ class RoomLibraryRefreshRepository @Inject constructor(
             val programId = programIdByServerId[se.programServerId] ?: continue
             val existing = episodeDao.findByServerItemId(se.serverId.value)
             if (existing == null) {
-                episodeDao.insert(se.toEntity(programId))
+                episodeDao.insert(se.toEntity(programId, existingSize = null))
             } else {
-                val updated = se.toEntity(programId).copy(id = existing.id)
+                val updated = se.toEntity(programId, existingSize = existing.sizeBytes).copy(id = existing.id)
                 if (updated != existing) episodeDao.update(updated)
             }
         }
@@ -90,14 +90,15 @@ class RoomLibraryRefreshRepository @Inject constructor(
         )
     }
 
-    private fun ServerEpisode.toEntity(programId: Long) = EpisodeEntity(
+    /** サーバが返さない値（サイズ）は手元の値を残す。 */
+    private fun ServerEpisode.toEntity(programId: Long, existingSize: Long?) = EpisodeEntity(
         serverItemId = serverId.value,
         programId = programId,
         title = title,
         airedAt = airedAt,
         addedAt = addedAt,
         runtimeTicks = Ticks.fromDuration(runtime),
-        sizeBytes = sizeBytes,
+        sizeBytes = sizeBytes ?: existingSize ?: 0L,
         container = container,
     )
 }
