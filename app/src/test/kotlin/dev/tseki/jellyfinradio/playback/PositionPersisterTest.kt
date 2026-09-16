@@ -4,7 +4,12 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tseki.jellyfinradio.domain.EpisodeId
+import dev.tseki.jellyfinradio.domain.PlaybackState
+import dev.tseki.jellyfinradio.domain.PlaybackStateRepository
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -115,6 +120,25 @@ class PositionPersisterTest {
         player.update { setContentPositionMs(42_000) }
         persister.detach()
         runCurrent()
+        assertEquals(42.seconds, repo.states.value[ep1]!!.position)
+    }
+    @Test
+    fun finalSaveSurvivesPlayerScopeCancellation() = runTest(StandardTestDispatcher()) {
+        // サービス破棄: detach() の直後に player 側のスコープが cancel される
+        val playerScope = CoroutineScope(SupervisorJob() + testScheduler.let { StandardTestDispatcher(it) })
+        val slowRepo = object : PlaybackStateRepository by repo {
+            override suspend fun update(episodeId: EpisodeId, transform: (PlaybackState) -> PlaybackState): PlaybackState {
+                delay(1.milliseconds) // Room の withTransaction と同じく必ず中断する
+                return repo.update(episodeId, transform)
+            }
+        }
+        player.setPlaylist(listOf(item(ep1)), listOf(runtime.inWholeMilliseconds))
+        player.update { setPlaybackState(Player.STATE_READY); setContentPositionMs(42_000) }
+        val persister = PositionPersister(player, slowRepo, clock, playerScope, persistScope = this)
+        persister.attach()
+        persister.detach()
+        playerScope.cancel()
+        advanceTimeBy(1.seconds)
         assertEquals(42.seconds, repo.states.value[ep1]!!.position)
     }
 }

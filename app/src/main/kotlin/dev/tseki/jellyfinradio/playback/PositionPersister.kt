@@ -19,13 +19,16 @@ import kotlin.time.Duration.Companion.seconds
  * 一時停止・停止（`isPlaying` が false になったとき）、回の切替（前の回の位置）、
  * 再生終了、再生中 [SAVE_INTERVAL] ごと。
  *
- * [scope] は [player] のアプリケーションスレッドで動くこと（Player はスレッド拘束）。
+ * [playerScope] は [player] のアプリケーションスレッドで動くこと（Player はスレッド拘束）。
+ * 書き込みは [persistScope] に載せる。サービス破棄で [playerScope] が cancel されても
+ * 最後の保存が失われないよう、こちらはプロセス寿命のスコープを渡す。
  */
 class PositionPersister(
     private val player: Player,
     private val repository: PlaybackStateRepository,
     private val clock: Clock,
-    private val scope: CoroutineScope,
+    private val playerScope: CoroutineScope,
+    private val persistScope: CoroutineScope = playerScope,
     private val saveInterval: Duration = SAVE_INTERVAL,
 ) : Player.Listener {
     private var ticker: Job? = null
@@ -72,7 +75,7 @@ class PositionPersister(
     }
     private fun startTicker() {
         if (ticker?.isActive == true) return
-        ticker = scope.launch {
+        ticker = playerScope.launch {
             while (isActive) {
                 delay(saveInterval)
                 saveCurrent()
@@ -89,7 +92,7 @@ class PositionPersister(
         save(episode, player.currentPosition.milliseconds, currentRuntime())
     }
     private fun save(episodeId: EpisodeId, position: Duration, runtime: Duration?) {
-        scope.launch {
+        persistScope.launch {
             repository.update(episodeId) { state ->
                 if (runtime == null) {
                     // 尺が分からなければ再生済み判定はできない。位置だけ進める

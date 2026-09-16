@@ -12,6 +12,7 @@ import androidx.media3.session.MediaSessionService
 import com.google.common.util.concurrent.ListenableFuture
 import dagger.hilt.android.AndroidEntryPoint
 import dev.tseki.jellyfinradio.MainActivity
+import dev.tseki.jellyfinradio.di.ApplicationScope
 import dev.tseki.jellyfinradio.domain.LibraryRepository
 import dev.tseki.jellyfinradio.domain.PlaybackStateRepository
 import kotlinx.coroutines.CoroutineScope
@@ -28,6 +29,7 @@ class PlaybackService : MediaSessionService() {
     @Inject lateinit var libraryRepository: LibraryRepository
     @Inject lateinit var playbackStateRepository: PlaybackStateRepository
     @Inject lateinit var clock: Clock
+    @Inject @ApplicationScope lateinit var applicationScope: CoroutineScope
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var session: MediaSession? = null
     private var positionPersister: PositionPersister? = null
@@ -70,7 +72,8 @@ class PlaybackService : MediaSessionService() {
                 ),
             )
             .build()
-        positionPersister = PositionPersister(player, playbackStateRepository, clock, scope).also { it.attach() }
+        positionPersister = PositionPersister(player, playbackStateRepository, clock, scope, applicationScope)
+            .also { it.attach() }
         resumeOnTransition = ResumeOnTransition(player, playbackStateRepository, scope).also { it.attach() }
     }
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
