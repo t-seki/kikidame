@@ -61,6 +61,10 @@ dependencies {
     implementation(libs.media3.session)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+
+    // jellyfin-sdk-kotlin は kotlin-logging 経由で slf4j を要求する。バインディングが無いと実行時に落ちる
+    runtimeOnly(libs.slf4j.android)
+
     testImplementation(libs.junit4)
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.robolectric)
