@@ -33,8 +33,8 @@ Android 向けの Jellyfin クライアントを新規に作ります。以下�
 | 永続化 | Room |
 | バックグラウンド | WorkManager（同期・ダウンロードの Worker） |
 | DI | Hilt |
-| 日時 | kotlinx-datetime（`Instant`）。ドメイン型の時間長は `kotlin.time.Duration` |
-| テスト | JUnit5 + kotlin-test、Room は Robolectric、Media3 はフェイク `Player` |
+| 日時 | `kotlin.time.Instant`（stdlib）+ kotlinx-datetime（`LocalDate` / `TimeZone`）。時間長は `kotlin.time.Duration` |
+| テスト | `:core:domain` は JUnit5、Android モジュールは JUnit4 + Robolectric。Media3 は `SimpleBasePlayer` 継承のフェイク `Player` |
 
 ## モジュール構成（M1 から この形で切る）
 
@@ -230,8 +230,9 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 - **再生操作**: 再生／一時停止／シーク／±30 秒スキップ／前後の回へ移動。
   連続再生は同じ番組内で **放送日の古い順** に次の回へ。再生済みの回は飛ばさない。再生済み／未再生の手動切替
   - 各回を開いた時点で、その番組の手元にある全各回（古い順）を Media3 のプレイリストとして
-    `MediaSessionService` に積み、選んだ回を開始インデックスにする。`mediaId` = ローカル `episodeId`、
-    各 `MediaItem` の `startPositionMs` に再開位置を与える。次／前・自動遷移・通知の ⏮⏭ は Media3 標準に任せる
+    `MediaSessionService` に積み、選んだ回を開始インデックス・再開位置で `setMediaItems` する。
+    `mediaId` = ローカル `episodeId`。Media3 のプレイリストは先頭の回にしか開始位置を持てないので、
+    次／前・自動遷移で別の回に入ったときはサービス側で保存位置（再開位置の規則）へシークする
 - **再生位置の保存**: 一時停止・停止・回の切替時（`onMediaItemTransition` の `oldPosition`）+ 再生中 10 秒ごと。
   プロセスの強制 kill で最大 10 秒戻るのは許容
 - **再起動後の復元**: 各回を開き直すと保存位置から再開できること。「最後に聴いていた回」の自動復元や
