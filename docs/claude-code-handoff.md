@@ -80,15 +80,21 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 
 主に使う取得パス（SDK 経由で呼ぶ）:
 
-- 番組一覧: `/Items?IncludeItemTypes=MusicAlbum&Recursive=true&ParentId={libraryId}`
-- 各回一覧: `/Items?ParentId={albumId}&IncludeItemTypes=Audio&Fields=MediaSources,DateCreated,PremiereDate&SortBy=DateCreated&SortOrder=Descending`
+- ライブラリ一覧: `/UserViews`。`CollectionType = music` のものだけ選択できる（他は理由付きでグレーアウト）
+- 番組一覧: `/Items?ParentId={libraryId}&IncludeItemTypes=MusicAlbum&Recursive=true`（1 回）
+- 各回一覧: `/Items?ParentId={libraryId}&IncludeItemTypes=Audio&Recursive=true&Fields=MediaSources,DateCreated,PremiereDate&SortBy=DateCreated&SortOrder=Descending&StartIndex=…&Limit=500`
+  （ライブラリ全体を 500 件ずつ。番組ごとには呼ばない。`AlbumId` で番組に結び付け、どの番組にも属さない Audio は取り込まない）
 - 原本ダウンロード: `/Items/{itemId}/Download`（トランスコードは使わない。direct play 前提）
 - 再生位置・再生済みの送信: **`POST /UserItems/{itemId}/UserData`**（`UpdateUserItemDataDto` の
   `PlaybackPositionTicks` / `Played` / `LastPlayedDate`）。`/Sessions/Playing/*` は使わない
 - 再生位置の初期取得: `GET /UserItems/{itemId}/UserData`（ローカルに行が無いときだけ）
 
-差分検出は `SortBy=DateCreated&SortOrder=Descending` で取得し、ローカルの最大取り込み日時に
-到達したら打ち切る方式。番組数が少ないうちはフル走査でも構わない。
+M2 は毎回フル走査（2,000 件規模なら数ページ）。差分検出（`DateCreated` 降順で取り、ローカルの最大取り込み日時に
+到達したら打ち切る）は M3 の定期同期で「通常は差分、1 日 1 回は全走査」の形で入れる。差分だけだと
+サーバ側で直ったメタデータ（放送日修正など）を拾えないため。
+
+サーバの `PremiereDate`（無ければ `DateCreated`）は日時で来るが、**日付部分だけ取って JST 0 時の `Instant`** にする
+（シード由来の放送日と同じ土俵にして、並び順が混ざらないようにする）。
 
 ## Room スキーマ（この形で作る）
 
@@ -247,6 +253,34 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 - **モジュール**: 上記 3 モジュールを最初から切る。`applicationId` は `dev.tseki.jellyfinradio`、`minSdk` 31
 - **Room**: `exportSchema = true` で `core/data/schemas/` を git 管理する
 - **CI**: GitHub Actions で PR ごとに `./gradlew test`
+
+### M2 の範囲（2026-09-17 の grilling で確定）
+
+- **経路**: `https://` 固定（正規証明書）。平文 HTTP は許可しない。URL 入力はスキーム省略可
+- **画面**: 未ログインなら 接続画面（URL・ユーザー名・パスワード）→ ライブラリ選択。ログイン済みなら M1 の番組一覧
+  - ライブラリ選択は**常に出す**。`/UserViews` の全ライブラリを列挙し、音楽以外は「音楽ライブラリのみ選べます」で
+    グレーアウト。音楽が 1 つなら選択済みにして「決定」だけ。0 なら決定不可
+  - 設定画面（番組一覧の歯車）: サーバ URL・ユーザー名・ライブラリ名（タップで選び直し）・最終取得日時、
+    **ログアウト**（認証情報だけ消す。手元のデータは残る）、**別のサーバに接続**（確認の上ローカルデータを全部消す）。
+    デバッグ用シードはここに移す（接続画面にもデバッグ節として置く）
+  - 401 はログアウトと同じ処理をして接続画面へ（URL とユーザー名は入力済み）
+- **認証情報**: `Client="Jellyfin Radio"`, `Device=Build.MODEL`, `DeviceId=` 初回生成 UUID, `Version=versionName`。
+  トークンは Keystore の鍵で AES-GCM 暗号化して Preferences DataStore に保存（`EncryptedSharedPreferences` は使わない）。
+  パスワードは保存しない。`SessionStore`（`:core:data`）が持つ
+- **取得の起点**: ログイン直後と、番組一覧・各回一覧の「引っ張って更新」だけ。自動取得は M3 の同期と一緒に入れる。
+  失敗はスナックバーで、一覧は Room のまま
+- **突合（CONTEXT.md「突合」）**: `serverItemId = NULL` の行にだけ行う。番組は (放送局, 番組名) = (`AlbumArtist`, `Name`)、
+  各回は同じ番組内の `Name` 完全一致。候補が複数なら結ばない（新規行）。表記ゆれは吸収しない（radirec-tool の alias の責務）
+- **取り込み**: サーバ由来の各回はサーバの値で上書き（タイトル・放送日・取り込み日時・尺・サイズ・コンテナ）。
+  `LocalFile` と `PlaybackState` は触らない。サーバの一覧に無い番組・各回は M2 では何もしない（削除・判断保留は M3）
+- **手元に無い各回**: 一覧に同じ並びで出すが薄く表示し、タップしても再生画面へ行かない。右端は雲アイコン（M3 でダウンロードボタンになる）。
+  番組一覧は「手元 M / 全 N 回」。連続再生のキューは手元にある回だけ（手元に無い回は飛ばす）
+- **ライブラリ切替**: 同じサーバなので手元の行は触らない。旧ライブラリの番組は M3 の判断保留と同じ扱いになる
+- **コードの置き場**: `:core:domain` にサーバのスナップショット型（`ServerProgram` / `ServerEpisode`）と突合の純粋関数
+  `matchLibrary`（JUnit 5）。`:core:data` に `JellyfinGateway` インターフェース（`login` / `listLibraries` / `fetchLibrary`）と
+  jellyfin-sdk-kotlin 実装、`SessionStore`。Repository が突合結果を 1 トランザクションで Room に適用。テストはフェイクのゲートウェイ。
+  モジュールは 3 つのまま
+
 ## 作業の進め方
 
 - 同期エンジンとデータ層はテストを先に書く
