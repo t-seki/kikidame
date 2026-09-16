@@ -96,8 +96,8 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 サーバ ID を持たない行（M1 のシード、孤児化した行）は正規の状態。
 
 ```kotlin
-@Entity(indices = [Index("serverItemId", unique = true)])
-data class ProgramEntity(          // 番組 = MusicAlbum
+@Entity(indices = [Index("serverItemId", unique = true), Index("stationName", "name", unique = true)])
+data class ProgramEntity(          // 番組 = MusicAlbum。(放送局, 番組名) はシードの同一性キー
   @PrimaryKey(autoGenerate = true) val id: Long = 0,
   val serverItemId: String?,
   val name: String,
