@@ -1,8 +1,11 @@
 package dev.tseki.jellyfinradio.ui.connect
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.tseki.jellyfinradio.LocalNetworkPermission
 import dev.tseki.jellyfinradio.domain.ServerException
 import dev.tseki.jellyfinradio.domain.SessionRepository
 import dev.tseki.jellyfinradio.domain.SessionState
@@ -28,6 +31,7 @@ data class ConnectUiState(
 
 @HiltViewModel
 class ConnectViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val sessionRepository: SessionRepository,
     private val seed: SeedLocalLibrary,
 ) : ViewModel() {
@@ -58,7 +62,12 @@ class ConnectViewModel @Inject constructor(
                 sessionRepository.signIn(s.serverUrl, s.userName, s.password)
                 _uiState.update { it.copy(isSubmitting = false, password = "") }
             } catch (e: ServerException) {
-                _uiState.update { it.copy(isSubmitting = false, error = e.toUserMessage()) }
+                val hint = if (e is ServerException.Unreachable && LocalNetworkPermission.isRequiredAndMissing(context)) {
+                    "\n「ローカルネットワーク」の権限が許可されていません。設定 → アプリ → Jellyfin Radio → 権限 から許可してください"
+                } else {
+                    ""
+                }
+                _uiState.update { it.copy(isSubmitting = false, error = e.toUserMessage() + hint) }
             } catch (e: IllegalArgumentException) {
                 _uiState.update { it.copy(isSubmitting = false, error = "https:// の URL だけ使えます") }
             }

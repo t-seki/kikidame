@@ -1,6 +1,7 @@
 package dev.tseki.jellyfinradio.data.jellyfin
 
 import android.content.Context
+import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.tseki.jellyfinradio.domain.LibraryView
 import dev.tseki.jellyfinradio.domain.ServerEpisode
@@ -149,28 +150,30 @@ class SdkJellyfinGateway @Inject constructor(
         )
     }
 
-    /** SDK の例外を [ServerException] に正規化する。 */
+    /** SDK の例外を [ServerException] に正規化する。原因の連鎖はログに残す（トークンは含まれない）。 */
     private suspend fun <T> call(block: suspend () -> T): T = try {
         block()
     } catch (e: ServerException) {
         throw e
-    } catch (e: InvalidStatusException) {
-        if (e.status == 401 || e.status == 403) throw ServerException.Unauthorized(e)
-        throw ServerException.Failed("HTTP ${e.status}", e)
-    } catch (e: TimeoutException) {
-        throw ServerException.Unreachable(e)
-    } catch (e: SecureConnectionException) {
-        throw ServerException.Unreachable(e)
-    } catch (e: ApiClientException) {
-        if (e.cause is IOException) throw ServerException.Unreachable(e)
-        throw ServerException.Failed(e.message ?: "api error", e)
-    } catch (e: IOException) {
-        throw ServerException.Unreachable(e)
+    } catch (e: Exception) {
+        Log.w(TAG, "server call failed: ${e.causeChain()}")
+        throw when (e) {
+            is InvalidStatusException ->
+                if (e.status == 401 || e.status == 403) ServerException.Unauthorized(e) else ServerException.Failed("HTTP ${e.status}", e)
+            is TimeoutException, is SecureConnectionException, is IOException -> ServerException.Unreachable(e)
+            is ApiClientException ->
+                if (e.cause is IOException) ServerException.Unreachable(e) else ServerException.Failed(e.message ?: "api error", e)
+            else -> ServerException.Failed(e.message ?: e::class.simpleName ?: "error", e)
+        }
     }
+
+    private fun Throwable.causeChain(): String =
+        generateSequence(this) { it.cause }.joinToString(" <- ") { "${it::class.simpleName}: ${it.message}" }
 
     companion object {
         const val CLIENT_NAME = "Jellyfin Radio"
         const val PAGE_SIZE = 500
+        private const val TAG = "JellyfinGateway"
     }
 }
 

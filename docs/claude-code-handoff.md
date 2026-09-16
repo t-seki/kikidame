@@ -51,7 +51,7 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 
 ## サーバ側の前提
 
-- Jellyfin **12.0** を対象にする（2026-09 リリース）
+- Jellyfin **12.0** を対象にする（2026-09 リリース）。自宅の実サーバは 2026-09-17 時点で 10.11.11（認証形式は同じ）
 - **レガシー認証は使用不可**。`?api_key=`、`X-Emby-Token`、`X-Emby-Authorization` は 12.0 で廃止された。
   `Authorization: MediaBrowser Client="...", Device="...", DeviceId="...", Version="...", Token="..."`
   形式のみを使う
@@ -250,6 +250,10 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
   - Android 13+ の `POST_NOTIFICATIONS` ランタイム権限要求
   - `AndroidManifest` に `foregroundServiceType="mediaPlayback"` と
     `FOREGROUND_SERVICE_MEDIA_PLAYBACK` 権限（Android 14+ の FGS 制約）
+  - **Android 17+（targetSdk 37）の `ACCESS_LOCAL_NETWORK` ランタイム権限**（M2 で判明）。無いと LAN 内の
+    サーバ宛の TCP が黙って落ちる（DNS だけ通るので名前解決は成功し、接続がタイムアウトする）。
+    `adb shell` や古い targetSdk のアプリは対象外なので、切り分けでは `run-as <pkg> nc -z <host> <port>` で
+    アプリの UID から試すこと
 - **モジュール**: 上記 3 モジュールを最初から切る。`applicationId` は `dev.tseki.jellyfinradio`、`minSdk` 31
 - **Room**: `exportSchema = true` で `core/data/schemas/` を git 管理する
 - **CI**: GitHub Actions で PR ごとに `./gradlew test`
