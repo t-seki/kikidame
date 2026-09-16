@@ -5,10 +5,13 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import dev.tseki.jellyfinradio.domain.DownloadState
 import kotlin.time.Instant
-/** 番組 = MusicAlbum。主キーはローカル代理キー、サーバ ID は nullable unique（ADR 0001）。 */
+/**
+ * 番組 = MusicAlbum。主キーはローカル代理キー、サーバ ID は nullable unique（ADR 0001）。
+ * (放送局, 番組名) は突合のキーだが一意ではない（サーバ側に同名の番組が複数あり得る）。
+ */
 @Entity(
     tableName = "programs",
-    indices = [Index("serverItemId", unique = true), Index(value = ["stationName", "name"], unique = true)],
+    indices = [Index("serverItemId", unique = true), Index(value = ["stationName", "name"])],
 )
 data class ProgramEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,

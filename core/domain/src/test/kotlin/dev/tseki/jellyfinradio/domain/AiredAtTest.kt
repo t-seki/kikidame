@@ -40,4 +40,10 @@ class AiredAtTest {
         assertNull(AiredAt.dateFromTag("2026"))
         assertNull(AiredAt.dateFromTag(null))
     }
+
+    @Test
+    fun `server aired at prefers premiere date and lands on JST midnight`() {
+        assertEquals(Instant.parse("2026-06-11T15:00:00Z"), serverAiredAt(june12, june13))
+        assertEquals(Instant.parse("2026-06-12T15:00:00Z"), serverAiredAt(null, june13))
+    }
 }
