@@ -12,6 +12,7 @@ kotlin {
 }
 dependencies {
     api(libs.kotlinx.datetime)
+    api(libs.kotlinx.coroutines.core)
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlin.test.junit5)
