@@ -1,5 +1,6 @@
 package dev.tseki.jellyfinradio.domain
 import kotlinx.coroutines.flow.Flow
+import kotlin.time.Duration
 import kotlin.time.Instant
 /** 番組一覧の 1 行。最新の各回の放送日で並べる。 */
 data class ProgramSummary(
@@ -14,6 +15,13 @@ data class EpisodeWithState(
     val playback: PlaybackState?,
 ) {
     val isPlayable: Boolean get() = localFile?.state == DownloadState.DONE && localFile.path != null
+    /**
+     * 次に開いたとき途中から再開する位置。先頭から始まる（未再生・末尾付近・記録なし）なら null。
+     * 一覧の進捗表示はこれに従い、再生済みかどうかは見ない。
+     */
+    val resumePosition: Duration?
+        get() = playback?.let { PlaybackRules.resumePosition(it.position, episode.runtime) }
+            ?.takeIf { it > Duration.ZERO }
 }
 interface LibraryRepository {
     /** 最新の各回の放送日が新しい順。 */

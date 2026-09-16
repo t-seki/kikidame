@@ -71,7 +71,7 @@ fun EpisodeListScreen(
 @Composable
 private fun EpisodeRow(item: EpisodeWithState, onClick: () -> Unit, onTogglePlayed: () -> Unit) {
     val played = item.playback?.played == true
-    val position = item.playback?.position ?: Duration.ZERO
+    val resume = item.resumePosition
     val runtime = item.episode.runtime
     ListItem(
         modifier = Modifier.clickable(enabled = item.isPlayable, onClick = onClick),
@@ -79,9 +79,10 @@ private fun EpisodeRow(item: EpisodeWithState, onClick: () -> Unit, onTogglePlay
         supportingContent = {
             Column {
                 Text("${item.episode.airedAt.toAiredDateText()} · ${runtime.toClockText()}")
-                if (!played && position > Duration.ZERO && runtime > Duration.ZERO) {
+                // 次に開いたとき途中から再開する回にだけ出す（再生済みでも途中で止めた回には出る）
+                if (resume != null && runtime > Duration.ZERO) {
                     LinearProgressIndicator(
-                        progress = { (position / runtime).toFloat().coerceIn(0f, 1f) },
+                        progress = { (resume / runtime).toFloat().coerceIn(0f, 1f) },
                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                     )
                 }
