@@ -73,6 +73,7 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 | --- | --- |
 | MusicAlbum | 番組 (Program) |
 | Audio | 各回 (Episode) |
+| `AlbumArtist` | 放送局 (Station) — `radirec-tool` が albumartist に放送局を書く |
 | `PremiereDate` → `DateCreated` → ファイル更新日時 | 放送日 (Aired At) — 並び順・「最新 N 回」の基準。この順でフォールバック |
 | `DateCreated` | 取り込み日時 (Added At) — 差分検出の打ち切りにだけ使う |
 | `Id` | サーバ ID — アプリ内の主キーではない（ADR 0001） |
@@ -99,7 +100,8 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 data class ProgramEntity(          // 番組 = MusicAlbum
   @PrimaryKey(autoGenerate = true) val id: Long = 0,
   val serverItemId: String?,
-  val name: String, val artistName: String?,
+  val name: String,
+  val stationName: String?,        // 放送局（MusicAlbum.AlbumArtist / シードでは番組フォルダの親フォルダ名）
   val syncEnabled: Boolean,        // 同期対象か（既定 false）
   val keepLatest: Int?,            // 最新 N 回まで保持（null = 上限なし）
   val deleteAfterPlayed: Boolean
@@ -150,9 +152,13 @@ data class PlaybackStateEntity(    // ローカル正（ADR 0002）
 - `syncedAt` が null のレコードだけを、オンライン復帰時に `POST /UserItems/{itemId}/UserData` へ送る。
   一方向で衝突解決はしない
 - **再生済み**の判定（`:core:domain` の純粋関数）:
-  - 再生位置が **末尾から残り 2 分以内**に達したら自動で `played = true`
+  - 再生位置が **末尾から残り 2 分以内**に達したら自動で `played = true`。ただし位置 0 では判定しない
+    （尺が 2 分以下の回は「再生が少しでも進んだら再生済み」。閾値を尺でスケールさせない）
   - 一度 true になったら、シークで戻しても自動では false に戻らない
-  - 手動で再生済み／未再生を切り替えられる（M1 の UI に含める）
+  - 手動で再生済み／未再生を切り替えられる（M1 の UI に含める）。**手動切替は再生位置を変えない**
+- **再開位置**（`:core:domain` の純粋関数）: 再生開始時は「残りが 2 分以下なら先頭から、そうでなければ
+  保存位置から」。再生済みフラグは見ない。最後まで再生し終えた回は位置 = 尺を保存する
+- 再生済みフラグと再生位置は互いに触らない。両者が絡むのは上記の再開位置だけ
 
 ## 同期エンジンの設計（M3）
 
@@ -176,7 +182,8 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 - 同期対象でない番組 → 保持ルールを適用しない。固定された各回だけが手元に残る
 - **保持ルールは独立した削除理由**。「最新 N 回まで保持」と「再生済みなら削除」のどちらかに該当すれば
   手元に置かない（保持は AND）。「最新 N 回」は再生済み・未再生を問わず放送日の新しい順、
-  同着はサーバ ID で安定ソート
+  同着（放送日は日単位なので同日パートで起きる）は各回のタイトルの辞書順 → ローカル ID で安定ソート。
+  この順序は各回一覧・連続再生と共通
 - **固定**された各回は保持ルールの対象外。利用者が固定を外すか手動削除するまで残る
 - サーバの一覧（`Known`）から消えた各回は手元からも削除する。サーバが各回の存在の正、手元はキャッシュ。
   ただしこの規則が届くのは **`Known` の番組に属し、かつ `serverItemId != null` の各回だけ**。
@@ -189,7 +196,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 - アプリ起動時: 前回同期から 1 時間以上経っていれば実行。手動プルでも実行
 - ダウンロード: Worker 内で HTTP ストリームを `.part` ファイルへ書き、完了後にリネーム。
   再開は `Range` ヘッダ。進捗は `setProgress` で UI へ
-- 置き場所: `getExternalFilesDir("episodes")/<番組>/<ファイル>`
+- 置き場所: `getExternalFilesDir("episodes")/<放送局>/<番組>/<ファイル>`（M1 のシードと同じ階層）
 
 ## 実装順序
 
@@ -202,28 +209,45 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 オフラインを後から足すと破綻するため、必ずこの順序で積む。
 
 ### M1 の範囲
-
-- **ファイルの供給**: `getExternalFilesDir("episodes")/<番組名>/<ファイル>.m4a` に `adb push` する。
-  デバッグビルド限定の「シード」操作（ボタン or `adb shell am broadcast` で叩く Receiver）が
-  このフォルダを走査し、サブフォルダを番組、ファイルを各回として `ProgramEntity` / `EpisodeEntity` /
-  `LocalFileEntity(state = DONE, pinned = true)` を生成する。放送日はタグ → ファイル更新日時の順で取る。
-  サーバ ID は null。**置き場所を `filesDir`（内部）に変えないこと** — root 無しの `adb push` が通らない
+- **ファイルの供給**: `getExternalFilesDir("episodes")/<放送局>/<番組名>/<ファイル>.m4a|.mp3` に `adb push` する。
+  この 2 階層は `radirec-tool` の出力（`<albumartist = 放送局>/<album = 番組>/<番組> YYYY-MM-DD.m4a`）を
+  そのまま持ち込めるように合わせてある。デバッグビルド限定の番組一覧画面の「シード」ボタンが
+  このフォルダを走査し、親フォルダを放送局（`stationName`）、サブフォルダを番組、ファイルを各回として
+  `ProgramEntity` / `EpisodeEntity` / `LocalFileEntity(state = DONE, pinned = true)` を生成する。
+  - 各回のタイトルはファイル名（拡張子なし）
+  - 放送日は タグ（M4A `©day` / MP3 `TDRC`、`YYYY-MM-DD`）→ ファイル名の `YYYY-MM-DD` → ファイル更新日時 の順。
+    日単位なので JST 00:00 の `Instant` にする。フォールバックの選択は `:core:domain` の純粋関数、
+    タグ読み取りは `:app` のシードに閉じ込める
+  - 尺は `MediaMetadataRetriever` の duration から。`sizeBytes` はファイルサイズ、`container` は拡張子
+  - **追加専用・べき等**: 番組はフォルダ、各回は `LocalFile.path` をキーに、既存行は触らず新しいファイルだけ足す。
+    ディスクから消えたファイルの扱いは M3（手元に無い各回の整合）で決める
+  - サーバ ID は null。**置き場所を `filesDir`（内部）に変えないこと** — root 無しの `adb push` が通らない。
+    Receiver を `exported` にして `am broadcast` で叩く方式は取らない
 - **画面**: 番組一覧 → 各回一覧 → 再生画面 の 3 階層。M2 で Jellyfin から番組が来ても画面は変えず、
   データソースだけ差し替わる。保持ルール編集画面は M3
+  - 番組一覧は「最新の各回の放送日が新しい順」、各回一覧は「放送日の新しい順」（同着はタイトルの辞書順）
+  - 各回の行に再生済みマークと、未再生かつ位置 > 0 の回には進捗（位置 / 尺）を出す
 - **再生操作**: 再生／一時停止／シーク／±30 秒スキップ／前後の回へ移動。
-  連続再生は同じ番組内で **放送日の古い順** に次の回へ。再生済み／未再生の手動切替
-- **再生位置の保存**: 一時停止・停止・回の切替時 + 再生中 10 秒ごと
+  連続再生は同じ番組内で **放送日の古い順** に次の回へ。再生済みの回は飛ばさない。再生済み／未再生の手動切替
+  - 各回を開いた時点で、その番組の手元にある全各回（古い順）を Media3 のプレイリストとして
+    `MediaSessionService` に積み、選んだ回を開始インデックスにする。`mediaId` = ローカル `episodeId`、
+    各 `MediaItem` の `startPositionMs` に再開位置を与える。次／前・自動遷移・通知の ⏮⏭ は Media3 標準に任せる
+- **再生位置の保存**: 一時停止・停止・回の切替時（`onMediaItemTransition` の `oldPosition`）+ 再生中 10 秒ごと。
+  プロセスの強制 kill で最大 10 秒戻るのは許容
+- **再起動後の復元**: 各回を開き直すと保存位置から再開できること。「最後に聴いていた回」の自動復元や
+  ミニプレイヤーは M1 に含めない
 - **MediaSessionService**: 通知・ロック画面操作。以下は必須
   - Android 13+ の `POST_NOTIFICATIONS` ランタイム権限要求
   - `AndroidManifest` に `foregroundServiceType="mediaPlayback"` と
     `FOREGROUND_SERVICE_MEDIA_PLAYBACK` 権限（Android 14+ の FGS 制約）
-- **モジュール**: 上記 3 モジュールを最初から切る
-
+- **モジュール**: 上記 3 モジュールを最初から切る。`applicationId` は `dev.tseki.jellyfinradio`、`minSdk` 31
+- **Room**: `exportSchema = true` で `core/data/schemas/` を git 管理する
+- **CI**: GitHub Actions で PR ごとに `./gradlew test`
 ## 作業の進め方
 
 - 同期エンジンとデータ層はテストを先に書く
   - `:core:domain`: プレーン JUnit5。M1 分は 再生済み判定、ticks ↔ `Duration` 変換、
-    放送日フォールバック（`PremiereDate` → 取り込み日時 → ファイル更新日時）
+    放送日フォールバック（`PremiereDate` → 取り込み日時、シードは タグ → ファイル名 → ファイル更新日時）、再開位置、各回の並び順（同着のタイブレーク）
   - `:core:data`: Robolectric + `Room.inMemoryDatabaseBuilder` で DAO / TypeConverter
   - Media3: 「`Player` から位置を受け取って Room に書く」部分だけフェイク `Player` で JVM テスト
   - CI は `./gradlew test`（エミュレータ不要）
