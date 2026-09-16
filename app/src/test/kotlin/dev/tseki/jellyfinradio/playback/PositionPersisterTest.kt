@@ -46,7 +46,7 @@ class PositionPersisterTest {
     private fun setup(scope: CoroutineScope): PositionPersister {
         player.setPlaylist(listOf(item(ep1), item(ep2)), listOf(runtime.inWholeMilliseconds, runtime.inWholeMilliseconds))
         player.update { setPlaybackState(Player.STATE_READY) }
-        return PositionPersister(player, repo, clock, scope).also { it.attach() }
+        return PositionPersister(player, repo, clock, playerScope = scope, persistScope = scope).also { it.attach() }
     }
     @Test
     fun savesPositionWhenPaused() = runTest(StandardTestDispatcher()) {

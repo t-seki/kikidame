@@ -17,7 +17,7 @@ import kotlin.time.Duration.Companion.seconds
 /**
  * [Player] の位置を Room に書く。保存のタイミングは
  * 一時停止・停止（`isPlaying` が false になったとき）、回の切替（前の回の位置）、
- * 再生終了、再生中 [SAVE_INTERVAL] ごと。
+ * 再生終了、再生中 [SAVE_INTERVAL] ごと、そして [detach]（サービス破棄。再生中でも保存する）。
  *
  * [playerScope] は [player] のアプリケーションスレッドで動くこと（Player はスレッド拘束）。
  * 書き込みは [persistScope] に載せる。サービス破棄で [playerScope] が cancel されても
@@ -28,7 +28,7 @@ class PositionPersister(
     private val repository: PlaybackStateRepository,
     private val clock: Clock,
     private val playerScope: CoroutineScope,
-    private val persistScope: CoroutineScope = playerScope,
+    private val persistScope: CoroutineScope,
     private val saveInterval: Duration = SAVE_INTERVAL,
 ) : Player.Listener {
     private var ticker: Job? = null

@@ -15,9 +15,14 @@ class PlayerConnection @Inject constructor(@ApplicationContext private val conte
     private val mutex = Mutex()
     private var controller: MediaController? = null
     suspend fun controller(): MediaController = mutex.withLock {
-        controller?.takeIf { it.isConnected } ?: MediaController.Builder(
-            context,
-            SessionToken(context, ComponentName(context, PlaybackService::class.java)),
-        ).buildAsync().await().also { controller = it }
+        controller?.takeIf { it.isConnected } ?: run {
+            // サービスが止まって切断された古いコントローラは解放してから作り直す
+            controller?.release()
+            controller = null
+            MediaController.Builder(
+                context,
+                SessionToken(context, ComponentName(context, PlaybackService::class.java)),
+            ).buildAsync().await().also { controller = it }
+        }
     }
 }
