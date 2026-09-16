@@ -25,4 +25,13 @@ class EpisodeOrderTest {
         val sorted = listOf(dupB, part2, older, dupA, part1).sortedWith(EpisodeOrder)
         assertEquals(listOf(older, part1, part2, dupA, dupB), sorted)
     }
+    @Test
+    fun `newest first reverses only the aired date`() {
+        val part2 = episode(3, "2026-06-11T15:00:00Z", "X 2026-06-12 (1)")
+        val part1 = episode(4, "2026-06-11T15:00:00Z", "X 2026-06-12")
+        val older = episode(1, "2026-06-04T15:00:00Z", "X 2026-06-05")
+        val newer = episode(5, "2026-06-18T15:00:00Z", "X 2026-06-19")
+        val sorted = listOf(part2, older, newer, part1).sortedWith(EpisodeOrder.newestFirst)
+        assertEquals(listOf(newer, part1, part2, older), sorted)
+    }
 }

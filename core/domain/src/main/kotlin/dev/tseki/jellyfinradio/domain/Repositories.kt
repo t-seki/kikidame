@@ -19,7 +19,7 @@ interface LibraryRepository {
     /** 最新の各回の放送日が新しい順。 */
     fun observePrograms(): Flow<List<ProgramSummary>>
     fun observeProgram(programId: ProgramId): Flow<Program?>
-    /** [EpisodeOrder] の逆順（新しい順）。 */
+    /** [EpisodeOrder.newestFirst]（放送日の新しい順、同着はタイトルの辞書順）。 */
     fun observeEpisodes(programId: ProgramId): Flow<List<EpisodeWithState>>
     suspend fun getEpisode(episodeId: EpisodeId): EpisodeWithState?
     /** 連続再生用。[EpisodeOrder] の順（古い順）で、手元にあるものだけ。 */

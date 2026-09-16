@@ -25,7 +25,7 @@ class RoomLibraryRepositoryTest : RoomTestBase() {
     fun episodeListIsNewestFirstWithTitleTieBreak() = runTest {
         val programId = seedProgram()
         val titles = repo.observeEpisodes(programId).first().map { it.episode.title }
-        assertEquals(listOf("X 2026-06-19", "X 2026-06-12 (1)", "X 2026-06-12", "X 2026-06-05"), titles)
+        assertEquals(listOf("X 2026-06-19", "X 2026-06-12", "X 2026-06-12 (1)", "X 2026-06-05"), titles)
     }
     @Test
     fun playableEpisodesAreOldestFirstAndExcludeMissingFiles() = runTest {

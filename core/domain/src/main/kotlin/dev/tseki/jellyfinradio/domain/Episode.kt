@@ -16,7 +16,11 @@ data class Episode(
     val container: String,
 )
 /**
- * 各回の正規の並び順: 放送日 → タイトルの辞書順 → ローカル ID。
- * 各回一覧はこの逆順（新しい順）、連続再生はこの順（古い順）で使う。
+ * 各回の正規の並び順: 放送日 → タイトルの辞書順 → ローカル ID。連続再生はこの順（古い順）。
+ * 各回一覧は [newestFirst]（放送日だけ逆順、同着のタイトル順はそのまま）。
  */
-object EpisodeOrder : Comparator<Episode> by compareBy<Episode>({ it.airedAt }, { it.title }, { it.id.value })
+object EpisodeOrder : Comparator<Episode> by compareBy<Episode>({ it.airedAt }, { it.title }, { it.id.value }) {
+    /** 放送日の新しい順。同じ放送日の中はタイトルの辞書順 → ローカル ID（正規の順と同じ）。 */
+    val newestFirst: Comparator<Episode> =
+        compareByDescending<Episode> { it.airedAt }.thenBy { it.title }.thenBy { it.id.value }
+}

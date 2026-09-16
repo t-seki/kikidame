@@ -24,7 +24,7 @@ class RoomLibraryRepository @Inject constructor(
         programDao.observeById(programId.value).map { it?.toDomain() }
     override fun observeEpisodes(programId: ProgramId): Flow<List<EpisodeWithState>> =
         episodeDao.observeByProgram(programId.value).map { rows ->
-            rows.map { it.toDomain() }.sortedWith(compareByDescending(EpisodeOrder) { it.episode })
+            rows.map { it.toDomain() }.sortedWith(compareBy(EpisodeOrder.newestFirst) { it.episode })
         }
     override suspend fun getEpisode(episodeId: EpisodeId): EpisodeWithState? =
         episodeDao.findById(episodeId.value)?.toDomain()
