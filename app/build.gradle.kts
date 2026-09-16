@@ -30,6 +30,8 @@ android {
     }
     testOptions {
         unitTests.isIncludeAndroidResources = true
+        // Robolectric を使わないプレーンな JVM テストでも android.util.Log を呼べるようにする
+        unitTests.isReturnDefaultValues = true
     }
 }
 kotlin {

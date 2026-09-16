@@ -11,6 +11,7 @@ import dev.tseki.jellyfinradio.domain.SessionRepository
 import dev.tseki.jellyfinradio.domain.SessionState
 import dev.tseki.jellyfinradio.seed.SeedLocalLibrary
 import dev.tseki.jellyfinradio.sync.toUserMessage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -70,6 +71,11 @@ class ConnectViewModel @Inject constructor(
                 _uiState.update { it.copy(isSubmitting = false, error = e.toUserMessage() + hint) }
             } catch (e: IllegalArgumentException) {
                 _uiState.update { it.copy(isSubmitting = false, error = "https:// の URL だけ使えます") }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // DataStore / Keystore の失敗。落とさずに画面へ
+                _uiState.update { it.copy(isSubmitting = false, error = "保存に失敗しました: ${e::class.simpleName}") }
             }
         }
     }

@@ -1,11 +1,14 @@
 package dev.tseki.jellyfinradio.sync
 
+import android.util.Log
 import dev.tseki.jellyfinradio.domain.LibraryRefreshRepository
 import dev.tseki.jellyfinradio.domain.RefreshResult
 import dev.tseki.jellyfinradio.domain.ServerException
 import dev.tseki.jellyfinradio.domain.SessionRepository
 import dev.tseki.jellyfinradio.di.ApplicationScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -30,7 +33,8 @@ class LibraryRefresher @Inject constructor(
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing
 
-    private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    // 連続した更新の結果を取りこぼさないよう少し余裕を持ち、溢れたら古い方を捨てる
+    private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 4, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val messages: SharedFlow<String> = _messages
 
     /** 画面が消えても最後まで走らせたいとき（ライブラリ選択直後の初回取得）。 */
@@ -55,10 +59,20 @@ class LibraryRefresher @Inject constructor(
         } catch (e: ServerException.Failed) {
             _messages.tryEmit("取得に失敗しました: ${e.message}")
             return null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Room / DataStore / Keystore の失敗。落とさずに文言にする
+            Log.e(TAG, "refresh failed", e)
+            _messages.tryEmit("取り込みに失敗しました: ${e::class.simpleName}")
+            return null
         } finally {
             _isRefreshing.value = false
             mutex.unlock()
         }
+    }
+    private companion object {
+        const val TAG = "LibraryRefresher"
     }
 }
 
