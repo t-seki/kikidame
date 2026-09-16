@@ -1,0 +1,4 @@
+Jellyfin サーバに音楽ライブラリとして取り込まれたラジオ録音を、番組単位のルールで自動ダウンロード／削除し、オフラインで聴く Android アプリ。
+- 用語集: [CONTEXT.md](./CONTEXT.md)
+- 設計判断の記録: [docs/adr/](./docs/adr/)
+- 実装引き継ぎ（設計の全体像・マイルストーン）: [docs/claude-code-handoff.md](./docs/claude-code-handoff.md)
