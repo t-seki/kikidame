@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -43,6 +44,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val session by viewModel.session.collectAsStateWithLifecycle()
+    val wifiOnly by viewModel.wifiOnly.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var confirmSignOut by remember { mutableStateOf(false) }
@@ -84,6 +86,14 @@ fun SettingsScreen(
             ListItem(
                 headlineContent = { Text((s as? SessionState.Ready)?.lastFetchedAt?.toDateTimeText() ?: "-") },
                 supportingContent = { Text("最終取得") },
+            )
+            HorizontalDivider()
+            Text("ダウンロード", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(16.dp, 16.dp, 16.dp, 4.dp))
+            ListItem(
+                modifier = Modifier.clickable { viewModel.setWifiOnly(!wifiOnly) },
+                headlineContent = { Text("Wi-Fi のみ") },
+                supportingContent = { Text("オフにするとモバイル回線でもダウンロードします") },
+                trailingContent = { Switch(checked = wifiOnly, onCheckedChange = viewModel::setWifiOnly) },
             )
             HorizontalDivider()
             ListItem(

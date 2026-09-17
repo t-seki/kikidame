@@ -160,3 +160,32 @@ $ADB shell ls -R /sdcard/Android/data/dev.tseki.jellyfinradio/files/episodes
 - [x] アプリを kill して再起動しても接続画面は出ず番組一覧
 - [x] 機内モードで更新 → 「サーバに接続できません。手元の一覧を表示しています」→ 手元の回を再生できる
 - [x] 「別のサーバに接続」→ 番組・各回・再生位置・セッションが消え、音声ファイルは残る（DB で確認）
+
+## 実機で試す（M3-a: ダウンロード）
+
+### 再開（`.part` + `Range`）の確認
+
+LAN では 10 MB が 0.5 秒で落ちるので、ダウンロード中に kill しても再開の経路を踏めない。代わりに「途中まで落ちた状態」を作る:
+
+```bash
+$ADB shell am force-stop dev.tseki.jellyfinradio
+# DB を引き出し、対象の local_files.state を 'DONE' → 'PENDING' に書き換えて戻す（development.md 上の「DB だけ消す」と同じ run-as 手順）
+$ADB shell "head -c 5000000 '<path>' > '<path>.part' && rm '<path>'"
+$ADB logcat -c && <アプリを起動>
+$ADB logcat -d | grep JellyfinGateway   # download <id> from 5000000 -> HTTP 206 Content-Range=bytes 5000000-.../...
+```
+
+`HTTP 206` と `Content-Range` が出て、ファイルが元のサイズで完成すれば再開できている。200 が出た場合は
+サーバが `Range` を無視しており、Worker は `.part` を書き直す（フェイクでテスト済み）。
+
+### 実機チェックリスト（M3-a）
+
+2026-09-17 に Pixel 7a（Android 17）と Jellyfin 10.11.11 で確認済み。
+
+- [x] 雲アイコンで 1 本落とし、再生できる。落とした回にピンが付く
+- [x] ダウンロード中のキャンセルで行が雲に戻る
+- [x] 「Wi-Fi のみ」ON でモバイル回線だと「Wi-Fi 待ち」のまま落ちず、Wi-Fi に戻ると落ちる
+- [x] 途中の `.part` から `Range` で再開する（サーバは 206 を返す）
+- [x] 長押し →「ファイルを削除」で雲に戻り、再生位置が残る。同期対象でない番組では「固定を外す」が出ない
+- [x] ファイルを消した状態で更新すると「手元に無くなっていた 1 回の記録を整理しました」と出て雲に戻る
+- [ ] 失敗の表示と再試行（機内モードでは Worker が起動しないため未確認。フェイクでテスト済み）

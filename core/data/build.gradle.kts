@@ -32,6 +32,7 @@ dependencies {
     ksp(libs.room.compiler)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.jellyfin.core)
+    implementation(libs.okhttp)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

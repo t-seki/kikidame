@@ -74,6 +74,8 @@ data class LocalFileEntity(
     val attemptCount: Int = 0,
     val lastAttemptAt: Instant? = null,
     val downloadedAt: Instant? = null,
+    /** キューに入れた時刻。手動ダウンロードはこの古い順（FIFO）に落とす。v3 で追加 */
+    val enqueuedAt: Instant? = null,
 )
 /**
  * 再生位置・再生済み。ローカル正（ADR 0002）。

@@ -58,8 +58,8 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 - `/emby/`・`/mediabrowser/` のパスは削除済み。使わない
 - OpenAPI 仕様に載っていないエンドポイントは使わない。認証・API アクセスは
   jellyfin-sdk-kotlin に任せ、自前で HTTP を組み立てない
-- ダウンロードは SDK の HttpClient（OkHttp）で `/Items/{itemId}/Download` をストリーム取得し、
-  Worker がファイルへ直接書く（ADR 0003）。Media3 の `HttpDataSource.Factory` に Authorization ヘッダを
+- ダウンロードは URL（`getDownloadUrl`）と `Authorization` ヘッダ（`AuthorizationHeaderBuilder`）を SDK に作らせ、
+  転送だけ OkHttp のストリームで行い、Worker がファイルへ直接書く（ADR 0003。SDK にストリーミング API が無いため）。Media3 の `HttpDataSource.Factory` に Authorization ヘッダを
   設定する必要があるのは、サーバから直接ストリーミング再生する場合（M4 以降で検討）に限る
 - 認証トークンは Android Keystore で生成した鍵で暗号化し DataStore に置く（`EncryptedSharedPreferences` は使わない）
 - ログアウトは認証情報だけを消し、手元のデータは残す。別サーバへ接続するときだけ
@@ -230,7 +230,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
     タグ読み取りは `:app` のシードに閉じ込める
   - 尺は `MediaMetadataRetriever` の duration から。`sizeBytes` はファイルサイズ、`container` は拡張子
   - **追加専用・べき等**: 番組はフォルダ、各回は `LocalFile.path` をキーに、既存行は触らず新しいファイルだけ足す。
-    ディスクから消えたファイルの扱いは M3（手元に無い各回の整合）で決める
+    ディスクから消えたファイルの扱いは M3-a で決めた（「M3-a の範囲」の削除の規則・整合。#5）
   - サーバ ID は null。**置き場所を `filesDir`（内部）に変えないこと** — root 無しの `adb push` が通らない。
     Receiver を `exported` にして `am broadcast` で叩く方式は取らない
 - **画面**: 番組一覧 → 各回一覧 → 再生画面 の 3 階層。M2 で Jellyfin から番組が来ても画面は変えず、
@@ -287,6 +287,41 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
   `LibraryMatching.match`（JUnit 5）。`:core:data` に `JellyfinGateway` インターフェース（`signIn` / `listLibraries` / `fetchLibrary`）と
   jellyfin-sdk-kotlin 実装、`SessionStore`。Repository が突合結果を 1 トランザクションで Room に適用。テストはフェイクのゲートウェイ。
   モジュールは 3 つのまま
+
+### M3 の分割（2026-09-17 の grilling で確定）
+
+M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認してマージする。
+**M3-a ダウンロード基盤**（#14）→ **M3-b 同期エンジンと保持ルール**（`planSync`、編集画面、Wi-Fi のみ、定期・起動時同期、#12）→
+**M3-c 消失と突合**（#3、#2、#9）。b・c の細部は a を動かしてから grilling する。
+
+### M3-a の範囲
+
+- **転送**: `JellyfinGateway.openDownload(episodeServerId, rangeStart)`。SDK にはストリーミング取得の API が無い
+  （`getDownload` / `request` は本文を `byte[]` に全部読む）ので、**URL は SDK の `getDownloadUrl`、`Authorization` ヘッダは SDK の
+  `AuthorizationHeaderBuilder` に作らせ、転送だけ OkHttp（SDK の依存に同梱）で行う**。エンドポイントと認証形式は手書きしない。
+  戻り値は `resumedFrom`（206 で `Range` が効いたか）・`totalBytes`・本文ストリーム。サーバが `Range` を無視して 200 を返したら
+  `.part` を書き直す。テストはフェイク（206 再開／200 全体再送の両方）
+- **Worker**: WorkManager のユニーク Worker（`download-queue`、`KEEP`）が `LocalFile.state = PENDING` の行を**キューに入れた順（FIFO、
+  `enqueuedAt`。実機確認で「タップした順に落ちてほしい」と決定）**に **1 本ずつ**処理する。再試行は列の末尾へ。M3-b の同期が積む分の優先順位はそこで決める。`<局>/<番組>/<タイトル>.<container>.part` に追記し、完了でリネーム。既存の `.part` は `Range: bytes=<size>-` で再開。
+  進捗は `setProgress`。通知は出さない（フォアグラウンドサービスにしない）
+- **条件**: 設定の「Wi-Fi のみ」（既定 ON、`AppSettings` DataStore）。ON なら `UNMETERED`、OFF なら `CONNECTED`。待ちの間は「Wi-Fi 待ち」表示
+- **失敗**: 1 本失敗しても次へ。`attemptCount` +1、`lastAttemptAt`、`FAILED`。同一実行内では再試行しない。次の起動で
+  `attemptCount < 3` を PENDING に戻す。3 回超えは手動の再試行だけ。401 は `LibraryRefresher` と同じくログアウト
+- **キャンセル**: DONE 以外の行を消し `.part` も消す。Worker は約 1 MB ごとに DB を見てスキップする
+- **行の操作**（各回一覧）: 右端アイコンは状態を表し、タップで最も自然な 1 操作
+  （雲 → ダウンロード（= 固定）、進捗リング → キャンセル、警告 → 再試行、手元にある回は再生済み切替）。
+  長押しでボトムシート（固定を外す／ファイルを削除／再生済み切替／ダウンロード）。固定中はタイトルの前にピン。
+  同期対象でない番組では「固定を外す」を出さない（外すと次の同期で消えるため）
+- **削除の規則**（手動削除・保持ルール・消えたファイルの整合で共通）:
+  - `serverItemId` がある回: ファイルと `LocalFile` 行だけ消す。`Episode` / `PlaybackState` は残る（ADR 0002。落とし直せば続きから）
+  - `serverItemId` が無い回（シード由来）: 二度と手に入らないので `Episode` ごと消す（`PlaybackState` は cascade）。
+    各回が 0 になった `serverItemId` 無しの番組も消す
+- **消えたファイルの整合（#5）**: 同期・更新の開始時に `DONE` 行を全走査し、再生開始時にも存在を確認する。無ければ上記の削除規則を
+  自動で適用し、スナックバー「ファイルが見つかりません」
+- **完了時**: `LocalFile(DONE, path, pinned = true, downloadedAt)`、`Episode.sizeBytes` を実バイト数で更新（M2 で保留した値をここで確定）。
+  同期によるダウンロード（M3-b）は `pinned = false`
+- **命名**: 放送局 null は `_`、`container` 空は `m4a`、禁止文字（`/ \ : * ? " < > |`）は `_`、同名衝突は ` (2)`
+- 「手元 M / 全 N 回」の M は `DONE` のみ。手元に無い回の再生は M3-a でも不可（ストリーミングは M4 以降）
 
 ## 作業の進め方
 
