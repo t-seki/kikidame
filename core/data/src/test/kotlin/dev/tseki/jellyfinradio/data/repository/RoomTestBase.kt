@@ -12,7 +12,7 @@ import kotlin.time.Instant
 /** テストごとに新しい in-memory DB を開く。時計は固定して `updatedAt` を検証可能にする。 */
 abstract class RoomTestBase {
     protected lateinit var db: JellyfinRadioDatabase
-    protected val now: Instant = Instant.parse("2026-09-16T00:00:00Z")
+    protected var now: Instant = Instant.parse("2026-09-16T00:00:00Z")
     protected val clock: Clock = object : Clock {
         override fun now(): Instant = this@RoomTestBase.now
     }

@@ -3,10 +3,13 @@ package dev.tseki.jellyfinradio.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.tseki.jellyfinradio.domain.AppSettingsRepository
 import dev.tseki.jellyfinradio.domain.LocalDataReset
 import dev.tseki.jellyfinradio.domain.SessionRepository
 import dev.tseki.jellyfinradio.domain.SessionState
+import dev.tseki.jellyfinradio.download.DownloadScheduler
 import dev.tseki.jellyfinradio.seed.SeedLocalLibrary
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -19,7 +22,25 @@ class SettingsViewModel @Inject constructor(
     private val sessionRepository: SessionRepository,
     private val reset: LocalDataReset,
     private val seed: SeedLocalLibrary,
+    private val settings: AppSettingsRepository,
+    private val scheduler: DownloadScheduler,
 ) : ViewModel() {
+    val wifiOnly: StateFlow<Boolean> = settings.wifiOnly
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    /** 変更したら、条件待ちの Worker を新しい条件で組み直す（実行中の転送は切らない）。 */
+    fun setWifiOnly(value: Boolean) {
+        viewModelScope.launch {
+            try {
+                settings.setWifiOnly(value)
+                scheduler.reschedule()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _message.value = "設定の保存に失敗しました: ${e::class.simpleName}"
+            }
+        }
+    }
+
     val session: StateFlow<SessionState?> = sessionRepository.state
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
