@@ -76,7 +76,7 @@ interface DownloadRepository {
 
 /** ダウンロードの実行側（Worker）が使う。 */
 interface DownloadQueue {
-    /** 次に落とす行（放送日の新しい順）。無ければ null。 */
+    /** 次に落とす行（キューに入れた順 = FIFO）。無ければ null。 */
     suspend fun nextPending(): EpisodeWithState?
 
     /** 次の実行に備えて、試行回数が上限未満の FAILED を PENDING に戻す。 */

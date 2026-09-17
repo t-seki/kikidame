@@ -45,6 +45,7 @@ class RoomDownloadRepository @Inject constructor(
                     state = DownloadState.PENDING,
                     path = path.absolutePath,
                     pinned = true,
+                    enqueuedAt = clock.now(),
                 ),
             )
         }
@@ -69,7 +70,8 @@ class RoomDownloadRepository @Inject constructor(
 
     override suspend fun retry(episodeId: EpisodeId) {
         val row = db.localFileDao().findByEpisode(episodeId.value) ?: return
-        if (row.state == DownloadState.FAILED) db.localFileDao().upsert(row.copy(state = DownloadState.PENDING))
+        // 再試行は列の末尾に付け直す
+        if (row.state == DownloadState.FAILED) db.localFileDao().upsert(row.copy(state = DownloadState.PENDING, enqueuedAt = clock.now()))
     }
 
     override suspend fun unpin(episodeId: EpisodeId) {

@@ -301,8 +301,8 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   `AuthorizationHeaderBuilder` に作らせ、転送だけ OkHttp（SDK の依存に同梱）で行う**。エンドポイントと認証形式は手書きしない。
   戻り値は `resumedFrom`（206 で `Range` が効いたか）・`totalBytes`・本文ストリーム。サーバが `Range` を無視して 200 を返したら
   `.part` を書き直す。テストはフェイク（206 再開／200 全体再送の両方）
-- **Worker**: WorkManager のユニーク Worker（`download-queue`、`KEEP`）が `LocalFile.state = PENDING` の行を放送日の新しい順に
-  **1 本ずつ**処理する。`<局>/<番組>/<タイトル>.<container>.part` に追記し、完了でリネーム。既存の `.part` は `Range: bytes=<size>-` で再開。
+- **Worker**: WorkManager のユニーク Worker（`download-queue`、`KEEP`）が `LocalFile.state = PENDING` の行を**キューに入れた順（FIFO、
+  `enqueuedAt`。実機確認で「タップした順に落ちてほしい」と決定）**に **1 本ずつ**処理する。再試行は列の末尾へ。M3-b の同期が積む分の優先順位はそこで決める。`<局>/<番組>/<タイトル>.<container>.part` に追記し、完了でリネーム。既存の `.part` は `Range: bytes=<size>-` で再開。
   進捗は `setProgress`。通知は出さない（フォアグラウンドサービスにしない）
 - **条件**: 設定の「Wi-Fi のみ」（既定 ON、`AppSettings` DataStore）。ON なら `UNMETERED`、OFF なら `CONNECTED`。待ちの間は「Wi-Fi 待ち」表示
 - **失敗**: 1 本失敗しても次へ。`attemptCount` +1、`lastAttemptAt`、`FAILED`。同一実行内では再試行しない。次の起動で

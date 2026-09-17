@@ -97,12 +97,12 @@ interface LocalFileDao {
     suspend fun findByEpisode(episodeId: Long): LocalFileEntity?
     @Query("SELECT * FROM local_files WHERE state = :state")
     suspend fun listByState(state: DownloadState): List<LocalFileEntity>
-    /** キューの先頭: PENDING を放送日の新しい順（同着はタイトル・ID）。 */
+    /** キューの先頭: PENDING をキューに入れた順（FIFO）。同時刻・不明は放送日の新しい順で安定させる。 */
     @Query(
         """
         SELECT lf.* FROM local_files lf JOIN episodes e ON e.id = lf.episodeId
         WHERE lf.state = 'PENDING'
-        ORDER BY e.airedAt DESC, e.title ASC, e.id ASC LIMIT 1
+        ORDER BY lf.enqueuedAt ASC, e.airedAt DESC, e.title ASC, e.id ASC LIMIT 1
         """,
     )
     suspend fun nextPending(): LocalFileEntity?

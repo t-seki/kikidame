@@ -98,6 +98,20 @@ class RoomDownloadRepositoryTest : RoomTestBase() {
     }
 
     @Test
+    fun retryGoesToTheBackOfTheQueue() = runTest {
+        val first = episodeId("2026-09-16 (1)")
+        val second = episodeId("2026-09-15 (1)")
+        repo.enqueue(first)
+        now += 1.minutes
+        repo.enqueue(second)
+        repo.markRunning(first)
+        repo.markFailed(first)
+        now += 1.minutes
+        repo.retry(first)
+        assertEquals(second, repo.nextPending()!!.episode.id)
+    }
+
+    @Test
     fun failedRowsAreRequeuedUntilTheAttemptLimit() = runTest {
         val id = episodeId("2026-09-16 (1)")
         repo.enqueue(id)
