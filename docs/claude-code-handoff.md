@@ -75,7 +75,7 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 | Audio | 各回 (Episode) |
 | `AlbumArtist` | 放送局 (Station) — `radirec-tool` が albumartist に放送局を書く |
 | `PremiereDate` → `DateCreated` → ファイル更新日時 | 放送日 (Aired At) — 並び順・「最新 N 回」の基準。この順でフォールバック |
-| `DateCreated` | 取り込み日時 (Added At) — 表示・並び順には使わない（差分取得は ADR 0004 で見送り） |
+| `DateCreated` | 取り込み日時 (Added At) — 保存するが新しさの判定には使わない。放送日の代用として並び順に効くのは上の行の経路（差分取得は ADR 0004 で見送り） |
 | `Id` | サーバ ID — アプリ内の主キーではない（ADR 0001） |
 
 主に使う取得パス（SDK 経由で呼ぶ）:
@@ -194,7 +194,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
   手元に置かない（保持は AND）。「最新 N 回」は再生済み・未再生を問わず放送日の新しい順、
   同着（放送日は日単位なので同日パートで起きる）は各回のタイトルの辞書順 → ローカル ID で安定ソート。
   この順序は各回一覧・連続再生と共通
-- **固定**された各回は保持ルールの対象外。利用者が固定を外すか手動削除するまで残る
+- **固定**された各回は保持ルールの対象外。利用者が固定を外すか手動削除するまで残る（例外はサーバの一覧から消えた回。次項）
 - サーバの一覧（`Known`）から消えた各回は手元からも削除する。サーバが各回の存在の正、手元はキャッシュ。
   ただしこの規則が届くのは **`Known` の番組に属し、かつ `serverItemId != null` の各回だけ**。
   サーバ ID を持たない各回（シード由来など）は「サーバに在る」と主張したことがないので対象外
@@ -314,7 +314,8 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   長押しでボトムシート（固定を外す／ファイルを削除／再生済み切替／ダウンロード）。固定中はタイトルの前にピン。
   同期対象でない番組では「固定を外す」を出さない（外すと次の同期で消えるため）
 - **削除の規則**（手動削除・保持ルール・消えたファイルの整合で共通）:
-  - `serverItemId` がある回: ファイルと `LocalFile` 行だけ消す。`Episode` / `PlaybackState` は残る（ADR 0002。落とし直せば続きから）
+  - `serverItemId` がある回: ファイルと `LocalFile` 行だけ消す。`Episode` / `PlaybackState` は残る（ADR 0002。落とし直せば続きから）。
+    ただし**サーバの一覧から消えた回**は落とし直せないので `Episode` ごと消す（M3-b の `remove`。固定でも）
   - `serverItemId` が無い回（シード由来）: 二度と手に入らないので `Episode` ごと消す（`PlaybackState` は cascade）。
     各回が 0 になった `serverItemId` 無しの番組も消す
 - **消えたファイルの整合（#5）**: 同期・更新の開始時に `DONE` 行を全走査し、再生開始時にも存在を確認する。無ければ上記の削除規則を
@@ -323,6 +324,8 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   同期によるダウンロード（M3-b）は `pinned = false`
 - **命名**: 放送局 null は `_`、`container` 空は `m4a`、禁止文字（`/ \ : * ? " < > |`）は `_`、同名衝突は ` (2)`
 - 「手元 M / 全 N 回」の M は `DONE` のみ。手元に無い回の再生は M3-a でも不可（ストリーミングは M4 以降）
+
+### M3-b の範囲（2026-09-17 の grilling で確定）
 
 - **同期の 1 回** = 全走査（`fetchLibrary`）→ 取り込み（M2 の突合・上書き）→ `planSync` → 削除の実行 → ダウンロード対象を
   `PENDING`（`pinned = false`）で enqueue → `DownloadScheduler.kick()`。転送は `DownloadWorker` に任せ、同期は自分でファイルを落とさない。
@@ -362,7 +365,8 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   N 本あれば「N 回のファイルが次の同期で削除されます。残したい回は固定してください」の確認ダイアログ
 - **保持ルール編集**: 各回一覧のトップバーの同期アイコン → ボトムシート。「この番組を同期する」スイッチ、「最新 N 回まで保持」
   （選択式 1 / 3 / 5 / 10 / 20 / 上限なし）、「再生済みなら削除」スイッチ（後の 2 つは同期 OFF でグレーアウト）、「今すぐ同期」ボタン。
-  ON にするとき `keepLatest` が null なら **既定 3** を入れる（利用者が「上限なし」を選んだら以降は触らない）。ON にしても即同期はしない。
+  ON に切り替えるたび `keepLatest` が null なら **既定 3** を入れる（「上限なし」にしたい場合は ON にした後で選ぶ。OFF → ON を往復すると 3 に戻る。
+  「未設定」と「上限なし」を区別する列は足さない）。ON にしても即同期はしない。
   `serverItemId` の無い番組はスイッチ無効 + 「サーバ上で見つかっていないため同期できません」。番組一覧の行に同期対象の印
 - **結果の文言**: 手動は「番組 X / 各回 Y を取得。Z 回をダウンロード予約、W 回を削除」（0 は省く）+ 判断保留があれば
   「N 番組はサーバ上で見つからず、そのままにしました」。`RefreshResult` に `enqueued` / `deleted` / `onHold` を足す。通知は出さない
@@ -402,6 +406,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 - `docs/adr/0001-local-surrogate-key.md` — 主キーはサーバ ID ではなく代理キー
 - `docs/adr/0002-playback-position-local-authority.md` — 再生位置・再生済みはローカル正
 - `docs/adr/0003-download-without-media3-downloadmanager.md` — DownloadManager を使わない
+- `docs/adr/0004-sync-deletes-only-from-full-listing.md` — 同期の削除の権限は全走査の一覧だけ
 - Jellyfin 12 認証仕様: https://gist.github.com/nielsvanvelzen/ea047d9028f676185832e51ffaf12a6f
 - jellyfin-sdk-kotlin Releases: https://github.com/jellyfin/jellyfin-sdk-kotlin/releases
 - Jellyfin OpenAPI (stable): https://api.jellyfin.org/openapi/jellyfin-openapi-stable.json
