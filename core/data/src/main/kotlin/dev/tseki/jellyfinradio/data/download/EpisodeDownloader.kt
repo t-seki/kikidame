@@ -27,7 +27,7 @@ sealed interface DownloadOutcome {
 
 /**
  * 1 本を `.part` に書いて完了でリネームする。既存の `.part` があれば `Range` で続きを要求し、
- * サーバが無視して全体を返したら（200）書き直す。チャンクごとにキャンセルを見る。
+ * サーバが無視して全体を返したら（200）書き直す。約 1 MB（[CHECK_EVERY]）ごとにキャンセルを見る。
  * 状態の更新（RUNNING / DONE / FAILED）はここで [DownloadQueue] に対して行う。
  */
 @Singleton

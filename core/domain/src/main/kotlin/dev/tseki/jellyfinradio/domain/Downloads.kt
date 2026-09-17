@@ -53,10 +53,10 @@ object EpisodeFileName {
 
 /** ダウンロードの操作（利用者側）。 */
 interface DownloadRepository {
-    /** 手動ダウンロード = 固定。既に手元にある／キューにある回は何もしない。 */
+    /** 手動ダウンロード = 固定。既に行がある回（手元にある・キュー中・失敗）は何もしない。失敗は [retry]。 */
     suspend fun enqueue(episodeId: EpisodeId)
 
-    /** PENDING / RUNNING を取り消す。書きかけのファイルも消す。 */
+    /** DONE 以外（PENDING / RUNNING / FAILED）の行を取り消す。書きかけのファイルも消す。 */
     suspend fun cancel(episodeId: EpisodeId)
 
     /** FAILED を PENDING に戻す（手動なので試行回数は見ない）。 */
@@ -94,7 +94,7 @@ interface DownloadQueue {
 
     suspend fun markFailed(episodeId: EpisodeId)
 
-    /** キャンセル済みなら false（Worker はチャンクごとに見る）。 */
+    /** キャンセル済みなら false（Worker は約 1 MB ごとに見る）。 */
     suspend fun isStillWanted(episodeId: EpisodeId): Boolean
 }
 
