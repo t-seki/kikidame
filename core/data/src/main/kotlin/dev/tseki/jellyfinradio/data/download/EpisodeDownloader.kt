@@ -4,6 +4,7 @@ import dev.tseki.jellyfinradio.data.jellyfin.JellyfinGateway
 import dev.tseki.jellyfinradio.data.jellyfin.ServerCredentials
 import dev.tseki.jellyfinradio.data.repository.RoomDownloadRepository
 import dev.tseki.jellyfinradio.domain.DownloadQueue
+import dev.tseki.jellyfinradio.domain.EpisodeId
 import dev.tseki.jellyfinradio.domain.EpisodeWithState
 import dev.tseki.jellyfinradio.domain.ServerException
 import kotlinx.coroutines.Dispatchers
@@ -40,8 +41,9 @@ class EpisodeDownloader @Inject constructor(
         onProgress: suspend (downloaded: Long, total: Long?) -> Unit = { _, _ -> },
     ): DownloadOutcome {
         val episodeId = item.episode.id
-        val serverId = item.episode.serverItemId ?: return DownloadOutcome.Failed(IllegalStateException("no server id"))
-        val targetPath = item.localFile?.path ?: return DownloadOutcome.Failed(IllegalStateException("no target path"))
+        // 起こらないはずだが、PENDING のまま残すと Worker が同じ行を拾い続けるので FAILED に落とす
+        val serverId = item.episode.serverItemId ?: return invalid(episodeId, "no server id")
+        val targetPath = item.localFile?.path ?: return invalid(episodeId, "no target path")
         val target = File(targetPath)
         val part = File(targetPath + RoomDownloadRepository.PART_SUFFIX)
 
@@ -96,6 +98,10 @@ class EpisodeDownloader @Inject constructor(
         }
     }
 
+    private suspend fun invalid(episodeId: EpisodeId, reason: String): DownloadOutcome {
+        queue.markFailed(episodeId)
+        return DownloadOutcome.Failed(IllegalStateException(reason))
+    }
     private fun cancelled(part: File): DownloadOutcome {
         part.delete()
         return DownloadOutcome.Cancelled
