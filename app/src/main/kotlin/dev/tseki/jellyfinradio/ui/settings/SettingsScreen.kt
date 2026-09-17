@@ -85,7 +85,7 @@ fun SettingsScreen(
             )
             ListItem(
                 headlineContent = { Text((s as? SessionState.Ready)?.lastFetchedAt?.toDateTimeText() ?: "-") },
-                supportingContent = { Text("最終取得") },
+                supportingContent = { Text("最終同期") },
             )
             HorizontalDivider()
             Text("ダウンロード", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(16.dp, 16.dp, 16.dp, 4.dp))

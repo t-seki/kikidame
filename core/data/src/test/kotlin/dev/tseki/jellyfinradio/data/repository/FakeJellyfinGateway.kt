@@ -4,8 +4,10 @@ import dev.tseki.jellyfinradio.data.jellyfin.DownloadStream
 import dev.tseki.jellyfinradio.data.jellyfin.JellyfinGateway
 import dev.tseki.jellyfinradio.data.jellyfin.ServerCredentials
 import dev.tseki.jellyfinradio.domain.LibraryView
+import dev.tseki.jellyfinradio.domain.ServerEpisode
 import dev.tseki.jellyfinradio.domain.ServerException
 import dev.tseki.jellyfinradio.domain.ServerItemId
+import dev.tseki.jellyfinradio.domain.ServerProgram
 import dev.tseki.jellyfinradio.domain.ServerSnapshot
 import dev.tseki.jellyfinradio.domain.Session
 
@@ -31,6 +33,21 @@ class FakeJellyfinGateway : JellyfinGateway {
         failWith?.let { throw it }
         fetchedLibraries += libraryId
         return snapshot
+    }
+
+    val fetchedPrograms = ArrayList<ServerItemId>()
+
+    /** [snapshot] の番組一覧に無ければ null（404 相当）。 */
+    override suspend fun fetchProgram(credentials: ServerCredentials, programServerId: ServerItemId): ServerProgram? {
+        failWith?.let { throw it }
+        return snapshot.programs.firstOrNull { it.serverId == programServerId }
+    }
+
+    /** [snapshot] のうちその番組に属する各回。 */
+    override suspend fun fetchProgramEpisodes(credentials: ServerCredentials, programServerId: ServerItemId): List<ServerEpisode> {
+        failWith?.let { throw it }
+        fetchedPrograms += programServerId
+        return snapshot.episodes.filter { it.programServerId == programServerId }
     }
     /** 各回 ID → 本文。`honorRange` が false なら Range を無視して 200 で全体を返す。 */
     val files = HashMap<ServerItemId, ByteArray>()

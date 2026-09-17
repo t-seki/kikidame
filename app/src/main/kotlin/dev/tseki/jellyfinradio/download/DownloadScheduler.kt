@@ -17,6 +17,10 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** 「PENDING が積まれたので Worker を起こしてほしい」だけの窓口。同期（[dev.tseki.jellyfinradio.sync.LibraryRefresher]）が使う。 */
+fun interface DownloadKicker {
+    suspend fun kick()
+}
 /**
  * ダウンロードの操作をキュー（Room）と Worker の起動にまとめる入口。
  * Worker はユニーク（`KEEP`）なので、走っていればそのまま次の PENDING も拾う。
@@ -26,7 +30,7 @@ class DownloadScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
     private val downloads: DownloadRepository,
     private val settings: AppSettingsRepository,
-) {
+) : DownloadKicker {
     private val workManager get() = WorkManager.getInstance(context)
 
     suspend fun download(episodeId: EpisodeId) {
@@ -41,8 +45,8 @@ class DownloadScheduler @Inject constructor(
 
     suspend fun cancel(episodeId: EpisodeId) = downloads.cancel(episodeId)
 
-    /** PENDING が残っていれば Worker を起動する（アプリ起動時・設定変更時にも呼ぶ）。 */
-    suspend fun kick() {
+    /** PENDING が残っていれば Worker を起動する（アプリ起動時・設定変更時・同期の後にも呼ぶ）。 */
+    override suspend fun kick() {
         val wifiOnly = settings.wifiOnly.first()
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)

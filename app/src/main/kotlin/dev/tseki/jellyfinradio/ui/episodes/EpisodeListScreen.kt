@@ -1,8 +1,11 @@
 package dev.tseki.jellyfinradio.ui.episodes
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,10 +23,15 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.SyncDisabled
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -35,6 +43,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -54,6 +64,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tseki.jellyfinradio.domain.DownloadState
 import dev.tseki.jellyfinradio.domain.EpisodeId
 import dev.tseki.jellyfinradio.domain.EpisodeWithState
+import dev.tseki.jellyfinradio.domain.Program
 import dev.tseki.jellyfinradio.download.DownloadProgress
 import dev.tseki.jellyfinradio.ui.toAiredDateText
 import dev.tseki.jellyfinradio.ui.toClockText
@@ -72,8 +83,10 @@ fun EpisodeListScreen(
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val progress by viewModel.progress.collectAsStateWithLifecycle()
     val waitingForNetwork by viewModel.waitingForNetwork.collectAsStateWithLifecycle()
+    val pendingDisable by viewModel.pendingDisable.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var sheetFor by remember { mutableStateOf<EpisodeId?>(null) }
+    var showSyncSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
@@ -91,6 +104,16 @@ fun EpisodeListScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showSyncSheet = true }, enabled = program != null) {
+                        // filled と outlined の Sync は形がほぼ同じなので、OFF は斜線入りで区別する
+                        if (program?.syncEnabled == true) {
+                            Icon(Icons.Filled.Sync, contentDescription = "同期の設定（同期対象）", tint = MaterialTheme.colorScheme.primary)
+                        } else {
+                            Icon(Icons.Filled.SyncDisabled, contentDescription = "同期の設定（同期していない）")
+                        }
                     }
                 },
             )
@@ -119,6 +142,29 @@ fun EpisodeListScreen(
                 }
             }
         }
+    }
+
+    val currentProgram = program
+    if (showSyncSheet && currentProgram != null) {
+        ProgramSyncSheet(
+            program = currentProgram,
+            onDismiss = { showSyncSheet = false },
+            onSetEnabled = viewModel::setSyncEnabled,
+            onKeepLatest = viewModel::setKeepLatest,
+            onDeleteAfterPlayed = viewModel::setDeleteAfterPlayed,
+            onSyncNow = { viewModel.syncNow(); showSyncSheet = false },
+        )
+    }
+    pendingDisable?.let { count ->
+        AlertDialog(
+            onDismissRequest = viewModel::cancelDisableSync,
+            title = { Text("同期をやめますか？") },
+            text = { Text("固定されていない $count 回のファイルが次の同期で削除されます。残したい回は先に固定してください。") },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmDisableSync) { Text("同期をやめる", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = viewModel::cancelDisableSync) { Text("キャンセル") } },
+        )
     }
 
     val target = sheetFor?.let { id -> episodes?.firstOrNull { it.episode.id == id } }
@@ -249,6 +295,68 @@ private fun EpisodeActionsSheet(
             if (played) Icons.Outlined.Circle else Icons.Filled.CheckCircle,
             if (played) "未再生にする" else "再生済みにする",
         ) { onTogglePlayed(); onDismiss() }
+        Spacer(Modifier.padding(bottom = 24.dp))
+    }
+}
+
+/**
+ * 同期対象と保持ルールの編集。保存するだけで、適用は次の同期（保存した瞬間には何も消えない）。
+ * サーバ ID の無い番組は同期できないのでスイッチを無効にする。
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+private fun ProgramSyncSheet(
+    program: Program,
+    onDismiss: () -> Unit,
+    onSetEnabled: (Boolean) -> Unit,
+    onKeepLatest: (Int?) -> Unit,
+    onDeleteAfterPlayed: (Boolean) -> Unit,
+    onSyncNow: () -> Unit,
+) {
+    val canSync = program.serverItemId != null
+    val enabled = program.syncEnabled
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Text(program.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+        ListItem(
+            modifier = Modifier.combinedClickable(enabled = canSync) { onSetEnabled(!enabled) },
+            headlineContent = { Text("この番組を同期する") },
+            supportingContent = {
+                Text(
+                    if (canSync) "保持ルールに従って自動でダウンロードし、外れた回を削除します。固定した回は残ります"
+                    else "サーバ上で見つかっていないため同期できません",
+                )
+            },
+            trailingContent = { Switch(checked = enabled, onCheckedChange = onSetEnabled, enabled = canSync) },
+        )
+        ListItem(
+            modifier = Modifier.alpha(if (enabled) 1f else 0.5f),
+            headlineContent = { Text("最新 N 回まで保持") },
+            supportingContent = {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+                    for (choice in EpisodeListViewModel.KEEP_LATEST_CHOICES) {
+                        FilterChip(
+                            selected = program.retentionRule.keepLatest == choice,
+                            onClick = { onKeepLatest(choice) },
+                            enabled = enabled,
+                            label = { Text(choice?.let { "$it 回" } ?: "上限なし") },
+                        )
+                    }
+                }
+            },
+        )
+        ListItem(
+            modifier = Modifier
+                .alpha(if (enabled) 1f else 0.5f)
+                .combinedClickable(enabled = enabled) { onDeleteAfterPlayed(!program.retentionRule.deleteAfterPlayed) },
+            headlineContent = { Text("再生済みなら削除") },
+            supportingContent = { Text("聴き終えた回を次の同期で手元から消します") },
+            trailingContent = {
+                Switch(checked = program.retentionRule.deleteAfterPlayed, onCheckedChange = onDeleteAfterPlayed, enabled = enabled)
+            },
+        )
+        Button(onClick = onSyncNow, enabled = canSync, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
+            Text("この番組を今すぐ同期")
+        }
         Spacer(Modifier.padding(bottom = 24.dp))
     }
 }

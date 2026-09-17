@@ -29,8 +29,8 @@ import kotlin.time.Instant
 class RoomDownloadRepositoryTest : RoomTestBase() {
     private val directory = EpisodesDirectory(ApplicationProvider.getApplicationContext())
     private val repo by lazy { RoomDownloadRepository(db, directory, clock) }
-    private val library by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao()) }
-    private val refresh by lazy { RoomLibraryRefreshRepository(db, testSessionStore(tmpDir(), kotlinx.coroutines.GlobalScope), FakeJellyfinGateway(), clock) }
+    private val library by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao(), db.localFileDao()) }
+    private val refresh by lazy { RoomLibraryRefreshRepository(db, testSessionStore(tmpDir(), kotlinx.coroutines.GlobalScope), FakeJellyfinGateway(), repo, clock) }
     private val importer by lazy { RoomLocalImportRepository(db, clock) }
     private val playback by lazy { RoomPlaybackStateRepository(db, clock) }
 

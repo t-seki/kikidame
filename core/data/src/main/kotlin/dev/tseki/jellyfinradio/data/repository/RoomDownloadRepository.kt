@@ -1,6 +1,7 @@
 package dev.tseki.jellyfinradio.data.repository
 
 import androidx.room.withTransaction
+import dev.tseki.jellyfinradio.data.db.EpisodeEntity
 import dev.tseki.jellyfinradio.data.db.JellyfinRadioDatabase
 import dev.tseki.jellyfinradio.data.db.LocalFileEntity
 import dev.tseki.jellyfinradio.data.db.toDomain
@@ -33,29 +34,53 @@ class RoomDownloadRepository @Inject constructor(
 
     override suspend fun enqueue(episodeId: EpisodeId) {
         db.withTransaction {
-            if (db.localFileDao().findByEpisode(episodeId.value) != null) return@withTransaction
-            val row = db.episodeDao().findById(episodeId.value) ?: return@withTransaction
-            val episode = row.episode
-            if (episode.serverItemId == null) return@withTransaction
-            val program = db.programDao().findById(episode.programId) ?: return@withTransaction
-            val path = uniqueTarget(EpisodeFileName.relativePath(program.stationName, program.name, episode.title, episode.container))
-            db.localFileDao().upsert(
-                LocalFileEntity(
-                    episodeId = episodeId.value,
-                    state = DownloadState.PENDING,
-                    path = path.absolutePath,
-                    pinned = true,
-                    enqueuedAt = clock.now(),
-                ),
-            )
+            val existing = db.localFileDao().findByEpisode(episodeId.value)
+            if (existing != null) {
+                // 同期が予約した行を手動に格上げする（手動ダウンロード = 固定）。手動同士の FIFO はタップした時刻で決めるので付け直す
+                if (!existing.pinned) db.localFileDao().upsert(existing.copy(pinned = true, enqueuedAt = clock.now()))
+                return@withTransaction
+            }
+            insertPending(episodeId, pinned = true)
         }
     }
 
-    /** 同名のファイルが既にあれば ` (2)`, ` (3)` … を付ける。 */
-    private fun uniqueTarget(relativePath: String): File {
+    override suspend fun enqueueForSync(episodeIds: List<EpisodeId>): Int = db.withTransaction {
+        var inserted = 0
+        for (id in episodeIds) {
+            if (db.localFileDao().findByEpisode(id.value) != null) continue
+            if (insertPending(id, pinned = false)) inserted++
+        }
+        inserted
+    }
+
+    /** トランザクション内で呼ぶ。サーバ ID の無い回は落とせないので何もしない（false）。 */
+    private suspend fun insertPending(episodeId: EpisodeId, pinned: Boolean): Boolean {
+        val row = db.episodeDao().findById(episodeId.value) ?: return false
+        val episode = row.episode
+        if (episode.serverItemId == null) return false
+        val program = db.programDao().findById(episode.programId) ?: return false
+        val path = uniqueTarget(EpisodeFileName.relativePath(program.stationName, program.name, episode.title, episode.container))
+        db.localFileDao().upsert(
+            LocalFileEntity(
+                episodeId = episodeId.value,
+                state = DownloadState.PENDING,
+                path = path.absolutePath,
+                pinned = pinned,
+                enqueuedAt = clock.now(),
+            ),
+        )
+        return true
+    }
+
+    /**
+     * 同名のファイルが既にあれば ` (2)`, ` (3)` … を付ける。ディスクだけでなく `local_files.path`（unique）も見る:
+     * 同期は 1 トランザクションで何本も予約するので、ファイルがまだ無くても行が先に取っていることがある
+     * （同じ番組に同じタイトルの回、禁止文字の置換で同名になる回）。
+     */
+    private suspend fun uniqueTarget(relativePath: String): File {
         var candidate = directory.resolve(relativePath)
         var n = 2
-        while (candidate.exists() || File(candidate.path + PART_SUFFIX).exists()) {
+        while (candidate.exists() || File(candidate.path + PART_SUFFIX).exists() || db.localFileDao().findByPath(candidate.absolutePath) != null) {
             candidate = directory.resolve(EpisodeFileName.withSuffix(relativePath, n++))
         }
         return candidate
@@ -86,23 +111,36 @@ class RoomDownloadRepository @Inject constructor(
         db.withTransaction {
             when (scope) {
                 LocalDeletionScope.FILE_ONLY -> db.localFileDao().delete(episodeId.value)
-                LocalDeletionScope.EPISODE -> {
-                    val programId = row.episode.programId
-                    db.episodeDao().deleteById(episodeId.value) // local_files / playback_states は cascade
-                    val program = db.programDao().findById(programId)
-                    if (program != null && program.serverItemId == null && db.episodeDao().countByProgram(programId) == 0) {
-                        db.programDao().deleteById(programId)
-                    }
-                }
+                LocalDeletionScope.EPISODE -> deleteEpisodeRow(row.episode)
             }
         }
-        path?.let { p ->
-            withContext(Dispatchers.IO) {
-                File(p).delete()
-                File(p + PART_SUFFIX).delete()
-            }
-        }
+        deleteFiles(path)
         return scope
+    }
+
+    override suspend fun removeEpisode(episodeId: EpisodeId) {
+        val row = db.episodeDao().findById(episodeId.value) ?: return
+        db.withTransaction { deleteEpisodeRow(row.episode) }
+        deleteFiles(row.localFile?.path)
+    }
+
+    /** トランザクション内で呼ぶ。`local_files` / `playback_states` は cascade。各回が 0 になったサーバ ID 無しの番組も消す。 */
+    private suspend fun deleteEpisodeRow(episode: EpisodeEntity) {
+        val programId = episode.programId
+        db.episodeDao().deleteById(episode.id)
+        val program = db.programDao().findById(programId)
+        if (program != null && program.serverItemId == null && db.episodeDao().countByProgram(programId) == 0) {
+            db.programDao().deleteById(programId)
+        }
+    }
+
+    /** ファイル I/O はトランザクションの外で。 */
+    private suspend fun deleteFiles(path: String?) {
+        path ?: return
+        withContext(Dispatchers.IO) {
+            File(path).delete()
+            File(path + PART_SUFFIX).delete()
+        }
     }
 
     override suspend fun reconcileMissingFiles(): Int {

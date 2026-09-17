@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 @RunWith(AndroidJUnit4::class)
 class RoomLocalImportRepositoryTest : RoomTestBase() {
     private val repo by lazy { RoomLocalImportRepository(db, clock) }
-    private val library by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao()) }
+    private val library by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao(), db.localFileDao()) }
     @Test
     fun importsProgramsAndEpisodesAsPinnedLocalFiles() = runTest {
         val result = repo.import(

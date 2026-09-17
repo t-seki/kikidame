@@ -15,6 +15,7 @@ import dev.tseki.jellyfinradio.domain.PlaybackRules
 import dev.tseki.jellyfinradio.domain.PlaybackStateRepository
 import dev.tseki.jellyfinradio.domain.Program
 import dev.tseki.jellyfinradio.domain.ProgramId
+import dev.tseki.jellyfinradio.domain.RetentionRule
 import dev.tseki.jellyfinradio.domain.SessionRepository
 import dev.tseki.jellyfinradio.domain.SessionState
 import dev.tseki.jellyfinradio.download.DownloadProgress
@@ -25,6 +26,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -37,7 +40,7 @@ import kotlin.time.Clock
 @HiltViewModel
 class EpisodeListViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    library: LibraryRepository,
+    private val library: LibraryRepository,
     private val playbackStates: PlaybackStateRepository,
     private val clock: Clock,
     sessionRepository: SessionRepository,
@@ -72,8 +75,51 @@ class EpisodeListViewModel @Inject constructor(
     /** 更新の結果と、この画面での操作の結果を 1 本にまとめてスナックバーへ。 */
     val messages: Flow<String> = merge(refresher.messages, localMessages)
 
+    /** 各回一覧の「引っ張って更新」= この番組だけ取り込む（#12）。削除はしない。 */
     fun refresh() {
-        viewModelScope.launch { refresher.refresh() }
+        viewModelScope.launch { refresher.refreshProgram(programId) }
+    }
+
+    /** ボトムシートの「この番組を今すぐ同期」= 1 番組の同期。 */
+    fun syncNow() {
+        viewModelScope.launch { refresher.syncProgram(programId) }
+    }
+
+    // --- 同期対象・保持ルール（適用は次の同期。ここでは保存するだけ） ---
+
+    /** OFF にすると次の同期で消える回の数。null なら確認ダイアログは出ていない。 */
+    private val _pendingDisable = MutableStateFlow<Int?>(null)
+    val pendingDisable: StateFlow<Int?> = _pendingDisable
+
+    /** ON にするとき、上限が未設定なら既定の 3 を入れる（「上限なし」は ON にした後で選ぶ）。 */
+    fun setSyncEnabled(enabled: Boolean) = act {
+        val current = program.value ?: library.observeProgram(programId).first() ?: return@act
+        if (enabled) {
+            val rule = current.retentionRule.let { if (it.keepLatest == null) it.copy(keepLatest = DEFAULT_KEEP_LATEST) else it }
+            library.updateSync(programId, syncEnabled = true, rule)
+        } else {
+            val count = library.countUnpinnedLocalFiles(programId)
+            if (count == 0) library.updateSync(programId, syncEnabled = false, current.retentionRule) else _pendingDisable.value = count
+        }
+    }
+
+    fun confirmDisableSync() = act {
+        _pendingDisable.value = null
+        val current = library.observeProgram(programId).first() ?: return@act
+        library.updateSync(programId, syncEnabled = false, current.retentionRule)
+    }
+
+    fun cancelDisableSync() {
+        _pendingDisable.value = null
+    }
+
+    fun setKeepLatest(keepLatest: Int?) = updateRule { it.copy(keepLatest = keepLatest) }
+
+    fun setDeleteAfterPlayed(value: Boolean) = updateRule { it.copy(deleteAfterPlayed = value) }
+
+    private fun updateRule(transform: (RetentionRule) -> RetentionRule) = act {
+        val current = library.observeProgram(programId).first() ?: return@act
+        library.updateSync(programId, current.syncEnabled, transform(current.retentionRule))
     }
 
     fun setPlayed(episodeId: EpisodeId, played: Boolean) {
@@ -95,9 +141,13 @@ class EpisodeListViewModel @Inject constructor(
 
     fun deleteLocal(episodeId: EpisodeId) = act {
         val scope = downloads.deleteLocal(episodeId)
+        val syncEnabled = program.value?.syncEnabled == true
         localMessages.tryEmit(
             when (scope) {
-                LocalDeletionScope.FILE_ONLY -> "ファイルを削除しました。再生位置は残っています"
+                // 同期対象なら保持すべき回は次の同期で落とし直される（handoff「手動削除と同期の往復」）
+                LocalDeletionScope.FILE_ONLY ->
+                    if (syncEnabled) "ファイルを削除しました。同期対象の番組なので、保持すべき回なら次の同期で落とし直されます"
+                    else "ファイルを削除しました。再生位置は残っています"
                 LocalDeletionScope.EPISODE -> "この回はサーバに無いため、一覧からも消しました"
             },
         )
@@ -117,7 +167,11 @@ class EpisodeListViewModel @Inject constructor(
         }
     }
 
-    private companion object {
-        const val TAG = "EpisodeListViewModel"
+    companion object {
+        private const val TAG = "EpisodeListViewModel"
+        const val DEFAULT_KEEP_LATEST = 3
+
+        /** 「最新 N 回まで保持」の選択肢。null は上限なし。 */
+        val KEEP_LATEST_CHOICES: List<Int?> = listOf(1, 3, 5, 10, 20, null)
     }
 }

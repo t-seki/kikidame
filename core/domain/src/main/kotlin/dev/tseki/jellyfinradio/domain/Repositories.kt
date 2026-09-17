@@ -35,6 +35,12 @@ interface LibraryRepository {
     suspend fun getEpisode(episodeId: EpisodeId): EpisodeWithState?
     /** 連続再生用。[EpisodeOrder] の順（古い順）で、手元にあるものだけ。 */
     suspend fun getPlayableEpisodes(programId: ProgramId): List<EpisodeWithState>
+
+    /** 同期対象と保持ルールを保存する。適用は次の同期（保存した瞬間には何も消えない）。 */
+    suspend fun updateSync(programId: ProgramId, syncEnabled: Boolean, rule: RetentionRule)
+
+    /** 同期対象を OFF にしたら次の同期で消える回の数（固定でない手元のファイル）。確認ダイアログ用。 */
+    suspend fun countUnpinnedLocalFiles(programId: ProgramId): Int
 }
 interface PlaybackStateRepository {
     suspend fun get(episodeId: EpisodeId): PlaybackState?

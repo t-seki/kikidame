@@ -16,7 +16,7 @@ import kotlin.time.Duration.Companion.minutes
 @RunWith(AndroidJUnit4::class)
 class RoomPlaybackStateRepositoryTest : RoomTestBase() {
     private val importer by lazy { RoomLocalImportRepository(db, clock) }
-    private val library by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao()) }
+    private val library by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao(), db.localFileDao()) }
     private val repo by lazy { RoomPlaybackStateRepository(db, clock) }
     private suspend fun seedEpisode(): EpisodeId {
         importer.import(listOf(scanned(title = "X 2026-06-12", airedAt = "2026-06-11T15:00:00Z")))

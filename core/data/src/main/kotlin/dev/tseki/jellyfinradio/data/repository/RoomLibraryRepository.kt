@@ -1,5 +1,6 @@
 package dev.tseki.jellyfinradio.data.repository
 import dev.tseki.jellyfinradio.data.db.EpisodeDao
+import dev.tseki.jellyfinradio.data.db.LocalFileDao
 import dev.tseki.jellyfinradio.data.db.ProgramDao
 import dev.tseki.jellyfinradio.data.db.toDomain
 import dev.tseki.jellyfinradio.domain.EpisodeId
@@ -9,6 +10,7 @@ import dev.tseki.jellyfinradio.domain.LibraryRepository
 import dev.tseki.jellyfinradio.domain.Program
 import dev.tseki.jellyfinradio.domain.ProgramId
 import dev.tseki.jellyfinradio.domain.ProgramSummary
+import dev.tseki.jellyfinradio.domain.RetentionRule
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -17,6 +19,7 @@ import javax.inject.Singleton
 class RoomLibraryRepository @Inject constructor(
     private val programDao: ProgramDao,
     private val episodeDao: EpisodeDao,
+    private val localFileDao: LocalFileDao,
 ) : LibraryRepository {
     override fun observePrograms(): Flow<List<ProgramSummary>> =
         programDao.observeSummaries().map { rows -> rows.map { it.toDomain() } }
@@ -33,4 +36,8 @@ class RoomLibraryRepository @Inject constructor(
             .map { it.toDomain() }
             .filter { it.isPlayable }
             .sortedWith(compareBy(EpisodeOrder) { it.episode })
+    override suspend fun updateSync(programId: ProgramId, syncEnabled: Boolean, rule: RetentionRule) =
+        programDao.updateSync(programId.value, syncEnabled, rule.keepLatest, rule.deleteAfterPlayed)
+    override suspend fun countUnpinnedLocalFiles(programId: ProgramId): Int =
+        localFileDao.countUnpinnedByProgram(programId.value)
 }
