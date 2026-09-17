@@ -326,6 +326,24 @@ class RoomSyncTest : RoomTestBase() {
     }
 
     @Test
+    fun duplicateTitlesInOneBatchGetDistinctPaths() = runTest {
+        signInAndSelect()
+        gateway.snapshot = ServerSnapshot(
+            programs = listOf(albumA),
+            episodes = listOf(se("a1", "2026-09-01"), se("a2", "2026-09-02").copy(title = "2026-09-01"), se("a3", "2026-09-03").copy(title = "2026-09:01")),
+        )
+        repo.refresh()
+        library.updateSync(programId(), syncEnabled = true, RetentionRule())
+
+        val result = repo.refresh()
+
+        assertEquals(3, result.enqueued)
+        val paths = episodes().mapNotNull { it.localFile?.path }
+        assertEquals(3, paths.size)
+        assertEquals(3, paths.toSet().size, "paths must be distinct: $paths")
+    }
+
+    @Test
     fun refreshProgramReturnsNullForAProgramWithoutServerId() = runTest {
         signInAndSelect()
         val id = ProgramId(db.programDao().insert(dev.tseki.jellyfinradio.data.db.ProgramEntity(serverItemId = null, name = "seed", stationName = null)))

@@ -71,11 +71,15 @@ class RoomDownloadRepository @Inject constructor(
         )
     }
 
-    /** 同名のファイルが既にあれば ` (2)`, ` (3)` … を付ける。 */
-    private fun uniqueTarget(relativePath: String): File {
+    /**
+     * 同名のファイルが既にあれば ` (2)`, ` (3)` … を付ける。ディスクだけでなく `local_files.path`（unique）も見る:
+     * 同期は 1 トランザクションで何本も予約するので、ファイルがまだ無くても行が先に取っていることがある
+     * （同じ番組に同じタイトルの回、禁止文字の置換で同名になる回）。
+     */
+    private suspend fun uniqueTarget(relativePath: String): File {
         var candidate = directory.resolve(relativePath)
         var n = 2
-        while (candidate.exists() || File(candidate.path + PART_SUFFIX).exists()) {
+        while (candidate.exists() || File(candidate.path + PART_SUFFIX).exists() || db.localFileDao().findByPath(candidate.absolutePath) != null) {
             candidate = directory.resolve(EpisodeFileName.withSuffix(relativePath, n++))
         }
         return candidate

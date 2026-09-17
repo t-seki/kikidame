@@ -350,7 +350,8 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
     `Unavailable` / `Gone` は `syncEnabled` に関わらず全部空 + `onHold`
   - **固定は N に数えない**（別枠）。`keepLatest` は固定を除いた放送日の新しい順で数える（同着は `EpisodeOrder`）
   - **サーバの一覧から消えた `serverItemId != null` の各回は固定でも `Episode` 行ごと消す**（`remove`。`LocalFile` / `PlaybackState` は cascade、
-    ファイルも消す）。保持ルールによる削除（`delete`）は `FILE_ONLY`（`PlaybackState` は残す、ADR 0002）。`Known` の番組で各回が 0 になっても番組は残す
+    ファイルも消す）。保持ルールによる削除（`delete`）は M3-a の削除の規則に従う: `serverItemId` がある回は `FILE_ONLY`（`PlaybackState` は残す、ADR 0002）、
+    無い回（固定を外したシード由来）は落とし直せないので `Episode` ごと。`Known` の番組で各回が 0 になっても番組は残す
   - `Unavailable` / `Gone` は `onHold`。M3-b では保存も表示もしない（M3-c、#3）。全走査なので番組ごとの `Unavailable` になる経路は無い
 - **実行側の例外**（`planSync` の外）: 削除対象が PENDING / RUNNING / FAILED なら `cancel` 相当。**再生中の回（現在の `MediaItem`）は今回は削除しない**
   （次回に持ち越し）。再生中の回 ID は `PlaybackService` が `Player.Listener` で `@Singleton` の `NowPlaying`（`StateFlow<EpisodeId?>`、`:app`）に
