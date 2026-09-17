@@ -108,6 +108,8 @@ interface LocalFileDao {
     suspend fun nextPending(): LocalFileEntity?
     @Query("UPDATE local_files SET state = 'PENDING' WHERE state = 'FAILED' AND attemptCount < :maxAttempts")
     suspend fun requeueFailed(maxAttempts: Int)
+    @Query("UPDATE local_files SET state = 'PENDING' WHERE state = 'RUNNING'")
+    suspend fun resetRunning()
     @Upsert
     suspend fun upsert(localFile: LocalFileEntity)
     @Query("DELETE FROM local_files WHERE episodeId = :episodeId")

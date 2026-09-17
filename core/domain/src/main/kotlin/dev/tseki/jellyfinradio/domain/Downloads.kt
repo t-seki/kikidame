@@ -73,6 +73,12 @@ interface DownloadQueue {
     /** 次の実行に備えて、試行回数が上限未満の FAILED を PENDING に戻す。 */
     suspend fun requeueFailed(maxAttempts: Int)
 
+    /** Worker が途中で殺されて RUNNING のまま残った行を PENDING に戻す（実行開始時に呼ぶ）。 */
+    suspend fun resetRunning()
+
+    /** 認証切れなどで中断した行を、試行回数を増やさずに PENDING へ戻す。 */
+    suspend fun resetToPending(episodeId: EpisodeId)
+
     suspend fun markRunning(episodeId: EpisodeId)
 
     suspend fun markDone(episodeId: EpisodeId, path: String, sizeBytes: Long)

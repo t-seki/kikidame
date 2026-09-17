@@ -127,6 +127,13 @@ class RoomDownloadRepository @Inject constructor(
 
     override suspend fun requeueFailed(maxAttempts: Int) = db.localFileDao().requeueFailed(maxAttempts)
 
+    override suspend fun resetRunning() = db.localFileDao().resetRunning()
+
+    override suspend fun resetToPending(episodeId: EpisodeId) {
+        val row = db.localFileDao().findByEpisode(episodeId.value) ?: return
+        if (row.state == DownloadState.RUNNING) db.localFileDao().upsert(row.copy(state = DownloadState.PENDING))
+    }
+
     override suspend fun markRunning(episodeId: EpisodeId) {
         val row = db.localFileDao().findByEpisode(episodeId.value) ?: return
         db.localFileDao().upsert(row.copy(state = DownloadState.RUNNING, lastAttemptAt = clock.now()))
