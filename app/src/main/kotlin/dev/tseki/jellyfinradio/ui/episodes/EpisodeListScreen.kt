@@ -24,7 +24,7 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.filled.SyncDisabled
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.PushPin
@@ -108,10 +108,11 @@ fun EpisodeListScreen(
                 },
                 actions = {
                     IconButton(onClick = { showSyncSheet = true }, enabled = program != null) {
+                        // filled と outlined の Sync は形がほぼ同じなので、OFF は斜線入りで区別する
                         if (program?.syncEnabled == true) {
                             Icon(Icons.Filled.Sync, contentDescription = "同期の設定（同期対象）", tint = MaterialTheme.colorScheme.primary)
                         } else {
-                            Icon(Icons.Outlined.Sync, contentDescription = "同期の設定")
+                            Icon(Icons.Filled.SyncDisabled, contentDescription = "同期の設定（同期していない）")
                         }
                     }
                 },
