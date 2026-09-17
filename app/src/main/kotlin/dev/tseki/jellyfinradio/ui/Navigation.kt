@@ -1,5 +1,6 @@
 package dev.tseki.jellyfinradio.ui
 
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -56,8 +57,8 @@ class SessionViewModel @Inject constructor(
     val state: StateFlow<SessionState?> = sessionRepository.state
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
     init {
-        // 起動時に PENDING が残っていれば Worker を起こす（kill 後の再開）
-        viewModelScope.launch { scheduler.kick() }
+        // 起動時に PENDING が残っていれば Worker を起こす（kill 後の再開）。失敗しても起動は妨げない
+        viewModelScope.launch { runCatching { scheduler.kick() }.onFailure { Log.w("SessionViewModel", "kick failed", it) } }
     }
 }
 

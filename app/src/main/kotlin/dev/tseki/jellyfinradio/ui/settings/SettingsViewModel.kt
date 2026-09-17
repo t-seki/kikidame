@@ -9,6 +9,7 @@ import dev.tseki.jellyfinradio.domain.SessionRepository
 import dev.tseki.jellyfinradio.domain.SessionState
 import dev.tseki.jellyfinradio.download.DownloadScheduler
 import dev.tseki.jellyfinradio.seed.SeedLocalLibrary
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -29,8 +30,14 @@ class SettingsViewModel @Inject constructor(
     /** 変更したら、条件待ちの Worker を新しい条件で組み直す（実行中の転送は切らない）。 */
     fun setWifiOnly(value: Boolean) {
         viewModelScope.launch {
-            settings.setWifiOnly(value)
-            scheduler.reschedule()
+            try {
+                settings.setWifiOnly(value)
+                scheduler.reschedule()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _message.value = "設定の保存に失敗しました: ${e::class.simpleName}"
+            }
         }
     }
 

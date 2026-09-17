@@ -104,7 +104,8 @@ class PlayerViewModel @Inject constructor(
             return
         }
         // ファイルマネージャ等で消されていたら、ここで整合して再生しない（#5）
-        if (!downloads.ensureFilePresent(episodeId)) {
+        val present = runCatching { downloads.ensureFilePresent(episodeId) }.getOrDefault(true)
+        if (!present) {
             _uiState.update { it.copy(error = "ファイルが見つかりません。手元の記録を整理しました") }
             return
         }

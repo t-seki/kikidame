@@ -230,7 +230,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
     タグ読み取りは `:app` のシードに閉じ込める
   - 尺は `MediaMetadataRetriever` の duration から。`sizeBytes` はファイルサイズ、`container` は拡張子
   - **追加専用・べき等**: 番組はフォルダ、各回は `LocalFile.path` をキーに、既存行は触らず新しいファイルだけ足す。
-    ディスクから消えたファイルの扱いは M3（手元に無い各回の整合）で決める
+    ディスクから消えたファイルの扱いは M3-a で決めた（「M3-a の範囲」の削除の規則・整合。#5）
   - サーバ ID は null。**置き場所を `filesDir`（内部）に変えないこと** — root 無しの `adb push` が通らない。
     Receiver を `exported` にして `am broadcast` で叩く方式は取らない
 - **画面**: 番組一覧 → 各回一覧 → 再生画面 の 3 階層。M2 で Jellyfin から番組が来ても画面は変えず、

@@ -1,5 +1,6 @@
 package dev.tseki.jellyfinradio.ui.episodes
 
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -20,6 +21,8 @@ import dev.tseki.jellyfinradio.download.DownloadProgress
 import dev.tseki.jellyfinradio.download.DownloadScheduler
 import dev.tseki.jellyfinradio.sync.LibraryRefresher
 import dev.tseki.jellyfinradio.ui.EpisodeListRoute
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -64,7 +67,7 @@ class EpisodeListViewModel @Inject constructor(
     val waitingForNetwork: StateFlow<Boolean> = scheduler.isWaitingForConstraints
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
-    private val localMessages = MutableSharedFlow<String>(extraBufferCapacity = 4)
+    private val localMessages = MutableSharedFlow<String>(extraBufferCapacity = 4, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     /** 更新の結果と、この画面での操作の結果を 1 本にまとめてスナックバーへ。 */
     val messages: Flow<String> = merge(refresher.messages, localMessages)
@@ -79,34 +82,42 @@ class EpisodeListViewModel @Inject constructor(
         }
     }
 
-    fun download(episodeId: EpisodeId) {
-        viewModelScope.launch { scheduler.download(episodeId) }
+    fun download(episodeId: EpisodeId) = act { scheduler.download(episodeId) }
+
+    fun cancel(episodeId: EpisodeId) = act { scheduler.cancel(episodeId) }
+
+    fun retry(episodeId: EpisodeId) = act { scheduler.retry(episodeId) }
+
+    fun unpin(episodeId: EpisodeId) = act {
+        downloads.unpin(episodeId)
+        localMessages.tryEmit("固定を外しました。保持ルールの対象になります")
     }
 
-    fun cancel(episodeId: EpisodeId) {
-        viewModelScope.launch { scheduler.cancel(episodeId) }
+    fun deleteLocal(episodeId: EpisodeId) = act {
+        val scope = downloads.deleteLocal(episodeId)
+        localMessages.tryEmit(
+            when (scope) {
+                LocalDeletionScope.FILE_ONLY -> "ファイルを削除しました。再生位置は残っています"
+                LocalDeletionScope.EPISODE -> "この回はサーバに無いため、一覧からも消しました"
+            },
+        )
     }
 
-    fun retry(episodeId: EpisodeId) {
-        viewModelScope.launch { scheduler.retry(episodeId) }
-    }
-
-    fun unpin(episodeId: EpisodeId) {
+    /** Room / ファイル I/O の失敗で落とさず、文言にして出す。 */
+    private fun act(block: suspend () -> Unit) {
         viewModelScope.launch {
-            downloads.unpin(episodeId)
-            localMessages.tryEmit("固定を外しました。保持ルールの対象になります")
+            try {
+                block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "episode action failed", e)
+                localMessages.tryEmit("操作に失敗しました: ${e::class.simpleName}")
+            }
         }
     }
 
-    fun deleteLocal(episodeId: EpisodeId) {
-        viewModelScope.launch {
-            val scope = downloads.deleteLocal(episodeId)
-            localMessages.tryEmit(
-                when (scope) {
-                    LocalDeletionScope.FILE_ONLY -> "ファイルを削除しました。再生位置は残っています"
-                    LocalDeletionScope.EPISODE -> "この回はサーバに無いため、一覧からも消しました"
-                },
-            )
-        }
+    private companion object {
+        const val TAG = "EpisodeListViewModel"
     }
 }
