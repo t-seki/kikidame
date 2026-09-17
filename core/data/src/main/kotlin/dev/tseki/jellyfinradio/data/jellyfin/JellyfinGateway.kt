@@ -1,6 +1,7 @@
 package dev.tseki.jellyfinradio.data.jellyfin
 
 import dev.tseki.jellyfinradio.domain.LibraryView
+import dev.tseki.jellyfinradio.domain.ServerEpisode
 import dev.tseki.jellyfinradio.domain.ServerException
 import dev.tseki.jellyfinradio.domain.ServerItemId
 import dev.tseki.jellyfinradio.domain.ServerSnapshot
@@ -23,6 +24,9 @@ interface JellyfinGateway {
 
     /** ライブラリ全体を取得する。番組に属さない各回は含めない。 */
     suspend fun fetchLibrary(credentials: ServerCredentials, libraryId: ServerItemId): ServerSnapshot
+
+    /** 1 番組（MusicAlbum）の各回だけを取得する（#12）。他の番組に属する各回は含めない。 */
+    suspend fun fetchProgramEpisodes(credentials: ServerCredentials, programServerId: ServerItemId): List<ServerEpisode>
     /**
      * 原本のストリームを開く。[rangeStart] > 0 なら `Range` で続きを要求するが、サーバが無視して
      * 全体を返すこともある（[DownloadStream.resumedFrom] で判別）。使い終わったら [DownloadStream.close]。

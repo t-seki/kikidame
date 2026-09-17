@@ -115,7 +115,17 @@ class SdkJellyfinGateway @Inject constructor(
             )
         }
         val programIds = programs.map { it.serverId }.toSet()
+        // 取得した番組のどれにも属さない各回は取り込まない
+        ServerSnapshot(programs, fetchAudio(api, parent).filter { it.programServerId in programIds })
+    }
 
+    override suspend fun fetchProgramEpisodes(credentials: ServerCredentials, programServerId: ServerItemId): List<ServerEpisode> = call {
+        val api = api(credentials.serverUrl, credentials.accessToken)
+        fetchAudio(api, UUID.fromString(programServerId.value)).filter { it.programServerId == programServerId }
+    }
+
+    /** `parent` 配下の Audio を 500 件ずつ全部。ライブラリでも番組（MusicAlbum）でも同じ形。 */
+    private suspend fun fetchAudio(api: ApiClient, parent: UUID): List<ServerEpisode> {
         val episodes = ArrayList<ServerEpisode>()
         var start = 0
         while (true) {
@@ -133,15 +143,11 @@ class SdkJellyfinGateway @Inject constructor(
                     limit = PAGE_SIZE,
                 ),
             )
-            for (item in page.items) {
-                val episode = item.toServerEpisode() ?: continue
-                // 取得した番組のどれにも属さない各回は取り込まない
-                if (episode.programServerId in programIds) episodes += episode
-            }
+            for (item in page.items) episodes += item.toServerEpisode() ?: continue
             start += page.items.size
             if (page.items.isEmpty() || start >= page.totalRecordCount) break
         }
-        ServerSnapshot(programs, episodes)
+        return episodes
     }
 
     /**

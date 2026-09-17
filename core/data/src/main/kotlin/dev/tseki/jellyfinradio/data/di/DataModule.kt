@@ -14,6 +14,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dev.tseki.jellyfinradio.data.db.EpisodeDao
 import dev.tseki.jellyfinradio.data.db.JellyfinRadioDatabase
+import dev.tseki.jellyfinradio.data.db.LocalFileDao
 import dev.tseki.jellyfinradio.data.db.ProgramDao
 import dev.tseki.jellyfinradio.data.jellyfin.JellyfinGateway
 import dev.tseki.jellyfinradio.data.jellyfin.SdkJellyfinGateway
@@ -54,6 +55,9 @@ object DatabaseModule {
 
     @Provides
     fun provideEpisodeDao(db: JellyfinRadioDatabase): EpisodeDao = db.episodeDao()
+
+    @Provides
+    fun provideLocalFileDao(db: JellyfinRadioDatabase): LocalFileDao = db.localFileDao()
 
     @Provides
     @Singleton

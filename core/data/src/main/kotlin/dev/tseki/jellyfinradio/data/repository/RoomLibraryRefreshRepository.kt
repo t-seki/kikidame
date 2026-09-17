@@ -8,39 +8,73 @@ import dev.tseki.jellyfinradio.data.db.toDomain
 import dev.tseki.jellyfinradio.data.jellyfin.JellyfinGateway
 import dev.tseki.jellyfinradio.data.jellyfin.credentials
 import dev.tseki.jellyfinradio.data.session.SessionStore
+import dev.tseki.jellyfinradio.domain.DownloadRepository
+import dev.tseki.jellyfinradio.domain.EpisodeId
 import dev.tseki.jellyfinradio.domain.LibraryMatching
 import dev.tseki.jellyfinradio.domain.LibraryRefreshRepository
+import dev.tseki.jellyfinradio.domain.ProgramId
 import dev.tseki.jellyfinradio.domain.RefreshResult
+import dev.tseki.jellyfinradio.domain.RetentionRule
 import dev.tseki.jellyfinradio.domain.ServerEpisode
+import dev.tseki.jellyfinradio.domain.ServerEpisodes
 import dev.tseki.jellyfinradio.domain.ServerException
 import dev.tseki.jellyfinradio.domain.ServerItemId
+import dev.tseki.jellyfinradio.domain.ServerProgram
 import dev.tseki.jellyfinradio.domain.ServerSnapshot
 import dev.tseki.jellyfinradio.domain.SessionState
+import dev.tseki.jellyfinradio.domain.SyncPlan
+import dev.tseki.jellyfinradio.domain.SyncPlanner
+import dev.tseki.jellyfinradio.domain.SyncProgramInput
 import dev.tseki.jellyfinradio.domain.Ticks
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Clock
 
 /**
- * サーバのライブラリ全体を取得し、突合（[LibraryMatching]）して Room に 1 トランザクションで適用する。
+ * サーバの一覧を取得し、突合（[LibraryMatching]）して Room に 1 トランザクションで適用する。
  * サーバ由来の各回はサーバの値で上書きし（サーバが返さない値は手元の値を残す）、`LocalFile` / `PlaybackState` は触らない。
- * サーバの一覧に無い行は何もしない（削除・判断保留は M3）。
+ *
+ * 全走査（[refresh]）は同期そのもの: 取り込んだ後に [SyncPlanner] を回し、保持ルールによる削除・サーバから消えた各回の除去・
+ * ダウンロードの予約まで行う（ADR 0004）。番組単位（[refreshProgram]）は取り込みだけで、削除はしない。
  */
 @Singleton
 class RoomLibraryRefreshRepository @Inject constructor(
     private val db: JellyfinRadioDatabase,
     private val store: SessionStore,
     private val gateway: JellyfinGateway,
+    private val downloads: DownloadRepository,
     private val clock: Clock,
 ) : LibraryRefreshRepository {
 
-    override suspend fun refresh(): RefreshResult {
-        val ready = store.current() as? SessionState.Ready ?: throw ServerException.Unauthorized()
+    override suspend fun refresh(excluded: Set<EpisodeId>): RefreshResult {
+        val ready = requireReady()
         val snapshot = gateway.fetchLibrary(ready.session.credentials(), ready.library.id)
         val result = apply(snapshot)
+        val outcome = synchronize(snapshot, excluded)
         store.saveLastFetchedAt(result.fetchedAt)
-        return result
+        return result.copy(
+            enqueued = outcome.enqueued,
+            deleted = outcome.deleted,
+            removed = outcome.removed,
+            onHold = outcome.onHold,
+        )
     }
+
+    override suspend fun refreshProgram(programId: ProgramId): RefreshResult? {
+        val ready = requireReady()
+        val program = db.programDao().findById(programId.value) ?: return null
+        val serverId = program.serverItemId?.let(::ServerItemId) ?: return null
+        val episodes = gateway.fetchProgramEpisodes(ready.session.credentials(), serverId)
+        // 番組の名前・放送局は手元の値のまま（番組一覧は取らない）。突合はこの番組の各回だけを相手にする
+        val snapshot = ServerSnapshot(
+            programs = listOf(ServerProgram(serverId, program.name, program.stationName)),
+            episodes = episodes,
+        )
+        return apply(snapshot)
+    }
+
+    private suspend fun requireReady(): SessionState.Ready =
+        store.current() as? SessionState.Ready ?: throw ServerException.Unauthorized()
 
     internal suspend fun apply(snapshot: ServerSnapshot): RefreshResult = db.withTransaction {
         val programDao = db.programDao()
@@ -88,6 +122,52 @@ class RoomLibraryRefreshRepository @Inject constructor(
             linkedEpisodes = match.episodeLinks.size,
             fetchedAt = clock.now(),
         )
+    }
+
+    internal data class SyncOutcome(val enqueued: Int, val deleted: Int, val removed: Int, val onHold: Int)
+
+    /**
+     * 取り込み後の Room の状態と全走査の結果から [SyncPlanner] を回し、結論を実行する。
+     * 実行順は 除去 → 削除 → 予約（容量を先に空ける）。[excluded]（再生中の回）は今回は消さない。
+     * サーバ ID を持たない番組は `Known` でも `Gone` でもない（サーバに在ると主張していない）ので入力に入れない。
+     */
+    internal suspend fun synchronize(snapshot: ServerSnapshot, excluded: Set<EpisodeId>): SyncOutcome {
+        val plan = plan(snapshot)
+        var removed = 0
+        for (id in plan.remove) {
+            if (id in excluded) continue
+            downloads.removeEpisode(id)
+            removed++
+        }
+        var deleted = 0
+        for (id in plan.delete) {
+            if (id in excluded) continue
+            downloads.deleteLocal(id)
+            deleted++
+        }
+        downloads.enqueueForSync(plan.download)
+        return SyncOutcome(enqueued = plan.download.size, deleted = deleted, removed = removed, onHold = plan.onHoldCount)
+    }
+
+    internal suspend fun plan(snapshot: ServerSnapshot): SyncPlan {
+        val serverProgramIds = snapshot.programs.map { it.serverId }.toSet()
+        val serverEpisodesByProgram = snapshot.episodes.groupBy({ it.programServerId }, { it.serverId })
+        val localByProgram = db.episodeDao().listSyncRows().groupBy { it.programId }
+        val inputs = db.programDao().listAll().mapNotNull { p ->
+            val serverId = p.serverItemId?.let(::ServerItemId) ?: return@mapNotNull null
+            SyncProgramInput(
+                programId = ProgramId(p.id),
+                syncEnabled = p.syncEnabled,
+                retentionRule = RetentionRule(p.keepLatest, p.deleteAfterPlayed),
+                server = if (serverId in serverProgramIds) {
+                    ServerEpisodes.Known(serverEpisodesByProgram[serverId].orEmpty().toSet())
+                } else {
+                    ServerEpisodes.Gone
+                },
+                local = localByProgram[p.id].orEmpty().map { it.toDomain() },
+            )
+        }
+        return SyncPlanner.plan(inputs)
     }
 
     /** サーバが返さない値（サイズ）は手元の値を残す。 */

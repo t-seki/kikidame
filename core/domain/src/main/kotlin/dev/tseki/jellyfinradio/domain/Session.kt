@@ -58,13 +58,24 @@ interface SessionRepository {
     suspend fun signOut()
 }
 
-/** サーバの一覧を取り込む。取得の起点はログイン直後と「引っ張って更新」だけ（自動化は M3）。 */
+/**
+ * サーバの一覧を取り込み、同期する。
+ * 全走査は同期そのもの（ADR 0004）、番組単位の取得は取り込みだけで削除しない。
+ */
 interface LibraryRefreshRepository {
     /**
-     * ライブラリ全体を取得し、突合して Room に取り込む。
+     * ライブラリ全体を取得し、突合して Room に取り込み、[SyncPlanner] の結論を実行する
+     * （保持ルールによる削除、サーバから消えた各回の除去、ダウンロードの予約）。
+     * [excluded] の各回（再生中の回）は今回は削除しない。
      * 401 は [ServerException.Unauthorized] を投げる（呼び出し側がログアウトへ導く）。
      */
-    suspend fun refresh(): RefreshResult
+    suspend fun refresh(excluded: Set<EpisodeId> = emptySet()): RefreshResult
+
+    /**
+     * 1 番組の各回だけを取得して取り込む（#12）。削除も予約もせず、最終同期の時刻も更新しない。
+     * 番組がサーバ ID を持たなければ null（呼び出し側は全体の [refresh] にフォールバックする）。
+     */
+    suspend fun refreshProgram(programId: ProgramId): RefreshResult?
 }
 
 data class RefreshResult(
@@ -73,6 +84,14 @@ data class RefreshResult(
     val linkedPrograms: Int,
     val linkedEpisodes: Int,
     val fetchedAt: Instant,
+    /** 同期で予約したダウンロードの数。 */
+    val enqueued: Int = 0,
+    /** 保持ルールで消したファイルの数。 */
+    val deleted: Int = 0,
+    /** サーバの一覧から消えたため除去した各回の数。 */
+    val removed: Int = 0,
+    /** 判断保留になった番組の数。 */
+    val onHold: Int = 0,
 )
 
 /** 「別のサーバに接続」。手元の番組・各回・再生位置・セッションを全部消す。ファイルは消さない。 */

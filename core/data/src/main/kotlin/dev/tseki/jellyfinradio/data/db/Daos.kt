@@ -9,6 +9,7 @@ import androidx.room.Update
 import androidx.room.Upsert
 import dev.tseki.jellyfinradio.domain.DownloadState
 import kotlinx.coroutines.flow.Flow
+import kotlin.time.Instant
 data class ProgramSummaryRow(
     @Embedded val program: ProgramEntity,
     val episodeCount: Int,
@@ -18,6 +19,17 @@ data class ProgramSummaryRow(
 /** 突合に必要な列だけ。 */
 data class ProgramKeyRow(val id: Long, val serverItemId: String?, val stationName: String?, val name: String)
 data class EpisodeKeyRow(val id: Long, val serverItemId: String?, val programId: Long, val title: String)
+/** 同期の判断に必要な列だけ（`SyncPlanner` の入力）。`local_files` / `playback_states` が無ければ null。 */
+data class EpisodeSyncRow(
+    val id: Long,
+    val serverItemId: String?,
+    val programId: Long,
+    val airedAt: Instant,
+    val title: String,
+    val pinned: Boolean?,
+    val hasLocalFile: Boolean,
+    val played: Boolean?,
+)
 @Dao
 interface ProgramDao {
     @Query(
@@ -46,6 +58,10 @@ interface ProgramDao {
     suspend fun setServerItemId(id: Long, serverItemId: String)
     @Query("UPDATE programs SET name = :name, stationName = :stationName WHERE id = :id")
     suspend fun updateNames(id: Long, name: String, stationName: String?)
+    @Query("UPDATE programs SET syncEnabled = :syncEnabled, keepLatest = :keepLatest, deleteAfterPlayed = :deleteAfterPlayed WHERE id = :id")
+    suspend fun updateSync(id: Long, syncEnabled: Boolean, keepLatest: Int?, deleteAfterPlayed: Boolean)
+    @Query("SELECT * FROM programs")
+    suspend fun listAll(): List<ProgramEntity>
     @Insert
     suspend fun insert(program: ProgramEntity): Long
     @Query("DELETE FROM programs")
@@ -76,6 +92,17 @@ interface EpisodeDao {
     suspend fun findByServerItemId(serverItemId: String): EpisodeEntity?
     @Query("SELECT id, serverItemId, programId, title FROM episodes")
     suspend fun listKeys(): List<EpisodeKeyRow>
+    /** 全各回を 1 クエリで（番組ごとに @Relation を引かない）。 */
+    @Query(
+        """
+        SELECT e.id, e.serverItemId, e.programId, e.airedAt, e.title,
+               lf.pinned AS pinned, (lf.episodeId IS NOT NULL) AS hasLocalFile, ps.played AS played
+        FROM episodes e
+          LEFT JOIN local_files lf ON lf.episodeId = e.id
+          LEFT JOIN playback_states ps ON ps.episodeId = e.id
+        """,
+    )
+    suspend fun listSyncRows(): List<EpisodeSyncRow>
     @Query("UPDATE episodes SET serverItemId = :serverItemId WHERE id = :id")
     suspend fun setServerItemId(id: Long, serverItemId: String)
     @Insert
@@ -97,15 +124,21 @@ interface LocalFileDao {
     suspend fun findByEpisode(episodeId: Long): LocalFileEntity?
     @Query("SELECT * FROM local_files WHERE state = :state")
     suspend fun listByState(state: DownloadState): List<LocalFileEntity>
-    /** キューの先頭: PENDING をキューに入れた順（FIFO）。同時刻・不明は放送日の新しい順で安定させる。 */
+    /**
+     * キューの先頭: 手動（固定）が常に先、その中はキューに入れた順（FIFO）。
+     * `enqueuedAt` は v3 で足した nullable なので NULL を先頭に来させない。同時刻は放送日の新しい順で安定させる。
+     */
     @Query(
         """
         SELECT lf.* FROM local_files lf JOIN episodes e ON e.id = lf.episodeId
         WHERE lf.state = 'PENDING'
-        ORDER BY lf.enqueuedAt ASC, e.airedAt DESC, e.title ASC, e.id ASC LIMIT 1
+        ORDER BY lf.pinned DESC, lf.enqueuedAt IS NULL, lf.enqueuedAt ASC, e.airedAt DESC, e.title ASC, e.id ASC LIMIT 1
         """,
     )
     suspend fun nextPending(): LocalFileEntity?
+    /** 固定でない手元の行の数（同期対象を OFF にしたら次の同期で消える回）。 */
+    @Query("SELECT COUNT(*) FROM local_files lf JOIN episodes e ON e.id = lf.episodeId WHERE e.programId = :programId AND lf.pinned = 0")
+    suspend fun countUnpinnedByProgram(programId: Long): Int
     @Query("UPDATE local_files SET state = 'PENDING' WHERE state = 'FAILED' AND attemptCount < :maxAttempts")
     suspend fun requeueFailed(maxAttempts: Int)
     @Query("UPDATE local_files SET state = 'PENDING' WHERE state = 'RUNNING'")
