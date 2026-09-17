@@ -16,6 +16,7 @@ import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.tseki.jellyfinradio.domain.SessionRepository
 import dev.tseki.jellyfinradio.domain.SessionState
+import dev.tseki.jellyfinradio.download.DownloadScheduler
 import dev.tseki.jellyfinradio.ui.connect.ConnectScreen
 import dev.tseki.jellyfinradio.ui.episodes.EpisodeListScreen
 import dev.tseki.jellyfinradio.ui.library.LibraryPickScreen
@@ -25,6 +26,7 @@ import dev.tseki.jellyfinradio.ui.settings.SettingsScreen
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import javax.inject.Inject
 
@@ -47,9 +49,16 @@ data class EpisodeListRoute(val programId: Long)
 data class PlayerRoute(val episodeId: Long)
 
 @HiltViewModel
-class SessionViewModel @Inject constructor(sessionRepository: SessionRepository) : ViewModel() {
+class SessionViewModel @Inject constructor(
+    sessionRepository: SessionRepository,
+    scheduler: DownloadScheduler,
+) : ViewModel() {
     val state: StateFlow<SessionState?> = sessionRepository.state
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    init {
+        // 起動時に PENDING が残っていれば Worker を起こす（kill 後の再開）
+        viewModelScope.launch { scheduler.kick() }
+    }
 }
 
 /**

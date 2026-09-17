@@ -3,9 +3,11 @@ package dev.tseki.jellyfinradio.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.tseki.jellyfinradio.domain.AppSettingsRepository
 import dev.tseki.jellyfinradio.domain.LocalDataReset
 import dev.tseki.jellyfinradio.domain.SessionRepository
 import dev.tseki.jellyfinradio.domain.SessionState
+import dev.tseki.jellyfinradio.download.DownloadScheduler
 import dev.tseki.jellyfinradio.seed.SeedLocalLibrary
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -19,7 +21,19 @@ class SettingsViewModel @Inject constructor(
     private val sessionRepository: SessionRepository,
     private val reset: LocalDataReset,
     private val seed: SeedLocalLibrary,
+    private val settings: AppSettingsRepository,
+    private val scheduler: DownloadScheduler,
 ) : ViewModel() {
+    val wifiOnly: StateFlow<Boolean> = settings.wifiOnly
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    /** 変更したら、条件待ちの Worker を新しい条件で組み直す。 */
+    fun setWifiOnly(value: Boolean) {
+        viewModelScope.launch {
+            settings.setWifiOnly(value)
+            scheduler.reschedule()
+        }
+    }
+
     val session: StateFlow<SessionState?> = sessionRepository.state
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 

@@ -1,7 +1,10 @@
 package dev.tseki.jellyfinradio.sync
 
 import app.cash.turbine.test
+import dev.tseki.jellyfinradio.domain.DownloadRepository
+import dev.tseki.jellyfinradio.domain.EpisodeId
 import dev.tseki.jellyfinradio.domain.LibraryRefreshRepository
+import dev.tseki.jellyfinradio.domain.LocalDeletionScope
 import dev.tseki.jellyfinradio.domain.LibraryView
 import dev.tseki.jellyfinradio.domain.RefreshResult
 import dev.tseki.jellyfinradio.domain.ServerException
@@ -39,6 +42,15 @@ class LibraryRefresherTest {
         }
     }
 
+    private class FakeDownloads(var missing: Int = 0) : DownloadRepository {
+        override suspend fun enqueue(episodeId: EpisodeId) = Unit
+        override suspend fun cancel(episodeId: EpisodeId) = Unit
+        override suspend fun retry(episodeId: EpisodeId) = Unit
+        override suspend fun unpin(episodeId: EpisodeId) = Unit
+        override suspend fun deleteLocal(episodeId: EpisodeId) = LocalDeletionScope.FILE_ONLY
+        override suspend fun reconcileMissingFiles(): Int = missing
+        override suspend fun ensureFilePresent(episodeId: EpisodeId): Boolean = true
+    }
     private class FakeSessionRepository : SessionRepository {
         val stateFlow = MutableStateFlow<SessionState>(SessionState.SignedOut(null, null))
         var signedOut = false
@@ -55,7 +67,7 @@ class LibraryRefresherTest {
     fun successEmitsCountsMessage() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { result = RefreshResult(3, 40, 1, 6, now) }
         val session = FakeSessionRepository()
-        val refresher = LibraryRefresher(repo, session, this)
+        val refresher = LibraryRefresher(repo, session, FakeDownloads(), this)
 
         refresher.messages.test {
             assertEquals(3, refresher.refresh()?.programs)
@@ -65,10 +77,20 @@ class LibraryRefresherTest {
     }
 
     @Test
+    fun reconcileMessageComesBeforeTheResult() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 2, 0, 0, now) }
+        val refresher = LibraryRefresher(repo, FakeSessionRepository(), FakeDownloads(missing = 2), this)
+        refresher.messages.test {
+            refresher.refresh()
+            assertTrue(awaitItem().contains("2 回"))
+            assertEquals("番組 1 / 各回 2 を取得しました", awaitItem())
+        }
+    }
+    @Test
     fun unauthorizedSignsOut() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { error = ServerException.Unauthorized() }
         val session = FakeSessionRepository()
-        val refresher = LibraryRefresher(repo, session, this)
+        val refresher = LibraryRefresher(repo, session, FakeDownloads(), this)
 
         refresher.messages.test {
             assertNull(refresher.refresh())
@@ -81,7 +103,7 @@ class LibraryRefresherTest {
     fun unreachableKeepsSessionAndReports() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { error = ServerException.Unreachable() }
         val session = FakeSessionRepository()
-        val refresher = LibraryRefresher(repo, session, this)
+        val refresher = LibraryRefresher(repo, session, FakeDownloads(), this)
 
         refresher.messages.test {
             assertNull(refresher.refresh())
@@ -94,7 +116,7 @@ class LibraryRefresherTest {
     fun concurrentRefreshIsIgnoredWhileOneIsRunning() = runTest(StandardTestDispatcher()) {
         val gate = CompletableDeferred<Unit>()
         val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now); this.gate = gate }
-        val refresher = LibraryRefresher(repo, FakeSessionRepository(), this)
+        val refresher = LibraryRefresher(repo, FakeSessionRepository(), FakeDownloads(), this)
 
         val first = async { refresher.refresh() }
         runCurrent()

@@ -8,6 +8,7 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.tseki.jellyfinradio.domain.DownloadRepository
 import dev.tseki.jellyfinradio.domain.EpisodeId
 import dev.tseki.jellyfinradio.domain.LibraryRepository
 import dev.tseki.jellyfinradio.domain.PlaybackRules
@@ -52,6 +53,7 @@ class PlayerViewModel @Inject constructor(
     private val playbackStates: PlaybackStateRepository,
     private val connection: PlayerConnection,
     private val clock: Clock,
+    private val downloads: DownloadRepository,
 ) : ViewModel() {
     private val requestedEpisodeId = EpisodeId(savedStateHandle.toRoute<PlayerRoute>().episodeId)
     private val _uiState = MutableStateFlow(PlayerUiState())
@@ -99,6 +101,11 @@ class PlayerViewModel @Inject constructor(
         val target = library.getEpisode(episodeId)
         if (target == null || !target.isPlayable) {
             _uiState.update { it.copy(error = "この回は手元にありません") }
+            return
+        }
+        // ファイルマネージャ等で消されていたら、ここで整合して再生しない（#5）
+        if (!downloads.ensureFilePresent(episodeId)) {
+            _uiState.update { it.copy(error = "ファイルが見つかりません。手元の記録を整理しました") }
             return
         }
         val program = library.observeProgram(target.episode.programId).first()

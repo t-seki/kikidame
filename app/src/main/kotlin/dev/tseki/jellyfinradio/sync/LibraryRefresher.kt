@@ -1,6 +1,7 @@
 package dev.tseki.jellyfinradio.sync
 
 import android.util.Log
+import dev.tseki.jellyfinradio.domain.DownloadRepository
 import dev.tseki.jellyfinradio.domain.LibraryRefreshRepository
 import dev.tseki.jellyfinradio.domain.RefreshResult
 import dev.tseki.jellyfinradio.domain.ServerException
@@ -27,6 +28,7 @@ import javax.inject.Singleton
 class LibraryRefresher @Inject constructor(
     private val refreshRepository: LibraryRefreshRepository,
     private val sessionRepository: SessionRepository,
+    private val downloads: DownloadRepository,
     @ApplicationScope private val applicationScope: CoroutineScope,
 ) {
     private val mutex = Mutex()
@@ -46,6 +48,9 @@ class LibraryRefresher @Inject constructor(
         if (!mutex.tryLock()) return null
         _isRefreshing.value = true
         try {
+            // 手元のファイルが消えていないか先に整合する（#5）
+            val reconciled = downloads.reconcileMissingFiles()
+            if (reconciled > 0) _messages.tryEmit("手元に無くなっていた $reconciled 回の記録を整理しました")
             val result = refreshRepository.refresh()
             _messages.tryEmit("番組 ${result.programs} / 各回 ${result.episodes} を取得しました")
             return result
