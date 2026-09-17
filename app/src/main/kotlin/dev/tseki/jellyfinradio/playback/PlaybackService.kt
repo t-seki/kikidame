@@ -30,10 +30,12 @@ class PlaybackService : MediaSessionService() {
     @Inject lateinit var playbackStateRepository: PlaybackStateRepository
     @Inject lateinit var clock: Clock
     @Inject @ApplicationScope lateinit var applicationScope: CoroutineScope
+    @Inject lateinit var nowPlaying: NowPlaying
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var session: MediaSession? = null
     private var positionPersister: PositionPersister? = null
     private var resumeOnTransition: ResumeOnTransition? = null
+    private var nowPlayingListener: Player.Listener? = null
     override fun onCreate() {
         super.onCreate()
         val player = ExoPlayer.Builder(this)
@@ -75,6 +77,7 @@ class PlaybackService : MediaSessionService() {
         positionPersister = PositionPersister(player, playbackStateRepository, clock, scope, applicationScope)
             .also { it.attach() }
         resumeOnTransition = ResumeOnTransition(player, playbackStateRepository, scope).also { it.attach() }
+        nowPlayingListener = nowPlaying.listener(player).also(player::addListener)
     }
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -87,9 +90,11 @@ class PlaybackService : MediaSessionService() {
         positionPersister?.detach()
         resumeOnTransition?.detach()
         session?.run {
+            nowPlayingListener?.let(player::removeListener)
             player.release()
             release()
         }
+        nowPlaying.set(null)
         session = null
         scope.cancel()
         super.onDestroy()

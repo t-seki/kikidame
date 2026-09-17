@@ -1,16 +1,24 @@
 package dev.tseki.jellyfinradio.sync
 
 import app.cash.turbine.test
+import dev.tseki.jellyfinradio.domain.AppSettingsRepository
 import dev.tseki.jellyfinradio.domain.DownloadRepository
 import dev.tseki.jellyfinradio.domain.EpisodeId
 import dev.tseki.jellyfinradio.domain.LibraryRefreshRepository
-import dev.tseki.jellyfinradio.domain.LocalDeletionScope
 import dev.tseki.jellyfinradio.domain.LibraryView
+import dev.tseki.jellyfinradio.domain.LocalDeletionScope
+import dev.tseki.jellyfinradio.domain.ProgramId
 import dev.tseki.jellyfinradio.domain.RefreshResult
+import dev.tseki.jellyfinradio.domain.SelectedLibrary
 import dev.tseki.jellyfinradio.domain.ServerException
+import dev.tseki.jellyfinradio.domain.ServerItemId
+import dev.tseki.jellyfinradio.domain.Session
 import dev.tseki.jellyfinradio.domain.SessionRepository
 import dev.tseki.jellyfinradio.domain.SessionState
+import dev.tseki.jellyfinradio.download.DownloadKicker
+import dev.tseki.jellyfinradio.playback.NowPlaying
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
@@ -31,19 +39,31 @@ class LibraryRefresherTest {
 
     private class FakeRefreshRepository : LibraryRefreshRepository {
         var result: RefreshResult? = null
+        var programResult: RefreshResult? = null
         var error: ServerException? = null
         var gate: CompletableDeferred<Unit>? = null
         var calls = 0
-        override suspend fun refresh(): RefreshResult {
+        var programCalls = 0
+        var lastExcluded: Set<EpisodeId> = emptySet()
+        override suspend fun refresh(excluded: Set<EpisodeId>): RefreshResult {
             calls++
+            lastExcluded = excluded
             gate?.await()
             error?.let { throw it }
             return result!!
+        }
+
+        override suspend fun refreshProgram(programId: ProgramId): RefreshResult? {
+            programCalls++
+            error?.let { throw it }
+            return programResult
         }
     }
 
     private class FakeDownloads(var missing: Int = 0) : DownloadRepository {
         override suspend fun enqueue(episodeId: EpisodeId) = Unit
+        override suspend fun enqueueForSync(episodeIds: List<EpisodeId>) = Unit
+        override suspend fun removeEpisode(episodeId: EpisodeId) = Unit
         override suspend fun cancel(episodeId: EpisodeId) = Unit
         override suspend fun retry(episodeId: EpisodeId) = Unit
         override suspend fun unpin(episodeId: EpisodeId) = Unit
@@ -51,8 +71,15 @@ class LibraryRefresherTest {
         override suspend fun reconcileMissingFiles(): Int = missing
         override suspend fun ensureFilePresent(episodeId: EpisodeId): Boolean = true
     }
-    private class FakeSessionRepository : SessionRepository {
-        val stateFlow = MutableStateFlow<SessionState>(SessionState.SignedOut(null, null))
+
+    private class FakeSessionRepository(ready: Boolean = true) : SessionRepository {
+        val stateFlow = MutableStateFlow<SessionState>(
+            if (ready) {
+                SessionState.Ready(Session("https://s", "alice", "u", "t"), SelectedLibrary(ServerItemId("lib"), "Radio"), null)
+            } else {
+                SessionState.SignedOut(null, null)
+            },
+        )
         var signedOut = false
         override val state: Flow<SessionState> = stateFlow
         override suspend fun signIn(serverUrl: String, userName: String, password: String) = Unit
@@ -63,34 +90,154 @@ class LibraryRefresherTest {
         }
     }
 
+    private class FakeSettings(wifiOnly: Boolean = true) : AppSettingsRepository {
+        override val wifiOnly = MutableStateFlow(wifiOnly)
+        override suspend fun setWifiOnly(value: Boolean) {
+            wifiOnly.value = value
+        }
+    }
+
+    private class FakeNetwork(var metered: Boolean = false) : NetworkStatus {
+        override fun isMetered() = metered
+    }
+
+    private class FakeKicker : DownloadKicker {
+        var kicks = 0
+        override suspend fun kick() {
+            kicks++
+        }
+    }
+
+    private fun CoroutineScope.refresher(
+        repo: FakeRefreshRepository,
+        session: FakeSessionRepository = FakeSessionRepository(),
+        downloads: FakeDownloads = FakeDownloads(),
+        settings: FakeSettings = FakeSettings(),
+        network: FakeNetwork = FakeNetwork(),
+        nowPlaying: NowPlaying = NowPlaying(),
+        kicker: FakeKicker = FakeKicker(),
+    ) = LibraryRefresher(repo, session, downloads, settings, network, nowPlaying, kicker, this)
+
     @Test
     fun successEmitsCountsMessage() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { result = RefreshResult(3, 40, 1, 6, now) }
-        val session = FakeSessionRepository()
-        val refresher = LibraryRefresher(repo, session, FakeDownloads(), this)
+        val refresher = refresher(repo)
 
         refresher.messages.test {
             assertEquals(3, refresher.refresh()?.programs)
-            assertEquals("番組 3 / 各回 40 を取得しました", awaitItem())
+            assertEquals("番組 3 / 各回 40 を取得", awaitItem())
         }
         assertFalse(refresher.isRefreshing.value)
     }
 
     @Test
+    fun syncMessageListsWhatHappened() {
+        assertEquals(
+            "番組 3 / 各回 40 を取得。5 回をダウンロード予約、3 回を削除。1 番組はサーバ上で見つからず、そのままにしました",
+            RefreshResult(3, 40, 0, 0, now, enqueued = 5, deleted = 2, removed = 1, onHold = 1).toSyncMessage(),
+        )
+        assertEquals("番組 3 / 各回 40 を取得。2 回を削除", RefreshResult(3, 40, 0, 0, now, deleted = 2).toSyncMessage())
+    }
+
+    @Test
+    fun enqueuedDownloadsKickTheWorkerAndPassTheNowPlayingEpisode() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now, enqueued = 2) }
+        val kicker = FakeKicker()
+        val nowPlaying = NowPlaying().apply { set(EpisodeId(42)) }
+        val refresher = refresher(repo, kicker = kicker, nowPlaying = nowPlaying)
+
+        refresher.refresh()
+
+        assertEquals(1, kicker.kicks)
+        assertEquals(setOf(EpisodeId(42)), repo.lastExcluded)
+    }
+
+    @Test
+    fun nothingEnqueuedDoesNotKick() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now) }
+        val kicker = FakeKicker()
+        refresher(repo, kicker = kicker).refresh()
+        assertEquals(0, kicker.kicks)
+    }
+
+    @Test
+    fun meteredNetworkWithWifiOnlySkipsTheServerButStillReconciles() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now) }
+        val refresher = refresher(repo, downloads = FakeDownloads(missing = 1), network = FakeNetwork(metered = true))
+
+        refresher.messages.test {
+            assertNull(refresher.refresh())
+            assertTrue(awaitItem().contains("1 回"))
+            assertEquals("Wi-Fi に接続していないため更新しません", awaitItem())
+        }
+        assertEquals(0, repo.calls)
+    }
+
+    @Test
+    fun meteredNetworkIsFineWhenWifiOnlyIsOff() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now) }
+        val refresher = refresher(repo, settings = FakeSettings(wifiOnly = false), network = FakeNetwork(metered = true))
+        assertEquals(1, refresher.refresh()?.programs)
+    }
+
+    @Test
+    fun silentRefreshEmitsNoMessages() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now) }
+        val refresher = refresher(repo)
+        refresher.messages.test {
+            assertEquals(1, refresher.refresh(silent = true)?.programs)
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun notReadyReturnsNullWithoutTouchingAnything() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now) }
+        val session = FakeSessionRepository(ready = false)
+        assertNull(refresher(repo, session = session).refresh())
+        assertEquals(0, repo.calls)
+        assertFalse(session.signedOut)
+    }
+
+    @Test
+    fun refreshProgramUsesTheProgramPathAndItsOwnMessage() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { programResult = RefreshResult(1, 7, 0, 0, now) }
+        val refresher = refresher(repo)
+        refresher.messages.test {
+            assertEquals(7, refresher.refreshProgram(ProgramId(1))?.episodes)
+            assertEquals("各回 7 を取得しました", awaitItem())
+        }
+        assertEquals(1, repo.programCalls)
+        assertEquals(0, repo.calls)
+    }
+
+    @Test
+    fun refreshProgramFallsBackToAFullSyncWithoutServerId() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { programResult = null; result = RefreshResult(2, 9, 0, 0, now) }
+        val refresher = refresher(repo)
+        refresher.messages.test {
+            assertEquals(9, refresher.refreshProgram(ProgramId(1))?.episodes)
+            assertEquals("番組 2 / 各回 9 を取得", awaitItem())
+        }
+        assertEquals(1, repo.calls)
+    }
+
+    @Test
     fun reconcileMessageComesBeforeTheResult() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 2, 0, 0, now) }
-        val refresher = LibraryRefresher(repo, FakeSessionRepository(), FakeDownloads(missing = 2), this)
+        val refresher = refresher(repo, downloads = FakeDownloads(missing = 2))
         refresher.messages.test {
             refresher.refresh()
             assertTrue(awaitItem().contains("2 回"))
-            assertEquals("番組 1 / 各回 2 を取得しました", awaitItem())
+            assertEquals("番組 1 / 各回 2 を取得", awaitItem())
         }
     }
+
     @Test
     fun unauthorizedSignsOut() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { error = ServerException.Unauthorized() }
         val session = FakeSessionRepository()
-        val refresher = LibraryRefresher(repo, session, FakeDownloads(), this)
+        val refresher = refresher(repo, session = session)
 
         refresher.messages.test {
             assertNull(refresher.refresh())
@@ -103,7 +250,7 @@ class LibraryRefresherTest {
     fun unreachableKeepsSessionAndReports() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { error = ServerException.Unreachable() }
         val session = FakeSessionRepository()
-        val refresher = LibraryRefresher(repo, session, FakeDownloads(), this)
+        val refresher = refresher(repo, session = session)
 
         refresher.messages.test {
             assertNull(refresher.refresh())
@@ -116,7 +263,7 @@ class LibraryRefresherTest {
     fun concurrentRefreshIsIgnoredWhileOneIsRunning() = runTest(StandardTestDispatcher()) {
         val gate = CompletableDeferred<Unit>()
         val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now); this.gate = gate }
-        val refresher = LibraryRefresher(repo, FakeSessionRepository(), FakeDownloads(), this)
+        val refresher = refresher(repo)
 
         val first = async { refresher.refresh() }
         runCurrent()
