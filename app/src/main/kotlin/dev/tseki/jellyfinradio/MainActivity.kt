@@ -1,4 +1,5 @@
 package dev.tseki.jellyfinradio
+
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -11,25 +12,50 @@ import androidx.core.content.ContextCompat
 import dagger.hilt.android.AndroidEntryPoint
 import dev.tseki.jellyfinradio.ui.JellyfinRadioNavHost
 import dev.tseki.jellyfinradio.ui.theme.JellyfinRadioTheme
+
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    private val requestNotifications =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* 拒否されても再生はできる */ }
+    private val requestPermissions =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { /* 拒否されても手元の再生はできる */ }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        requestNotificationPermissionIfNeeded()
+        requestRuntimePermissionsIfNeeded()
         setContent {
             JellyfinRadioTheme {
                 JellyfinRadioNavHost()
             }
         }
     }
-    /** Android 13+ は通知の表示にランタイム権限が要る。無いと再生通知が出ない。 */
-    private fun requestNotificationPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
-            PackageManager.PERMISSION_GRANTED
-        if (!granted) requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+
+    /**
+     * - Android 13+: 通知の表示に `POST_NOTIFICATIONS` が要る。無いと再生通知が出ない
+     * - Android 17+（targetSdk 37）: LAN 内のサーバへ接続するのに `ACCESS_LOCAL_NETWORK` が要る。
+     *   無いと LAN 宛の TCP が黙って落ちる（DNS だけは通る）
+     */
+    private fun requestRuntimePermissionsIfNeeded() {
+        val missing = buildList {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !granted(Manifest.permission.POST_NOTIFICATIONS)) {
+                add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            if (Build.VERSION.SDK_INT >= LocalNetworkPermission.MIN_SDK && !granted(LocalNetworkPermission.NAME)) {
+                add(LocalNetworkPermission.NAME)
+            }
+        }
+        if (missing.isNotEmpty()) requestPermissions.launch(missing.toTypedArray())
     }
+
+    private fun granted(permission: String) =
+        ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+}
+
+/** Android 17 のローカルネットワーク権限。定数は API 37 の `Manifest.permission.ACCESS_LOCAL_NETWORK`。 */
+object LocalNetworkPermission {
+    const val NAME = "android.permission.ACCESS_LOCAL_NETWORK"
+    const val MIN_SDK = 37
+
+    fun isRequiredAndMissing(context: android.content.Context): Boolean =
+        Build.VERSION.SDK_INT >= MIN_SDK &&
+            ContextCompat.checkSelfPermission(context, NAME) != PackageManager.PERMISSION_GRANTED
 }

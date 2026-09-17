@@ -5,7 +5,10 @@ import kotlin.time.Instant
 /** 番組一覧の 1 行。最新の各回の放送日で並べる。 */
 data class ProgramSummary(
     val program: Program,
+    /** サーバ上の分も含めた各回の数。 */
     val episodeCount: Int,
+    /** 手元にファイルがある各回の数。 */
+    val localEpisodeCount: Int,
     val latestAiredAt: Instant?,
 )
 /** 各回一覧・再生画面が使う、各回とその手元の状態。 */

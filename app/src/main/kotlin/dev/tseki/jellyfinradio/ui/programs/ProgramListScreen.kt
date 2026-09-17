@@ -1,4 +1,5 @@
 package dev.tseki.jellyfinradio.ui.programs
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -7,7 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -19,6 +20,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,53 +31,59 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.tseki.jellyfinradio.BuildConfig
 import dev.tseki.jellyfinradio.domain.ProgramId
 import dev.tseki.jellyfinradio.domain.ProgramSummary
 import dev.tseki.jellyfinradio.ui.toAiredDateText
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProgramListScreen(
     onProgramClick: (ProgramId) -> Unit,
+    onSettingsClick: () -> Unit,
     viewModel: ProgramListViewModel = hiltViewModel(),
 ) {
     val programs by viewModel.programs.collectAsStateWithLifecycle()
-    val seedMessage by viewModel.seedMessage.collectAsStateWithLifecycle()
+    val canRefresh by viewModel.canRefresh.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    LaunchedEffect(seedMessage) {
-        seedMessage?.let {
-            snackbarHostState.showSnackbar(it)
-            viewModel.consumeSeedMessage()
-        }
+
+    LaunchedEffect(Unit) {
+        viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
     }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("番組") },
                 actions = {
-                    if (BuildConfig.DEBUG) {
-                        IconButton(onClick = viewModel::runSeed) {
-                            Icon(Icons.Default.CloudDownload, contentDescription = "シード")
-                        }
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(Icons.Default.Settings, contentDescription = "設定")
                     }
                 },
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
-        val list = programs
-        when {
-            list == null -> Unit
-            list.isEmpty() -> EmptyPrograms(viewModel.seedRoot, Modifier.padding(padding))
-            else -> LazyColumn(Modifier.padding(padding)) {
-                items(list, key = { it.program.id.value }) { summary ->
-                    ProgramRow(summary, onClick = { onProgramClick(summary.program.id) })
-                    HorizontalDivider()
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { if (canRefresh) viewModel.refresh() },
+            modifier = Modifier.padding(padding).fillMaxSize(),
+        ) {
+            val list = programs
+            when {
+                list == null -> Box(Modifier.fillMaxSize())
+                list.isEmpty() -> EmptyPrograms(canRefresh)
+                else -> LazyColumn(Modifier.fillMaxSize()) {
+                    items(list, key = { it.program.id.value }) { summary ->
+                        ProgramRow(summary, onClick = { onProgramClick(summary.program.id) })
+                        HorizontalDivider()
+                    }
                 }
             }
         }
     }
 }
+
 @Composable
 private fun ProgramRow(summary: ProgramSummary, onClick: () -> Unit) {
     ListItem(
@@ -83,22 +91,31 @@ private fun ProgramRow(summary: ProgramSummary, onClick: () -> Unit) {
         headlineContent = { Text(summary.program.name) },
         supportingContent = {
             val station = summary.program.stationName
+            val count = if (summary.localEpisodeCount == summary.episodeCount) {
+                "${summary.episodeCount} 回"
+            } else {
+                "手元 ${summary.localEpisodeCount} / 全 ${summary.episodeCount} 回"
+            }
             val latest = summary.latestAiredAt?.let { "最新 ${it.toAiredDateText()}" }
-            Text(listOfNotNull(station, "${summary.episodeCount} 回", latest).joinToString(" · "))
+            Text(listOfNotNull(station, count, latest).joinToString(" · "))
         },
     )
 }
+
 @Composable
-private fun EmptyPrograms(seedRoot: String?, modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("番組がありません", style = MaterialTheme.typography.titleMedium)
-            if (BuildConfig.DEBUG && seedRoot != null) {
-                Text(
-                    "$seedRoot/<放送局>/<番組>/ に音声ファイルを adb push して、右上のシードを押してください",
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
-                )
+private fun EmptyPrograms(canRefresh: Boolean) {
+    // PullToRefreshBox の中身はスクロール可能である必要があるので LazyColumn で包む
+    LazyColumn(Modifier.fillMaxSize()) {
+        item {
+            Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("番組がありません", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (canRefresh) "引っ張って更新するとサーバから取得します" else "設定からサーバに接続するか、シードで手元のファイルを取り込んでください",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
         }
     }
