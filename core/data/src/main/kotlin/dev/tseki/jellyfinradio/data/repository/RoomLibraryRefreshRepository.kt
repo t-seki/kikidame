@@ -161,8 +161,8 @@ class RoomLibraryRefreshRepository @Inject constructor(
             downloads.deleteLocal(id)
             deleted++
         }
-        downloads.enqueueForSync(plan.download)
-        return SyncOutcome(enqueued = plan.download.size, deleted = deleted, removed = removed, onHold = plan.onHoldCount)
+        val enqueued = downloads.enqueueForSync(plan.download)
+        return SyncOutcome(enqueued = enqueued, deleted = deleted, removed = removed, onHold = plan.onHoldCount)
     }
 
     /** [onlyProgramId] を渡すとその番組だけを入力にする（1 番組の同期。他の番組は一覧に無くても消失扱いにしない）。 */

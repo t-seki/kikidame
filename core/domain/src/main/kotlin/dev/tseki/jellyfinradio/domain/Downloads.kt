@@ -56,8 +56,8 @@ interface DownloadRepository {
     /** 手動ダウンロード = 固定。既に行がある回は固定にするだけ（同期分の予約を手動に格上げする）。失敗は [retry]。 */
     suspend fun enqueue(episodeId: EpisodeId)
 
-    /** 同期による予約（`pinned = false`）。渡した順にキューへ入れる。既に行がある回は飛ばす。 */
-    suspend fun enqueueForSync(episodeIds: List<EpisodeId>)
+    /** 同期による予約（`pinned = false`）。渡した順にキューへ入れる。既に行がある回は飛ばし、実際に予約した数を返す。 */
+    suspend fun enqueueForSync(episodeIds: List<EpisodeId>): Int
 
     /**
      * サーバの一覧から消えた各回を `Episode` 行ごと消す（`LocalFile` / `PlaybackState` は cascade、ファイルも消す）。

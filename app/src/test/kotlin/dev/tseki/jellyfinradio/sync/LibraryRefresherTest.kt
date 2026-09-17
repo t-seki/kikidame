@@ -71,7 +71,7 @@ class LibraryRefresherTest {
 
     private class FakeDownloads(var missing: Int = 0) : DownloadRepository {
         override suspend fun enqueue(episodeId: EpisodeId) = Unit
-        override suspend fun enqueueForSync(episodeIds: List<EpisodeId>) = Unit
+        override suspend fun enqueueForSync(episodeIds: List<EpisodeId>) = episodeIds.size
         override suspend fun removeEpisode(episodeId: EpisodeId) = Unit
         override suspend fun cancel(episodeId: EpisodeId) = Unit
         override suspend fun retry(episodeId: EpisodeId) = Unit

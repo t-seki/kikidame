@@ -99,7 +99,16 @@ class LibraryRefresher @Inject constructor(
                 return null
             }
             val result = block() ?: return null
-            if (result.enqueued > 0) kicker.kick()
+            // 同期は済んでいる。Worker を起こせなくても結果は返す（次の起動やダウンロード操作で拾われる）
+            if (result.enqueued > 0) {
+                try {
+                    kicker.kick()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w(TAG, "could not start the download worker", e)
+                }
+            }
             return result
         } catch (e: ServerException.Unauthorized) {
             say(silent, "サーバの認証が切れました。もう一度ログインしてください")

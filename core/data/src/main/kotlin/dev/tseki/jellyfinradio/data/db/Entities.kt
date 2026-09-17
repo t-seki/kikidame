@@ -74,7 +74,7 @@ data class LocalFileEntity(
     val attemptCount: Int = 0,
     val lastAttemptAt: Instant? = null,
     val downloadedAt: Instant? = null,
-    /** キューに入れた時刻。手動ダウンロードはこの古い順（FIFO）に落とす。v3 で追加 */
+    /** キューに入れた時刻。手動（固定）を先に、その中はこの古い順（FIFO）に落とす。同期の予約にも付く。v3 で追加 */
     val enqueuedAt: Instant? = null,
 )
 /**

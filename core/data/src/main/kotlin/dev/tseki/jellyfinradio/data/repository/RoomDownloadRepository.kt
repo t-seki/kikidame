@@ -36,29 +36,29 @@ class RoomDownloadRepository @Inject constructor(
         db.withTransaction {
             val existing = db.localFileDao().findByEpisode(episodeId.value)
             if (existing != null) {
-                // 同期が予約した行を手動に格上げする（手動ダウンロード = 固定）
-                if (!existing.pinned) db.localFileDao().upsert(existing.copy(pinned = true))
+                // 同期が予約した行を手動に格上げする（手動ダウンロード = 固定）。手動同士の FIFO はタップした時刻で決めるので付け直す
+                if (!existing.pinned) db.localFileDao().upsert(existing.copy(pinned = true, enqueuedAt = clock.now()))
                 return@withTransaction
             }
             insertPending(episodeId, pinned = true)
         }
     }
 
-    override suspend fun enqueueForSync(episodeIds: List<EpisodeId>) {
-        db.withTransaction {
-            for (id in episodeIds) {
-                if (db.localFileDao().findByEpisode(id.value) != null) continue
-                insertPending(id, pinned = false)
-            }
+    override suspend fun enqueueForSync(episodeIds: List<EpisodeId>): Int = db.withTransaction {
+        var inserted = 0
+        for (id in episodeIds) {
+            if (db.localFileDao().findByEpisode(id.value) != null) continue
+            if (insertPending(id, pinned = false)) inserted++
         }
+        inserted
     }
 
-    /** トランザクション内で呼ぶ。サーバ ID の無い回は落とせないので何もしない。 */
-    private suspend fun insertPending(episodeId: EpisodeId, pinned: Boolean) {
-        val row = db.episodeDao().findById(episodeId.value) ?: return
+    /** トランザクション内で呼ぶ。サーバ ID の無い回は落とせないので何もしない（false）。 */
+    private suspend fun insertPending(episodeId: EpisodeId, pinned: Boolean): Boolean {
+        val row = db.episodeDao().findById(episodeId.value) ?: return false
         val episode = row.episode
-        if (episode.serverItemId == null) return
-        val program = db.programDao().findById(episode.programId) ?: return
+        if (episode.serverItemId == null) return false
+        val program = db.programDao().findById(episode.programId) ?: return false
         val path = uniqueTarget(EpisodeFileName.relativePath(program.stationName, program.name, episode.title, episode.container))
         db.localFileDao().upsert(
             LocalFileEntity(
@@ -69,6 +69,7 @@ class RoomDownloadRepository @Inject constructor(
                 enqueuedAt = clock.now(),
             ),
         )
+        return true
     }
 
     /**
