@@ -58,8 +58,8 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 - `/emby/`・`/mediabrowser/` のパスは削除済み。使わない
 - OpenAPI 仕様に載っていないエンドポイントは使わない。認証・API アクセスは
   jellyfin-sdk-kotlin に任せ、自前で HTTP を組み立てない
-- ダウンロードは SDK の HttpClient（OkHttp）で `/Items/{itemId}/Download` をストリーム取得し、
-  Worker がファイルへ直接書く（ADR 0003）。Media3 の `HttpDataSource.Factory` に Authorization ヘッダを
+- ダウンロードは URL（`getDownloadUrl`）と `Authorization` ヘッダ（`AuthorizationHeaderBuilder`）を SDK に作らせ、
+  転送だけ OkHttp のストリームで行い、Worker がファイルへ直接書く（ADR 0003。SDK にストリーミング API が無いため）。Media3 の `HttpDataSource.Factory` に Authorization ヘッダを
   設定する必要があるのは、サーバから直接ストリーミング再生する場合（M4 以降で検討）に限る
 - 認証トークンは Android Keystore で生成した鍵で暗号化し DataStore に置く（`EncryptedSharedPreferences` は使わない）
 - ログアウトは認証情報だけを消し、手元のデータは残す。別サーバへ接続するときだけ
@@ -296,8 +296,11 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 
 ### M3-a の範囲
 
-- **転送**: `JellyfinGateway.openDownload(episodeServerId, rangeStart)`。SDK の `ApiClient` で `/Items/{id}/Download` を認証付き
-  ストリームとして取得する（自前で HTTP を組み立てない）。テストはフェイク
+- **転送**: `JellyfinGateway.openDownload(episodeServerId, rangeStart)`。SDK にはストリーミング取得の API が無い
+  （`getDownload` / `request` は本文を `byte[]` に全部読む）ので、**URL は SDK の `getDownloadUrl`、`Authorization` ヘッダは SDK の
+  `AuthorizationHeaderBuilder` に作らせ、転送だけ OkHttp（SDK の依存に同梱）で行う**。エンドポイントと認証形式は手書きしない。
+  戻り値は `resumedFrom`（206 で `Range` が効いたか）・`totalBytes`・本文ストリーム。サーバが `Range` を無視して 200 を返したら
+  `.part` を書き直す。テストはフェイク（206 再開／200 全体再送の両方）
 - **Worker**: WorkManager のユニーク Worker（`download-queue`、`KEEP`）が `LocalFile.state = PENDING` の行を放送日の新しい順に
   **1 本ずつ**処理する。`<局>/<番組>/<タイトル>.<container>.part` に追記し、完了でリネーム。既存の `.part` は `Range: bytes=<size>-` で再開。
   進捗は `setProgress`。通知は出さない（フォアグラウンドサービスにしない）
