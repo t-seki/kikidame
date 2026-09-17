@@ -76,6 +76,13 @@ interface LibraryRefreshRepository {
      * 番組がサーバ ID を持たなければ null（呼び出し側は全体の [refresh] にフォールバックする）。
      */
     suspend fun refreshProgram(programId: ProgramId): RefreshResult?
+
+    /**
+     * 1 番組だけ同期する。番組の存在を確かめてから（無ければ消失 = 判断保留）その番組の各回一覧を取り、
+     * 取り込み → [SyncPlanner] → 除去・削除・予約をこの番組に限って行う。その番組についての一覧は完全なので
+     * 削除の権限を持つ（ADR 0004）。最終同期の時刻は更新しない。サーバ ID を持たなければ null。
+     */
+    suspend fun syncProgram(programId: ProgramId, excluded: Set<EpisodeId> = emptySet()): RefreshResult?
 }
 
 data class RefreshResult(

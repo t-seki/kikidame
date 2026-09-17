@@ -80,9 +80,9 @@ class EpisodeListViewModel @Inject constructor(
         viewModelScope.launch { refresher.refreshProgram(programId) }
     }
 
-    /** ボトムシートの「今すぐ同期」= 全走査の同期。 */
+    /** ボトムシートの「この番組を今すぐ同期」= 1 番組の同期。 */
     fun syncNow() {
-        viewModelScope.launch { refresher.refresh() }
+        viewModelScope.launch { refresher.syncProgram(programId) }
     }
 
     // --- 同期対象・保持ルール（適用は次の同期。ここでは保存するだけ） ---

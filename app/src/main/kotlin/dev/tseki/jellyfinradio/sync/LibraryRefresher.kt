@@ -29,7 +29,8 @@ import javax.inject.Singleton
 /**
  * 更新と同期の唯一の入口。同時に 1 つしか走らせず、結果を文言にして画面へ流す。
  *
- * - [refresh]: 全走査 = 同期（ADR 0004）。番組一覧の「引っ張って更新」、「今すぐ同期」、定期・起動時の Worker が呼ぶ
+ * - [refresh]: 全走査 = ライブラリ全体の同期（ADR 0004）。番組一覧の「引っ張って更新」、定期・起動時の Worker が呼ぶ
+ * - [syncProgram]: 1 番組の同期。シートの「この番組を今すぐ同期」が呼ぶ
  * - [refreshProgram]: 番組単位の取り込み（#12）。各回一覧の「引っ張って更新」が呼ぶ。削除しない
  * - 「Wi-Fi のみ」は手動を含めて効く。従量制ならサーバに触らず理由を出して終える。手元のファイルの整合（#5）はその前に走る
  * - 401 はログアウトと同じ処理をする（セッション状態が変わり、画面側が接続画面へ導く）
@@ -74,13 +75,18 @@ class LibraryRefresher @Inject constructor(
         }
     }
 
+    /** 1 番組だけ同期する。サーバ ID の無い番組は何もしない（シート側でスイッチを無効にしている）。 */
+    suspend fun syncProgram(programId: ProgramId): RefreshResult? = guarded(silent = false) {
+        refreshRepository.syncProgram(programId, excluded = excluded())?.also { say(false, it.toProgramSyncMessage()) }
+    }
+
     private fun excluded(): Set<EpisodeId> = setOfNotNull(nowPlaying.current.value)
 
     private fun say(silent: Boolean, message: String) {
         if (!silent) _messages.tryEmit(message)
     }
 
-    private suspend fun guarded(silent: Boolean, block: suspend () -> RefreshResult): RefreshResult? {
+    private suspend fun guarded(silent: Boolean, block: suspend () -> RefreshResult?): RefreshResult? {
         if (!mutex.tryLock()) return null
         _isRefreshing.value = true
         try {
@@ -92,7 +98,7 @@ class LibraryRefresher @Inject constructor(
                 say(silent, "Wi-Fi に接続していないため更新しません")
                 return null
             }
-            val result = block()
+            val result = block() ?: return null
             if (result.enqueued > 0) kicker.kick()
             return result
         } catch (e: ServerException.Unauthorized) {
@@ -132,6 +138,16 @@ fun RefreshResult.toSyncMessage(): String = buildString {
     )
     if (actions.isNotEmpty()) append("。").append(actions.joinToString("、"))
     if (onHold > 0) append("。$onHold 番組はサーバ上で見つからず、そのままにしました")
+}
+
+/** 1 番組の同期の文言。 */
+fun RefreshResult.toProgramSyncMessage(): String {
+    if (onHold > 0) return "この番組はサーバ上で見つかりません。何も変えていません"
+    val actions = listOfNotNull(
+        enqueued.takeIf { it > 0 }?.let { "$it 回をダウンロード予約" },
+        (deleted + removed).takeIf { it > 0 }?.let { "$it 回を削除" },
+    )
+    return if (actions.isEmpty()) "各回 $episodes を確認。手元は最新です" else "各回 $episodes を確認。" + actions.joinToString("、")
 }
 
 /** 接続画面の文言。 */

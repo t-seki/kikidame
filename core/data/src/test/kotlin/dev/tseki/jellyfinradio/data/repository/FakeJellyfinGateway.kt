@@ -7,6 +7,7 @@ import dev.tseki.jellyfinradio.domain.LibraryView
 import dev.tseki.jellyfinradio.domain.ServerEpisode
 import dev.tseki.jellyfinradio.domain.ServerException
 import dev.tseki.jellyfinradio.domain.ServerItemId
+import dev.tseki.jellyfinradio.domain.ServerProgram
 import dev.tseki.jellyfinradio.domain.ServerSnapshot
 import dev.tseki.jellyfinradio.domain.Session
 
@@ -35,6 +36,12 @@ class FakeJellyfinGateway : JellyfinGateway {
     }
 
     val fetchedPrograms = ArrayList<ServerItemId>()
+
+    /** [snapshot] の番組一覧に無ければ null（404 相当）。 */
+    override suspend fun fetchProgram(credentials: ServerCredentials, programServerId: ServerItemId): ServerProgram? {
+        failWith?.let { throw it }
+        return snapshot.programs.firstOrNull { it.serverId == programServerId }
+    }
 
     /** [snapshot] のうちその番組に属する各回。 */
     override suspend fun fetchProgramEpisodes(credentials: ServerCredentials, programServerId: ServerItemId): List<ServerEpisode> {

@@ -58,6 +58,15 @@ class LibraryRefresherTest {
             error?.let { throw it }
             return programResult
         }
+
+        var syncProgramResult: RefreshResult? = null
+        var syncProgramCalls = 0
+        override suspend fun syncProgram(programId: ProgramId, excluded: Set<EpisodeId>): RefreshResult? {
+            syncProgramCalls++
+            lastExcluded = excluded
+            error?.let { throw it }
+            return syncProgramResult
+        }
     }
 
     private class FakeDownloads(var missing: Int = 0) : DownloadRepository {
@@ -197,6 +206,27 @@ class LibraryRefresherTest {
         assertNull(refresher(repo, session = session).refresh())
         assertEquals(0, repo.calls)
         assertFalse(session.signedOut)
+    }
+
+    @Test
+    fun syncProgramReportsAndKicks() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { syncProgramResult = RefreshResult(1, 6, 0, 0, now, enqueued = 2, deleted = 1) }
+        val kicker = FakeKicker()
+        val nowPlaying = NowPlaying().apply { set(EpisodeId(7)) }
+        val refresher = refresher(repo, kicker = kicker, nowPlaying = nowPlaying)
+        refresher.messages.test {
+            assertEquals(2, refresher.syncProgram(ProgramId(1))?.enqueued)
+            assertEquals("各回 6 を確認。2 回をダウンロード予約、1 回を削除", awaitItem())
+        }
+        assertEquals(1, kicker.kicks)
+        assertEquals(setOf(EpisodeId(7)), repo.lastExcluded)
+        assertEquals(0, repo.calls)
+    }
+
+    @Test
+    fun programSyncMessages() {
+        assertEquals("各回 6 を確認。手元は最新です", RefreshResult(1, 6, 0, 0, now).toProgramSyncMessage())
+        assertEquals("この番組はサーバ上で見つかりません。何も変えていません", RefreshResult(0, 0, 0, 0, now, onHold = 1).toProgramSyncMessage())
     }
 
     @Test

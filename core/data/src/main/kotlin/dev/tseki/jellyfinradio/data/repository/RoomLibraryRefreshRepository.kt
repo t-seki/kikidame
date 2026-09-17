@@ -73,6 +73,22 @@ class RoomLibraryRefreshRepository @Inject constructor(
         return apply(snapshot)
     }
 
+    override suspend fun syncProgram(programId: ProgramId, excluded: Set<EpisodeId>): RefreshResult? {
+        val ready = requireReady()
+        val local = db.programDao().findById(programId.value) ?: return null
+        val serverId = local.serverItemId?.let(::ServerItemId) ?: return null
+        val credentials = ready.session.credentials()
+        val program = gateway.fetchProgram(credentials, serverId)
+        if (program == null) {
+            // 消失。何も落とさず何も消さない
+            return RefreshResult(programs = 0, episodes = 0, linkedPrograms = 0, linkedEpisodes = 0, fetchedAt = clock.now(), onHold = 1)
+        }
+        val snapshot = ServerSnapshot(programs = listOf(program), episodes = gateway.fetchProgramEpisodes(credentials, serverId))
+        val result = apply(snapshot)
+        val outcome = synchronize(snapshot, excluded, onlyProgramId = programId)
+        return result.copy(enqueued = outcome.enqueued, deleted = outcome.deleted, removed = outcome.removed, onHold = outcome.onHold)
+    }
+
     private suspend fun requireReady(): SessionState.Ready =
         store.current() as? SessionState.Ready ?: throw ServerException.Unauthorized()
 
@@ -131,8 +147,8 @@ class RoomLibraryRefreshRepository @Inject constructor(
      * 実行順は 除去 → 削除 → 予約（容量を先に空ける）。[excluded]（再生中の回）は今回は消さない。
      * サーバ ID を持たない番組は `Known` でも `Gone` でもない（サーバに在ると主張していない）ので入力に入れない。
      */
-    internal suspend fun synchronize(snapshot: ServerSnapshot, excluded: Set<EpisodeId>): SyncOutcome {
-        val plan = plan(snapshot)
+    internal suspend fun synchronize(snapshot: ServerSnapshot, excluded: Set<EpisodeId>, onlyProgramId: ProgramId? = null): SyncOutcome {
+        val plan = plan(snapshot, onlyProgramId)
         var removed = 0
         for (id in plan.remove) {
             if (id in excluded) continue
@@ -149,11 +165,13 @@ class RoomLibraryRefreshRepository @Inject constructor(
         return SyncOutcome(enqueued = plan.download.size, deleted = deleted, removed = removed, onHold = plan.onHoldCount)
     }
 
-    internal suspend fun plan(snapshot: ServerSnapshot): SyncPlan {
+    /** [onlyProgramId] を渡すとその番組だけを入力にする（1 番組の同期。他の番組は一覧に無くても消失扱いにしない）。 */
+    internal suspend fun plan(snapshot: ServerSnapshot, onlyProgramId: ProgramId? = null): SyncPlan {
         val serverProgramIds = snapshot.programs.map { it.serverId }.toSet()
         val serverEpisodesByProgram = snapshot.episodes.groupBy({ it.programServerId }, { it.serverId })
         val localByProgram = db.episodeDao().listSyncRows().groupBy { it.programId }
-        val inputs = db.programDao().listAll().mapNotNull { p ->
+        val programs = if (onlyProgramId == null) db.programDao().listAll() else listOfNotNull(db.programDao().findById(onlyProgramId.value))
+        val inputs = programs.mapNotNull { p ->
             val serverId = p.serverItemId?.let(::ServerItemId) ?: return@mapNotNull null
             SyncProgramInput(
                 programId = ProgramId(p.id),

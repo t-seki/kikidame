@@ -23,6 +23,7 @@ import dev.tseki.jellyfinradio.domain.SelectedLibrary
 import dev.tseki.jellyfinradio.domain.ServerEpisode
 import dev.tseki.jellyfinradio.domain.ServerException
 import dev.tseki.jellyfinradio.domain.ServerItemId
+import dev.tseki.jellyfinradio.domain.ServerProgram
 import dev.tseki.jellyfinradio.domain.ServerSnapshot
 import dev.tseki.jellyfinradio.domain.Session
 import dev.tseki.jellyfinradio.domain.SessionRepository
@@ -68,6 +69,7 @@ class DownloadWorkerTest {
         override suspend fun listLibraries(credentials: ServerCredentials): List<LibraryView> = error("unused")
         override suspend fun fetchLibrary(credentials: ServerCredentials, libraryId: ServerItemId): ServerSnapshot = error("unused")
         override suspend fun fetchProgramEpisodes(credentials: ServerCredentials, programServerId: ServerItemId): List<ServerEpisode> = error("unused")
+        override suspend fun fetchProgram(credentials: ServerCredentials, programServerId: ServerItemId): ServerProgram? = error("unused")
         override suspend fun openDownload(credentials: ServerCredentials, episodeServerId: ServerItemId, rangeStart: Long): DownloadStream {
             if (unauthorized) throw ServerException.Unauthorized()
             val bytes = files[episodeServerId] ?: throw ServerException.Failed("HTTP 404")

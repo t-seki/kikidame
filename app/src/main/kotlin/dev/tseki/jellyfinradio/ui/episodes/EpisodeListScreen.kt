@@ -355,7 +355,7 @@ private fun ProgramSyncSheet(
             },
         )
         Button(onClick = onSyncNow, enabled = canSync, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
-            Text("今すぐ同期")
+            Text("この番組を今すぐ同期")
         }
         Spacer(Modifier.padding(bottom = 24.dp))
     }

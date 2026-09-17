@@ -107,13 +107,7 @@ class SdkJellyfinGateway @Inject constructor(
                 includeItemTypes = listOf(BaseItemKind.MUSIC_ALBUM),
             ),
         )
-        val programs = albums.items.map { album ->
-            ServerProgram(
-                serverId = ServerItemId(album.id.toString()),
-                name = album.name.orEmpty(),
-                stationName = album.albumArtist ?: album.albumArtists?.firstOrNull()?.name,
-            )
-        }
+        val programs = albums.items.map { it.toServerProgram() }
         val programIds = programs.map { it.serverId }.toSet()
         // 取得した番組のどれにも属さない各回は取り込まない
         ServerSnapshot(programs, fetchAudio(api, parent).filter { it.programServerId in programIds })
@@ -123,6 +117,24 @@ class SdkJellyfinGateway @Inject constructor(
         val api = api(credentials.serverUrl, credentials.accessToken)
         fetchAudio(api, UUID.fromString(programServerId.value)).filter { it.programServerId == programServerId }
     }
+
+    override suspend fun fetchProgram(credentials: ServerCredentials, programServerId: ServerItemId): ServerProgram? = call {
+        val api = api(credentials.serverUrl, credentials.accessToken)
+        val album = try {
+            val response by api.libraryApi.getItem(UUID.fromString(programServerId.value))
+            response
+        } catch (e: InvalidStatusException) {
+            if (e.status == 404) return@call null else throw e
+        }
+        if (album.type != BaseItemKind.MUSIC_ALBUM) return@call null
+        album.toServerProgram()
+    }
+
+    private fun BaseItemDto.toServerProgram() = ServerProgram(
+        serverId = ServerItemId(id.toString()),
+        name = name.orEmpty(),
+        stationName = albumArtist ?: albumArtists?.firstOrNull()?.name,
+    )
 
     /** `parent` 配下の Audio を 500 件ずつ全部。ライブラリでも番組（MusicAlbum）でも同じ形。 */
     private suspend fun fetchAudio(api: ApiClient, parent: UUID): List<ServerEpisode> {

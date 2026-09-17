@@ -87,7 +87,7 @@ class RoomSyncTest : RoomTestBase() {
     /** ファイルを作って DONE にする（ダウンロード完了の代わり）。 */
     private suspend fun markDone(serverId: String, pinned: Boolean): File {
         val e = episode(serverId)
-        val file = File(directory.root, "${e.episode.title}.m4a").apply { parentFile?.mkdirs(); writeBytes(ByteArray(8)) }
+        val file = File(directory.root, "$serverId-${e.episode.title}.m4a").apply { parentFile?.mkdirs(); writeBytes(ByteArray(8)) }
         db.localFileDao().upsert(
             LocalFileEntity(e.episode.id.value, DownloadState.DONE, file.absolutePath, pinned = pinned, downloadedAt = now),
         )
@@ -341,6 +341,58 @@ class RoomSyncTest : RoomTestBase() {
         val paths = episodes().mapNotNull { it.localFile?.path }
         assertEquals(3, paths.size)
         assertEquals(3, paths.toSet().size, "paths must be distinct: $paths")
+    }
+
+    @Test
+    fun syncProgramAppliesTheRuleToThatProgramOnly() = runTest {
+        signInAndSelect()
+        gateway.snapshot = ServerSnapshot(
+            programs = listOf(albumA, albumB),
+            episodes = listOf(se("a1", "2026-09-01"), se("a2", "2026-09-02"), se("b1", "2026-09-01", "album-2"), se("b2", "2026-09-02", "album-2")),
+        )
+        repo.refresh()
+        val (a, b) = library.observePrograms().first().sortedBy { it.program.name }.map { it.program.id }
+        library.updateSync(a, true, RetentionRule(keepLatest = 1))
+        library.updateSync(b, true, RetentionRule(keepLatest = 1))
+        val fileA1 = markDone("a1", pinned = false)
+        val fileB1 = markDone("b1", pinned = false)
+        val fetchedAt = assertIs<SessionState.Ready>(session.state.first()).lastFetchedAt
+        now += 5.minutes
+        // サーバ側で a1 が消え、a3 が増えた
+        gateway.snapshot = ServerSnapshot(
+            programs = listOf(albumA, albumB),
+            episodes = listOf(se("a2", "2026-09-02"), se("a3", "2026-09-03"), se("b1", "2026-09-01", "album-2"), se("b2", "2026-09-02", "album-2")),
+        )
+
+        val result = assertNotNull(repo.syncProgram(a))
+
+        assertEquals(listOf(ServerItemId("album-1")), gateway.fetchedPrograms)
+        assertEquals(1, result.removed, "a1 vanished from the server")
+        assertEquals(1, result.enqueued, "a3 is the latest")
+        assertEquals(0, result.onHold)
+        assertFalse(fileA1.exists())
+        assertTrue(fileB1.exists(), "the other program is untouched")
+        assertEquals(DownloadState.PENDING, episode("a3").localFile?.state)
+        assertEquals(DownloadState.DONE, episode("b1").localFile?.state)
+        assertEquals(fetchedAt, assertIs<SessionState.Ready>(session.state.first()).lastFetchedAt, "last sync is only for the full sync")
+    }
+
+    @Test
+    fun syncProgramOfAGoneProgramIsOnHold() = runTest {
+        signInAndSelect()
+        gateway.snapshot = threeEpisodes
+        repo.refresh()
+        library.updateSync(programId(), true, RetentionRule(keepLatest = 1))
+        val file = markDone("a1", pinned = false)
+        gateway.snapshot = ServerSnapshot(emptyList(), emptyList())
+
+        val result = assertNotNull(repo.syncProgram(programId()))
+
+        assertEquals(1, result.onHold)
+        assertEquals(0, result.deleted + result.removed + result.enqueued)
+        assertTrue(file.exists())
+        assertTrue(gateway.fetchedPrograms.isEmpty(), "episodes are not even requested")
+        assertEquals(3, episodes().size)
     }
 
     @Test
