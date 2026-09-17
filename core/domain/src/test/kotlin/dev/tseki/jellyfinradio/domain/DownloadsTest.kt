@@ -36,6 +36,14 @@ class DownloadsTest {
     }
 
     @Test
+    fun `container lists from ffmpeg collapse to a known audio extension`() {
+        assertEquals("m4a", EpisodeFileName.extensionFor("mov,mp4,m4a,3gp,3g2,mj2"))
+        assertEquals("mp3", EpisodeFileName.extensionFor("MP3"))
+        assertEquals("mkv", EpisodeFileName.extensionFor("mkv,webm"))
+        assertEquals("m4a", EpisodeFileName.extensionFor(""))
+        assertEquals("s/p/t.m4a", EpisodeFileName.relativePath("s", "p", "t", "mov,mp4,m4a,3gp,3g2,mj2"))
+    }
+    @Test
     fun `collision suffix goes before the extension`() {
         assertEquals("s/p/t (2).m4a", EpisodeFileName.withSuffix("s/p/t.m4a", 2))
         assertEquals("s/p/noext (3)", EpisodeFileName.withSuffix("s/p/noext", 3))

@@ -20,13 +20,22 @@ object EpisodeFileName {
     private val FORBIDDEN = Regex("""[/\\:*?"<>|\p{Cntrl}]""")
     const val DEFAULT_CONTAINER = "m4a"
     const val UNKNOWN_STATION = "_"
+    private val PREFERRED_EXTENSIONS = listOf("m4a", "mp3", "aac", "ogg", "opus", "flac", "wav", "mp4")
 
     /** OS で使えない文字を `_` に。空になったら `_`。 */
     fun sanitize(segment: String): String =
         segment.replace(FORBIDDEN, "_").trim().trimEnd('.').ifEmpty { "_" }
 
+    /**
+     * Jellyfin の `Container` は `mov,mp4,m4a,3gp,3g2,mj2` のようなカンマ区切りで来ることがある（ffmpeg の
+     * フォーマット名一覧）。既知の音声拡張子があればそれを、無ければ先頭を、空なら `m4a` を使う。
+     */
+    fun extensionFor(container: String): String {
+        val candidates = container.lowercase().split(',').map { it.trim().trimStart('.') }.filter { it.isNotEmpty() }
+        return PREFERRED_EXTENSIONS.firstOrNull { it in candidates } ?: candidates.firstOrNull() ?: DEFAULT_CONTAINER
+    }
     fun relativePath(stationName: String?, programName: String, title: String, container: String): String {
-        val ext = container.trim().lowercase().ifEmpty { DEFAULT_CONTAINER }
+        val ext = extensionFor(container)
         return listOf(
             sanitize(stationName ?: UNKNOWN_STATION),
             sanitize(programName),

@@ -185,6 +185,7 @@ class SdkJellyfinGateway @Inject constructor(
             throw ServerException.Failed("empty body")
         }
         val contentRange = response.header("Content-Range")
+        Log.i(TAG, "download ${episodeServerId.value} from $rangeStart -> HTTP ${response.code} Content-Range=$contentRange")
         val resumedFrom = if (response.code == 206) parseContentRangeStart(contentRange) ?: rangeStart else null
         val totalBytes = when {
             response.code == 206 -> parseContentRangeTotal(contentRange)
