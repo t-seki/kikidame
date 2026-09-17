@@ -7,6 +7,7 @@ import androidx.room.Relation
 import androidx.room.Transaction
 import androidx.room.Update
 import androidx.room.Upsert
+import dev.tseki.jellyfinradio.domain.DownloadState
 import kotlinx.coroutines.flow.Flow
 data class ProgramSummaryRow(
     @Embedded val program: ProgramEntity,
@@ -49,6 +50,10 @@ interface ProgramDao {
     suspend fun insert(program: ProgramEntity): Long
     @Query("DELETE FROM programs")
     suspend fun deleteAll()
+    @Query("DELETE FROM programs WHERE id = :id")
+    suspend fun deleteById(id: Long)
+    @Query("SELECT * FROM programs WHERE id = :id")
+    suspend fun findById(id: Long): ProgramEntity?
 }
 /** 各回とその手元の状態。`@Relation` の to-one は行が無ければ null。 */
 data class EpisodeRow(
@@ -77,13 +82,36 @@ interface EpisodeDao {
     suspend fun insert(episode: EpisodeEntity): Long
     @Update
     suspend fun update(episode: EpisodeEntity)
+    @Query("UPDATE episodes SET sizeBytes = :sizeBytes WHERE id = :id")
+    suspend fun updateSize(id: Long, sizeBytes: Long)
+    @Query("DELETE FROM episodes WHERE id = :id")
+    suspend fun deleteById(id: Long)
+    @Query("SELECT COUNT(*) FROM episodes WHERE programId = :programId")
+    suspend fun countByProgram(programId: Long): Int
 }
 @Dao
 interface LocalFileDao {
     @Query("SELECT * FROM local_files WHERE path = :path")
     suspend fun findByPath(path: String): LocalFileEntity?
+    @Query("SELECT * FROM local_files WHERE episodeId = :episodeId")
+    suspend fun findByEpisode(episodeId: Long): LocalFileEntity?
+    @Query("SELECT * FROM local_files WHERE state = :state")
+    suspend fun listByState(state: DownloadState): List<LocalFileEntity>
+    /** キューの先頭: PENDING を放送日の新しい順（同着はタイトル・ID）。 */
+    @Query(
+        """
+        SELECT lf.* FROM local_files lf JOIN episodes e ON e.id = lf.episodeId
+        WHERE lf.state = 'PENDING'
+        ORDER BY e.airedAt DESC, e.title ASC, e.id ASC LIMIT 1
+        """,
+    )
+    suspend fun nextPending(): LocalFileEntity?
+    @Query("UPDATE local_files SET state = 'PENDING' WHERE state = 'FAILED' AND attemptCount < :maxAttempts")
+    suspend fun requeueFailed(maxAttempts: Int)
     @Upsert
     suspend fun upsert(localFile: LocalFileEntity)
+    @Query("DELETE FROM local_files WHERE episodeId = :episodeId")
+    suspend fun delete(episodeId: Long)
 }
 @Dao
 interface PlaybackStateDao {

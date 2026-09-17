@@ -25,6 +25,7 @@ import org.jellyfin.sdk.api.client.extensions.authenticateUserByName
 import org.jellyfin.sdk.api.client.extensions.authenticationApi
 import org.jellyfin.sdk.api.client.extensions.libraryApi
 import org.jellyfin.sdk.api.client.extensions.userViewApi
+import org.jellyfin.sdk.api.client.util.AuthorizationHeaderBuilder
 import org.jellyfin.sdk.createJellyfin
 import org.jellyfin.sdk.model.ClientInfo
 import org.jellyfin.sdk.model.api.BaseItemDto
@@ -35,6 +36,11 @@ import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.SortOrder
 import org.jellyfin.sdk.model.api.request.GetItemsRequest
 import java.io.IOException
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -138,6 +144,63 @@ class SdkJellyfinGateway @Inject constructor(
         ServerSnapshot(programs, episodes)
     }
 
+    /**
+     * SDK にはストリーミング取得の API が無い（`getDownload` は本文を `byte[]` に全部読む）ので、
+     * URL とヘッダだけ SDK に作らせて転送は OkHttp で行う。エンドポイントと認証形式は手書きしない。
+     */
+    override suspend fun openDownload(
+        credentials: ServerCredentials,
+        episodeServerId: ServerItemId,
+        rangeStart: Long,
+    ): DownloadStream = call {
+        val api = api(credentials.serverUrl, credentials.accessToken)
+        val url = api.libraryApi.getDownloadUrl(UUID.fromString(episodeServerId.value))
+        val authorization = AuthorizationHeaderBuilder.buildHeader(
+            clientName = api.clientInfo.name,
+            clientVersion = api.clientInfo.version,
+            deviceId = api.deviceInfo.id,
+            deviceName = api.deviceInfo.name,
+            accessToken = credentials.accessToken,
+        )
+        val request = Request.Builder()
+            .url(url)
+            .header("Authorization", authorization)
+            .apply { if (rangeStart > 0) header("Range", "bytes=$rangeStart-") }
+            .build()
+        val response = withContext(Dispatchers.IO) { downloadClient.newCall(request).execute() }
+        when (response.code) {
+            200, 206 -> Unit
+            401, 403 -> {
+                response.close()
+                throw ServerException.Unauthorized()
+            }
+            else -> {
+                val code = response.code
+                response.close()
+                throw ServerException.Failed("HTTP $code")
+            }
+        }
+        val body = response.body ?: run {
+            response.close()
+            throw ServerException.Failed("empty body")
+        }
+        val contentRange = response.header("Content-Range")
+        val resumedFrom = if (response.code == 206) parseContentRangeStart(contentRange) ?: rangeStart else null
+        val totalBytes = when {
+            response.code == 206 -> parseContentRangeTotal(contentRange)
+            body.contentLength() >= 0 -> body.contentLength()
+            else -> null
+        }
+        DownloadStream(resumedFrom = resumedFrom, totalBytes = totalBytes, body = body.byteStream()) { response.close() }
+    }
+
+    private val downloadClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .build()
+    }
+
     private fun BaseItemDto.toServerEpisode(): ServerEpisode? {
         val albumId = albumId ?: return null
         val created = dateCreated ?: return null
@@ -178,6 +241,16 @@ class SdkJellyfinGateway @Inject constructor(
         const val CLIENT_NAME = "Jellyfin Radio"
         const val PAGE_SIZE = 500
         private const val TAG = "JellyfinGateway"
+        private val CONTENT_RANGE_START = Regex("bytes\\s+(\\d+)-")
+        private val CONTENT_RANGE_TOTAL = Regex("/(\\d+)\\s*$")
+
+        /** `Content-Range: bytes 1000-49999/50000` → 1000 */
+        internal fun parseContentRangeStart(header: String?): Long? =
+            header?.let(CONTENT_RANGE_START::find)?.groupValues?.get(1)?.toLongOrNull()
+
+        /** `Content-Range: bytes 1000-49999/50000` → 50000。`*` なら null */
+        internal fun parseContentRangeTotal(header: String?): Long? =
+            header?.let(CONTENT_RANGE_TOTAL::find)?.groupValues?.get(1)?.toLongOrNull()
     }
 }
 
