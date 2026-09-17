@@ -75,7 +75,7 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 | Audio | 各回 (Episode) |
 | `AlbumArtist` | 放送局 (Station) — `radirec-tool` が albumartist に放送局を書く |
 | `PremiereDate` → `DateCreated` → ファイル更新日時 | 放送日 (Aired At) — 並び順・「最新 N 回」の基準。この順でフォールバック |
-| `DateCreated` | 取り込み日時 (Added At) — 差分検出の打ち切りにだけ使う |
+| `DateCreated` | 取り込み日時 (Added At) — 表示・並び順には使わない（差分取得は ADR 0004 で見送り） |
 | `Id` | サーバ ID — アプリ内の主キーではない（ADR 0001） |
 
 主に使う取得パス（SDK 経由で呼ぶ）:
@@ -91,9 +91,9 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
   `PlaybackPositionTicks` / `Played` / `LastPlayedDate`）。`/Sessions/Playing/*` は使わない
 - 再生位置の初期取得: `GET /UserItems/{itemId}/UserData`（ローカルに行が無いときだけ）
 
-M2 は毎回フル走査（2,000 件規模なら数ページ）。差分検出（`DateCreated` 降順で取り、ローカルの最大取り込み日時に
-到達したら打ち切る）は M3 の定期同期で「通常は差分、1 日 1 回は全走査」の形で入れる。差分だけだと
-サーバ側で直ったメタデータ（放送日修正など）を拾えないため。
+取得は毎回フル走査（実機 153 番組 / 6,004 回で約 12 秒）。差分取得（`DateCreated` 降順で取り、ローカルの最大取り込み日時に
+到達したら打ち切る）は**作らない**（ADR 0004）: 不完全な一覧を同期の入力にすると載っていないだけの各回を削除してしまい、
+全走査が 12 秒で終わる今は取り込み専用の経路を持つ価値が無い。各回一覧の「引っ張って更新」だけは番組単位取得（#12、M3-b）。
 
 サーバの `PremiereDate`（無ければ `DateCreated`）は日時で来るが、**日付部分だけ取って JST 0 時の `Instant`** にする
 （シード由来の放送日と同じ土俵にして、並び順が混ざらないようにする）。
@@ -202,8 +202,9 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 
 運用パラメータ:
 
-- 定期同期: `PeriodicWorkRequest` 6 時間ごと、`Constraints` は充電中 + （設定が Wi-Fi のみなら）UNMETERED
-- アプリ起動時: 前回同期から 1 時間以上経っていれば実行。手動プルでも実行
+- 定期同期: `PeriodicWorkRequest` 6 時間ごと、`Constraints` は `DownloadWorker` と同じ（Wi-Fi のみなら UNMETERED、
+  そうでなければ CONNECTED）。充電中の条件は課さない（同期自体の通信は一覧の JSON だけで軽く、転送は `DownloadWorker` の制約で守られる）
+- アプリ起動時: 前回同期から 1 時間以上経っていれば実行（同じ制約で待つ）。番組一覧の手動プルは同期そのもの（M3-b の範囲を参照）
 - ダウンロード: Worker 内で HTTP ストリームを `.part` ファイルへ書き、完了後にリネーム。
   再開は `Range` ヘッダ。進捗は `setProgress` で UI へ
 - 置き場所: `getExternalFilesDir("episodes")/<放送局>/<番組>/<ファイル>`（M1 のシードと同じ階層）
@@ -322,6 +323,54 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   同期によるダウンロード（M3-b）は `pinned = false`
 - **命名**: 放送局 null は `_`、`container` 空は `m4a`、禁止文字（`/ \ : * ? " < > |`）は `_`、同名衝突は ` (2)`
 - 「手元 M / 全 N 回」の M は `DONE` のみ。手元に無い回の再生は M3-a でも不可（ストリーミングは M4 以降）
+
+- **同期の 1 回** = 全走査（`fetchLibrary`）→ 取り込み（M2 の突合・上書き）→ `planSync` → 削除の実行 → ダウンロード対象を
+  `PENDING`（`pinned = false`）で enqueue → `DownloadScheduler.kick()`。転送は `DownloadWorker` に任せ、同期は自分でファイルを落とさない。
+  **削除の権限を持つ入力は全走査だけ**（ADR 0004）。差分取得は作らない
+- **入口は `LibraryRefresher` に一本化**（mutex 共有）。定期 `SyncWorker`・起動時・番組一覧の手動プル・ボトムシートの「今すぐ同期」が
+  すべてここを通る。**番組一覧の「引っ張って更新」= 手動同期**（`planSync` まで回す）。**各回一覧の「引っ張って更新」= 番組単位取得（#12）**で、
+  突合・上書き・追加はするが削除しない。設定画面の「最終取得」は「最終同期」（値は `lastFetchedAt`。番組単位取得は更新しない）。
+  ログイン直後の初回取得も同期になるが、全番組が同期対象 OFF なので何も落ちず何も消えない
+- **「Wi-Fi のみ」は同期にも効く**（手動を含む）。`SyncWorker` の制約は `DownloadWorker` と同じ（UNMETERED / CONNECTED、充電中は課さない）。
+  手動は `LibraryRefresher` で `ConnectivityManager.isActiveNetworkMetered` を見て、従量制ならスナックバー
+  「Wi-Fi に接続していないため更新しません」で終える（裏で待たせない）。判定は全走査・番組単位・起動時・定期のすべてが通るが、
+  **ゲートはサーバへの取得だけを包む**: 先頭の `reconcileMissingFiles()`（#5、ローカル I/O のみ）は従量制でも走らせる
+- **起点**: 定期は `PeriodicWorkRequest` 6 時間（`UPDATE` で起動時に登録し直す）。起動時は `ProcessLifecycleOwner` の `ON_START` で
+  前回同期から 1 時間以上なら `OneTimeWorkRequest`（ユニーク `sync-once`、`KEEP`）。定期・起動時の失敗は `Result.success()` で終え次回を待つ
+  （スナックバー無し、Log のみ）。401 は `DownloadWorker` と同じくログアウト
+- **`planSync`**（`:core:domain`、純粋、JUnit 5）: 入力は番組ごとの `{ syncEnabled, retentionRule, server: Known(list) | Unavailable | Gone,
+  local: List<LocalEpisodeState(episodeId, serverItemId?, airedAt, title, pinned, played, hasLocalFile)> }`。`hasLocalFile` は
+  PENDING / RUNNING / DONE / FAILED のいずれかの行があること（**FAILED も「手元にある」**。再試行は M3-a の規則のまま Worker 起動時に
+  `attemptCount < 3` を PENDING に戻す。3 回超は手動のみ）。出力は `{ download: List<EpisodeId>, delete: List<EpisodeId>, remove: List<EpisodeId>, onHold: Boolean }`
+  - **`syncEnabled = false` でも関数は動く**: `download` は空、`delete` は非固定の手元ファイル全部、`remove` はサーバから消えた
+    `serverItemId != null` の回（固定含む）。`syncEnabled` が効くのは保持ルールの適用（何を `download` し、固定でない何を `delete` するか）だけ。
+    `Unavailable` / `Gone` は `syncEnabled` に関わらず全部空 + `onHold`
+  - **固定は N に数えない**（別枠）。`keepLatest` は固定を除いた放送日の新しい順で数える（同着は `EpisodeOrder`）
+  - **サーバの一覧から消えた `serverItemId != null` の各回は固定でも `Episode` 行ごと消す**（`remove`。`LocalFile` / `PlaybackState` は cascade、
+    ファイルも消す）。保持ルールによる削除（`delete`）は `FILE_ONLY`（`PlaybackState` は残す、ADR 0002）。`Known` の番組で各回が 0 になっても番組は残す
+  - `Unavailable` / `Gone` は `onHold`。M3-b では保存も表示もしない（M3-c、#3）。全走査なので番組ごとの `Unavailable` になる経路は無い
+- **実行側の例外**（`planSync` の外）: 削除対象が PENDING / RUNNING / FAILED なら `cancel` 相当。**再生中の回（現在の `MediaItem`）は今回は削除しない**
+  （次回に持ち越し）。再生中の回 ID は `PlaybackService` が `Player.Listener` で `@Singleton` の `NowPlaying`（`StateFlow<EpisodeId?>`、`:app`）に
+  書き、同期の実行側はそれを読む（Worker と Service は同一プロセス。MediaController を Worker から結ばない）。
+  実行順は削除 → enqueue。同期分の enqueue 順は **番組をまたいで放送日の新しい順**
+- **キューの優先順位**（M3-a から持ち越し）: `nextPending()` を `pinned DESC, enqueuedAt IS NULL, enqueuedAt ASC, airedAt DESC` に変える（手動が常に先。
+  `enqueuedAt` は v3 で足した nullable なので NULL を先頭に来させない）。
+  同期分（`pinned = false`）の行に利用者が「ダウンロード」を選んだら `pinned = true` にする（既存の `enqueue` の「行があれば何もしない」を変える）
+- **手動削除と同期の往復は仕様として受け入れる**: 同期対象の番組で保持すべき回のファイルを手で消しても、次の同期で落とし直される。
+  削除時のスナックバーに「同期対象の番組なので次の同期で落とし直されます」を足す。聴かない回は再生済みにするのが正規の操作。「除外」状態は作らない
+- **同期対象 OFF**: 次の同期でその番組の非固定ファイルが全部消える（CONTEXT.md「固定」の定義どおり）。OFF に切り替えるとき手元に非固定の回が
+  N 本あれば「N 回のファイルが次の同期で削除されます。残したい回は固定してください」の確認ダイアログ
+- **保持ルール編集**: 各回一覧のトップバーの同期アイコン → ボトムシート。「この番組を同期する」スイッチ、「最新 N 回まで保持」
+  （選択式 1 / 3 / 5 / 10 / 20 / 上限なし）、「再生済みなら削除」スイッチ（後の 2 つは同期 OFF でグレーアウト）、「今すぐ同期」ボタン。
+  ON にするとき `keepLatest` が null なら **既定 3** を入れる（利用者が「上限なし」を選んだら以降は触らない）。ON にしても即同期はしない。
+  `serverItemId` の無い番組はスイッチ無効 + 「サーバ上で見つかっていないため同期できません」。番組一覧の行に同期対象の印
+- **結果の文言**: 手動は「番組 X / 各回 Y を取得。Z 回をダウンロード予約、W 回を削除」（0 は省く）+ 判断保留があれば
+  「N 番組はサーバ上で見つからず、そのままにしました」。`RefreshResult` に `enqueued` / `deleted` / `onHold` を足す。通知は出さない
+- **#12 番組単位の更新**: `JellyfinGateway.fetchProgramEpisodes(credentials, programServerId)`、
+  `LibraryRefreshRepository.refreshProgram(programId)`（突合は「番組 1 つ + その各回」のスナップショットで `LibraryMatching.match`、削除なし）。
+  `serverItemId` の無い番組は手動同期にフォールバック
+- Room のスキーマ変更は無し（`syncEnabled` / `keepLatest` / `deleteAfterPlayed` は v1 から在る）。`Episode.addedAt` は差分取得を見送ったことで
+  読み手が無くなるが、列は残す（取り込み日時の表示や #9 の補助に使える。消すならスキーマ変更が要る）
 
 ## 作業の進め方
 
