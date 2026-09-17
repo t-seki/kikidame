@@ -9,7 +9,7 @@ data class Program(
     val syncEnabled: Boolean = false,
     val retentionRule: RetentionRule = RetentionRule(),
 )
-/** 保持ルール。M1 では保存するだけで適用しない（適用は M3）。 */
+/** 保持ルール。同期のときに [SyncPlanner] が適用する（保存した瞬間には何も消えない）。 */
 data class RetentionRule(
     /** 最新 N 回まで保持。null は上限なし。 */
     val keepLatest: Int? = null,

@@ -18,7 +18,7 @@ import dev.tseki.jellyfinradio.domain.SessionState
 import kotlinx.coroutines.flow.first
 
 /**
- * `local_files` の PENDING を放送日の新しい順に 1 本ずつ落とす。並列にはしない。
+ * `local_files` の PENDING を 1 本ずつ落とす（順序は `LocalFileDao.nextPending`: 手動が先、その中はキューに入れた順）。並列にはしない。
  * 1 本の失敗は行に記録して次へ進む。401 はログアウトして止まる。
  * 進捗は `setProgress` で各回 ID と割合を流す（一覧の進捗リング）。
  */

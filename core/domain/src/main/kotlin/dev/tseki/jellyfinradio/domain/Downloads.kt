@@ -53,8 +53,17 @@ object EpisodeFileName {
 
 /** ダウンロードの操作（利用者側）。 */
 interface DownloadRepository {
-    /** 手動ダウンロード = 固定。既に行がある回（手元にある・キュー中・失敗）は何もしない。失敗は [retry]。 */
+    /** 手動ダウンロード = 固定。既に行がある回は固定にするだけ（同期分の予約を手動に格上げする）。失敗は [retry]。 */
     suspend fun enqueue(episodeId: EpisodeId)
+
+    /** 同期による予約（`pinned = false`）。渡した順にキューへ入れる。既に行がある回は飛ばし、実際に予約した数を返す。 */
+    suspend fun enqueueForSync(episodeIds: List<EpisodeId>): Int
+
+    /**
+     * サーバの一覧から消えた各回を `Episode` 行ごと消す（`LocalFile` / `PlaybackState` は cascade、ファイルも消す）。
+     * [deletionScopeFor] は「落とし直せる」前提なので、ここには当てはまらない。
+     */
+    suspend fun removeEpisode(episodeId: EpisodeId)
 
     /** DONE 以外（PENDING / RUNNING / FAILED）の行を取り消す。書きかけのファイルも消す。 */
     suspend fun cancel(episodeId: EpisodeId)

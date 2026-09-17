@@ -3,6 +3,7 @@ import dev.tseki.jellyfinradio.domain.Episode
 import dev.tseki.jellyfinradio.domain.EpisodeId
 import dev.tseki.jellyfinradio.domain.EpisodeWithState
 import dev.tseki.jellyfinradio.domain.LocalEpisodeKey
+import dev.tseki.jellyfinradio.domain.LocalEpisodeState
 import dev.tseki.jellyfinradio.domain.LocalFile
 import dev.tseki.jellyfinradio.domain.LocalProgramKey
 import dev.tseki.jellyfinradio.domain.PlaybackState
@@ -32,6 +33,15 @@ fun ProgramKeyRow.toDomain(): LocalProgramKey =
     LocalProgramKey(ProgramId(id), serverItemId?.let(::ServerItemId), stationName, name)
 fun EpisodeKeyRow.toDomain(): LocalEpisodeKey =
     LocalEpisodeKey(EpisodeId(id), serverItemId?.let(::ServerItemId), ProgramId(programId), title)
+fun EpisodeSyncRow.toDomain(): LocalEpisodeState = LocalEpisodeState(
+    id = EpisodeId(id),
+    serverItemId = serverItemId?.let(::ServerItemId),
+    airedAt = airedAt,
+    title = title,
+    pinned = pinned == true,
+    played = played == true,
+    hasLocalFile = hasLocalFile,
+)
 fun EpisodeEntity.toDomain(): Episode = Episode(
     id = EpisodeId(id),
     serverItemId = serverItemId?.let(::ServerItemId),

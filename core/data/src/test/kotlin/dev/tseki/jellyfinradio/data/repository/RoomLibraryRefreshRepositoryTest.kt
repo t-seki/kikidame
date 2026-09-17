@@ -1,6 +1,8 @@
 package dev.tseki.jellyfinradio.data.repository
 
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.tseki.jellyfinradio.data.files.EpisodesDirectory
 import dev.tseki.jellyfinradio.domain.LibraryView
 import dev.tseki.jellyfinradio.domain.PlaybackRules
 import dev.tseki.jellyfinradio.domain.ServerEpisode
@@ -38,9 +40,11 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
     private val store by lazy { testSessionStore(tmp.root, scope) }
     private val session by lazy { DataStoreSessionRepository(store, gateway) }
     private val importer by lazy { RoomLocalImportRepository(db, clock) }
-    private val library by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao()) }
+    private val library by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao(), db.localFileDao()) }
     private val playback by lazy { RoomPlaybackStateRepository(db, clock) }
-    private val repo by lazy { RoomLibraryRefreshRepository(db, store, gateway, clock) }
+    private val directory by lazy { EpisodesDirectory(ApplicationProvider.getApplicationContext()) }
+    private val downloads by lazy { RoomDownloadRepository(db, directory, clock) }
+    private val repo by lazy { RoomLibraryRefreshRepository(db, store, gateway, downloads, clock) }
 
     private val program = "パンサー向井のふらっと"
     private val station = "TBSラジオ"
@@ -144,8 +148,9 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
         assertTrue(library.observeEpisodes(summary.program.id).first().any { it.episode.title == "renamed" })
     }
 
+    /** 番組ごとサーバの一覧から消えたら消失 = 判断保留（各回が消えた場合は RoomSyncTest）。 */
     @Test
-    fun rowsMissingFromTheServerAreLeftAlone() = runTest {
+    fun aProgramGoneFromTheServerIsLeftAlone() = runTest {
         signInAndSelect()
         gateway.snapshot = snapshot
         repo.refresh()
