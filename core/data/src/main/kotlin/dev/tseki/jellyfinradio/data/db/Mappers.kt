@@ -2,7 +2,9 @@ package dev.tseki.jellyfinradio.data.db
 import dev.tseki.jellyfinradio.domain.Episode
 import dev.tseki.jellyfinradio.domain.EpisodeId
 import dev.tseki.jellyfinradio.domain.EpisodeWithState
+import dev.tseki.jellyfinradio.domain.LocalEpisodeKey
 import dev.tseki.jellyfinradio.domain.LocalFile
+import dev.tseki.jellyfinradio.domain.LocalProgramKey
 import dev.tseki.jellyfinradio.domain.PlaybackState
 import dev.tseki.jellyfinradio.domain.Program
 import dev.tseki.jellyfinradio.domain.ProgramId
@@ -23,8 +25,13 @@ fun ProgramEntity.toDomain(): Program = Program(
 fun ProgramSummaryRow.toDomain(): ProgramSummary = ProgramSummary(
     program = program.toDomain(),
     episodeCount = episodeCount,
+    localEpisodeCount = localEpisodeCount,
     latestAiredAt = latestAiredAt?.let(Instant::fromEpochMilliseconds),
 )
+fun ProgramKeyRow.toDomain(): LocalProgramKey =
+    LocalProgramKey(ProgramId(id), serverItemId?.let(::ServerItemId), stationName, name)
+fun EpisodeKeyRow.toDomain(): LocalEpisodeKey =
+    LocalEpisodeKey(EpisodeId(id), serverItemId?.let(::ServerItemId), ProgramId(programId), title)
 fun EpisodeEntity.toDomain(): Episode = Episode(
     id = EpisodeId(id),
     serverItemId = serverItemId?.let(::ServerItemId),
