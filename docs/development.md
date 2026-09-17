@@ -200,8 +200,8 @@ $ADB shell dumpsys jobscheduler | grep -A3 "dev.tseki.jellyfinradio" | head -40
 $ADB logcat -d | grep -E "SyncWorker|LibraryRefresher"   # "sync: 番組 N / 各回 M を取得。…"
 ```
 
-起動時同期をすぐ試したいときは、設定画面の「最終同期」が 1 時間以上前になるまで待つか、ログアウト → ログインし直す
-（最終同期が消えるので、次に前面に出たとき `sync-once` が積まれる）。
+起動時同期は前回同期から 1 時間以上あけないと積まれない（ログイン直後の初回取得も同期なので、ログインし直しでは試せない）。
+待たずに Worker を走らせるなら、`dumpsys jobscheduler` で WorkManager のジョブ ID を見て `adb shell cmd jobscheduler run -f dev.tseki.jellyfinradio <jobId>`。
 
 ### 実機チェックリスト（M3-b）
 
