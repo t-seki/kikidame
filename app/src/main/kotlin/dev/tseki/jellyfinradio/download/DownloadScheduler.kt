@@ -51,8 +51,14 @@ class DownloadScheduler @Inject constructor(
         workManager.enqueueUniqueWork(DownloadWorker.UNIQUE_NAME, ExistingWorkPolicy.KEEP, request)
     }
 
-    /** 「Wi-Fi のみ」を変えたら、待っている Worker の条件を差し替える。 */
+    /**
+     * 「Wi-Fi のみ」を変えたら、条件待ちの Worker を新しい条件で組み直す。
+     * 実行中の Worker は止めない（転送を切らない）。その Worker は今のキューを最後まで処理し、
+     * 次に起動する Worker から新しい条件が効く。
+     */
     suspend fun reschedule() {
+        val infos = workManager.getWorkInfosForUniqueWorkFlow(DownloadWorker.UNIQUE_NAME).first()
+        if (infos.any { it.state == WorkInfo.State.RUNNING }) return
         workManager.cancelUniqueWork(DownloadWorker.UNIQUE_NAME)
         kick()
     }

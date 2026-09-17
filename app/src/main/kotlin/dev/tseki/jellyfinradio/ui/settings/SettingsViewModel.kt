@@ -26,7 +26,7 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
     val wifiOnly: StateFlow<Boolean> = settings.wifiOnly
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
-    /** 変更したら、条件待ちの Worker を新しい条件で組み直す。 */
+    /** 変更したら、条件待ちの Worker を新しい条件で組み直す（実行中の転送は切らない）。 */
     fun setWifiOnly(value: Boolean) {
         viewModelScope.launch {
             settings.setWifiOnly(value)

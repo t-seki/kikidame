@@ -188,7 +188,9 @@ class SdkJellyfinGateway @Inject constructor(
         Log.i(TAG, "download ${episodeServerId.value} from $rangeStart -> HTTP ${response.code} Content-Range=$contentRange")
         val resumedFrom = if (response.code == 206) parseContentRangeStart(contentRange) ?: rangeStart else null
         val totalBytes = when {
+            // 206 で Content-Range が無い／読めないときは、残りの長さから全体を求めて完全性チェックを生かす
             response.code == 206 -> parseContentRangeTotal(contentRange)
+                ?: body.contentLength().takeIf { it >= 0 }?.let { it + (resumedFrom ?: 0L) }
             body.contentLength() >= 0 -> body.contentLength()
             else -> null
         }

@@ -78,16 +78,17 @@ class RoomDownloadRepositoryTest : RoomTestBase() {
     }
 
     @Test
-    fun queueOrderIsNewestFirstAndDoneUpdatesSize() = runTest {
+    fun queueOrderIsFifoAndDoneUpdatesSize() = runTest {
         val newer = episodeId("2026-09-16 (1)")
         val older = episodeId("2026-09-15 (1)")
         repo.enqueue(older)
+        now += 1.minutes
         repo.enqueue(newer)
-        assertEquals(newer, repo.nextPending()!!.episode.id)
+        assertEquals(older, repo.nextPending()!!.episode.id, "tapped first, downloaded first")
 
-        repo.markRunning(newer)
-        assertTrue(repo.isStillWanted(newer))
-        assertEquals(older, repo.nextPending()!!.episode.id)
+        repo.markRunning(older)
+        assertTrue(repo.isStillWanted(older))
+        assertEquals(newer, repo.nextPending()!!.episode.id)
         val target = db.localFileDao().findByEpisode(newer.value)!!.path!!
         repo.markDone(newer, target, 12345)
         val done = library.getEpisode(newer)!!
