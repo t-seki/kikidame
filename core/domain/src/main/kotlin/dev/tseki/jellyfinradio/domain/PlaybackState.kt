@@ -17,6 +17,18 @@ data class PlaybackState(
             PlaybackState(episodeId, Duration.ZERO, played = false, updatedAt = now)
     }
 }
+/** 倍速の選択肢（#35）。アプリ全体で 1 つ。ピッチは変えない。再生位置は音源の時間なので倍速の影響を受けない。 */
+object PlaybackSpeed {
+    const val DEFAULT = 1.0f
+    val CHOICES: List<Float> = listOf(1.0f, 1.25f, 1.5f, 1.75f, 2.0f)
+
+    /** 保存値が選択肢に無ければ既定に戻す（将来選択肢を変えたとき用）。 */
+    fun normalize(value: Float?): Float = value?.takeIf { it in CHOICES } ?: DEFAULT
+
+    /** 「1.5×」「2×」の形。 */
+    fun label(speed: Float): String = if (speed == speed.toInt().toFloat()) "${speed.toInt()}×" else "$speed×"
+}
+
 /**
  * 再生済みと再開位置の規則。再生済みフラグと再生位置は互いに書き換えない（[advance] は位置を、
  * [setPlayed] はフラグだけを変える）。両方を読んで決めるのは [resumePosition] と [isNotStarted] だけ。

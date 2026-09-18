@@ -247,7 +247,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
     次／前・自動遷移で別の回に入ったときはサービス側で保存位置（再開位置の規則）へシークする
 - **再生位置の保存**: 一時停止・停止・回の切替時（`onMediaItemTransition` の `oldPosition`）+ 再生中 10 秒ごと。
   ただし行が無く、位置 5 秒未満・未再生（`PlaybackRules.NOT_STARTED_THRESHOLD`、聴き始めていない）なら書かない（#7）。
-  プロセスの強制 kill で最大 10 秒戻るのは許容
+  プロセスの強制 kill で最大 10 秒戻るのは許容（定期保存は壁時計なので、倍速なら音源時間で最大 10 秒 × 速度）
 - **再起動後の復元**: 各回を開き直すと保存位置から再開できること。「最後に聴いていた回」の自動復元や
   ミニプレイヤーは M1 に含めない
 - **MediaSessionService**: 通知・ロック画面操作。以下は必須
@@ -306,7 +306,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 - **Worker**: WorkManager のユニーク Worker（`download-queue`、`KEEP`）が `LocalFile.state = PENDING` の行を**キューに入れた順（FIFO、
   `enqueuedAt`。実機確認で「タップした順に落ちてほしい」と決定）**に **1 本ずつ**処理する。再試行は列の末尾へ。M3-b の同期が積む分の優先順位はそこで決める。`<局>/<番組>/<タイトル>.<container>.part` に追記し、完了でリネーム。既存の `.part` は `Range: bytes=<size>-` で再開。
   進捗は `setProgress`。通知は出さない（フォアグラウンドサービスにしない）
-- **条件**: 設定の「Wi-Fi のみ」（既定 ON、`AppSettings` DataStore）。ON なら `UNMETERED`、OFF なら `CONNECTED`。待ちの間は「Wi-Fi 待ち」表示
+- **条件**: 設定の「Wi-Fi のみ」（既定 ON、`AppSettings` DataStore。倍速（#35）も同じ DataStore）。ON なら `UNMETERED`、OFF なら `CONNECTED`。待ちの間は「Wi-Fi 待ち」表示
 - **失敗**: 1 本失敗しても次へ。`attemptCount` +1、`lastAttemptAt`、`FAILED`。同一実行内では再試行しない。次の起動で
   `attemptCount < 3` を PENDING に戻す。3 回超えは手動の再試行だけ。401 は `LibraryRefresher` と同じくログアウト
 - **キャンセル**: DONE 以外の行を消し `.part` も消す。Worker は約 1 MB ごとに DB を見てスキップする

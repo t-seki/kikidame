@@ -1,6 +1,5 @@
 package dev.tseki.jellyfinradio.domain
 
-import kotlinx.coroutines.flow.Flow
 
 /** 手元のファイルを消すときの範囲。 */
 enum class LocalDeletionScope {
@@ -111,9 +110,4 @@ interface DownloadQueue {
 
     /** キャンセル済みなら false（Worker は約 1 MB ごとに見る）。 */
     suspend fun isStillWanted(episodeId: EpisodeId): Boolean
-}
-
-interface AppSettingsRepository {
-    val wifiOnly: Flow<Boolean>
-    suspend fun setWifiOnly(value: Boolean)
 }
