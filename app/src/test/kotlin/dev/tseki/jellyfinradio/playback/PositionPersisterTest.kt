@@ -90,6 +90,13 @@ class PositionPersisterTest {
         runCurrent()
         assertNull(repo.states.value[ep1])
         assertEquals(1, repo.updateCount, "update 自体は呼ばれるが書かれない")
+        // ⏮ で戻っても同じ（方向は見ない）
+        player.update { setContentPositionMs(1_000) }
+        player.seekToPreviousMediaItem()
+        player.update { }
+        runCurrent()
+        assertNull(repo.states.value[ep2])
+        assertEquals(2, repo.updateCount)
     }
 
     @Test
