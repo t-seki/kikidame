@@ -92,15 +92,15 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    /** スリープタイマーの表示（#36）: 残り時間「24:59」、「回の終わり」、未設定なら null。残り時間は 1 秒ごとに更新。 */
+    /** スリープタイマーの表示（#36）: 残り時間「24:59」（一時停止中は止まったまま）、「回の終わり」、未設定なら null。 */
     val sleepTimerLabel: StateFlow<String?> = sleepTimer.setting
         .flatMapLatest { setting ->
             when (setting) {
                 null -> flowOf(null)
                 SleepTimerSetting.EndOfEpisode -> flowOf("回の終わり")
-                is SleepTimerSetting.At -> flow {
+                is SleepTimerSetting.Countdown -> flow {
                     while (true) {
-                        emit((setting.endsAt - clock.now()).coerceAtLeast(Duration.ZERO).toClockText())
+                        emit(setting.remainingAt(clock.now()).toClockText())
                         delay(1_000)
                     }
                 }
@@ -112,7 +112,8 @@ class PlayerViewModel @Inject constructor(
         .map { it != null }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
-    fun setSleepTimer(after: Duration?) = sleepTimer.set(after?.let { SleepTimerSetting.At(clock.now() + it) })
+    /** [after] 後に一時停止（再生中だけ減る）。null で解除。 */
+    fun setSleepTimer(after: Duration?) = sleepTimer.set(after?.let { SleepTimerSetting.Countdown(it) })
 
     fun setSleepTimerToEndOfEpisode() = sleepTimer.set(SleepTimerSetting.EndOfEpisode)
 

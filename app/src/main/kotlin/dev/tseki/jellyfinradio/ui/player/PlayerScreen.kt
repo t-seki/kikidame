@@ -233,7 +233,7 @@ private fun SleepTimerSheet(
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Text("スリープタイマー", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
         Text(
-            "時間が来るか今の回が終わったら一時停止します。再生を止めると解除されます",
+            "時間が来るか今の回が終わったら一時停止します。一時停止している間は時間が進みません",
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(horizontal = 24.dp),
         )
