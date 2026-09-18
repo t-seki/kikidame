@@ -46,7 +46,6 @@ class RoomRematchTest : RoomTestBase() {
     private val session by lazy { DataStoreSessionRepository(store, gateway) }
     private val library by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao(), db.localFileDao()) }
     private val playback by lazy { RoomPlaybackStateRepository(db, clock) }
-    private val importer by lazy { RoomLocalImportRepository(db, clock) }
     private val directory by lazy { EpisodesDirectory(ApplicationProvider.getApplicationContext()) }
     private val downloads by lazy { RoomDownloadRepository(db, directory, clock) }
     private val repo by lazy { RoomLibraryRefreshRepository(db, store, gateway, downloads, clock) }
@@ -179,7 +178,7 @@ class RoomRematchTest : RoomTestBase() {
 
     @Test
     fun seededEpisodesLinkByAiredDayAndRuntimeWhenTitlesDiffer() = runTest {
-        importer.import(
+        seed(
             listOf(
                 scanned(station = station, program = programName, title = "$programName 2026-09-16-1", airedAt = "2026-09-15T15:00:00Z", runtime = 89.minutes + 59.seconds),
                 scanned(station = station, program = programName, title = "$programName 2026-09-16-2", airedAt = "2026-09-15T15:00:00Z", runtime = 60.minutes + 5.seconds),

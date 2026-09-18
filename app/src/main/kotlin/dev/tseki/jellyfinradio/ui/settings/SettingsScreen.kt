@@ -32,7 +32,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.tseki.jellyfinradio.BuildConfig
 import dev.tseki.jellyfinradio.domain.SessionState
 import dev.tseki.jellyfinradio.ui.toDateTimeText
 
@@ -106,16 +105,6 @@ fun SettingsScreen(
                 headlineContent = { Text("別のサーバに接続", color = MaterialTheme.colorScheme.error) },
                 supportingContent = { Text("手元の番組・各回・再生位置をすべて消してから接続画面へ。音声ファイルは消しません") },
             )
-
-            if (BuildConfig.DEBUG) {
-                HorizontalDivider()
-                Text("デバッグ", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(16.dp, 16.dp, 16.dp, 4.dp))
-                ListItem(
-                    modifier = Modifier.clickable(onClick = viewModel::runSeed),
-                    headlineContent = { Text("シード") },
-                    supportingContent = { Text("${viewModel.seedRoot}/<放送局>/<番組>/ を走査して手元のファイルを取り込みます") },
-                )
-            }
         }
     }
 

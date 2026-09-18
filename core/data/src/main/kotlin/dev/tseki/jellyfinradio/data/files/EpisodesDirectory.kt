@@ -8,7 +8,7 @@ import javax.inject.Singleton
 
 /**
  * 手元の音声ファイルの置き場 `getExternalFilesDir("episodes")`。
- * `filesDir` に変えないこと — root 無しの `adb push` が通らない。シードもダウンロードも同じ木を使う。
+ * `filesDir` に変えないこと — 外部ストレージなら `adb pull` でファイルを取り出せる（root 無し）。
  */
 @Singleton
 class EpisodesDirectory @Inject constructor(@ApplicationContext private val context: Context) {

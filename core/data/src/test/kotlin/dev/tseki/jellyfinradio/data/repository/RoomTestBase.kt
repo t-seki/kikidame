@@ -2,7 +2,11 @@ package dev.tseki.jellyfinradio.data.repository
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import dev.tseki.jellyfinradio.data.db.JellyfinRadioDatabase
-import dev.tseki.jellyfinradio.domain.ScannedEpisode
+import dev.tseki.jellyfinradio.data.db.EpisodeEntity
+import dev.tseki.jellyfinradio.data.db.LocalFileEntity
+import dev.tseki.jellyfinradio.data.db.ProgramEntity
+import dev.tseki.jellyfinradio.domain.DownloadState
+import dev.tseki.jellyfinradio.domain.Ticks
 import org.junit.After
 import org.junit.Before
 import kotlin.time.Clock
@@ -27,20 +31,49 @@ abstract class RoomTestBase {
     fun closeDatabase() {
         db.close()
     }
+    /** サーバ ID を持たない手元の行（ADR 0001。かつてのシードが作っていた形）をテスト用に組み立てる。 */
+    data class LocalRow(
+        val station: String,
+        val program: String,
+        val title: String,
+        val airedAt: Instant,
+        val runtime: Duration,
+        val path: String,
+    )
+
     protected fun scanned(
         station: String = "J-WAVE",
         program: String = "LOGISTEED RADIONOMICS",
         title: String,
         airedAt: String,
         runtime: Duration = 30.minutes,
-    ) = ScannedEpisode(
-        stationName = station,
-        programName = program,
+    ) = LocalRow(
+        station = station,
+        program = program,
         title = title,
-        path = "/sdcard/Android/data/dev.tseki.jellyfinradio/files/episodes/$station/$program/$title.m4a",
         airedAt = Instant.parse(airedAt),
         runtime = runtime,
-        sizeBytes = 1024,
-        container = "m4a",
+        path = "/sdcard/Android/data/dev.tseki.jellyfinradio/files/episodes/$station/$program/$title.m4a",
     )
+
+    /** 番組は (放送局, 番組名) で探して無ければ作り、各回は固定された DONE のファイル付きで入れる。 */
+    protected suspend fun seed(rows: List<LocalRow>) {
+        for (r in rows) {
+            val programId = db.programDao().findByStationAndName(r.station, r.program)?.id
+                ?: db.programDao().insert(ProgramEntity(serverItemId = null, name = r.program, stationName = r.station))
+            val episodeId = db.episodeDao().insert(
+                EpisodeEntity(
+                    serverItemId = null,
+                    programId = programId,
+                    title = r.title,
+                    airedAt = r.airedAt,
+                    addedAt = null,
+                    runtimeTicks = Ticks.fromDuration(r.runtime),
+                    sizeBytes = 1024,
+                    container = "m4a",
+                ),
+            )
+            db.localFileDao().upsert(LocalFileEntity(episodeId, DownloadState.DONE, r.path, pinned = true, downloadedAt = now))
+        }
+    }
 }

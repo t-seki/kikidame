@@ -17,7 +17,7 @@ data class ProgramEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val serverItemId: String?,
     val name: String,
-    /** 放送局（MusicAlbum.AlbumArtist / シードでは番組フォルダの親フォルダ名）。 */
+    /** 放送局（MusicAlbum.AlbumArtist）。保存先では番組フォルダの親フォルダ名になる。 */
     val stationName: String?,
     val syncEnabled: Boolean = false,
     /** 最新 N 回まで保持（null = 上限なし）。 */
@@ -44,7 +44,7 @@ data class EpisodeEntity(
     val title: String,
     /** 放送日。 */
     val airedAt: Instant,
-    /** 取り込み日時。サーバと突合されるまでは null（シード由来）。 */
+    /** 取り込み日時。サーバを経由していない行は null。 */
     val addedAt: Instant?,
     /** 1 tick = 100ns。ticks は Entity とサーバ境界にだけ現れる。 */
     val runtimeTicks: Long,

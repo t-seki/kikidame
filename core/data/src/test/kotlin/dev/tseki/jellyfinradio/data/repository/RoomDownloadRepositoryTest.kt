@@ -31,7 +31,6 @@ class RoomDownloadRepositoryTest : RoomTestBase() {
     private val repo by lazy { RoomDownloadRepository(db, directory, clock) }
     private val library by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao(), db.localFileDao()) }
     private val refresh by lazy { RoomLibraryRefreshRepository(db, testSessionStore(tmpDir(), kotlinx.coroutines.GlobalScope), FakeJellyfinGateway(), repo, clock) }
-    private val importer by lazy { RoomLocalImportRepository(db, clock) }
     private val playback by lazy { RoomPlaybackStateRepository(db, clock) }
 
     private fun tmpDir(): File = File(directory.root, "tmp").apply { mkdirs() }
@@ -158,7 +157,7 @@ class RoomDownloadRepositoryTest : RoomTestBase() {
 
     @Test
     fun deleteSeededEpisodeRemovesEpisodeAndEmptyLocalProgram() = runTest {
-        importer.import(listOf(scanned(station = "J-WAVE", program = "Solo", title = "Solo 2026-06-12", airedAt = "2026-06-11T15:00:00Z")))
+        seed(listOf(scanned(station = "J-WAVE", program = "Solo", title = "Solo 2026-06-12", airedAt = "2026-06-11T15:00:00Z")))
         val solo = library.observePrograms().first().first { it.program.name == "Solo" }
         val ep = library.observeEpisodes(solo.program.id).first().single()
         playback.update(ep.episode.id) { PlaybackRules.setPlayed(it, true, now) }
