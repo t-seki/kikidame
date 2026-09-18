@@ -160,7 +160,7 @@ class PlayerViewModel @Inject constructor(
     override fun onCleared() {
         controller?.let {
             it.removeListener(listener)
-            connection.release()
+            connection.release(it)
         }
     }
     companion object {
