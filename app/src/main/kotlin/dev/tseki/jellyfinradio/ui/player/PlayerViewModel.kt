@@ -85,7 +85,8 @@ class PlayerViewModel @Inject constructor(
      * 指定の回を開く。同じ番組のキューが既に積まれていればその中でシークする。
      * 既にその回を再生中なら何もしない（画面に戻ってきただけ）。その回で止まっている
      * （一時停止・再生終了）なら、再生開始として再開位置の規則を適用してから再生する。
-     * [play] が false（ミニプレイヤーから）なら、その回が載っている限り止まっていても触らない。
+     * [play] が false（ミニプレイヤーから「見に行く」だけ）なら再生を始めない: その回が載っていれば
+     * 止まっていても触らず、載っていなければ（プロセス死からの復元でサービスが死んでいたとき）積むだけにする。
      */
     private suspend fun open(player: Player, episodeId: EpisodeId, play: Boolean) {
         if (EpisodeMediaItems.episodeId(player.currentMediaItem) == episodeId && player.playbackState != Player.STATE_IDLE) {
@@ -126,7 +127,7 @@ class PlayerViewModel @Inject constructor(
             player.setMediaItems(items, index, startMs)
         }
         player.prepare()
-        player.play()
+        if (play) player.play()
     }
     private fun refresh(player: Player) {
         val item = player.currentMediaItem
