@@ -71,7 +71,7 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
             )
         },
     ) { padding ->
-        // 左右スワイプで秒単位のシーク（#29）。横方向の中央帯から始めたドラッグだけ拾い、シークバーの上では
+        // 左右スワイプで秒単位のシーク（#29）。画面中央の領域から始めたドラッグだけ拾い、シークバーの上では
         // Slider が勝つ（自分でドラッグを消費する）。ドラッグ中は開始時の位置からの差分と目標位置を表示し、
         // 指を離した時点で 1 回だけシークする
         val latest by rememberUpdatedState(state)
@@ -86,7 +86,7 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
                 .pointerInput(Unit) {
                     detectHorizontalDragGestures(
                         onDragStart = { start ->
-                            if (SwipeSeek.isInCenterBand(start.x, size.width.toFloat())) {
+                            if (SwipeSeek.isInCenterArea(start.x, start.y, size.width.toFloat(), size.height.toFloat())) {
                                 swipeStartMs = latest.positionMs
                                 swipeOffsetDp = 0f
                             }

@@ -9,12 +9,16 @@ import kotlin.math.roundToLong
 object SwipeSeek {
     /** 横に何 dp 動かすと 1 秒ぶん動くか（10dp = 2 秒。実機で試して決めた）。 */
     const val DP_PER_SECOND = 5f
-    /** ドラッグの開始位置がこの幅（画面幅に対する割合、中央寄せ）に入っているときだけ拾う。端は戻るジェスチャや誤操作の緩衝。 */
-    const val CENTER_BAND_FRACTION = 0.6f
-    /** 横位置 [x] が中央帯に入っているか。 */
-    fun isInCenterBand(x: Float, width: Float): Boolean {
-        val half = width * CENTER_BAND_FRACTION / 2
-        return x >= width / 2 - half && x <= width / 2 + half
+    /** ドラッグの開始位置がこの横幅（画面幅に対する割合、中央寄せ）に入っているときだけ拾う。端は戻るジェスチャや誤操作の緩衝。 */
+    const val CENTER_WIDTH_FRACTION = 0.6f
+    /** 同じく縦（画面高に対する割合、中央寄せ）。コンテンツ自体が中央にあるので横より広め。 */
+    const val CENTER_HEIGHT_FRACTION = 0.7f
+    /** 開始位置 ([x], [y]) が中央の領域に入っているか。 */
+    fun isInCenterArea(x: Float, y: Float, width: Float, height: Float): Boolean =
+        inBand(x, width, CENTER_WIDTH_FRACTION) && inBand(y, height, CENTER_HEIGHT_FRACTION)
+    private fun inBand(v: Float, size: Float, fraction: Float): Boolean {
+        val half = size * fraction / 2
+        return v >= size / 2 - half && v <= size / 2 + half
     }
 
     /** 横の移動量（dp、右が正）を秒差（ミリ秒）に変換する。 */

@@ -19,11 +19,16 @@ class SwipeSeekTest {
     }
 
     @Test
-    fun onlyTheCenterBandStartsASwipe() {
-        assertEquals(true, SwipeSeek.isInCenterBand(x = 540f, width = 1080f))
-        assertEquals(true, SwipeSeek.isInCenterBand(x = 216f, width = 1080f))
-        assertEquals(false, SwipeSeek.isInCenterBand(x = 215f, width = 1080f))
-        assertEquals(false, SwipeSeek.isInCenterBand(x = 900f, width = 1080f))
+    fun onlyTheCenterAreaStartsASwipe() {
+        val w = 1080f
+        val h = 2000f
+        assertEquals(true, SwipeSeek.isInCenterArea(x = 540f, y = 1000f, width = w, height = h))
+        // 横は中央 60%（216..864）、縦は中央 70%（300..1700）
+        assertEquals(true, SwipeSeek.isInCenterArea(x = 216f, y = 300f, width = w, height = h))
+        assertEquals(false, SwipeSeek.isInCenterArea(x = 215f, y = 1000f, width = w, height = h))
+        assertEquals(false, SwipeSeek.isInCenterArea(x = 900f, y = 1000f, width = w, height = h))
+        assertEquals(false, SwipeSeek.isInCenterArea(x = 540f, y = 299f, width = w, height = h))
+        assertEquals(false, SwipeSeek.isInCenterArea(x = 540f, y = 1701f, width = w, height = h))
     }
     @Test
     fun deltaTextShowsSignAndWholeSeconds() {
