@@ -14,6 +14,7 @@ import dev.tseki.jellyfinradio.domain.LibraryRepository
 import dev.tseki.jellyfinradio.domain.PlaybackRules
 import dev.tseki.jellyfinradio.domain.PlaybackStateRepository
 import dev.tseki.jellyfinradio.playback.EpisodeMediaItems
+import dev.tseki.jellyfinradio.playback.NowPlaying
 import dev.tseki.jellyfinradio.playback.PlayerConnection
 import dev.tseki.jellyfinradio.ui.PlayerRoute
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -54,6 +55,7 @@ class PlayerViewModel @Inject constructor(
     private val connection: PlayerConnection,
     private val clock: Clock,
     private val downloads: DownloadRepository,
+    nowPlaying: NowPlaying,
 ) : ViewModel() {
     private val route = savedStateHandle.toRoute<PlayerRoute>()
     private val requestedEpisodeId = EpisodeId(route.episodeId)
@@ -70,6 +72,10 @@ class PlayerViewModel @Inject constructor(
         override fun onEvents(player: Player, events: Player.Events) = refresh(player)
     }
     init {
+        // 再生の失敗でキューが空になった理由。この画面が開いている間はここが受け取り、閉じていれば一覧のスナックバーが受け取る
+        viewModelScope.launch {
+            nowPlaying.messages.collect { message -> _uiState.update { it.copy(error = message) } }
+        }
         viewModelScope.launch {
             val c = connection.acquire()
             controller = c

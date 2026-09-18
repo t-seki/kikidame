@@ -39,14 +39,19 @@ class PlaybackService : MediaSessionService() {
     private var resumeOnTransition: ResumeOnTransition? = null
     private var nowPlayingListener: Player.Listener? = null
     /**
-     * 再生に失敗したらキューを空にする。聴き終えて止まっている回は同期が消せる（#27）ので、
-     * その後に ▶ を押すとファイルが無い。空にすれば聴いている回も無くなり、ミニプレイヤーと通知が消える。
+     * 再生に失敗したら（原因を問わず）キューを空にし、理由を UI へ渡す。空にすれば聴いている回も無くなり、
+     * ミニプレイヤーと通知が消える。典型は、聴き終えて止まっている回を同期が消した（#27）後に ▶ を押してファイルが無い場合。
      */
     private val errorListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
             Log.w(TAG, "playback failed, clearing the queue", error)
             session?.player?.clearMediaItems()
-            nowPlaying.say("ファイルが見つからないため再生を止めました")
+            nowPlaying.say(
+                when (error.errorCode) {
+                    PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND -> "ファイルが見つからないため再生を止めました"
+                    else -> "再生に失敗したため止めました（${error.errorCodeName}）"
+                },
+            )
         }
     }
     override fun onCreate() {

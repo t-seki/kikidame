@@ -355,8 +355,8 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
     ファイルも消す）。保持ルールによる削除（`delete`）は M3-a の削除の規則に従う: `serverItemId` がある回は `FILE_ONLY`（`PlaybackState` は残す、ADR 0002）、
     無い回（サーバを経由していない回）は落とし直せないので `Episode` ごと。`Known` の番組で各回が 0 になっても番組は残す
   - `Unavailable` / `Gone` は `onHold`。M3-b では保存も表示もしない（M3-c、#3 で `goneSince` として保存）。全走査なので番組ごとの `Unavailable` になる経路は無い
-- **実行側の例外**（`planSync` の外）: 削除対象が PENDING / RUNNING / FAILED なら `cancel` 相当。**再生中の回（現在の `MediaItem`）は今回は削除しない**
-  （次回に持ち越し）。再生中の回 ID は `PlaybackService` が `Player.Listener` で `@Singleton` の `NowPlaying`（`StateFlow<EpisodeId?>`、`:app`）に
+- **実行側の例外**（`planSync` の外）: 削除対象が PENDING / RUNNING / FAILED なら `cancel` 相当。**聴いている回（現在の `MediaItem`）は今回は削除しない**
+  （次回に持ち越し。ただし最後まで聴き終えて止まっている回は除外しない — #27。消された後に ▶ を押すと再生に失敗し、キューを空にして理由をスナックバーに出す）。聴いている回は `PlaybackService` が `Player.Listener` で `@Singleton` の `NowPlaying`（`StateFlow<NowPlayingState?>`、`:app`）に
   書き、同期の実行側はそれを読む（Worker と Service は同一プロセス。MediaController を Worker から結ばない）。
   実行順は削除 → enqueue。同期分の enqueue 順は **番組をまたいで放送日の新しい順**
 - **キューの優先順位**（M3-a から持ち越し）: `nextPending()` を `pinned DESC, enqueuedAt IS NULL, enqueuedAt ASC, airedAt DESC` に変える（手動が常に先。

@@ -4,11 +4,11 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import dev.tseki.jellyfinradio.domain.EpisodeId
-import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,6 +25,7 @@ data class NowPlayingState(
 /**
  * 聴いている回 = 今プレイヤーに載っている各回（止まっていても）。[PlaybackService] が書き、
  * 同期がこの回（聴き終えていなければ）を今回の削除から外し、一覧のマークとミニプレイヤーがこの回を指す（ADR 0006）。
+ * 聴いている回が利用者の操作なしに消えたとき（再生の失敗）は、その理由も [messages] でここから UI へ渡す。
  * Worker・Service・UI は同一プロセスなので、MediaController を結ばずにここで受け渡す。
  */
 @Singleton
@@ -40,13 +41,14 @@ class NowPlaying @Inject constructor() {
         _state.value = state
     }
 
-    private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    // 出した時点で誰も見ていなくても（再生画面・バックグラウンド）、次に見た画面へ 1 回だけ届くように Channel で持つ
+    private val _messages = Channel<String>(Channel.CONFLATED)
 
-    /** 聴いている回が利用者の操作なしに消えた理由（再生の失敗など）。一覧がスナックバーに出す。 */
-    val messages: Flow<String> = _messages
+    /** 聴いている回が利用者の操作なしに消えた理由（再生の失敗など）。今見えている画面（再生画面か一覧）が 1 回だけ受け取って出す。 */
+    val messages: Flow<String> = _messages.receiveAsFlow()
 
     fun say(message: String) {
-        _messages.tryEmit(message)
+        _messages.trySend(message)
     }
 
     /** [Player] に付けて現在の [MediaItem] と再生中かどうかを追う。サービス終了時は [set] に null を渡す。 */
