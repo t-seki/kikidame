@@ -11,9 +11,8 @@ import kotlin.test.assertNull
 import kotlin.time.Instant
 @RunWith(AndroidJUnit4::class)
 class RoomLibraryRepositoryTest : RoomTestBase() {
-    private val importer by lazy { RoomLocalImportRepository(db, clock) }
     private val repo by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao(), db.localFileDao()) }
-    private suspend fun seedProgram() = importer.import(
+    private suspend fun seedProgram() = seed(
         listOf(
             scanned(title = "X 2026-06-12 (1)", airedAt = "2026-06-11T15:00:00Z"),
             scanned(title = "X 2026-06-05", airedAt = "2026-06-04T15:00:00Z"),
@@ -40,7 +39,7 @@ class RoomLibraryRepositoryTest : RoomTestBase() {
     }
     @Test
     fun programsAreOrderedByLatestAiredAt() = runTest {
-        importer.import(
+        seed(
             listOf(
                 scanned(program = "Old", title = "Old 2026-01-01", airedAt = "2025-12-31T15:00:00Z"),
                 scanned(program = "New", title = "New 2026-06-01", airedAt = "2026-05-31T15:00:00Z"),

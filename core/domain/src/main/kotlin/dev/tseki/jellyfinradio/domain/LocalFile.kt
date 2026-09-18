@@ -6,7 +6,7 @@ data class LocalFile(
     val episodeId: EpisodeId,
     val state: DownloadState,
     val path: String?,
-    /** 固定。保持ルールの対象外（手動ダウンロード・シード由来）。 */
+    /** 固定。保持ルールの対象外（手動ダウンロード）。 */
     val pinned: Boolean,
     val attemptCount: Int = 0,
     val lastAttemptAt: Instant? = null,

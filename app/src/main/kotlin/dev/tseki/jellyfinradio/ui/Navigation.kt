@@ -80,7 +80,7 @@ fun JellyfinRadioNavHost(sessionViewModel: SessionViewModel = hiltViewModel()) {
 
     NavHost(navController = navController, startDestination = startDestination) {
         composable<ConnectRoute> {
-            ConnectScreen(onBrowseLocalOnly = { navController.navigate(ProgramListRoute) { popUpTo(0) } })
+            ConnectScreen()
         }
         composable<LibraryPickRoute> {
             val fromSettings = navController.previousBackStackEntry != null

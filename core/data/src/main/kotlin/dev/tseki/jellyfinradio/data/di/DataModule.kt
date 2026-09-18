@@ -23,7 +23,6 @@ import dev.tseki.jellyfinradio.data.repository.RoomDownloadRepository
 import dev.tseki.jellyfinradio.data.repository.RoomLibraryRefreshRepository
 import dev.tseki.jellyfinradio.data.repository.RoomLibraryRepository
 import dev.tseki.jellyfinradio.data.repository.RoomLocalDataReset
-import dev.tseki.jellyfinradio.data.repository.RoomLocalImportRepository
 import dev.tseki.jellyfinradio.data.repository.RoomPlaybackStateRepository
 import dev.tseki.jellyfinradio.data.session.KeystoreTokenCipher
 import dev.tseki.jellyfinradio.data.settings.DataStoreAppSettings
@@ -35,7 +34,6 @@ import dev.tseki.jellyfinradio.domain.DownloadRepository
 import dev.tseki.jellyfinradio.domain.LibraryRefreshRepository
 import dev.tseki.jellyfinradio.domain.LibraryRepository
 import dev.tseki.jellyfinradio.domain.LocalDataReset
-import dev.tseki.jellyfinradio.domain.LocalImportRepository
 import dev.tseki.jellyfinradio.domain.PlaybackStateRepository
 import dev.tseki.jellyfinradio.domain.SessionRepository
 import javax.inject.Qualifier
@@ -98,9 +96,6 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindPlaybackStateRepository(impl: RoomPlaybackStateRepository): PlaybackStateRepository
-
-    @Binds
-    abstract fun bindLocalImportRepository(impl: RoomLocalImportRepository): LocalImportRepository
 
     @Binds
     abstract fun bindSessionRepository(impl: DataStoreSessionRepository): SessionRepository

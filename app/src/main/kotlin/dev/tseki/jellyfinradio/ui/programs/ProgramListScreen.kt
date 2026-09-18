@@ -117,7 +117,7 @@ private fun EmptyPrograms(canRefresh: Boolean) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("番組がありません", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        if (canRefresh) "引っ張って更新するとサーバから取得します" else "設定からサーバに接続するか、シードで手元のファイルを取り込んでください",
+                        if (canRefresh) "引っ張って更新するとサーバから取得します" else "設定からサーバに接続してください",
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
                     )
