@@ -18,6 +18,7 @@ import kotlin.time.Duration.Companion.seconds
  * [Player] の位置を Room に書く。保存のタイミングは
  * 一時停止・停止（`isPlaying` が false になったとき）、回の切替（前の回の位置）、
  * 再生終了、再生中 [SAVE_INTERVAL] ごと、そして [detach]（サービス破棄。再生中でも保存する）。
+ * ただしリポジトリは、行が無く聴き始めてもいない回（[PlaybackRules.isWorthRecording]）を書かない。
  *
  * [playerScope] は [player] のアプリケーションスレッドで動くこと（Player はスレッド拘束）。
  * 書き込みは [persistScope] に載せる。サービス破棄で [playerScope] が cancel されても

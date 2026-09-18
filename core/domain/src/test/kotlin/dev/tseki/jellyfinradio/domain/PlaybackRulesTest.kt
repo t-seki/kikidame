@@ -5,6 +5,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -56,5 +57,24 @@ class PlaybackRulesTest {
         assertEquals(Duration.ZERO, PlaybackRules.resumePosition(29.minutes, runtime))
         assertEquals(Duration.ZERO, PlaybackRules.resumePosition(runtime, runtime))
         assertEquals(Duration.ZERO, PlaybackRules.resumePosition(Duration.ZERO, runtime))
+    }
+
+    @Test
+    fun notStartedIsUnderFiveSecondsAndUnplayed() {
+        val base = PlaybackState.initial(EpisodeId(1), Instant.parse("2026-09-19T00:00:00Z"))
+        assertTrue(PlaybackRules.isNotStarted(base))
+        assertTrue(PlaybackRules.isNotStarted(base.copy(position = 4_999.milliseconds)))
+        assertFalse(PlaybackRules.isNotStarted(base.copy(position = 5.seconds)))
+        assertFalse(PlaybackRules.isNotStarted(base.copy(played = true)))
+    }
+
+    @Test
+    fun recordingIsSkippedOnlyWhenNoRowAndNotStarted() {
+        val base = PlaybackState.initial(EpisodeId(1), Instant.parse("2026-09-19T00:00:00Z"))
+        assertFalse(PlaybackRules.isWorthRecording(existing = null, next = base.copy(position = 3.seconds)))
+        assertTrue(PlaybackRules.isWorthRecording(existing = null, next = base.copy(position = 12.seconds)))
+        assertTrue(PlaybackRules.isWorthRecording(existing = null, next = base.copy(played = true)))
+        // 途中まで聴いた後に先頭へ戻した: 既存行があるので位置 0 でも書く
+        assertTrue(PlaybackRules.isWorthRecording(existing = base.copy(position = 20.minutes), next = base))
     }
 }
