@@ -37,7 +37,9 @@ data class ServerSnapshot(
     val scope: SnapshotScope = SnapshotScope.Library,
 )
 sealed interface SnapshotScope {
+    /** ライブラリ全体。番組の結び直し・消失の判定・各回の削除ができる。 */
     data object Library : SnapshotScope
+    /** 1 番組分。その番組の各回については完全なので結び直しと削除ができるが、番組一覧は無いので番組の結び直しはしない。 */
     data class Program(val programServerId: ServerItemId) : SnapshotScope
 }
 
