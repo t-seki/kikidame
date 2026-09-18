@@ -1,6 +1,5 @@
 package dev.tseki.jellyfinradio.domain
 
-import kotlinx.coroutines.flow.Flow
 
 /** 手元のファイルを消すときの範囲。 */
 enum class LocalDeletionScope {
@@ -111,25 +110,4 @@ interface DownloadQueue {
 
     /** キャンセル済みなら false（Worker は約 1 MB ごとに見る）。 */
     suspend fun isStillWanted(episodeId: EpisodeId): Boolean
-}
-
-interface AppSettingsRepository {
-    val wifiOnly: Flow<Boolean>
-    suspend fun setWifiOnly(value: Boolean)
-
-    /** 倍速。アプリ全体で 1 つ（番組ごとには持たない）。[PlaybackSpeed.CHOICES] のどれか。 */
-    val playbackSpeed: Flow<Float>
-    suspend fun setPlaybackSpeed(value: Float)
-}
-
-/** 倍速の選択肢。ピッチは変えない。 */
-object PlaybackSpeed {
-    const val DEFAULT = 1.0f
-    val CHOICES: List<Float> = listOf(1.0f, 1.25f, 1.5f, 1.75f, 2.0f)
-
-    /** 保存値が選択肢に無ければ既定に戻す（将来選択肢を変えたとき用）。 */
-    fun normalize(value: Float?): Float = value?.takeIf { it in CHOICES } ?: DEFAULT
-
-    /** 「1.5×」「2×」の形。 */
-    fun label(speed: Float): String = if (speed == speed.toInt().toFloat()) "${speed.toInt()}×" else "$speed×"
 }

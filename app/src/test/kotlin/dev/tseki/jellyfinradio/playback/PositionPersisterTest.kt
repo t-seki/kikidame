@@ -61,7 +61,10 @@ class PositionPersisterTest {
         assertFalse(saved.played)
         assertNull(saved.syncedAt)
     }
-    /** 倍速（#35）でもプレイヤーの位置は音源の実時間なので、そのまま保存され再生済み判定も変わらない。 */
+    /**
+     * 倍速（#35）: プレイヤーの位置は音源の時間なので、そのまま保存する。この番人は
+     * PositionPersister に速度で位置を換算する処理を持ち込んだら落ちる（今は速度を見ていない）。
+     */
     @Test
     fun speedDoesNotChangeWhatIsSaved() = runTest(StandardTestDispatcher()) {
         setup(this)

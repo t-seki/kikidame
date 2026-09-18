@@ -2,6 +2,8 @@ package dev.tseki.jellyfinradio.ui.player
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -173,13 +175,13 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
         SpeedSheet(current = speed, onSelect = viewModel::setSpeed, onDismiss = { showSpeedSheet = false })
     }
 }
-/** 倍速の選択。アプリ全体で 1 つなので、選んだ瞬間に反映され再起動しても保持される。 */
-@OptIn(ExperimentalMaterial3Api::class)
+/** 倍速を選ぶシート。保存と反映は ViewModel → 設定 → サービスの経路で、ここは選択肢を見せるだけ。狭い画面では折り返す。 */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun SpeedSheet(current: Float, onSelect: (Float) -> Unit, onDismiss: () -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Text("再生速度", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
-        Row(Modifier.padding(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("倍速", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+        FlowRow(Modifier.padding(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for (choice in PlaybackSpeed.CHOICES) {
                 FilterChip(
                     selected = choice == current,

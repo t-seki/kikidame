@@ -19,6 +19,7 @@ import dev.tseki.jellyfinradio.playback.EpisodeMediaItems
 import dev.tseki.jellyfinradio.playback.NowPlaying
 import dev.tseki.jellyfinradio.playback.PlayerConnection
 import dev.tseki.jellyfinradio.ui.PlayerRoute
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -75,7 +76,15 @@ class PlayerViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlaybackSpeed.DEFAULT)
 
     fun setSpeed(speed: Float) {
-        viewModelScope.launch { settings.setPlaybackSpeed(speed) }
+        viewModelScope.launch {
+            try {
+                settings.setPlaybackSpeed(speed)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "設定の保存に失敗しました: ${e::class.simpleName}") }
+            }
+        }
     }
 
     private var controller: MediaController? = null
