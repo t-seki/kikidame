@@ -71,7 +71,7 @@ class PlayerViewModel @Inject constructor(
     }
     init {
         viewModelScope.launch {
-            val c = connection.controller()
+            val c = connection.acquire()
             controller = c
             c.addListener(listener)
             open(c, requestedEpisodeId, route.play)
@@ -158,7 +158,10 @@ class PlayerViewModel @Inject constructor(
         }
     }
     override fun onCleared() {
-        controller?.removeListener(listener)
+        controller?.let {
+            it.removeListener(listener)
+            connection.release()
+        }
     }
     companion object {
         const val POSITION_REFRESH_MS = 500L

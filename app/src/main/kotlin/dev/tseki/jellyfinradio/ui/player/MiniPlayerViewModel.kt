@@ -23,12 +23,16 @@ class MiniPlayerViewModel @Inject constructor(
 ) : ViewModel() {
     val state: StateFlow<NowPlayingState?> = nowPlaying.state
 
-    /** ミニプレイヤーが見えている = サービスが生きているので、ここで controller を取っても新たな起動にはならない。 */
+    /**
+     * ミニプレイヤーが見えている = サービスが生きているので、ここで controller を取っても新たな起動にはならない。
+     * 操作のあいだだけ持ち、離す（一覧画面にいる間サービスに bind し続けない）。
+     */
     fun togglePlayPause() {
         viewModelScope.launch {
             try {
-                val controller = connection.controller()
-                if (controller.isPlaying) controller.pause() else controller.play()
+                connection.use { controller ->
+                    if (controller.isPlaying) controller.pause() else controller.play()
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
