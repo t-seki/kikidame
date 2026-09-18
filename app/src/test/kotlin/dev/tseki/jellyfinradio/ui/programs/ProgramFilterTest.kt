@@ -3,6 +3,8 @@ package dev.tseki.jellyfinradio.ui.programs
 import dev.tseki.jellyfinradio.domain.Program
 import dev.tseki.jellyfinradio.domain.ProgramId
 import dev.tseki.jellyfinradio.domain.ProgramSummary
+import dev.tseki.jellyfinradio.ui.programs.ProgramFilter.Station
+import dev.tseki.jellyfinradio.ui.programs.ProgramFilter.StationKey
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -59,6 +61,43 @@ class ProgramFilterTest {
         assertEquals(listOf(haraichi, ann), ProgramFilter.apply(all, "ー"))
     }
 
+    // ---- 放送局のチップ（#45） ----
+    private val tbs = StationKey("TBS")
+    private val lfr = StationKey("LFR")
+    private val none = StationKey(null)
+    @Test
+    fun filtersByStationExactly() {
+        assertEquals(listOf(haraichi), ProgramFilter.apply(all, "", tbs))
+        // 「TBS」を番組名に含む局なしの番組は、局の絞り込みでは残らない（完全一致）
+        assertEquals(listOf(noStation), ProgramFilter.apply(all, "", none))
+        assertSame(all, ProgramFilter.apply(all, "", null))
+    }
+    @Test
+    fun stationAndQueryAreAnded() {
+        assertEquals(listOf(haraichi), ProgramFilter.apply(all, "ターン", tbs))
+        assertEquals(emptyList(), ProgramFilter.apply(all, "ターン", lfr))
+        assertEquals(emptyList(), ProgramFilter.apply(all, "ZZZ", tbs))
+    }
+    @Test
+    fun stationSelectionAloneIsActive() {
+        assertTrue(ProgramFilter.isActive("", tbs))
+        assertFalse(ProgramFilter.isActive("  ", null))
+    }
+    @Test
+    fun stationsAreOrderedByCountThenNameWithNoneLast() {
+        val list = listOf(
+            summary(1, "a", "LFR"), summary(2, "b", "LFR"),
+            summary(3, "c", "TBS"), summary(4, "d", "TBS"),
+            summary(5, "e", "ABC"),
+            summary(6, "f", null), summary(7, "g", null),
+        )
+        assertEquals(
+            listOf(Station(lfr, 2), Station(tbs, 2), Station(none, 2), Station(StationKey("ABC"), 1)),
+            ProgramFilter.stations(list),
+        )
+        assertEquals("局なし", none.label)
+        assertEquals(emptyList(), ProgramFilter.stations(emptyList()))
+    }
     private fun summary(id: Long, name: String, station: String?) = ProgramSummary(
         program = Program(id = ProgramId(id), serverItemId = null, name = name, stationName = station),
         episodeCount = 0,
