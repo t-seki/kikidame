@@ -1,9 +1,11 @@
 package dev.tseki.jellyfinradio.playback
 import android.app.PendingIntent
 import android.content.Intent
+import android.util.Log
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.CommandButton
@@ -36,6 +38,16 @@ class PlaybackService : MediaSessionService() {
     private var positionPersister: PositionPersister? = null
     private var resumeOnTransition: ResumeOnTransition? = null
     private var nowPlayingListener: Player.Listener? = null
+    /**
+     * 再生に失敗したらキューを空にする。聴き終えて止まっている回は同期が消せる（#27）ので、
+     * その後に ▶ を押すとファイルが無い。空にすれば聴いている回も無くなり、ミニプレイヤーと通知が消える。
+     */
+    private val errorListener = object : Player.Listener {
+        override fun onPlayerError(error: PlaybackException) {
+            Log.w(TAG, "playback failed, clearing the queue", error)
+            session?.player?.clearMediaItems()
+        }
+    }
     override fun onCreate() {
         super.onCreate()
         val player = ExoPlayer.Builder(this)
@@ -78,6 +90,7 @@ class PlaybackService : MediaSessionService() {
             .also { it.attach() }
         resumeOnTransition = ResumeOnTransition(player, playbackStateRepository, scope).also { it.attach() }
         nowPlayingListener = nowPlaying.listener(player).also(player::addListener)
+        player.addListener(errorListener)
     }
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -91,6 +104,7 @@ class PlaybackService : MediaSessionService() {
         resumeOnTransition?.detach()
         session?.run {
             nowPlayingListener?.let(player::removeListener)
+            player.removeListener(errorListener)
             player.release()
             release()
         }
@@ -118,6 +132,7 @@ class PlaybackService : MediaSessionService() {
         }
     }
     companion object {
+        private const val TAG = "PlaybackService"
         const val SKIP_MS = 10_000L
     }
 }

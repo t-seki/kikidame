@@ -129,7 +129,8 @@ class LibraryRefresherTest {
         kicker: FakeKicker = FakeKicker(),
     ) = LibraryRefresher(repo, session, downloads, settings, network, nowPlaying, kicker, this)
 
-    private fun nowPlaying(episodeId: Long) = NowPlayingState(EpisodeId(episodeId), "title", "program", isPlaying = true)
+    private fun nowPlaying(episodeId: Long, ended: Boolean = false) =
+        NowPlayingState(EpisodeId(episodeId), "title", "program", isPlaying = !ended, isEnded = ended)
 
     @Test
     fun successEmitsCountsMessage() = runTest(StandardTestDispatcher()) {
@@ -163,6 +164,15 @@ class LibraryRefresherTest {
 
         assertEquals(1, kicker.kicks)
         assertEquals(setOf(EpisodeId(42)), repo.lastExcluded)
+    }
+
+    /** 聴き終えて止まっている回は除外しない（#27）。「再生済みなら削除」で次の同期に消える。 */
+    @Test
+    fun endedNowPlayingIsNotExcluded() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now) }
+        val nowPlaying = NowPlaying().apply { set(nowPlaying(42, ended = true)) }
+        refresher(repo, nowPlaying = nowPlaying).refresh()
+        assertEquals(emptySet(), repo.lastExcluded)
     }
 
     @Test
