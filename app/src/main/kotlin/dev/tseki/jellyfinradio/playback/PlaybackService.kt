@@ -15,6 +15,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import dagger.hilt.android.AndroidEntryPoint
 import dev.tseki.jellyfinradio.MainActivity
 import dev.tseki.jellyfinradio.di.ApplicationScope
+import dev.tseki.jellyfinradio.domain.AppSettingsRepository
 import dev.tseki.jellyfinradio.domain.LibraryRepository
 import dev.tseki.jellyfinradio.domain.PlaybackStateRepository
 import kotlinx.coroutines.CoroutineScope
@@ -22,6 +23,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.guava.future
 import javax.inject.Inject
 import kotlin.time.Clock
@@ -33,6 +35,7 @@ class PlaybackService : MediaSessionService() {
     @Inject lateinit var clock: Clock
     @Inject @ApplicationScope lateinit var applicationScope: CoroutineScope
     @Inject lateinit var nowPlaying: NowPlaying
+    @Inject lateinit var settings: AppSettingsRepository
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var session: MediaSession? = null
     private var positionPersister: PositionPersister? = null
@@ -97,6 +100,8 @@ class PlaybackService : MediaSessionService() {
         resumeOnTransition = ResumeOnTransition(player, playbackStateRepository, scope).also { it.attach() }
         nowPlayingListener = nowPlaying.listener(player).also(player::addListener)
         player.addListener(errorListener)
+        // 倍速（#35）: アプリ全体で 1 つ。設定が変われば即反映。ピッチは変えない
+        scope.launch { settings.playbackSpeed.collect { speed -> player.setPlaybackSpeed(speed) } }
     }
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
     override fun onTaskRemoved(rootIntent: Intent?) {

@@ -21,6 +21,9 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -44,6 +47,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.tseki.jellyfinradio.domain.PlaybackSpeed
 import dev.tseki.jellyfinradio.ui.toClockText
 import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,6 +55,8 @@ import kotlin.time.Duration.Companion.milliseconds
 fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val played by viewModel.played.collectAsStateWithLifecycle()
+    val speed by viewModel.speed.collectAsStateWithLifecycle()
+    var showSpeedSheet by remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -133,7 +139,13 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
                 durationMs = state.durationMs,
                 onSeek = viewModel::seekTo,
             )
-            Spacer(Modifier.height(24.dp))
+            // シークバーの下: 倍速（#35）。スリープタイマー（#36）もこの行に並ぶ
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+                TextButton(onClick = { showSpeedSheet = true }) {
+                    Text(PlaybackSpeed.label(speed), style = MaterialTheme.typography.labelLarge)
+                }
+            }
+            Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 IconButton(onClick = viewModel::previous, enabled = state.hasPrevious) {
                     Icon(Icons.Default.SkipPrevious, contentDescription = "前の回", Modifier.size(32.dp))
@@ -157,7 +169,29 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
             }
         }
     }
+    if (showSpeedSheet) {
+        SpeedSheet(current = speed, onSelect = viewModel::setSpeed, onDismiss = { showSpeedSheet = false })
+    }
 }
+/** 倍速の選択。アプリ全体で 1 つなので、選んだ瞬間に反映され再起動しても保持される。 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SpeedSheet(current: Float, onSelect: (Float) -> Unit, onDismiss: () -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Text("再生速度", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+        Row(Modifier.padding(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (choice in PlaybackSpeed.CHOICES) {
+                FilterChip(
+                    selected = choice == current,
+                    onClick = { onSelect(choice); onDismiss() },
+                    label = { Text(PlaybackSpeed.label(choice)) },
+                )
+            }
+        }
+        Spacer(Modifier.padding(bottom = 32.dp))
+    }
+}
+
 /** ドラッグ中は指の位置を表示し、離した時点で 1 回だけシークする。 */
 @Composable
 private fun SeekBar(positionMs: Long, durationMs: Long, onSeek: (Long) -> Unit) {

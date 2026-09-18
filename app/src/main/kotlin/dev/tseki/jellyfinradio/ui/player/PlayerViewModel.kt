@@ -8,10 +8,12 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.tseki.jellyfinradio.domain.AppSettingsRepository
 import dev.tseki.jellyfinradio.domain.DownloadRepository
 import dev.tseki.jellyfinradio.domain.EpisodeId
 import dev.tseki.jellyfinradio.domain.LibraryRepository
 import dev.tseki.jellyfinradio.domain.PlaybackRules
+import dev.tseki.jellyfinradio.domain.PlaybackSpeed
 import dev.tseki.jellyfinradio.domain.PlaybackStateRepository
 import dev.tseki.jellyfinradio.playback.EpisodeMediaItems
 import dev.tseki.jellyfinradio.playback.NowPlaying
@@ -56,6 +58,7 @@ class PlayerViewModel @Inject constructor(
     private val clock: Clock,
     private val downloads: DownloadRepository,
     nowPlaying: NowPlaying,
+    private val settings: AppSettingsRepository,
 ) : ViewModel() {
     private val route = savedStateHandle.toRoute<PlayerRoute>()
     private val requestedEpisodeId = EpisodeId(route.episodeId)
@@ -67,6 +70,14 @@ class PlayerViewModel @Inject constructor(
         .distinctUntilChanged()
         .flatMapLatest { id -> if (id == null) flowOf(false) else playbackStates.observe(id).map { it?.played == true } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    /** 倍速（#35）。アプリ全体の設定で、サービス側が同じ Flow を購読してプレイヤーに反映する。 */
+    val speed: StateFlow<Float> = settings.playbackSpeed
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlaybackSpeed.DEFAULT)
+
+    fun setSpeed(speed: Float) {
+        viewModelScope.launch { settings.setPlaybackSpeed(speed) }
+    }
+
     private var controller: MediaController? = null
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) = refresh(player)
