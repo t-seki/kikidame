@@ -23,6 +23,8 @@ data class ProgramEntity(
     /** 最新 N 回まで保持（null = 上限なし）。 */
     val keepLatest: Int? = null,
     val deleteAfterPlayed: Boolean = false,
+    /** 消失した日時。null ならサーバに在る。v4 で追加 */
+    val goneSince: Instant? = null,
 )
 /** 各回 = Audio。 */
 @Entity(
