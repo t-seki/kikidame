@@ -22,6 +22,7 @@ fun ProgramEntity.toDomain(): Program = Program(
     stationName = stationName,
     syncEnabled = syncEnabled,
     retentionRule = RetentionRule(keepLatest = keepLatest, deleteAfterPlayed = deleteAfterPlayed),
+    goneSince = goneSince,
 )
 fun ProgramSummaryRow.toDomain(): ProgramSummary = ProgramSummary(
     program = program.toDomain(),

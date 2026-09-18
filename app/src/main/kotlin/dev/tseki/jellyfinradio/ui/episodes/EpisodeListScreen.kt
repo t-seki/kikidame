@@ -91,6 +91,10 @@ fun EpisodeListScreen(
     LaunchedEffect(Unit) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
     }
+    LaunchedEffect(Unit) {
+        viewModel.programRemoved.collect { onBack() }
+    }
+    var confirmRemoveProgram by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -153,6 +157,20 @@ fun EpisodeListScreen(
             onKeepLatest = viewModel::setKeepLatest,
             onDeleteAfterPlayed = viewModel::setDeleteAfterPlayed,
             onSyncNow = { viewModel.syncNow(); showSyncSheet = false },
+            onRemoveProgram = { showSyncSheet = false; confirmRemoveProgram = true },
+        )
+    }
+    if (confirmRemoveProgram && currentProgram != null) {
+        AlertDialog(
+            onDismissRequest = { confirmRemoveProgram = false },
+            title = { Text("この番組を手元から消しますか？") },
+            text = { Text("「${currentProgram.name}」の各回・ファイル・再生位置をすべて消します。この操作は取り消せません。") },
+            confirmButton = {
+                TextButton(onClick = { confirmRemoveProgram = false; viewModel.removeProgram() }) {
+                    Text("手元から消す", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirmRemoveProgram = false }) { Text("キャンセル") } },
         )
     }
     pendingDisable?.let { count ->
@@ -312,8 +330,10 @@ private fun ProgramSyncSheet(
     onKeepLatest: (Int?) -> Unit,
     onDeleteAfterPlayed: (Boolean) -> Unit,
     onSyncNow: () -> Unit,
+    onRemoveProgram: () -> Unit,
 ) {
-    val canSync = program.serverItemId != null
+    // 消失した番組（サーバの一覧に無く、突合でも結び直せなかった）とサーバ ID の無い番組は同期できない
+    val canSync = program.serverItemId != null && !program.isGone
     val enabled = program.syncEnabled
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Text(program.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
@@ -322,11 +342,14 @@ private fun ProgramSyncSheet(
             headlineContent = { Text("この番組を同期する") },
             supportingContent = {
                 Text(
-                    if (canSync) "保持ルールに従って自動でダウンロードし、外れた回を削除します。固定した回は残ります"
-                    else "サーバ上で見つかっていないため同期できません",
+                    when {
+                        program.isGone -> "サーバ上で見つかりません（${program.goneSince?.toAiredDateText()} から）。同期は止まっています。手元の回はそのまま聴けます"
+                        !canSync -> "サーバ上で見つかっていないため同期できません"
+                        else -> "保持ルールに従って自動でダウンロードし、外れた回を削除します。固定した回は残ります"
+                    },
                 )
             },
-            trailingContent = { Switch(checked = enabled, onCheckedChange = onSetEnabled, enabled = canSync) },
+            trailingContent = { Switch(checked = enabled && canSync, onCheckedChange = onSetEnabled, enabled = canSync) },
         )
         ListItem(
             modifier = Modifier.alpha(if (enabled) 1f else 0.5f),
@@ -354,8 +377,13 @@ private fun ProgramSyncSheet(
                 Switch(checked = program.retentionRule.deleteAfterPlayed, onCheckedChange = onDeleteAfterPlayed, enabled = enabled)
             },
         )
-        Button(onClick = onSyncNow, enabled = canSync, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
-            Text("この番組を今すぐ同期")
+        if (canSync) {
+            Button(onClick = onSyncNow, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
+                Text("この番組を今すぐ同期")
+            }
+        } else {
+            // サーバに在る番組を消しても次の同期で戻ってくる（再生位置だけ失う）ので、消せるのはサーバに無い番組だけ
+            SheetAction(Icons.Filled.Delete, "この番組を手元から消す") { onRemoveProgram() }
         }
         Spacer(Modifier.padding(bottom = 24.dp))
     }

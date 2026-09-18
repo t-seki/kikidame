@@ -13,6 +13,7 @@ import dev.tseki.jellyfinradio.domain.EpisodeFileName
 import dev.tseki.jellyfinradio.domain.EpisodeId
 import dev.tseki.jellyfinradio.domain.EpisodeWithState
 import dev.tseki.jellyfinradio.domain.LocalDeletionScope
+import dev.tseki.jellyfinradio.domain.ProgramId
 import dev.tseki.jellyfinradio.domain.deletionScopeFor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -122,6 +123,12 @@ class RoomDownloadRepository @Inject constructor(
         val row = db.episodeDao().findById(episodeId.value) ?: return
         db.withTransaction { deleteEpisodeRow(row.episode) }
         deleteFiles(row.localFile?.path)
+    }
+
+    override suspend fun removeProgram(programId: ProgramId) {
+        val paths = db.localFileDao().listPathsByProgram(programId.value)
+        db.withTransaction { db.programDao().deleteById(programId.value) } // episodes → local_files / playback_states は cascade
+        for (p in paths) deleteFiles(p)
     }
 
     /** トランザクション内で呼ぶ。`local_files` / `playback_states` は cascade。各回が 0 になったサーバ ID 無しの番組も消す。 */
