@@ -9,6 +9,13 @@ import kotlin.math.roundToLong
 object SwipeSeek {
     /** 横に何 dp 動かすと 1 秒ぶん動くか（10dp = 2 秒。実機で試して決めた）。 */
     const val DP_PER_SECOND = 5f
+    /** ドラッグの開始位置がこの幅（画面幅に対する割合、中央寄せ）に入っているときだけ拾う。端は戻るジェスチャや誤操作の緩衝。 */
+    const val CENTER_BAND_FRACTION = 0.6f
+    /** 横位置 [x] が中央帯に入っているか。 */
+    fun isInCenterBand(x: Float, width: Float): Boolean {
+        val half = width * CENTER_BAND_FRACTION / 2
+        return x >= width / 2 - half && x <= width / 2 + half
+    }
 
     /** 横の移動量（dp、右が正）を秒差（ミリ秒）に変換する。 */
     fun deltaMs(offsetDp: Float): Long = (offsetDp / DP_PER_SECOND * 1000).roundToLong()

@@ -71,8 +71,9 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
             )
         },
     ) { padding ->
-        // 左右スワイプで秒単位のシーク（#29）。シークバー以外の全域で効く（Slider は自分でドラッグを消費する）。
-        // ドラッグ中は開始時の位置からの差分と目標位置を表示し、指を離した時点で 1 回だけシークする
+        // 左右スワイプで秒単位のシーク（#29）。横方向の中央帯から始めたドラッグだけ拾い、シークバーの上では
+        // Slider が勝つ（自分でドラッグを消費する）。ドラッグ中は開始時の位置からの差分と目標位置を表示し、
+        // 指を離した時点で 1 回だけシークする
         val latest by rememberUpdatedState(state)
         val density = LocalDensity.current
         var swipeStartMs by remember { mutableStateOf(0L) }
@@ -84,9 +85,11 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
                 .padding(padding)
                 .pointerInput(Unit) {
                     detectHorizontalDragGestures(
-                        onDragStart = {
-                            swipeStartMs = latest.positionMs
-                            swipeOffsetDp = 0f
+                        onDragStart = { start ->
+                            if (SwipeSeek.isInCenterBand(start.x, size.width.toFloat())) {
+                                swipeStartMs = latest.positionMs
+                                swipeOffsetDp = 0f
+                            }
                         },
                         onDragEnd = {
                             swipeOffsetDp?.let { viewModel.seekTo(SwipeSeek.targetMs(swipeStartMs, it, latest.durationMs)) }
@@ -94,8 +97,10 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
                         },
                         onDragCancel = { swipeOffsetDp = null },
                         onHorizontalDrag = { change, dragAmount ->
+                            // 端から始めたドラッグ（swipeOffsetDp == null）は拾わない
+                            val current = swipeOffsetDp ?: return@detectHorizontalDragGestures
                             change.consume()
-                            swipeOffsetDp = (swipeOffsetDp ?: 0f) + with(density) { dragAmount.toDp().value }
+                            swipeOffsetDp = current + with(density) { dragAmount.toDp().value }
                         },
                     )
                 }

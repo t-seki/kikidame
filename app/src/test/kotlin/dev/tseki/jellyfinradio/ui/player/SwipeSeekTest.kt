@@ -19,6 +19,13 @@ class SwipeSeekTest {
     }
 
     @Test
+    fun onlyTheCenterBandStartsASwipe() {
+        assertEquals(true, SwipeSeek.isInCenterBand(x = 540f, width = 1080f))
+        assertEquals(true, SwipeSeek.isInCenterBand(x = 216f, width = 1080f))
+        assertEquals(false, SwipeSeek.isInCenterBand(x = 215f, width = 1080f))
+        assertEquals(false, SwipeSeek.isInCenterBand(x = 900f, width = 1080f))
+    }
+    @Test
     fun deltaTextShowsSignAndWholeSeconds() {
         assertEquals("+7 秒", SwipeSeek.deltaText(7_400L))
         assertEquals("−12 秒", SwipeSeek.deltaText(-12_000L))
