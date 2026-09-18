@@ -21,6 +21,7 @@ import dev.tseki.jellyfinradio.domain.ServerException
 import dev.tseki.jellyfinradio.domain.ServerItemId
 import dev.tseki.jellyfinradio.domain.ServerProgram
 import dev.tseki.jellyfinradio.domain.ServerSnapshot
+import dev.tseki.jellyfinradio.domain.SnapshotScope
 import dev.tseki.jellyfinradio.domain.SessionState
 import dev.tseki.jellyfinradio.domain.SyncPlan
 import dev.tseki.jellyfinradio.domain.SyncPlanner
@@ -65,10 +66,11 @@ class RoomLibraryRefreshRepository @Inject constructor(
         val program = db.programDao().findById(programId.value) ?: return null
         val serverId = program.serverItemId?.let(::ServerItemId) ?: return null
         val episodes = gateway.fetchProgramEpisodes(ready.session.credentials(), serverId)
-        // 番組の名前・放送局は手元の値のまま（番組一覧は取らない）。突合はこの番組の各回だけを相手にする
+        // 番組の名前・放送局は手元の値のまま（番組一覧は取らない）。突合（結び直しを含む）はこの番組の各回だけを相手にする
         val snapshot = ServerSnapshot(
             programs = listOf(ServerProgram(serverId, program.name, program.stationName)),
             episodes = episodes,
+            scope = SnapshotScope.Program(serverId),
         )
         return apply(snapshot)
     }
@@ -83,7 +85,11 @@ class RoomLibraryRefreshRepository @Inject constructor(
             // 消失。何も落とさず何も消さない
             return RefreshResult(programs = 0, episodes = 0, linkedPrograms = 0, linkedEpisodes = 0, fetchedAt = clock.now(), onHold = 1)
         }
-        val snapshot = ServerSnapshot(programs = listOf(program), episodes = gateway.fetchProgramEpisodes(credentials, serverId))
+        val snapshot = ServerSnapshot(
+            programs = listOf(program),
+            episodes = gateway.fetchProgramEpisodes(credentials, serverId),
+            scope = SnapshotScope.Program(serverId),
+        )
         val result = apply(snapshot)
         val outcome = synchronize(snapshot, excluded, onlyProgramId = programId)
         return result.copy(enqueued = outcome.enqueued, deleted = outcome.deleted, removed = outcome.removed, onHold = outcome.onHold)
