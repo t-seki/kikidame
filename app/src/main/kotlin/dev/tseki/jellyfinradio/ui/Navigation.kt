@@ -46,7 +46,7 @@ object ProgramListRoute
 @Serializable
 data class EpisodeListRoute(val programId: Long)
 
-/** [play] が false なら、その回が既に載っているときは再生を始めない（ミニプレイヤーから「見に行く」だけの遷移）。 */
+/** [play] が false なら再生を始めない（ミニプレイヤーから「見に行く」だけの遷移）。載っている回は触らず、載っていなければ積むだけ。 */
 @Serializable
 data class PlayerRoute(val episodeId: Long, val play: Boolean = true)
 
