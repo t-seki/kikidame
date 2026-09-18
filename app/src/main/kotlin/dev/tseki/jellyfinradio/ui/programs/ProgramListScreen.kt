@@ -33,8 +33,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.tseki.jellyfinradio.domain.EpisodeId
 import dev.tseki.jellyfinradio.domain.ProgramId
 import dev.tseki.jellyfinradio.domain.ProgramSummary
+import dev.tseki.jellyfinradio.ui.player.MiniPlayer
 import dev.tseki.jellyfinradio.ui.toAiredDateText
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,6 +44,7 @@ import dev.tseki.jellyfinradio.ui.toAiredDateText
 fun ProgramListScreen(
     onProgramClick: (ProgramId) -> Unit,
     onSettingsClick: () -> Unit,
+    onNowPlayingClick: (EpisodeId) -> Unit,
     viewModel: ProgramListViewModel = hiltViewModel(),
 ) {
     val programs by viewModel.programs.collectAsStateWithLifecycle()
@@ -65,6 +68,7 @@ fun ProgramListScreen(
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        bottomBar = { MiniPlayer(onClick = onNowPlayingClick) },
     ) { padding ->
         PullToRefreshBox(
             isRefreshing = isRefreshing,

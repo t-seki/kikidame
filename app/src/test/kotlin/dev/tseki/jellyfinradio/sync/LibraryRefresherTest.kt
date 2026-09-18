@@ -17,6 +17,7 @@ import dev.tseki.jellyfinradio.domain.SessionRepository
 import dev.tseki.jellyfinradio.domain.SessionState
 import dev.tseki.jellyfinradio.download.DownloadKicker
 import dev.tseki.jellyfinradio.playback.NowPlaying
+import dev.tseki.jellyfinradio.playback.NowPlayingState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -128,6 +129,8 @@ class LibraryRefresherTest {
         kicker: FakeKicker = FakeKicker(),
     ) = LibraryRefresher(repo, session, downloads, settings, network, nowPlaying, kicker, this)
 
+    private fun nowPlaying(episodeId: Long) = NowPlayingState(EpisodeId(episodeId), "title", "program", isPlaying = true)
+
     @Test
     fun successEmitsCountsMessage() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { result = RefreshResult(3, 40, 1, 6, now) }
@@ -153,7 +156,7 @@ class LibraryRefresherTest {
     fun enqueuedDownloadsKickTheWorkerAndPassTheNowPlayingEpisode() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now, enqueued = 2) }
         val kicker = FakeKicker()
-        val nowPlaying = NowPlaying().apply { set(EpisodeId(42)) }
+        val nowPlaying = NowPlaying().apply { set(nowPlaying(42)) }
         val refresher = refresher(repo, kicker = kicker, nowPlaying = nowPlaying)
 
         refresher.refresh()
@@ -213,7 +216,7 @@ class LibraryRefresherTest {
     fun syncProgramReportsAndKicks() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { syncProgramResult = RefreshResult(1, 6, 0, 0, now, enqueued = 2, deleted = 1) }
         val kicker = FakeKicker()
-        val nowPlaying = NowPlaying().apply { set(EpisodeId(7)) }
+        val nowPlaying = NowPlaying().apply { set(nowPlaying(7)) }
         val refresher = refresher(repo, kicker = kicker, nowPlaying = nowPlaying)
         refresher.messages.test {
             assertEquals(2, refresher.syncProgram(ProgramId(1))?.enqueued)

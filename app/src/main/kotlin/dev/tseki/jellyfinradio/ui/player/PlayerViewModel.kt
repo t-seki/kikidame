@@ -55,7 +55,8 @@ class PlayerViewModel @Inject constructor(
     private val clock: Clock,
     private val downloads: DownloadRepository,
 ) : ViewModel() {
-    private val requestedEpisodeId = EpisodeId(savedStateHandle.toRoute<PlayerRoute>().episodeId)
+    private val route = savedStateHandle.toRoute<PlayerRoute>()
+    private val requestedEpisodeId = EpisodeId(route.episodeId)
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState
     /** 再生中の回の再生済みフラグ。Room を正として表示する。 */
@@ -73,7 +74,7 @@ class PlayerViewModel @Inject constructor(
             val c = connection.controller()
             controller = c
             c.addListener(listener)
-            open(c, requestedEpisodeId)
+            open(c, requestedEpisodeId, route.play)
             while (isActive) {
                 refresh(c)
                 delay(POSITION_REFRESH_MS)
@@ -84,10 +85,11 @@ class PlayerViewModel @Inject constructor(
      * 指定の回を開く。同じ番組のキューが既に積まれていればその中でシークする。
      * 既にその回を再生中なら何もしない（画面に戻ってきただけ）。その回で止まっている
      * （一時停止・再生終了）なら、再生開始として再開位置の規則を適用してから再生する。
+     * [play] が false（ミニプレイヤーから）なら、その回が載っている限り止まっていても触らない。
      */
-    private suspend fun open(player: Player, episodeId: EpisodeId) {
+    private suspend fun open(player: Player, episodeId: EpisodeId, play: Boolean) {
         if (EpisodeMediaItems.episodeId(player.currentMediaItem) == episodeId && player.playbackState != Player.STATE_IDLE) {
-            if (!player.isPlaying) {
+            if (play && !player.isPlaying) {
                 val runtime = player.duration.takeIf { it != C.TIME_UNSET }
                     ?: player.currentMediaItem?.mediaMetadata?.durationMs
                 if (runtime != null && runtime > 0) {

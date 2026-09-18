@@ -1,0 +1,68 @@
+package dev.tseki.jellyfinradio.ui.player
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.tseki.jellyfinradio.domain.EpisodeId
+import dev.tseki.jellyfinradio.playback.NowPlayingState
+
+/**
+ * 一覧の下に出す「聴いている回」のバー。番組名 / 回タイトルと再生／一時停止だけを持ち、
+ * バーのタップで再生画面へ行く。聴いている回が無ければ何も描かない。
+ * `Scaffold(bottomBar)` に置く前提で、ナビゲーションバーの inset はここで取る。
+ */
+@Composable
+fun MiniPlayer(onClick: (EpisodeId) -> Unit, viewModel: MiniPlayerViewModel = hiltViewModel()) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val current = state ?: return
+    MiniPlayerBar(state = current, onClick = { onClick(current.episodeId) }, onTogglePlayPause = viewModel::togglePlayPause)
+}
+
+@Composable
+private fun MiniPlayerBar(state: NowPlayingState, onClick: () -> Unit, onTogglePlayPause: () -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 3.dp) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                state.programName?.let {
+                    Text(it, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Text(state.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            IconButton(onClick = onTogglePlayPause) {
+                if (state.isPlaying) {
+                    Icon(Icons.Default.Pause, contentDescription = "一時停止")
+                } else {
+                    Icon(Icons.Default.PlayArrow, contentDescription = "再生")
+                }
+            }
+        }
+    }
+}
