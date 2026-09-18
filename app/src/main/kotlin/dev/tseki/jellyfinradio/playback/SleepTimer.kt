@@ -31,8 +31,8 @@ sealed interface SleepTimerSetting {
 }
 
 /**
- * スリープタイマーの置き場。再生画面が [set] で書き、[PlaybackService] の [SleepTimerRunner] が読んで実行する
- * （[NowPlaying] と同じくプロセス内で受け渡す、ADR 0006）。
+ * スリープタイマーの置き場。再生画面が [set] で選び、[PlaybackService] の [SleepTimerRunner] が読んで実行し、
+ * 進み具合（数え始め・一時停止・発火・解除）も書き戻す。プロセス内で受け渡す点は [NowPlaying] と同じ（ADR 0006）。
  */
 @Singleton
 class SleepTimer @Inject constructor() {
@@ -54,8 +54,10 @@ class SleepTimer @Inject constructor() {
  * [setPauseAtEndOfMediaItems] は ExoPlayer の同名の機能（[Player] のインターフェースには無いので注入する）。
  *
  * カウントダウンは `playWhenReady` が true の間だけ進める（`isPlaying` ではなく `playWhenReady` を見るのは、
- * バッファリングやシークの一瞬で止めないため）。解除されるのは、利用者が選び直す・解除する、タイマーが発火する、
- * 回が終わり切る（`STATE_ENDED`。もう待つものが無い）、サービスが消える（[detach]）とき。
+ * バッファリングやシークの一瞬で止めないため）。解除されるのは、利用者が選び直す・解除する、発火する
+ * （カウントダウンは時間が来て止めたとき、回の終わりまでは ExoPlayer が回の終わりで止めたとき =
+ * `PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM`）、回が終わり切る（`STATE_ENDED`。もう待つものが無い）、
+ * サービスが消える（[detach]）とき。
  */
 class SleepTimerRunner(
     private val player: Player,
@@ -81,12 +83,19 @@ class SleepTimerRunner(
     }
 
     override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-        val setting = timer.setting.value as? SleepTimerSetting.Countdown ?: return
-        val now = clock.now()
-        if (playWhenReady) {
-            if (setting.runningSince == null) timer.set(setting.copy(runningSince = now))
-        } else if (setting.runningSince != null) {
-            timer.set(SleepTimerSetting.Countdown(setting.remainingAt(now)))
+        when (val setting = timer.setting.value) {
+            // 回の終わりで止めた = 発火。次の回まで持ち越さない
+            SleepTimerSetting.EndOfEpisode ->
+                if (!playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM) timer.set(null)
+            is SleepTimerSetting.Countdown -> {
+                val now = clock.now()
+                if (playWhenReady) {
+                    if (setting.runningSince == null) timer.set(setting.copy(runningSince = now))
+                } else if (setting.runningSince != null) {
+                    timer.set(SleepTimerSetting.Countdown(setting.remainingAt(now)))
+                }
+            }
+            null -> Unit
         }
     }
 

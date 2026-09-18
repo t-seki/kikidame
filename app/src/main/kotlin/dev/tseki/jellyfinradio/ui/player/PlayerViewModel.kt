@@ -92,7 +92,7 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    /** スリープタイマーの表示（#36）: 残り時間「24:59」（一時停止中は止まったまま）、「回の終わり」、未設定なら null。 */
+    /** スリープタイマーの表示（#36）: 残り時間「24:59」（60 分直後は「1:00:00」。一時停止中は止まったまま）、「回の終わり」、未設定なら null。 */
     val sleepTimerLabel: StateFlow<String?> = sleepTimer.setting
         .flatMapLatest { setting ->
             when (setting) {

@@ -131,6 +131,18 @@ class SleepTimerRunnerTest {
         assertFalse(pauseAtEnd)
     }
 
+    /** 途中の回で「この回の終わりまで」が発火したら解除。次の回まで持ち越さない（キューに次があるので STATE_ENDED にはならない）。 */
+    @Test
+    fun endOfEpisodeFiringClearsTheTimer() = withRunner {
+        startPlaying()
+        timer.set(SleepTimerSetting.EndOfEpisode)
+        runCurrent()
+        player.update { setPlayWhenReady(false, Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM) }
+        runCurrent()
+        assertNull(timer.setting.value, "回の終わりで止めた = 発火")
+        assertFalse(pauseAtEnd)
+    }
+
     @Test
     fun choosingAgainReplacesTheCountdown() = withRunner {
         startPlaying()
