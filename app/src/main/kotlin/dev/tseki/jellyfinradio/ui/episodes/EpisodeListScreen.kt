@@ -21,6 +21,8 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Sync
@@ -38,6 +40,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -66,6 +69,8 @@ import dev.tseki.jellyfinradio.domain.EpisodeId
 import dev.tseki.jellyfinradio.domain.EpisodeWithState
 import dev.tseki.jellyfinradio.domain.Program
 import dev.tseki.jellyfinradio.download.DownloadProgress
+import dev.tseki.jellyfinradio.playback.NowPlayingState
+import dev.tseki.jellyfinradio.ui.player.MiniPlayer
 import dev.tseki.jellyfinradio.ui.toAiredDateText
 import dev.tseki.jellyfinradio.ui.toClockText
 import kotlin.time.Duration
@@ -74,6 +79,7 @@ import kotlin.time.Duration
 @Composable
 fun EpisodeListScreen(
     onEpisodeClick: (EpisodeId) -> Unit,
+    onNowPlayingClick: (EpisodeId) -> Unit,
     onBack: () -> Unit,
     viewModel: EpisodeListViewModel = hiltViewModel(),
 ) {
@@ -83,6 +89,7 @@ fun EpisodeListScreen(
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val progress by viewModel.progress.collectAsStateWithLifecycle()
     val waitingForNetwork by viewModel.waitingForNetwork.collectAsStateWithLifecycle()
+    val nowPlaying by viewModel.nowPlaying.collectAsStateWithLifecycle()
     val pendingDisable by viewModel.pendingDisable.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var sheetFor by remember { mutableStateOf<EpisodeId?>(null) }
@@ -123,6 +130,7 @@ fun EpisodeListScreen(
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        bottomBar = { MiniPlayer(onClick = onNowPlayingClick) },
     ) { padding ->
         PullToRefreshBox(
             isRefreshing = isRefreshing,
@@ -133,6 +141,7 @@ fun EpisodeListScreen(
                 items(episodes.orEmpty(), key = { it.episode.id.value }) { item ->
                     EpisodeRow(
                         item = item,
+                        nowPlaying = nowPlaying?.takeIf { it.episodeId == item.episode.id },
                         progress = progress?.takeIf { it.episodeId == item.episode.id },
                         waitingForNetwork = waitingForNetwork,
                         onClick = { onEpisodeClick(item.episode.id) },
@@ -203,11 +212,13 @@ fun EpisodeListScreen(
  * 右端のアイコンは状態を表し、タップで最も自然な 1 操作をする:
  * 雲 → ダウンロード（= 固定）、待機／進捗 → キャンセル、警告 → 再試行、手元にある回 → 再生済み切替。
  * 残りの操作は長押しのボトムシート。手元に無い回はタップで再生画面へ行かない。
+ * 聴いている回（[nowPlaying] がこの回）は背景を変え、タイトルの前に再生中／一時停止のアイコンを出す。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun EpisodeRow(
     item: EpisodeWithState,
+    nowPlaying: NowPlayingState?,
     progress: DownloadProgress?,
     waitingForNetwork: Boolean,
     onClick: () -> Unit,
@@ -227,10 +238,21 @@ private fun EpisodeRow(
         modifier = Modifier
             .combinedClickable(onClick = { if (playable) onClick() }, onLongClick = onLongClick)
             .alpha(if (playable || state != null) 1f else 0.5f),
+        colors = ListItemDefaults.colors(
+            containerColor = if (nowPlaying != null) MaterialTheme.colorScheme.secondaryContainer else ListItemDefaults.containerColor,
+        ),
         headlineContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (local?.pinned == true && state == DownloadState.DONE) {
                     Icon(Icons.Filled.PushPin, contentDescription = "固定", Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                }
+                if (nowPlaying != null) {
+                    if (nowPlaying.isPlaying) {
+                        Icon(Icons.Filled.GraphicEq, contentDescription = "聴いている回（再生中）", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                    } else {
+                        Icon(Icons.Filled.Pause, contentDescription = "聴いている回（一時停止中）", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                    }
                     Spacer(Modifier.width(4.dp))
                 }
                 Text(item.episode.title)

@@ -20,6 +20,8 @@ import dev.tseki.jellyfinradio.domain.SessionRepository
 import dev.tseki.jellyfinradio.domain.SessionState
 import dev.tseki.jellyfinradio.download.DownloadProgress
 import dev.tseki.jellyfinradio.download.DownloadScheduler
+import dev.tseki.jellyfinradio.playback.NowPlaying
+import dev.tseki.jellyfinradio.playback.NowPlayingState
 import dev.tseki.jellyfinradio.sync.LibraryRefresher
 import dev.tseki.jellyfinradio.ui.EpisodeListRoute
 import kotlinx.coroutines.CancellationException
@@ -47,6 +49,7 @@ class EpisodeListViewModel @Inject constructor(
     private val refresher: LibraryRefresher,
     private val downloads: DownloadRepository,
     private val scheduler: DownloadScheduler,
+    nowPlaying: NowPlaying,
 ) : ViewModel() {
     private val programId = ProgramId(savedStateHandle.toRoute<EpisodeListRoute>().programId)
 
@@ -61,6 +64,9 @@ class EpisodeListViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     val isRefreshing: StateFlow<Boolean> = refresher.isRefreshing
+
+    /** 聴いている回（別の番組の回のこともある）。この番組の回なら行にマークを出す。 */
+    val nowPlaying: StateFlow<NowPlayingState?> = nowPlaying.state
 
     /** 進行中のダウンロード（各回 ID と割合）。 */
     val progress: StateFlow<DownloadProgress?> = scheduler.progress

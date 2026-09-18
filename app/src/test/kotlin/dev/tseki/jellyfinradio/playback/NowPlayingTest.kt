@@ -1,0 +1,88 @@
+package dev.tseki.jellyfinradio.playback
+
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.Player
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.tseki.jellyfinradio.domain.EpisodeId
+import org.junit.Test
+import org.junit.runner.RunWith
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+
+@RunWith(AndroidJUnit4::class)
+class NowPlayingTest {
+    private val player = FakePlayer()
+    private val nowPlaying = NowPlaying().also { player.addListener(it.listener(player)) }
+
+    private fun item(id: Long, title: String, program: String) = MediaItem.Builder()
+        .setMediaId(id.toString())
+        .setUri("file:///tmp/$id.m4a")
+        .setMediaMetadata(MediaMetadata.Builder().setTitle(title).setArtist(program).build())
+        .build()
+
+    private fun load(vararg items: MediaItem) = player.setPlaylist(items.toList(), items.map { 1_800_000L })
+
+    @Test
+    fun nothingLoadedMeansNoNowPlaying() {
+        assertNull(nowPlaying.state.value)
+        assertNull(nowPlaying.current.value)
+    }
+
+    @Test
+    fun loadingAPlaylistPicksUpTheCurrentItemAndItsMetadata() {
+        load(item(1, "第 1 回", "番組 A"), item(2, "第 2 回", "番組 A"))
+        assertEquals(NowPlayingState(EpisodeId(1), "第 1 回", "番組 A", isPlaying = false), nowPlaying.state.value)
+        assertEquals(EpisodeId(1), nowPlaying.current.value)
+    }
+
+    @Test
+    fun isPlayingFollowsTheReadyAndPlayWhenReadyState() {
+        load(item(1, "第 1 回", "番組 A"))
+        player.update { setPlaybackState(Player.STATE_READY) }
+        player.playWhenReady = true
+        player.update { }
+        assertEquals(true, nowPlaying.state.value?.isPlaying)
+
+        player.playWhenReady = false
+        player.update { }
+        assertEquals(false, nowPlaying.state.value?.isPlaying)
+        assertEquals(EpisodeId(1), nowPlaying.state.value?.episodeId)
+    }
+
+    @Test
+    fun movingToTheNextItemFollows() {
+        load(item(1, "第 1 回", "番組 A"), item(2, "第 2 回", "番組 A"))
+        player.seekToNextMediaItem()
+        player.update { }
+        assertEquals(EpisodeId(2), nowPlaying.state.value?.episodeId)
+        assertEquals("第 2 回", nowPlaying.state.value?.title)
+        assertEquals(EpisodeId(2), nowPlaying.current.value)
+    }
+
+    @Test
+    fun endedKeepsTheItemLoadedButNotPlaying() {
+        load(item(1, "第 1 回", "番組 A"))
+        player.update { setPlaybackState(Player.STATE_READY) }
+        player.playWhenReady = true
+        player.update { }
+        player.update { setPlaybackState(Player.STATE_ENDED) }
+        assertEquals(NowPlayingState(EpisodeId(1), "第 1 回", "番組 A", isPlaying = false), nowPlaying.state.value)
+    }
+
+    @Test
+    fun clearingThePlaylistClearsNowPlaying() {
+        load(item(1, "第 1 回", "番組 A"))
+        player.update { setPlaylist(emptyList()) }
+        assertNull(nowPlaying.state.value)
+        assertNull(nowPlaying.current.value)
+    }
+
+    @Test
+    fun serviceShutdownClearsExplicitly() {
+        load(item(1, "第 1 回", "番組 A"))
+        nowPlaying.set(null)
+        assertNull(nowPlaying.state.value)
+        assertNull(nowPlaying.current.value)
+    }
+}
