@@ -1,6 +1,7 @@
 package dev.tseki.jellyfinradio.playback
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tseki.jellyfinradio.domain.EpisodeId
@@ -60,6 +61,23 @@ class PositionPersisterTest {
         assertFalse(saved.played)
         assertNull(saved.syncedAt)
     }
+    /**
+     * 倍速（#35）: プレイヤーの位置は音源の時間なので、そのまま保存する。この番人は
+     * PositionPersister に速度で位置を換算する処理を持ち込んだら落ちる（今は速度を見ていない）。
+     */
+    @Test
+    fun speedDoesNotChangeWhatIsSaved() = runTest(StandardTestDispatcher()) {
+        setup(this)
+        player.update { setPlaybackParameters(PlaybackParameters(2.0f)) }
+        player.update { setPlayWhenReady(true, Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST) }
+        runCurrent()
+        player.update { setPlayWhenReady(false, Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST); setContentPositionMs(29 * 60_000L) }
+        runCurrent()
+        val saved = repo.states.value[ep1]!!
+        assertEquals(29.minutes, saved.position)
+        assertTrue(saved.played, "残り 1 分なので再生済み。倍速は無関係")
+    }
+
     @Test
     fun savesEveryTenSecondsWhilePlaying() = runTest(StandardTestDispatcher()) {
         setup(this)

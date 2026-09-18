@@ -106,6 +106,10 @@ class LibraryRefresherTest {
         override suspend fun setWifiOnly(value: Boolean) {
             wifiOnly.value = value
         }
+        override val playbackSpeed = MutableStateFlow(1.0f)
+        override suspend fun setPlaybackSpeed(value: Float) {
+            playbackSpeed.value = value
+        }
     }
 
     private class FakeNetwork(var metered: Boolean = false) : NetworkStatus {
