@@ -65,6 +65,12 @@ interface DownloadRepository {
      */
     suspend fun removeEpisode(episodeId: EpisodeId)
 
+    /**
+     * 番組を手元から消す（番組・各回・ファイル・再生位置のすべて）。消失した番組とサーバ ID の無い番組の「この番組を手元から消す」用。
+     * サーバに在る番組を消しても次の同期で戻ってくる（再生位置だけ失う）ので、呼び出し側で出し分ける。
+     */
+    suspend fun removeProgram(programId: ProgramId)
+
     /** DONE 以外（PENDING / RUNNING / FAILED）の行を取り消す。書きかけのファイルも消す。 */
     suspend fun cancel(episodeId: EpisodeId)
 

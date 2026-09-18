@@ -396,6 +396,72 @@ class RoomSyncTest : RoomTestBase() {
     }
 
     @Test
+    fun goneIsRecordedOnFullSyncAndClearedWhenTheProgramReturns() = runTest {
+        signInAndSelect()
+        gateway.snapshot = threeEpisodes
+        repo.refresh()
+        val id = programId()
+        assertNull(library.observeProgram(id).first()?.goneSince)
+        gateway.snapshot = ServerSnapshot(listOf(albumB), listOf(se("b1", "2026-09-05", program = "album-2")))
+        repo.refresh()
+        assertEquals(now, library.observeProgram(id).first()?.goneSince)
+        now += 5.minutes
+        repo.refresh()
+        assertEquals(now - 5.minutes, library.observeProgram(id).first()?.goneSince, "the first time it went missing is kept")
+        gateway.snapshot = threeEpisodes.copy(programs = threeEpisodes.programs + albumB)
+        repo.refresh()
+        assertNull(library.observeProgram(id).first()?.goneSince, "found again")
+    }
+    @Test
+    fun programSync404RecordsGoneAndSuccessClearsIt() = runTest {
+        signInAndSelect()
+        gateway.snapshot = threeEpisodes
+        repo.refresh()
+        val id = programId()
+        gateway.snapshot = ServerSnapshot(emptyList(), emptyList())
+        repo.syncProgram(id)
+        assertEquals(now, library.observeProgram(id).first()?.goneSince)
+        gateway.snapshot = threeEpisodes
+        repo.syncProgram(id)
+        assertNull(library.observeProgram(id).first()?.goneSince)
+    }
+    @Test
+    fun refreshProgramAlsoRecordsAndClearsGone() = runTest {
+        signInAndSelect()
+        gateway.snapshot = threeEpisodes
+        repo.refresh()
+        val id = programId()
+        val file = markDone("a1", pinned = false)
+
+        gateway.snapshot = ServerSnapshot(emptyList(), emptyList())
+        val onHold = assertNotNull(repo.refreshProgram(id))
+        assertEquals(1, onHold.onHold)
+        assertEquals(now, library.observeProgram(id).first()?.goneSince)
+        assertTrue(file.exists(), "a per-program refresh never deletes")
+        assertEquals(3, episodes().size)
+
+        gateway.snapshot = threeEpisodes
+        repo.refreshProgram(id)
+        assertNull(library.observeProgram(id).first()?.goneSince, "pull-to-refresh on the episode list clears the badge")
+    }
+
+    @Test
+    fun removeProgramDeletesRowsFilesAndPlayback() = runTest {
+        signInAndSelect()
+        gateway.snapshot = threeEpisodes
+        repo.refresh()
+        val id = programId()
+        val file = markDone("a1", pinned = true)
+        val a1 = episode("a1").episode.id
+        playback.update(a1) { PlaybackRules.advance(it, 10.minutes, 60.minutes, now) }
+        assertNotNull(db.playbackStateDao().findByEpisode(a1.value))
+        downloads.removeProgram(id)
+        assertTrue(library.observePrograms().first().isEmpty())
+        assertFalse(file.exists())
+        assertEquals(0, db.episodeDao().listKeys().size)
+        assertNull(db.playbackStateDao().findByEpisode(a1.value))
+    }
+    @Test
     fun refreshProgramReturnsNullForAProgramWithoutServerId() = runTest {
         signInAndSelect()
         val id = ProgramId(db.programDao().insert(dev.tseki.jellyfinradio.data.db.ProgramEntity(serverItemId = null, name = "seed", stationName = null)))

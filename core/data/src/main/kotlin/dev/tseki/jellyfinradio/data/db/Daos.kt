@@ -62,6 +62,8 @@ interface ProgramDao {
     suspend fun updateSync(id: Long, syncEnabled: Boolean, keepLatest: Int?, deleteAfterPlayed: Boolean)
     @Query("SELECT * FROM programs")
     suspend fun listAll(): List<ProgramEntity>
+    @Query("UPDATE programs SET goneSince = :at WHERE id = :id")
+    suspend fun setGoneSince(id: Long, at: Instant?)
     @Insert
     suspend fun insert(program: ProgramEntity): Long
     @Query("DELETE FROM programs")
@@ -136,6 +138,9 @@ interface LocalFileDao {
         """,
     )
     suspend fun nextPending(): LocalFileEntity?
+    /** 番組の手元のファイルのパス（番組ごとの削除用）。 */
+    @Query("SELECT lf.path FROM local_files lf JOIN episodes e ON e.id = lf.episodeId WHERE e.programId = :programId AND lf.path IS NOT NULL")
+    suspend fun listPathsByProgram(programId: Long): List<String>
     /** 固定でない手元の行の数（同期対象を OFF にしたら次の同期で消える回）。 */
     @Query("SELECT COUNT(*) FROM local_files lf JOIN episodes e ON e.id = lf.episodeId WHERE e.programId = :programId AND lf.pinned = 0")
     suspend fun countUnpinnedByProgram(programId: Long): Int

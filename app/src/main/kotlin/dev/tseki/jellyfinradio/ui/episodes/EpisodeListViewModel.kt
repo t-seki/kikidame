@@ -113,6 +113,16 @@ class EpisodeListViewModel @Inject constructor(
         _pendingDisable.value = null
     }
 
+    /** 番組を手元から消した（画面は戻る）。 */
+    private val _programRemoved = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val programRemoved: Flow<Unit> = _programRemoved
+
+    /** 消失した番組・サーバ ID の無い番組の「この番組を手元から消す」。番組・各回・ファイル・再生位置をすべて消す。 */
+    fun removeProgram() = act {
+        downloads.removeProgram(programId)
+        _programRemoved.tryEmit(Unit)
+    }
+
     fun setKeepLatest(keepLatest: Int?) = updateRule { it.copy(keepLatest = keepLatest) }
 
     fun setDeleteAfterPlayed(value: Boolean) = updateRule { it.copy(deleteAfterPlayed = value) }
