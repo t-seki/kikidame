@@ -315,7 +315,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   同期対象でない番組では「固定を外す」を出さない（外すと次の同期で消えるため）
 - **削除の規則**（手動削除・保持ルール・消えたファイルの整合で共通）:
   - `serverItemId` がある回: ファイルと `LocalFile` 行だけ消す。`Episode` / `PlaybackState` は残る（ADR 0002。落とし直せば続きから）。
-    ただし**サーバの一覧から消えた回**は落とし直せないので `Episode` ごと消す（M3-b の `remove`。固定でも）
+    ただし**サーバの一覧から消えた回**は落とし直せないので `Episode` ごと消す（M3-b の `remove`。固定でも。M3-c 以降は突合で結び直せなかった回に限る）
   - `serverItemId` が無い回（シード由来）: 二度と手に入らないので `Episode` ごと消す（`PlaybackState` は cascade）。
     各回が 0 になった `serverItemId` 無しの番組も消す
 - **消えたファイルの整合（#5）**: 同期・更新の開始時に `DONE` 行を全走査し、再生開始時にも存在を確認する。無ければ上記の削除規則を
@@ -354,7 +354,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   - **サーバの一覧から消えた `serverItemId != null` の各回は固定でも `Episode` 行ごと消す**（`remove`。`LocalFile` / `PlaybackState` は cascade、
     ファイルも消す）。保持ルールによる削除（`delete`）は M3-a の削除の規則に従う: `serverItemId` がある回は `FILE_ONLY`（`PlaybackState` は残す、ADR 0002）、
     無い回（固定を外したシード由来）は落とし直せないので `Episode` ごと。`Known` の番組で各回が 0 になっても番組は残す
-  - `Unavailable` / `Gone` は `onHold`。M3-b では保存も表示もしない（M3-c、#3）。全走査なので番組ごとの `Unavailable` になる経路は無い
+  - `Unavailable` / `Gone` は `onHold`。M3-b では保存も表示もしない（M3-c、#3 で `goneSince` として保存）。全走査なので番組ごとの `Unavailable` になる経路は無い
 - **実行側の例外**（`planSync` の外）: 削除対象が PENDING / RUNNING / FAILED なら `cancel` 相当。**再生中の回（現在の `MediaItem`）は今回は削除しない**
   （次回に持ち越し）。再生中の回 ID は `PlaybackService` が `Player.Listener` で `@Singleton` の `NowPlaying`（`StateFlow<EpisodeId?>`、`:app`）に
   書き、同期の実行側はそれを読む（Worker と Service は同一プロセス。MediaController を Worker から結ばない）。
@@ -379,6 +379,29 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   `serverItemId` の無い番組は手動同期にフォールバック
 - Room のスキーマ変更は無し（`syncEnabled` / `keepLatest` / `deleteAfterPlayed` は v1 から在る）。`Episode.addedAt` は差分取得を見送ったことで
   読み手が無くなるが、列は残す（取り込み日時の表示や #9 の補助に使える。消すならスキーマ変更が要る）
+
+### M3-c の範囲（2026-09-18 の grilling で確定）
+
+3 本の PR に分ける。**PR 1 = #2（突合の拡張、ADR 0005。第二段も含む）** → **PR 2 = #21（シード機能の削除）** → **PR 3 = #3（消失の記録と UI）**。
+#9 は「シードは実運用で使わない」と判断して close（2026-09-18）。第二段の突合は再取り込みと同時にタイトルを付け直したケースの保険として残す。
+
+- **突合の対象を「未結合」に広げる**（CONTEXT.md「未結合」「突合」、ADR 0005）: サーバ ID を持たない行に加えて、**持っているサーバ ID が今回の完全な一覧に無い行**も
+  対象にする。`LibraryMatching.match` の「`serverItemId == null` だけ」を「未結合」に変え、キーは従来どおり（番組は (放送局, 番組名)、各回は同じ番組内のタイトル完全一致、双方 1 対 1）。
+  結び付けたら `serverItemId` を書き換えるだけで `LocalFile` / `PlaybackState` は触らない。突合は `newPrograms` の挿入より前（今の順序）なので、再取り込み後に番組が二重になることは無い
+- **第二段（元 #9）**: タイトルで結べなかった未結合の各回に対し、同じ番組内で **放送日（日単位）が同じ ＋ 尺の差が 5 秒以内** の候補が双方 1 対 1 なら結ぶ。
+  尺 0（タグが読めなかったシード）は対象外。同日に複数本あって尺で絞れなければ結ばない。古い ID の行にも同じ第二段を適用する。
+  結んだ後はサーバの値で上書き（タイトルは `2026-09-16 (1)` になる）。`EpisodeKeyRow` / `LocalEpisodeKey` に `airedAt` と `runtime` を足す
+- **同期との順序**: 全体同期（`refresh`）も 1 番組の同期（`syncProgram`）も、取り込み（突合を含む）→ `planSync` の順は今のまま。結び直せなかった古い ID の各回だけが
+  `remove` に落ちる（本当にサーバから消えた回）。1 番組の同期で番組が 404 のときは番組一覧が無いので結び直さず判断保留
+- **確度の境界**: 「双方 1 対 1 でなければ結ばない」だけ。閾値付きの自動結合も利用者の確認 UI も作らない（ADR 0005）
+- **消失の記録（#3）**: `programs` に `goneSince: Instant?` を足す（スキーマ v4、`AutoMigration(3, 4)`）。全体同期で「番組一覧に無く突合でも結べなかった」番組に立て、
+  見つかれば（結び直しを含めて）null に戻す。1 番組の同期で 404 なら立てる。`ProgramSummary` / `Program` に載せる
+- **消失の表示**: 番組一覧の行に「サーバ上で見つかりません」と `CloudOff` アイコン、並び順は変えない。各回一覧の同期シートはスイッチを無効化して
+  「サーバ上で見つかりません（M/d から）。同期は止まっています。手元の回はそのまま聴けます」。その下に **「この番組を手元から消す」**（確認 → 番組・各回・ファイル・
+  再生位置をすべて消す）。この操作は**消失した番組とサーバ ID の無い番組だけ**に出す（サーバに在る番組を消しても次の同期で戻り、再生位置だけ失うため）
+- **到達不能の表示は無し**: 全走査しかないので番組単位の到達不能は起きない。ライブラリ全体の到達不能は今のスナックバーのまま。通知も出さない
+- **実機確認**: #2 の再取り込みは自宅ライブラリを作り直す必要があるため **Robolectric のみ**（`FakeJellyfinGateway` で番組 ID・各回 ID の変更を模す）。
+  シードの再現データは端末に残っておらず、シード自体を削除する（#21）ので第二段の実機確認はしない
 
 ## 作業の進め方
 
@@ -411,6 +434,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 - `docs/adr/0002-playback-position-local-authority.md` — 再生位置・再生済みはローカル正
 - `docs/adr/0003-download-without-media3-downloadmanager.md` — DownloadManager を使わない
 - `docs/adr/0004-sync-deletes-only-from-full-listing.md` — 同期の削除の権限は全走査の一覧だけ
+- `docs/adr/0005-rematch-unlinked-rows-before-sync-deletes.md` — 突合の対象を未結合に広げ、同期の削除判断の前に走らせる
 - Jellyfin 12 認証仕様: https://gist.github.com/nielsvanvelzen/ea047d9028f676185832e51ffaf12a6f
 - jellyfin-sdk-kotlin Releases: https://github.com/jellyfin/jellyfin-sdk-kotlin/releases
 - Jellyfin OpenAPI (stable): https://api.jellyfin.org/openapi/jellyfin-openapi-stable.json
