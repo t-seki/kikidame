@@ -96,7 +96,8 @@ fun ProgramListScreen(
                         if (starred.isNotEmpty()) {
                             item(key = "header-starred") { SectionHeader("よく聴く") }
                             programItems(starred, onProgramClick, viewModel::setStarred)
-                            item(key = "header-others") { SectionHeader("その他") }
+                            // 全部がよく聴くなら「その他」の見出しも出さない
+                            if (others.isNotEmpty()) item(key = "header-others") { SectionHeader("その他") }
                         }
                         programItems(others, onProgramClick, viewModel::setStarred)
                     }

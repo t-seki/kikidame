@@ -12,7 +12,7 @@ import org.junit.runner.RunWith
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 
-/** 過去のスキーマ（`schemas/` の JSON）から最新まで AutoMigration で上がり、既存の行が読めること。 */
+/** 過去のスキーマ（`schemas/` の JSON）から最新まで AutoMigration で上がること。v4→v5 は既存の行の既定値まで見る。 */
 @RunWith(AndroidJUnit4::class)
 class MigrationTest {
     @get:Rule
@@ -41,6 +41,13 @@ class MigrationTest {
         } finally {
             migrated.close()
         }
+    }
+
+    /** 最初のスキーマからの通し。列追加が nullable か既定値付きで、途中のどこも手書きマイグレーションを要さないこと。 */
+    @Test
+    fun v1MigratesAllTheWayToLatest() {
+        helper.createDatabase(DB_NAME, 1).close()
+        helper.runMigrationsAndValidate(DB_NAME, 5, true).close()
     }
 
     companion object {

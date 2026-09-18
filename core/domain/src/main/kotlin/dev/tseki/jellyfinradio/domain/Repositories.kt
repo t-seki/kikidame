@@ -2,7 +2,7 @@ package dev.tseki.jellyfinradio.domain
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Duration
 import kotlin.time.Instant
-/** 番組一覧の 1 行。最新の各回の放送日で並べる。 */
+/** 番組一覧の 1 行。[LibraryRepository.observePrograms] は最新の各回の放送日順で返し、画面はよく聴く番組を先に分けて出す。 */
 data class ProgramSummary(
     val program: Program,
     /** サーバ上の分も含めた各回の数。 */

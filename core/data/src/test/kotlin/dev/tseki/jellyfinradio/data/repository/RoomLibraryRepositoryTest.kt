@@ -52,6 +52,17 @@ class RoomLibraryRepositoryTest : RoomTestBase() {
         assertEquals(2, summaries[0].episodeCount)
     }
     @Test
+    fun setStarredRoundTrips() = runTest {
+        val programId = seedProgram()
+        assertEquals(false, repo.observeProgram(programId).first()?.starred)
+        repo.setStarred(programId, true)
+        assertEquals(true, repo.observeProgram(programId).first()?.starred)
+        assertEquals(true, repo.observePrograms().first().single().program.starred)
+        repo.setStarred(programId, false)
+        assertEquals(false, repo.observeProgram(programId).first()?.starred)
+    }
+
+    @Test
     fun getEpisodeReturnsNullForUnknownId() = runTest {
         assertNull(repo.getEpisode(dev.tseki.jellyfinradio.domain.EpisodeId(999)))
     }
