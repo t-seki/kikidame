@@ -29,6 +29,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,13 +73,16 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
         },
     ) { padding ->
         // 左右スワイプで秒単位のシーク（#29）。画面中央の領域から始めたドラッグだけ拾い、シークバーの上では
-        // Slider が勝つ（自分でドラッグを消費する）。ドラッグ中は開始時の位置からの差分と目標位置を表示し、
-        // 指を離した時点で 1 回だけシークする
+        // Slider が勝つ（自分でドラッグを消費する）。ボタンの上から始めても拾う（タップはタッチスロップ内なので混ざらない）。
+        // ドラッグ中は開始時の位置からの差分と目標位置を表示し、指を離した時点で 1 回だけシークする。
+        // 尺が分かるまでは始めない（SeekBar の enabled と同じ）
         val latest by rememberUpdatedState(state)
         val density = LocalDensity.current
         var swipeStartMs by remember { mutableStateOf(0L) }
         var swipeOffsetDp by remember { mutableStateOf<Float?>(null) }
         val swipeTargetMs = swipeOffsetDp?.let { SwipeSeek.targetMs(swipeStartMs, it, state.durationMs) }
+        // ドラッグ中に回が切り替わったら（自動遷移）、古い回の位置を基準にシークしないよう破棄する
+        LaunchedEffect(state.episodeId) { swipeOffsetDp = null }
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -86,7 +90,9 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
                 .pointerInput(Unit) {
                     detectHorizontalDragGestures(
                         onDragStart = { start ->
-                            if (SwipeSeek.isInCenterArea(start.x, start.y, size.width.toFloat(), size.height.toFloat())) {
+                            if (latest.durationMs > 0 &&
+                                SwipeSeek.isInCenterArea(start.x, start.y, size.width.toFloat(), size.height.toFloat())
+                            ) {
                                 swipeStartMs = latest.positionMs
                                 swipeOffsetDp = 0f
                             }
@@ -97,7 +103,7 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
                         },
                         onDragCancel = { swipeOffsetDp = null },
                         onHorizontalDrag = { change, dragAmount ->
-                            // 端から始めたドラッグ（swipeOffsetDp == null）は拾わない
+                            // 中央の領域の外から始めた・尺が無い・回が切り替わった（swipeOffsetDp == null）なら拾わない
                             val current = swipeOffsetDp ?: return@detectHorizontalDragGestures
                             change.consume()
                             swipeOffsetDp = current + with(density) { dragAmount.toDp().value }
