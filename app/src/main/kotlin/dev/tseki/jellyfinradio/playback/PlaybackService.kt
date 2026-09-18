@@ -61,14 +61,14 @@ class PlaybackService : MediaSessionService() {
             .setSessionActivity(sessionActivity)
             .setMediaButtonPreferences(
                 listOf(
-                    CommandButton.Builder(CommandButton.ICON_SKIP_BACK_30)
+                    CommandButton.Builder(CommandButton.ICON_SKIP_BACK_10)
                         .setPlayerCommand(Player.COMMAND_SEEK_BACK)
-                        .setDisplayName("30 秒戻る")
+                        .setDisplayName("10 秒戻る")
                         .setSlots(CommandButton.SLOT_BACK)
                         .build(),
-                    CommandButton.Builder(CommandButton.ICON_SKIP_FORWARD_30)
+                    CommandButton.Builder(CommandButton.ICON_SKIP_FORWARD_10)
                         .setPlayerCommand(Player.COMMAND_SEEK_FORWARD)
-                        .setDisplayName("30 秒進む")
+                        .setDisplayName("10 秒進む")
                         .setSlots(CommandButton.SLOT_FORWARD)
                         .build(),
                 ),
@@ -118,6 +118,6 @@ class PlaybackService : MediaSessionService() {
         }
     }
     companion object {
-        const val SKIP_MS = 30_000L
+        const val SKIP_MS = 10_000L
     }
 }

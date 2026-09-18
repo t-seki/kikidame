@@ -1,4 +1,5 @@
 package dev.tseki.jellyfinradio.ui.player
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,10 +12,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Forward30
+import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Replay30
+import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.outlined.Circle
@@ -28,12 +29,17 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -66,8 +72,45 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
             )
         },
     ) { padding ->
+        // 左右スワイプで秒単位のシーク（#29）。画面中央の領域から始めたドラッグだけ拾い、シークバーの上では
+        // Slider が勝つ（自分でドラッグを消費する）。ボタンの上から始めても拾う（タップはタッチスロップ内なので混ざらない）。
+        // ドラッグ中は開始時の位置からの差分と目標位置を表示し、指を離した時点で 1 回だけシークする。
+        // 尺が分かるまでは始めない（SeekBar の enabled と同じ）
+        val latest by rememberUpdatedState(state)
+        val density = LocalDensity.current
+        var swipeStartMs by remember { mutableStateOf(0L) }
+        var swipeOffsetDp by remember { mutableStateOf<Float?>(null) }
+        val swipeTargetMs = swipeOffsetDp?.let { SwipeSeek.targetMs(swipeStartMs, it, state.durationMs) }
+        // ドラッグ中に回が切り替わったら（自動遷移）、古い回の位置を基準にシークしないよう破棄する
+        LaunchedEffect(state.episodeId) { swipeOffsetDp = null }
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { start ->
+                            if (latest.durationMs > 0 &&
+                                SwipeSeek.isInCenterArea(start.x, start.y, size.width.toFloat(), size.height.toFloat())
+                            ) {
+                                swipeStartMs = latest.positionMs
+                                swipeOffsetDp = 0f
+                            }
+                        },
+                        onDragEnd = {
+                            swipeOffsetDp?.let { viewModel.seekTo(SwipeSeek.targetMs(swipeStartMs, it, latest.durationMs)) }
+                            swipeOffsetDp = null
+                        },
+                        onDragCancel = { swipeOffsetDp = null },
+                        onHorizontalDrag = { change, dragAmount ->
+                            // 中央の領域の外から始めた・尺が無い・回が切り替わった（swipeOffsetDp == null）なら拾わない
+                            val current = swipeOffsetDp ?: return@detectHorizontalDragGestures
+                            change.consume()
+                            swipeOffsetDp = current + with(density) { dragAmount.toDp().value }
+                        },
+                    )
+                }
+                .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -76,9 +119,17 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
                 Spacer(Modifier.height(8.dp))
                 Text(it, color = MaterialTheme.colorScheme.error)
             }
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(8.dp))
+            // スワイプ中だけ見せる。場所は常に確保してレイアウトが跳ねないようにする
+            Text(
+                text = swipeTargetMs?.let { "${SwipeSeek.deltaText(it - swipeStartMs)} → ${it.milliseconds.toClockText()}" } ?: " ",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.alpha(if (swipeTargetMs != null) 1f else 0f),
+            )
+            Spacer(Modifier.height(24.dp))
             SeekBar(
-                positionMs = state.positionMs,
+                positionMs = swipeTargetMs ?: state.positionMs,
                 durationMs = state.durationMs,
                 onSeek = viewModel::seekTo,
             )
@@ -88,7 +139,7 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
                     Icon(Icons.Default.SkipPrevious, contentDescription = "前の回", Modifier.size(32.dp))
                 }
                 IconButton(onClick = viewModel::seekBack) {
-                    Icon(Icons.Default.Replay30, contentDescription = "30 秒戻る", Modifier.size(32.dp))
+                    Icon(Icons.Default.Replay10, contentDescription = "10 秒戻る", Modifier.size(32.dp))
                 }
                 FilledIconButton(onClick = viewModel::togglePlayPause, modifier = Modifier.size(72.dp)) {
                     if (state.isPlaying) {
@@ -98,7 +149,7 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
                     }
                 }
                 IconButton(onClick = viewModel::seekForward) {
-                    Icon(Icons.Default.Forward30, contentDescription = "30 秒進む", Modifier.size(32.dp))
+                    Icon(Icons.Default.Forward10, contentDescription = "10 秒進む", Modifier.size(32.dp))
                 }
                 IconButton(onClick = viewModel::next, enabled = state.hasNext) {
                     Icon(Icons.Default.SkipNext, contentDescription = "次の回", Modifier.size(32.dp))
