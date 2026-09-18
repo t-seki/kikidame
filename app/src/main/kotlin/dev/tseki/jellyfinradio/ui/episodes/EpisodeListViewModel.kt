@@ -78,8 +78,8 @@ class EpisodeListViewModel @Inject constructor(
 
     private val localMessages = MutableSharedFlow<String>(extraBufferCapacity = 4, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
-    /** 更新の結果と、この画面での操作の結果を 1 本にまとめてスナックバーへ。 */
-    val messages: Flow<String> = merge(refresher.messages, localMessages)
+    /** 更新の結果、この画面での操作の結果、ミニプレイヤーが消えた理由を 1 本にまとめてスナックバーへ。 */
+    val messages: Flow<String> = merge(refresher.messages, localMessages, nowPlaying.messages)
 
     /** 各回一覧の「引っ張って更新」= この番組だけ取り込む（#12）。削除はしない。 */
     fun refresh() {

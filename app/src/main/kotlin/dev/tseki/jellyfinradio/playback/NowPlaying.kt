@@ -4,6 +4,9 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import dev.tseki.jellyfinradio.domain.EpisodeId
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
@@ -35,6 +38,15 @@ class NowPlaying @Inject constructor() {
 
     fun set(state: NowPlayingState?) {
         _state.value = state
+    }
+
+    private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+    /** 聴いている回が利用者の操作なしに消えた理由（再生の失敗など）。一覧がスナックバーに出す。 */
+    val messages: Flow<String> = _messages
+
+    fun say(message: String) {
+        _messages.tryEmit(message)
     }
 
     /** [Player] に付けて現在の [MediaItem] と再生中かどうかを追う。サービス終了時は [set] に null を渡す。 */

@@ -46,6 +46,7 @@ class PlaybackService : MediaSessionService() {
         override fun onPlayerError(error: PlaybackException) {
             Log.w(TAG, "playback failed, clearing the queue", error)
             session?.player?.clearMediaItems()
+            nowPlaying.say("ファイルが見つからないため再生を止めました")
         }
     }
     override fun onCreate() {
