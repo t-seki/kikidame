@@ -13,6 +13,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 @RunWith(AndroidJUnit4::class)
 class RoomPlaybackStateRepositoryTest : RoomTestBase() {
     private val library by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao(), db.localFileDao()) }
@@ -47,5 +48,21 @@ class RoomPlaybackStateRepositoryTest : RoomTestBase() {
         repo.update(id) { PlaybackRules.setPlayed(it, true, now) }
         db.openHelper.writableDatabase.execSQL("DELETE FROM episodes")
         assertNull(repo.get(id))
+    }
+
+    @Test
+    fun skippedEpisodeLeavesNoRow() = runTest {
+        val id = seedEpisode()
+        val result = repo.update(id) { PlaybackRules.advance(it, 3.seconds, 30.minutes, now) }
+        assertEquals(3.seconds, result.position)
+        assertNull(repo.get(id), "位置 5 秒未満・未再生・行なし → 書かない (#7)")
+    }
+
+    @Test
+    fun resettingToStartUpdatesExistingRow() = runTest {
+        val id = seedEpisode()
+        repo.update(id) { PlaybackRules.advance(it, 20.minutes, 30.minutes, now) }
+        repo.update(id) { PlaybackRules.advance(it, 0.seconds, 30.minutes, now) }
+        assertEquals(0.seconds, repo.get(id)!!.position, "既存の行があれば位置 0 でも更新する")
     }
 }

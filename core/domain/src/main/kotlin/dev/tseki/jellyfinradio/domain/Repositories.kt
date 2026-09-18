@@ -49,7 +49,8 @@ interface PlaybackStateRepository {
     fun observe(episodeId: EpisodeId): Flow<PlaybackState?>
     /**
      * 行が無ければ [PlaybackState.initial] から始めて [transform] を適用し保存する。
-     * 読み取り・変換・書き込みは 1 トランザクション。
+     * 読み取り・変換・書き込みは 1 トランザクション。ただし [PlaybackRules.isWorthRecording] が
+     * false（行が無く、結果も聴き始めていない）なら書かずに結果だけ返す。
      */
     suspend fun update(episodeId: EpisodeId, transform: (PlaybackState) -> PlaybackState): PlaybackState
 }

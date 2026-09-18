@@ -4,6 +4,7 @@ import dev.tseki.jellyfinradio.data.db.JellyfinRadioDatabase
 import dev.tseki.jellyfinradio.data.db.toDomain
 import dev.tseki.jellyfinradio.data.db.toEntity
 import dev.tseki.jellyfinradio.domain.EpisodeId
+import dev.tseki.jellyfinradio.domain.PlaybackRules
 import dev.tseki.jellyfinradio.domain.PlaybackState
 import dev.tseki.jellyfinradio.domain.PlaybackStateRepository
 import kotlinx.coroutines.flow.Flow
@@ -25,8 +26,9 @@ class RoomPlaybackStateRepository @Inject constructor(
         episodeId: EpisodeId,
         transform: (PlaybackState) -> PlaybackState,
     ): PlaybackState = db.withTransaction {
-        val current = dao.findByEpisode(episodeId.value)?.toDomain()
-            ?: PlaybackState.initial(episodeId, clock.now())
-        transform(current).also { dao.upsert(it.toEntity()) }
+        val existing = dao.findByEpisode(episodeId.value)?.toDomain()
+        val next = transform(existing ?: PlaybackState.initial(episodeId, clock.now()))
+        if (PlaybackRules.isWorthRecording(existing, next)) dao.upsert(next.toEntity())
+        next
     }
 }
