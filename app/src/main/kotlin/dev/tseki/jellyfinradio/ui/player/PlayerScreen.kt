@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Pause
@@ -20,6 +22,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
@@ -50,7 +53,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tseki.jellyfinradio.domain.PlaybackSpeed
+import dev.tseki.jellyfinradio.playback.SleepTimer
 import dev.tseki.jellyfinradio.ui.toClockText
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,6 +64,9 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
     val played by viewModel.played.collectAsStateWithLifecycle()
     val speed by viewModel.speed.collectAsStateWithLifecycle()
     var showSpeedSheet by remember { mutableStateOf(false) }
+    val sleepTimerLabel by viewModel.sleepTimerLabel.collectAsStateWithLifecycle()
+    val sleepTimerSet by viewModel.sleepTimerSet.collectAsStateWithLifecycle()
+    var showSleepSheet by remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -141,10 +149,21 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
                 durationMs = state.durationMs,
                 onSeek = viewModel::seekTo,
             )
-            // シークバーの下: 倍速（#35）。スリープタイマー（#36）もこの行に並ぶ
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+            // シークバーの下: 倍速（#35）とスリープタイマー（#36）
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start, verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = { showSpeedSheet = true }) {
                     Text(PlaybackSpeed.label(speed), style = MaterialTheme.typography.labelLarge)
+                }
+                TextButton(onClick = { showSleepSheet = true }) {
+                    if (sleepTimerSet) {
+                        Icon(Icons.Filled.Bedtime, contentDescription = "スリープタイマー（設定中）", Modifier.size(18.dp))
+                    } else {
+                        Icon(Icons.Outlined.Bedtime, contentDescription = "スリープタイマー", Modifier.size(18.dp))
+                    }
+                    sleepTimerLabel?.let {
+                        Spacer(Modifier.width(6.dp))
+                        Text(it, style = MaterialTheme.typography.labelLarge)
+                    }
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -174,6 +193,14 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
     if (showSpeedSheet) {
         SpeedSheet(current = speed, onSelect = viewModel::setSpeed, onDismiss = { showSpeedSheet = false })
     }
+    if (showSleepSheet) {
+        SleepTimerSheet(
+            isSet = sleepTimerSet,
+            onSelectAfter = viewModel::setSleepTimer,
+            onSelectEndOfEpisode = viewModel::setSleepTimerToEndOfEpisode,
+            onDismiss = { showSleepSheet = false },
+        )
+    }
 }
 /** 倍速を選ぶシート。保存と反映は ViewModel → 設定 → サービスの経路で、ここは選択肢を見せるだけ。狭い画面では折り返す。 */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -188,6 +215,35 @@ private fun SpeedSheet(current: Float, onSelect: (Float) -> Unit, onDismiss: () 
                     onClick = { onSelect(choice); onDismiss() },
                     label = { Text(PlaybackSpeed.label(choice)) },
                 )
+            }
+        }
+        Spacer(Modifier.padding(bottom = 32.dp))
+    }
+}
+
+/** スリープタイマーを選ぶシート。時間・この回の終わりまで・解除（設定中のみ）。実行はサービス側。 */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+private fun SleepTimerSheet(
+    isSet: Boolean,
+    onSelectAfter: (Duration?) -> Unit,
+    onSelectEndOfEpisode: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Text("スリープタイマー", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+        Text(
+            "時間が来るか今の回が終わったら一時停止します。一時停止している間は時間が進みません",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(horizontal = 24.dp),
+        )
+        FlowRow(Modifier.padding(horizontal = 24.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (choice in SleepTimer.CHOICES) {
+                FilterChip(selected = false, onClick = { onSelectAfter(choice); onDismiss() }, label = { Text("${choice.inWholeMinutes} 分") })
+            }
+            FilterChip(selected = false, onClick = { onSelectEndOfEpisode(); onDismiss() }, label = { Text("この回の終わりまで") })
+            if (isSet) {
+                FilterChip(selected = false, onClick = { onSelectAfter(null); onDismiss() }, label = { Text("解除") })
             }
         }
         Spacer(Modifier.padding(bottom = 32.dp))
