@@ -76,6 +76,21 @@ class NowPlayingTest {
         assertNull(nowPlaying.excludedFromSync)
     }
 
+    /** スリープタイマーの「この回の終わりまで」で途中の回を止めたとき（#36）も聴き終えた扱い。再開すれば戻る。 */
+    @Test
+    fun pausedAtEndOfItemCountsAsEnded() {
+        load(item(1, "第 1 回", "番組 A"), item(2, "第 2 回", "番組 A"))
+        player.update { setPlaybackState(Player.STATE_READY) }
+        player.playWhenReady = true
+        player.update { }
+        player.update { setPlayWhenReady(false, Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM) }
+        assertEquals(true, nowPlaying.state.value?.isEnded)
+        assertNull(nowPlaying.excludedFromSync)
+        player.update { setPlayWhenReady(true, Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST) }
+        assertEquals(false, nowPlaying.state.value?.isEnded)
+        assertEquals(EpisodeId(1), nowPlaying.excludedFromSync)
+    }
+
     @Test
     fun clearingThePlaylistClearsNowPlaying() {
         load(item(1, "第 1 回", "番組 A"))

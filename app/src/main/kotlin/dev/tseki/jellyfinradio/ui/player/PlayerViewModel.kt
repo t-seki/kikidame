@@ -18,7 +18,10 @@ import dev.tseki.jellyfinradio.domain.PlaybackStateRepository
 import dev.tseki.jellyfinradio.playback.EpisodeMediaItems
 import dev.tseki.jellyfinradio.playback.NowPlaying
 import dev.tseki.jellyfinradio.playback.PlayerConnection
+import dev.tseki.jellyfinradio.playback.SleepTimer
+import dev.tseki.jellyfinradio.playback.SleepTimerSetting
 import dev.tseki.jellyfinradio.ui.PlayerRoute
+import dev.tseki.jellyfinradio.ui.toClockText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -28,6 +31,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -60,6 +64,7 @@ class PlayerViewModel @Inject constructor(
     private val downloads: DownloadRepository,
     nowPlaying: NowPlaying,
     private val settings: AppSettingsRepository,
+    private val sleepTimer: SleepTimer,
 ) : ViewModel() {
     private val route = savedStateHandle.toRoute<PlayerRoute>()
     private val requestedEpisodeId = EpisodeId(route.episodeId)
@@ -86,6 +91,31 @@ class PlayerViewModel @Inject constructor(
             }
         }
     }
+
+    /** スリープタイマーの表示（#36）: 残り時間「24:59」（60 分直後は「1:00:00」。一時停止中は止まったまま）、「回の終わり」、未設定なら null。 */
+    val sleepTimerLabel: StateFlow<String?> = sleepTimer.setting
+        .flatMapLatest { setting ->
+            when (setting) {
+                null -> flowOf(null)
+                SleepTimerSetting.EndOfEpisode -> flowOf("回の終わり")
+                is SleepTimerSetting.Countdown -> flow {
+                    while (true) {
+                        emit(setting.remainingAt(clock.now()).toClockText())
+                        delay(1_000)
+                    }
+                }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    val sleepTimerSet: StateFlow<Boolean> = sleepTimer.setting
+        .map { it != null }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /** [after] 後に一時停止（再生中だけ減る）。null で解除。 */
+    fun setSleepTimer(after: Duration?) = sleepTimer.set(after?.let { SleepTimerSetting.Countdown(it) })
+
+    fun setSleepTimerToEndOfEpisode() = sleepTimer.set(SleepTimerSetting.EndOfEpisode)
 
     private var controller: MediaController? = null
     private val listener = object : Player.Listener {

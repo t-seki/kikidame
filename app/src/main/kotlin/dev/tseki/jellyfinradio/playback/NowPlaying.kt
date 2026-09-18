@@ -18,7 +18,10 @@ data class NowPlayingState(
     val title: String,
     val programName: String?,
     val isPlaying: Boolean,
-    /** 最後まで聴き終えて止まっている（`STATE_ENDED`）。載ったままだが、同期はもう削除から外さない（#27）。 */
+    /**
+     * 最後まで聴き終えて止まっている。キューの最後なら `STATE_ENDED`、途中の回でもスリープタイマーの
+     * 「この回の終わりまで」で回の終わりで止めたとき（#36）。載ったままだが、同期はもう削除から外さない（#27）。
+     */
     val isEnded: Boolean = false,
 )
 
@@ -53,16 +56,27 @@ class NowPlaying @Inject constructor() {
 
     /** [Player] に付けて現在の [MediaItem] と再生中かどうかを追う。サービス終了時は [set] に null を渡す。 */
     fun listener(player: Player): Player.Listener = object : Player.Listener {
-        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = read(player)
+        /** 回の終わりで止めた（`pauseAtEndOfMediaItems`）。再開するか回が変われば下ろす。 */
+        private var pausedAtEndOfItem = false
 
-        override fun onTimelineChanged(timeline: Timeline, reason: Int) = read(player)
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            pausedAtEndOfItem = false
+            read(player, pausedAtEndOfItem)
+        }
 
-        override fun onIsPlayingChanged(isPlaying: Boolean) = read(player)
+        override fun onTimelineChanged(timeline: Timeline, reason: Int) = read(player, pausedAtEndOfItem)
 
-        override fun onPlaybackStateChanged(playbackState: Int) = read(player)
+        override fun onIsPlayingChanged(isPlaying: Boolean) = read(player, pausedAtEndOfItem)
+
+        override fun onPlaybackStateChanged(playbackState: Int) = read(player, pausedAtEndOfItem)
+
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            pausedAtEndOfItem = !playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM
+            read(player, pausedAtEndOfItem)
+        }
     }
 
-    private fun read(player: Player) {
+    private fun read(player: Player, pausedAtEndOfItem: Boolean) {
         val item = player.currentMediaItem
         val episodeId = EpisodeMediaItems.episodeId(item)
         set(
@@ -74,7 +88,7 @@ class NowPlaying @Inject constructor() {
                     title = item.mediaMetadata.title?.toString() ?: "",
                     programName = item.mediaMetadata.artist?.toString(),
                     isPlaying = player.isPlaying,
-                    isEnded = player.playbackState == Player.STATE_ENDED,
+                    isEnded = player.playbackState == Player.STATE_ENDED || pausedAtEndOfItem,
                 )
             },
         )
