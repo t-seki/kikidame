@@ -12,8 +12,8 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sync
@@ -31,7 +31,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -44,7 +43,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -83,15 +81,17 @@ fun ProgramListScreen(
     BackHandler(enabled = isSearching, onBack = viewModel::stopSearch)
     Scaffold(
         topBar = {
-            if (isSearching) {
-                SearchTopBar(query, onQueryChange = viewModel::setQuery, onClose = viewModel::stopSearch)
-            } else {
+            // タイトルは検索中も残し、入力欄はその下に一段出す（#44）。虫眼鏡は検索中は × になる
+            Column {
                 TopAppBar(
                     title = { Text("番組") },
                     actions = {
-                        // 絞る対象が無いときは虫眼鏡を出さない
-                        if (!programs.isNullOrEmpty()) {
-                            IconButton(onClick = viewModel::startSearch) {
+                        when {
+                            isSearching -> IconButton(onClick = viewModel::stopSearch) {
+                                Icon(Icons.Default.Close, contentDescription = "検索を閉じる")
+                            }
+                            // 絞る対象が無いときは虫眼鏡を出さない
+                            !programs.isNullOrEmpty() -> IconButton(onClick = viewModel::startSearch) {
                                 Icon(Icons.Default.Search, contentDescription = "検索")
                             }
                         }
@@ -100,6 +100,7 @@ fun ProgramListScreen(
                         }
                     },
                 )
+                if (isSearching) SearchField(query, onQueryChange = viewModel::setQuery)
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -157,12 +158,11 @@ fun ProgramListScreen(
 }
 
 /**
- * 検索モードの TopAppBar（#44）。title を入力欄に差し替え、← で閉じる（検索語も消える）、× は空欄に戻すだけで閉じない。
+ * 検索の入力欄（#44）。TopAppBar の下に一段置き、文字は本文サイズ（タイトルと区別する）。× は空欄に戻すだけで閉じない（閉じるのは TopAppBar の ×）。
  * M3 の SearchBar は全画面のサジェスト領域を持つ部品なので、その場で一覧を絞る用途には使わない。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SearchTopBar(query: String, onQueryChange: (String) -> Unit, onClose: () -> Unit) {
+private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     // 開いた瞬間にフォーカスとキーボードを出す
@@ -170,36 +170,23 @@ private fun SearchTopBar(query: String, onQueryChange: (String) -> Unit, onClose
         focusRequester.requestFocus()
         keyboard?.show()
     }
-    TopAppBar(
-        navigationIcon = {
-            IconButton(onClick = onClose) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "検索を閉じる")
-            }
-        },
-        title = {
-            TextField(
-                value = query,
-                onValueChange = onQueryChange,
-                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
-                placeholder = { Text("番組名・放送局名") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                ),
-            )
-        },
-        actions = {
+    TextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+        textStyle = MaterialTheme.typography.bodyLarge,
+        placeholder = { Text("番組名・放送局名") },
+        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+        trailingIcon = {
             if (query.isNotEmpty()) {
                 IconButton(onClick = { onQueryChange("") }) {
                     Icon(Icons.Default.Clear, contentDescription = "検索語を消す")
                 }
             }
         },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
     )
 }
 private fun LazyListScope.programItems(
