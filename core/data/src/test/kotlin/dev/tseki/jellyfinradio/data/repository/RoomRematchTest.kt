@@ -34,7 +34,7 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
-/** 再取り込み（サーバ ID の変更）後の結び直し（ADR 0005）と、シード行の第二段突合（#9）。 */
+/** 再取り込み（サーバ ID の変更）後の結び直し（ADR 0005）と、タイトルが違う未結合の各回の第二段突合（放送日 + 尺）。 */
 @RunWith(AndroidJUnit4::class)
 class RoomRematchTest : RoomTestBase() {
     @get:Rule
@@ -46,7 +46,6 @@ class RoomRematchTest : RoomTestBase() {
     private val session by lazy { DataStoreSessionRepository(store, gateway) }
     private val library by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao(), db.localFileDao()) }
     private val playback by lazy { RoomPlaybackStateRepository(db, clock) }
-    private val importer by lazy { RoomLocalImportRepository(db, clock) }
     private val directory by lazy { EpisodesDirectory(ApplicationProvider.getApplicationContext()) }
     private val downloads by lazy { RoomDownloadRepository(db, directory, clock) }
     private val repo by lazy { RoomLibraryRefreshRepository(db, store, gateway, downloads, clock) }
@@ -178,8 +177,8 @@ class RoomRematchTest : RoomTestBase() {
     }
 
     @Test
-    fun seededEpisodesLinkByAiredDayAndRuntimeWhenTitlesDiffer() = runTest {
-        importer.import(
+    fun unlinkedEpisodesLinkByAiredDayAndRuntimeWhenTitlesDiffer() = runTest {
+        seed(
             listOf(
                 scanned(station = station, program = programName, title = "$programName 2026-09-16-1", airedAt = "2026-09-15T15:00:00Z", runtime = 89.minutes + 59.seconds),
                 scanned(station = station, program = programName, title = "$programName 2026-09-16-2", airedAt = "2026-09-15T15:00:00Z", runtime = 60.minutes + 5.seconds),
@@ -191,7 +190,7 @@ class RoomRematchTest : RoomTestBase() {
         signInAndSelect()
         gateway.snapshot = snapshot(
             "P1",
-            // シードの放送日（JST 0 時 = 前日 15:00Z）と同じ日
+            // 手元の行の放送日（JST 0 時 = 前日 15:00Z）と同じ日
             se("E1", "P1", "2026-09-16 (1)", "2026-09-15T15:00:00Z", runtime = 90.minutes),
             se("E2", "P1", "2026-09-16 (2)", "2026-09-15T15:00:00Z", runtime = 60.minutes + 4.seconds),
         )

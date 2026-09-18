@@ -39,7 +39,6 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
     private val gateway = FakeJellyfinGateway()
     private val store by lazy { testSessionStore(tmp.root, scope) }
     private val session by lazy { DataStoreSessionRepository(store, gateway) }
-    private val importer by lazy { RoomLocalImportRepository(db, clock) }
     private val library by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao(), db.localFileDao()) }
     private val playback by lazy { RoomPlaybackStateRepository(db, clock) }
     private val directory by lazy { EpisodesDirectory(ApplicationProvider.getApplicationContext()) }
@@ -86,7 +85,7 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
 
     @Test
     fun linksSeededRowsAndAddsServerOnlyEpisodes() = runTest {
-        importer.import(
+        seed(
             listOf(
                 scanned(station = station, program = program, title = "$program 2026-09-14-1", airedAt = "2026-09-13T15:00:00Z"),
                 scanned(station = station, program = program, title = "$program 2026-09-14-2", airedAt = "2026-09-13T15:00:00Z"),

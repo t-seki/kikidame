@@ -11,11 +11,11 @@ enum class LocalDeletionScope {
     EPISODE,
 }
 
-/** 削除の規則: サーバ ID がある回はファイルだけ、無い回（シード由来）は各回ごと。 */
+/** 削除の規則: サーバ ID がある回はファイルだけ、無い回（サーバを経由していない、落とし直せない回）は各回ごと。 */
 fun deletionScopeFor(episode: Episode): LocalDeletionScope =
     if (episode.serverItemId != null) LocalDeletionScope.FILE_ONLY else LocalDeletionScope.EPISODE
 
-/** 保存先のファイル名。フォルダ構成はシードと同じ `<放送局>/<番組>/<タイトル>.<container>`。 */
+/** 保存先のファイル名。フォルダ構成は radirec-tool の出力と同じ `<放送局>/<番組>/<タイトル>.<container>`。 */
 object EpisodeFileName {
     private val FORBIDDEN = Regex("""[/\\:*?"<>|\p{Cntrl}]""")
     const val DEFAULT_CONTAINER = "m4a"

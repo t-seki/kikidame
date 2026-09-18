@@ -84,36 +84,17 @@ WSL2 は USB を見られないが、LAN 上の端末には TCP で届く。Wind
 adb install -r \\wsl.localhost\Ubuntu\home\<you>\dev\jellyfin-radio\app\build\outputs\apk\debug\app-debug.apk
 ```
 
-### 音声ファイルを入れる
+### 音声ファイルを入れる（M1 当時の手順。シードは M3-c で削除）
 
-radirec-tool の出力ツリーをそのまま push する（`<放送局>/<番組>/<番組> YYYY-MM-DD.m4a`）。
-
-```bash
-$ADB push "/mnt/z/Radio/TBSラジオ/番組名" "/sdcard/Android/data/dev.tseki.jellyfinradio/files/episodes/TBSラジオ/"
-$ADB shell ls -R /sdcard/Android/data/dev.tseki.jellyfinradio/files/episodes
-```
-
-- Windows の adb で日本語パスを push すると、**引数末尾のマルチバイト文字が欠ける**ことがある
-  （`TBSラジオ/` → `TBSラジ`）。WSL2 の adb（UTF-8）なら起きない。化けたときは改名コマンドを
-  UTF-8・LF のシェルスクリプトにして `adb push` → `adb shell sh <script>` で実行する（引数に日本語を通さない）
-- シード済みのファイルを消して入れ直すときは DB も消す（パスをキーに既存行をスキップするため。
-  消えたファイルの行の整理は #5）。`pm clear` は push したファイルまで消すので、デバッグ特権で DB だけ消す:
-  ```bash
-  $ADB shell am force-stop dev.tseki.jellyfinradio
-  $ADB shell run-as dev.tseki.jellyfinradio rm -f databases/jellyfin-radio.db databases/jellyfin-radio.db-wal databases/jellyfin-radio.db-shm
-  ```
-
-アプリを開き、番組一覧右上の「シード」（デバッグビルドのみ）を押す。走査先は
-`getExternalFilesDir("episodes")`。`filesDir` に変えないこと — root 無しの `adb push` が通らない。
-
-タグ（`©day`）が読めているかを切り分けたいときは、日付を含まないファイル名（`tagtest.m4a` など）で 1 本
-入れる。各回一覧の日付が元の放送日ならタグ経由、push した日ならファイル更新日時へのフォールバック。
+M1 ではサーバ無しで試すため、`getExternalFilesDir("episodes")/<放送局>/<番組>/` に `adb push` したファイルを
+デバッグビルドの「シード」が走査して取り込んでいた。M2 以降はサーバから落とせるので、この機能は #21 で削除した。
+手元のファイルを直接入れたい場合は、番組・各回の行に結び付ける仕組みが無いので別途設計が要る（#21 の非目標）。
 
 ### 実機チェックリスト（M1）
 
 2026-09-17 に Pixel 7a（Android 17）で確認済み。`©day` の項目のみ未確認。
 
-- [x] `adb push` した 2 階層のツリーがシードで取り込まれ、番組一覧 → 各回一覧 → 再生画面 と辿れる
+- [x] （M1 当時）`adb push` した 2 階層のツリーがシードで取り込まれ、番組一覧 → 各回一覧 → 再生画面 と辿れる
 - [x] 各回一覧が放送日の新しい順、同日の 2 本はタイトルの辞書順（`… (1)` / `-2` が後）
 - [ ] タグの `©day` が放送日として読める（タグが無い／読めない場合はファイル名の日付）
 - [x] 再生／一時停止／シーク／±30 秒／前後の回
@@ -152,7 +133,7 @@ $ADB shell ls -R /sdcard/Android/data/dev.tseki.jellyfinradio/files/episodes
 - [x] 接続画面でサーバ・ユーザー名・パスワードを入れてログインできる。違うパスワードは「ユーザー名またはパスワードが違います」
 - [x] ライブラリ選択に全ライブラリが並び、音楽以外はグレーで「音楽ライブラリのみ選べます」。音楽が 1 つなら選択済み
 - [x] 決定直後に「番組 N / 各回 M を取得しました」（153 番組 / 6,004 回、約 12 秒）
-- [x] シード済みの番組がサーバの番組と突合され重複しない（各回はタイトルが違うので別行 → #9）
+- [x] （M2 当時）シード済みの番組がサーバの番組と突合され重複しない（各回はタイトルが違うので別行 → #9）
 - [x] 番組一覧に「手元 M / 全 N 回」。引っ張って更新で再取得
 - [x] 手元に無い各回が薄く、右端が雲、タップしても再生画面へ行かない。手元の回は再生位置・再生済みが残る
 - [x] 設定にサーバ・ユーザー・ライブラリ・最終取得。ライブラリの選び直しができる

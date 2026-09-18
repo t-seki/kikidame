@@ -9,7 +9,6 @@ import dev.tseki.jellyfinradio.LocalNetworkPermission
 import dev.tseki.jellyfinradio.domain.ServerException
 import dev.tseki.jellyfinradio.domain.SessionRepository
 import dev.tseki.jellyfinradio.domain.SessionState
-import dev.tseki.jellyfinradio.seed.SeedLocalLibrary
 import dev.tseki.jellyfinradio.sync.toUserMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,7 +24,6 @@ data class ConnectUiState(
     val password: String = "",
     val isSubmitting: Boolean = false,
     val error: String? = null,
-    val seedMessage: String? = null,
 ) {
     val canSubmit: Boolean get() = !isSubmitting && serverUrl.isNotBlank() && userName.isNotBlank()
 }
@@ -34,7 +32,6 @@ data class ConnectUiState(
 class ConnectViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val sessionRepository: SessionRepository,
-    private val seed: SeedLocalLibrary,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ConnectUiState())
     val uiState: StateFlow<ConnectUiState> = _uiState
@@ -79,18 +76,4 @@ class ConnectViewModel @Inject constructor(
             }
         }
     }
-
-    /** デバッグ用。サーバ無しで手元のデータを使う。 */
-    fun runSeed() {
-        viewModelScope.launch {
-            val r = seed.run()
-            _uiState.update {
-                it.copy(seedMessage = "番組 ${r.addedPrograms} / 各回 ${r.addedEpisodes} を追加（既存 ${r.skippedEpisodes} はスキップ）")
-            }
-        }
-    }
-
-    fun consumeSeedMessage() = _uiState.update { it.copy(seedMessage = null) }
-
-    val seedRoot: String? get() = seed.root?.absolutePath
 }

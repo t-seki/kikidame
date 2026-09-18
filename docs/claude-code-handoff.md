@@ -96,20 +96,20 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 全走査が 12 秒で終わる今は取り込み専用の経路を持つ価値が無い。各回一覧の「引っ張って更新」だけは番組単位取得（#12、M3-b）。
 
 サーバの `PremiereDate`（無ければ `DateCreated`）は日時で来るが、**日付部分だけ取って JST 0 時の `Instant`** にする
-（シード由来の放送日と同じ土俵にして、並び順が混ざらないようにする）。
+（日単位の値として並び順を安定させる）。
 
 ## Room スキーマ（この形で作る）
 
 主キーはすべてローカル代理キー。サーバ ID は nullable unique（ADR 0001）。
-サーバ ID を持たない行（M1 のシード、孤児化した行）は正規の状態。
+サーバ ID を持たない行（未結合）は正規の状態（ADR 0001）。M1〜M3-b にあったシード（手元フォルダの走査）は M3-c で削除した（#21）。
 
 ```kotlin
 @Entity(indices = [Index("serverItemId", unique = true), Index("stationName", "name")])
-data class ProgramEntity(          // 番組 = MusicAlbum。(放送局, 番組名) はシード・突合のキーだが一意ではない（v2）
+data class ProgramEntity(          // 番組 = MusicAlbum。(放送局, 番組名) は突合のキーだが一意ではない（v2）
   @PrimaryKey(autoGenerate = true) val id: Long = 0,
   val serverItemId: String?,
   val name: String,
-  val stationName: String?,        // 放送局（MusicAlbum.AlbumArtist / シードでは番組フォルダの親フォルダ名）
+  val stationName: String?,        // 放送局（MusicAlbum.AlbumArtist）
   val syncEnabled: Boolean,        // 同期対象か（既定 false）
   val keepLatest: Int?,            // 最新 N 回まで保持（null = 上限なし）
   val deleteAfterPlayed: Boolean
@@ -122,7 +122,7 @@ data class EpisodeEntity(          // 各回 = Audio
   val programId: Long,
   val title: String,
   val airedAt: Instant,            // 放送日（PremiereDate、無ければ DateCreated）
-  val addedAt: Instant?,           // 取り込み日時（DateCreated）。シード由来は null
+  val addedAt: Instant?,           // 取り込み日時（DateCreated）
   val runtimeTicks: Long, val sizeBytes: Long,
   val container: String
 )
@@ -132,7 +132,7 @@ data class LocalFileEntity(        // ダウンロード状態の唯一の正（
   @PrimaryKey val episodeId: Long,
   val state: DownloadState,        // PENDING / RUNNING / DONE / FAILED
   val path: String?,               // getExternalFilesDir("episodes") 配下の絶対パス
-  val pinned: Boolean,             // 固定。保持ルールの対象外（手動ダウンロード・シード由来）
+  val pinned: Boolean,             // 固定。保持ルールの対象外（手動ダウンロード）
   val attemptCount: Int,           // FAILED の再試行判断用。WorkManager の backoff は request 単位で各回単位ではない
   val lastAttemptAt: Instant?,
   val downloadedAt: Instant?
@@ -197,7 +197,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 - **固定**された各回は保持ルールの対象外。利用者が固定を外すか手動削除するまで残る（例外はサーバの一覧から消えた回。次項）
 - サーバの一覧（`Known`）から消えた各回は手元からも削除する。サーバが各回の存在の正、手元はキャッシュ。
   ただしこの規則が届くのは **`Known` の番組に属し、かつ `serverItemId != null` の各回だけ**。
-  サーバ ID を持たない各回（シード由来など）は「サーバに在る」と主張したことがないので対象外
+  サーバ ID を持たない各回は「サーバに在る」と主張したことがないので対象外
 - 保持すべき集合 − 手元の集合 → ダウンロード対象（再生済みの回は保持すべき集合に入らないので落ちない）
 
 運用パラメータ:
@@ -207,7 +207,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 - アプリ起動時: 前回同期から 1 時間以上経っていれば実行（同じ制約で待つ）。番組一覧の手動プルは同期そのもの（M3-b の範囲を参照）
 - ダウンロード: Worker 内で HTTP ストリームを `.part` ファイルへ書き、完了後にリネーム。
   再開は `Range` ヘッダ。進捗は `setProgress` で UI へ
-- 置き場所: `getExternalFilesDir("episodes")/<放送局>/<番組>/<ファイル>`（M1 のシードと同じ階層）
+- 置き場所: `getExternalFilesDir("episodes")/<放送局>/<番組>/<ファイル>`（radirec-tool の出力と同じ階層）
 
 ## 実装順序
 
@@ -220,7 +220,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 オフラインを後から足すと破綻するため、必ずこの順序で積む。
 
 ### M1 の範囲
-- **ファイルの供給**: `getExternalFilesDir("episodes")/<放送局>/<番組名>/<ファイル>.m4a|.mp3` に `adb push` する。
+- **ファイルの供給**（**M3-c で削除**、#21。以下は M1 当時の記録）: `getExternalFilesDir("episodes")/<放送局>/<番組名>/<ファイル>.m4a|.mp3` に `adb push` する。
   この 2 階層は `radirec-tool` の出力（`<albumartist = 放送局>/<album = 番組>/<番組> YYYY-MM-DD.m4a`）を
   そのまま持ち込めるように合わせてある。デバッグビルド限定の番組一覧画面の「シード」ボタンが
   このフォルダを走査し、親フォルダを放送局（`stationName`）、サブフォルダを番組、ファイルを各回として
@@ -269,7 +269,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
     グレーアウト。音楽が 1 つなら選択済みにして「決定」だけ。0 なら決定不可
   - 設定画面（番組一覧の歯車）: サーバ URL・ユーザー名・ライブラリ名（タップで選び直し）・最終取得日時、
     **ログアウト**（認証情報だけ消す。手元のデータは残る）、**別のサーバに接続**（確認の上ローカルデータを全部消す）。
-    デバッグ用シードはここに移す（接続画面にもデバッグ節として置く）
+    デバッグ用シードはここに移す（接続画面にもデバッグ節として置く。M3-c で削除）
   - 401 はログアウトと同じ処理をして接続画面へ（URL とユーザー名は入力済み）
 - **認証情報**: `Client="Jellyfin Radio"`, `Version=versionName`。`Device` / `DeviceId` は jellyfin-sdk-kotlin の Android 既定
   （端末のモデル名 / `ANDROID_ID` 由来）に任せ、自前の UUID は持たない（実装時に変更。保存する値が 1 つ減る）。
@@ -316,7 +316,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 - **削除の規則**（手動削除・保持ルール・消えたファイルの整合で共通）:
   - `serverItemId` がある回: ファイルと `LocalFile` 行だけ消す。`Episode` / `PlaybackState` は残る（ADR 0002。落とし直せば続きから）。
     ただし**サーバの一覧から消えた回**は落とし直せないので `Episode` ごと消す（M3-b の `remove`。固定でも。M3-c 以降は突合で結び直せなかった回に限る）
-  - `serverItemId` が無い回（シード由来）: 二度と手に入らないので `Episode` ごと消す（`PlaybackState` は cascade）。
+  - `serverItemId` が無い回（サーバを経由していない回。シード削除後は通常存在しない）: 二度と手に入らないので `Episode` ごと消す（`PlaybackState` は cascade）。
     各回が 0 になった `serverItemId` 無しの番組も消す
 - **消えたファイルの整合（#5）**: 同期・更新の開始時に `DONE` 行を全走査し、再生開始時にも存在を確認する。無ければ上記の削除規則を
   自動で適用し、スナックバー「ファイルが見つかりません」
@@ -353,7 +353,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   - **固定は N に数えない**（別枠）。`keepLatest` は固定を除いた放送日の新しい順で数える（同着は `EpisodeOrder`）
   - **サーバの一覧から消えた `serverItemId != null` の各回は固定でも `Episode` 行ごと消す**（`remove`。`LocalFile` / `PlaybackState` は cascade、
     ファイルも消す）。保持ルールによる削除（`delete`）は M3-a の削除の規則に従う: `serverItemId` がある回は `FILE_ONLY`（`PlaybackState` は残す、ADR 0002）、
-    無い回（固定を外したシード由来）は落とし直せないので `Episode` ごと。`Known` の番組で各回が 0 になっても番組は残す
+    無い回（サーバを経由していない回）は落とし直せないので `Episode` ごと。`Known` の番組で各回が 0 になっても番組は残す
   - `Unavailable` / `Gone` は `onHold`。M3-b では保存も表示もしない（M3-c、#3 で `goneSince` として保存）。全走査なので番組ごとの `Unavailable` になる経路は無い
 - **実行側の例外**（`planSync` の外）: 削除対象が PENDING / RUNNING / FAILED なら `cancel` 相当。**再生中の回（現在の `MediaItem`）は今回は削除しない**
   （次回に持ち越し）。再生中の回 ID は `PlaybackService` が `Player.Listener` で `@Singleton` の `NowPlaying`（`StateFlow<EpisodeId?>`、`:app`）に
@@ -389,7 +389,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   対象にする。`LibraryMatching.match` の「`serverItemId == null` だけ」を「未結合」に変え、キーは従来どおり（番組は (放送局, 番組名)、各回は同じ番組内のタイトル完全一致、双方 1 対 1）。
   結び付けたら `serverItemId` を書き換えるだけで `LocalFile` / `PlaybackState` は触らない。突合は `newPrograms` の挿入より前（今の順序）なので、再取り込み後に番組が二重になることは無い
 - **第二段（元 #9）**: タイトルで結べなかった未結合の各回に対し、同じ番組内で **放送日（日単位）が同じ ＋ 尺の差が 5 秒以内** の候補が双方 1 対 1 なら結ぶ。
-  尺 0（タグが読めなかったシード）は対象外。同日に複数本あって尺で絞れなければ結ばない。古い ID の行にも同じ第二段を適用する。
+  尺 0（不明）は対象外。同日に複数本あって尺で絞れなければ結ばない。古い ID の行にも同じ第二段を適用する。
   結んだ後はサーバの値で上書き（タイトルは `2026-09-16 (1)` になる）。`EpisodeKeyRow` / `LocalEpisodeKey` に `airedAt` と `runtime` を足す
 - **同期との順序**: 全体同期（`refresh`）も 1 番組の同期（`syncProgram`）も、取り込み（突合を含む）→ `planSync` の順は今のまま。結び直せなかった古い ID の各回だけが
   `remove` に落ちる（本当にサーバから消えた回）。1 番組の同期で番組が 404 のときは番組一覧が無いので結び直さず判断保留
@@ -407,7 +407,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 
 - 同期エンジンとデータ層はテストを先に書く
   - `:core:domain`: プレーン JUnit5。M1 分は 再生済み判定、ticks ↔ `Duration` 変換、
-    放送日フォールバック（`PremiereDate` → 取り込み日時、シードは タグ → ファイル名 → ファイル更新日時）、再開位置、各回の並び順（同着のタイブレーク）
+    放送日フォールバック（`PremiereDate` → 取り込み日時）、再開位置、各回の並び順（同着のタイブレーク）
   - `:core:data`: Robolectric + `Room.inMemoryDatabaseBuilder` で DAO / TypeConverter
   - Media3: 「`Player` から位置を受け取って Room に書く」部分だけフェイク `Player` で JVM テスト
   - CI は `./gradlew test`（エミュレータ不要）

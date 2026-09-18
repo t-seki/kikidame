@@ -13,20 +13,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -34,28 +27,17 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.tseki.jellyfinradio.BuildConfig
 
 /** サーバ URL・ユーザー名・パスワードでログインする。成功するとセッション状態が変わり、NavHost が次の画面へ導く。 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConnectScreen(
-    onBrowseLocalOnly: () -> Unit,
     viewModel: ConnectViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    LaunchedEffect(state.seedMessage) {
-        state.seedMessage?.let {
-            snackbarHostState.showSnackbar(it)
-            viewModel.consumeSeedMessage()
-        }
-    }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Jellyfin に接続") }) },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -100,18 +82,6 @@ fun ConnectScreen(
                 } else {
                     Text("接続")
                 }
-            }
-
-            if (BuildConfig.DEBUG) {
-                Spacer(Modifier.height(24.dp))
-                HorizontalDivider()
-                Text("デバッグ", style = MaterialTheme.typography.labelLarge)
-                Text(
-                    "${viewModel.seedRoot}/<放送局>/<番組>/ に音声ファイルを adb push してからシードすると、サーバ無しで手元のデータを使えます",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                OutlinedButton(onClick = viewModel::runSeed) { Text("シード") }
-                TextButton(onClick = onBrowseLocalOnly) { Text("手元のデータだけで番組一覧を開く") }
             }
         }
     }

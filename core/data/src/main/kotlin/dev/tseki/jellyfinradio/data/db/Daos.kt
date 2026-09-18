@@ -47,7 +47,7 @@ interface ProgramDao {
     fun observeSummaries(): Flow<List<ProgramSummaryRow>>
     @Query("SELECT * FROM programs WHERE id = :id")
     fun observeById(id: Long): Flow<ProgramEntity?>
-    /** シードの同一性キー。突合でサーバ ID が付いた後も同じ番組に足す。 */
+    /** (放送局, 番組名) で探す。一意ではない。本体の突合は [listKeys] を [dev.tseki.jellyfinradio.domain.LibraryMatching] に渡す方式で、これは使わない（テストの下ごしらえ用）。 */
     @Query("SELECT * FROM programs WHERE stationName IS :stationName AND name = :name ORDER BY id LIMIT 1")
     suspend fun findByStationAndName(stationName: String?, name: String): ProgramEntity?
     @Query("SELECT * FROM programs WHERE serverItemId = :serverItemId")
