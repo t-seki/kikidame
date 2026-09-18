@@ -55,7 +55,8 @@ class PlayerViewModel @Inject constructor(
     private val clock: Clock,
     private val downloads: DownloadRepository,
 ) : ViewModel() {
-    private val requestedEpisodeId = EpisodeId(savedStateHandle.toRoute<PlayerRoute>().episodeId)
+    private val route = savedStateHandle.toRoute<PlayerRoute>()
+    private val requestedEpisodeId = EpisodeId(route.episodeId)
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState
     /** 再生中の回の再生済みフラグ。Room を正として表示する。 */
@@ -70,10 +71,10 @@ class PlayerViewModel @Inject constructor(
     }
     init {
         viewModelScope.launch {
-            val c = connection.controller()
+            val c = connection.acquire()
             controller = c
             c.addListener(listener)
-            open(c, requestedEpisodeId)
+            open(c, requestedEpisodeId, route.play)
             while (isActive) {
                 refresh(c)
                 delay(POSITION_REFRESH_MS)
@@ -84,10 +85,12 @@ class PlayerViewModel @Inject constructor(
      * 指定の回を開く。同じ番組のキューが既に積まれていればその中でシークする。
      * 既にその回を再生中なら何もしない（画面に戻ってきただけ）。その回で止まっている
      * （一時停止・再生終了）なら、再生開始として再開位置の規則を適用してから再生する。
+     * [play] が false（ミニプレイヤーから「見に行く」だけ）なら再生を始めない: その回が載っていれば
+     * 止まっていても触らず、載っていなければ（プロセス死からの復元でサービスが死んでいたとき）積むだけにする。
      */
-    private suspend fun open(player: Player, episodeId: EpisodeId) {
+    private suspend fun open(player: Player, episodeId: EpisodeId, play: Boolean) {
         if (EpisodeMediaItems.episodeId(player.currentMediaItem) == episodeId && player.playbackState != Player.STATE_IDLE) {
-            if (!player.isPlaying) {
+            if (play && !player.isPlaying) {
                 val runtime = player.duration.takeIf { it != C.TIME_UNSET }
                     ?: player.currentMediaItem?.mediaMetadata?.durationMs
                 if (runtime != null && runtime > 0) {
@@ -124,7 +127,7 @@ class PlayerViewModel @Inject constructor(
             player.setMediaItems(items, index, startMs)
         }
         player.prepare()
-        player.play()
+        if (play) player.play()
     }
     private fun refresh(player: Player) {
         val item = player.currentMediaItem
@@ -155,7 +158,10 @@ class PlayerViewModel @Inject constructor(
         }
     }
     override fun onCleared() {
-        controller?.removeListener(listener)
+        controller?.let {
+            it.removeListener(listener)
+            connection.release(it)
+        }
     }
     companion object {
         const val POSITION_REFRESH_MS = 500L

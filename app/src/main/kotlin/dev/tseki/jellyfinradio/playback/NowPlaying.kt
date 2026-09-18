@@ -9,27 +9,57 @@ import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** 聴いている回の見た目に要る分。タイトル・番組名は [MediaItem] のメタデータから取り、Room は引かない。 */
+data class NowPlayingState(
+    val episodeId: EpisodeId,
+    val title: String,
+    val programName: String?,
+    val isPlaying: Boolean,
+)
+
 /**
- * 今プレイヤーに載っている各回（止まっていても）。[PlaybackService] が書き、同期がこの回を今回の削除から外す。
- * Worker と Service は同一プロセスなので、MediaController を結ばずにここで受け渡す。
+ * 聴いている回 = 今プレイヤーに載っている各回（止まっていても）。[PlaybackService] が書き、
+ * 同期がこの回を今回の削除から外し、一覧のマークとミニプレイヤーがこの回を指す（ADR 0006）。
+ * Worker・Service・UI は同一プロセスなので、MediaController を結ばずにここで受け渡す。
  */
 @Singleton
 class NowPlaying @Inject constructor() {
+    private val _state = MutableStateFlow<NowPlayingState?>(null)
+    val state: StateFlow<NowPlayingState?> = _state
+
     private val _current = MutableStateFlow<EpisodeId?>(null)
+
+    /** 同期の削除除外用。[state] の各回 ID だけ。 */
     val current: StateFlow<EpisodeId?> = _current
 
-    fun set(episodeId: EpisodeId?) {
-        _current.value = episodeId
+    fun set(state: NowPlayingState?) {
+        _state.value = state
+        _current.value = state?.episodeId
     }
 
-    /** [Player] に付けて現在の [MediaItem] を追う。サービス終了時は [set] に null を渡す。 */
+    /** [Player] に付けて現在の [MediaItem] と再生中かどうかを追う。サービス終了時は [set] に null を渡す。 */
     fun listener(player: Player): Player.Listener = object : Player.Listener {
-        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            set(EpisodeMediaItems.episodeId(mediaItem))
-        }
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = read(player)
 
-        override fun onTimelineChanged(timeline: Timeline, reason: Int) {
-            set(EpisodeMediaItems.episodeId(player.currentMediaItem))
-        }
+        override fun onTimelineChanged(timeline: Timeline, reason: Int) = read(player)
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) = read(player)
+    }
+
+    private fun read(player: Player) {
+        val item = player.currentMediaItem
+        val episodeId = EpisodeMediaItems.episodeId(item)
+        set(
+            if (item == null || episodeId == null) {
+                null
+            } else {
+                NowPlayingState(
+                    episodeId = episodeId,
+                    title = item.mediaMetadata.title?.toString() ?: "",
+                    programName = item.mediaMetadata.artist?.toString(),
+                    isPlaying = player.isPlaying,
+                )
+            },
+        )
     }
 }

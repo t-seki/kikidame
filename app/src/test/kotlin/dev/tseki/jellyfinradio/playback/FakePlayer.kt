@@ -15,6 +15,11 @@ class FakePlayer : SimpleBasePlayer(Looper.getMainLooper()) {
         .setAvailableCommands(Player.Commands.Builder().addAllCommands().build())
         .build()
     override fun getState(): State = state
+    init {
+        // SimpleBasePlayer は最初の invalidateState() でその時点の状態を「変更前」として取り込む。
+        // 空の状態で確定させておかないと、リスナーを付けてから最初に積んだプレイリストの通知が出ない
+        invalidateState()
+    }
     /** 状態を変更して通知を流し切る。 */
     fun update(block: State.Builder.() -> Unit) {
         state = state.buildUpon().apply(block).build()

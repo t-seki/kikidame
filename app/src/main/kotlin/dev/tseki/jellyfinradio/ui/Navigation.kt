@@ -46,8 +46,9 @@ object ProgramListRoute
 @Serializable
 data class EpisodeListRoute(val programId: Long)
 
+/** [play] が false なら再生を始めない（ミニプレイヤーから「見に行く」だけの遷移）。載っている回は触らず、載っていなければ積むだけ。 */
 @Serializable
-data class PlayerRoute(val episodeId: Long)
+data class PlayerRoute(val episodeId: Long, val play: Boolean = true)
 
 @HiltViewModel
 class SessionViewModel @Inject constructor(
@@ -101,11 +102,13 @@ fun JellyfinRadioNavHost(sessionViewModel: SessionViewModel = hiltViewModel()) {
             ProgramListScreen(
                 onProgramClick = { navController.navigate(EpisodeListRoute(it.value)) },
                 onSettingsClick = { navController.navigate(SettingsRoute) },
+                onNowPlayingClick = { navController.navigate(PlayerRoute(it.value, play = false)) },
             )
         }
         composable<EpisodeListRoute> {
             EpisodeListScreen(
                 onEpisodeClick = { navController.navigate(PlayerRoute(it.value)) },
+                onNowPlayingClick = { navController.navigate(PlayerRoute(it.value, play = false)) },
                 onBack = navController::popIfNotRoot,
             )
         }
