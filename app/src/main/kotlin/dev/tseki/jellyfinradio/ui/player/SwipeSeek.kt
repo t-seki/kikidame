@@ -7,8 +7,8 @@ import kotlin.math.roundToLong
  * 粒度は [DP_PER_SECOND] だけで決まる（実機で試して調整する）。
  */
 object SwipeSeek {
-    /** 横に何 dp 動かすと 1 秒ぶん動くか。 */
-    const val DP_PER_SECOND = 10f
+    /** 横に何 dp 動かすと 1 秒ぶん動くか（10dp = 2 秒。実機で試して決めた）。 */
+    const val DP_PER_SECOND = 5f
 
     /** 横の移動量（dp、右が正）を秒差（ミリ秒）に変換する。 */
     fun deltaMs(offsetDp: Float): Long = (offsetDp / DP_PER_SECOND * 1000).roundToLong()

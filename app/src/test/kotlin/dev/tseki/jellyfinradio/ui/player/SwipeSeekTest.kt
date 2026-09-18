@@ -5,15 +5,15 @@ import kotlin.test.assertEquals
 
 class SwipeSeekTest {
     @Test
-    fun tenDpIsOneSecond() {
-        assertEquals(1_000L, SwipeSeek.deltaMs(10f))
-        assertEquals(-2_500L, SwipeSeek.deltaMs(-25f))
+    fun tenDpIsTwoSeconds() {
+        assertEquals(2_000L, SwipeSeek.deltaMs(10f))
+        assertEquals(-5_000L, SwipeSeek.deltaMs(-25f))
         assertEquals(0L, SwipeSeek.deltaMs(0f))
     }
 
     @Test
     fun targetIsClampedToTheEpisode() {
-        assertEquals(67_000L, SwipeSeek.targetMs(startMs = 60_000L, offsetDp = 70f, durationMs = 3_600_000L))
+        assertEquals(74_000L, SwipeSeek.targetMs(startMs = 60_000L, offsetDp = 70f, durationMs = 3_600_000L))
         assertEquals(0L, SwipeSeek.targetMs(startMs = 5_000L, offsetDp = -100f, durationMs = 3_600_000L))
         assertEquals(3_600_000L, SwipeSeek.targetMs(startMs = 3_595_000L, offsetDp = 100f, durationMs = 3_600_000L))
     }
