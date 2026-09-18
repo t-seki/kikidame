@@ -118,11 +118,12 @@ fun ProgramListScreen(
                 else -> {
                     val listState = rememberLazyListState()
                     // 検索語が変わるたびに先頭へ（絞った結果は先頭から見たい。解除したときも先頭に戻す）。
-                    // 初回は動かさない（番組から戻ったときに復元されたスクロール位置を潰さない）
-                    var seenQuery by remember { mutableStateOf(query) }
-                    LaunchedEffect(query) {
-                        if (query != seenQuery) {
-                            seenQuery = query
+                    // 末尾の空白など絞り込みに効かない変化では動かさず、初回も動かさない（番組から戻ったときに復元された位置を潰さない）
+                    val effectiveQuery = ProgramFilter.normalize(query)
+                    var seenQuery by remember { mutableStateOf(effectiveQuery) }
+                    LaunchedEffect(effectiveQuery) {
+                        if (effectiveQuery != seenQuery) {
+                            seenQuery = effectiveQuery
                             listState.scrollToItem(0)
                         }
                     }
@@ -165,7 +166,10 @@ private fun SearchTopBar(query: String, onQueryChange: (String) -> Unit, onClose
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     // 開いた瞬間にフォーカスとキーボードを出す
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+        keyboard?.show()
+    }
     TopAppBar(
         navigationIcon = {
             IconButton(onClick = onClose) {
