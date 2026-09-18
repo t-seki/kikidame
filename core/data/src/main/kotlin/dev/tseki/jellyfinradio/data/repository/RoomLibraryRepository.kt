@@ -38,6 +38,8 @@ class RoomLibraryRepository @Inject constructor(
             .sortedWith(compareBy(EpisodeOrder) { it.episode })
     override suspend fun updateSync(programId: ProgramId, syncEnabled: Boolean, rule: RetentionRule) =
         programDao.updateSync(programId.value, syncEnabled, rule.keepLatest, rule.deleteAfterPlayed)
+    override suspend fun setStarred(programId: ProgramId, starred: Boolean) =
+        programDao.setStarred(programId.value, starred)
     override suspend fun countUnpinnedLocalFiles(programId: ProgramId): Int =
         localFileDao.countUnpinnedByProgram(programId.value)
 }

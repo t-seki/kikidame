@@ -11,6 +11,8 @@ data class Program(
     val retentionRule: RetentionRule = RetentionRule(),
     /** 消失（CONTEXT.md）: サーバの番組一覧に無く突合でも結び直せなかったと最初に分かった日時。null ならサーバに在る。 */
     val goneSince: Instant? = null,
+    /** よく聴く（CONTEXT.md）: 利用者が特に聴く番組に付ける印。固定・同期対象とは独立で、同期にもダウンロードにも影響しない。 */
+    val starred: Boolean = false,
 ) {
     val isGone: Boolean get() = goneSince != null
 }

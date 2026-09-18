@@ -2,7 +2,7 @@ package dev.tseki.jellyfinradio.domain
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Duration
 import kotlin.time.Instant
-/** 番組一覧の 1 行。最新の各回の放送日で並べる。 */
+/** 番組一覧の 1 行。[LibraryRepository.observePrograms] は最新の各回の放送日順で返し、画面はよく聴く番組を先に分けて出す。 */
 data class ProgramSummary(
     val program: Program,
     /** サーバ上の分も含めた各回の数。 */
@@ -39,6 +39,8 @@ interface LibraryRepository {
     /** 同期対象と保持ルールを保存する。適用は次の同期（保存した瞬間には何も消えない）。 */
     suspend fun updateSync(programId: ProgramId, syncEnabled: Boolean, rule: RetentionRule)
 
+    /** よく聴くの印を付ける／外す。表示にだけ効く。 */
+    suspend fun setStarred(programId: ProgramId, starred: Boolean)
     /** 同期対象を OFF にしたら次の同期で消える回の数（固定でない手元のファイル）。確認ダイアログ用。 */
     suspend fun countUnpinnedLocalFiles(programId: ProgramId): Int
 }

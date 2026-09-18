@@ -17,6 +17,12 @@ android {
     testOptions {
         unitTests.isIncludeAndroidResources = true
     }
+    // マイグレーションテストが過去のスキーマ JSON を読めるように
+    sourceSets {
+        getByName("test") {
+            assets.srcDirs("$projectDir/schemas")
+        }
+    }
 }
 kotlin {
     compilerOptions {
@@ -43,4 +49,5 @@ dependencies {
     testImplementation(libs.androidx.test.ext.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)
+    testImplementation(libs.room.testing)
 }
