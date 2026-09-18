@@ -37,12 +37,14 @@ class PlaybackService : MediaSessionService() {
     @Inject @ApplicationScope lateinit var applicationScope: CoroutineScope
     @Inject lateinit var nowPlaying: NowPlaying
     @Inject lateinit var settings: AppSettingsRepository
+    @Inject lateinit var sleepTimer: SleepTimer
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var session: MediaSession? = null
     private var positionPersister: PositionPersister? = null
     private var resumeOnTransition: ResumeOnTransition? = null
     private var nowPlayingListener: Player.Listener? = null
     private var speedJob: Job? = null
+    private var sleepTimerRunner: SleepTimerRunner? = null
     /**
      * 再生に失敗したら（原因を問わず）キューを空にし、理由を UI へ渡す。空にすれば聴いている回も無くなり、
      * ミニプレイヤーと通知が消える。典型は、聴き終えて止まっている回を同期が消した（#27）後に ▶ を押してファイルが無い場合。
@@ -104,6 +106,9 @@ class PlaybackService : MediaSessionService() {
         player.addListener(errorListener)
         // 倍速（#35）: アプリ全体で 1 つ。設定が変われば即反映。ピッチは変えない
         speedJob = scope.launch { settings.playbackSpeed.collect { speed -> player.setPlaybackSpeed(speed) } }
+        // スリープタイマー（#36）: 画面を閉じても動くようここに住む
+        sleepTimerRunner = SleepTimerRunner(player, sleepTimer, clock, scope) { player.pauseAtEndOfMediaItems = it }
+            .also { it.attach() }
     }
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -115,6 +120,7 @@ class PlaybackService : MediaSessionService() {
     override fun onDestroy() {
         // player に触るものは release() の前に止める
         speedJob?.cancel()
+        sleepTimerRunner?.detach()
         positionPersister?.detach()
         resumeOnTransition?.detach()
         session?.run {
