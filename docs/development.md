@@ -210,3 +210,29 @@ $ADB logcat -d | grep -E "SyncWorker|LibraryRefresher"   # "sync: 番組 N / 各
 
 再取り込み（サーバ ID の変更）は自宅ライブラリを作り直す必要があるため実機では確認せず、`RoomRematchTest`（番組・各回の ID が全部変わる／各回だけ変わる／本当に消えた回だけ消える／1 番組の同期で結び直す）で担保する（2026-09-18）。
 手元に影響が出る変化は「再取り込み後に番組が二重にならない」「各回の ID だけ変わっても消えない」で、どちらも以前は起きていた。
+
+## 実機で試す（M3-c: 消失の表示）
+
+サーバ上に無い番組を作る手段: (a) 設定でライブラリを切り替える（旧ライブラリの番組が全部消失になる。音楽ライブラリが 2 つ以上あるとき）、
+(b) サーバ側で 1 番組のフォルダを外してスキャン、(c) デバッグビルドなら端末の DB を書き換える（2026-09-18 に採用）:
+
+```bash
+$ADB shell am force-stop dev.tseki.jellyfinradio
+$ADB shell "run-as dev.tseki.jellyfinradio sh -c 'cat databases/jellyfin-radio.db'" > dev.db   # -wal も取り、python の sqlite3 で checkpoint
+# programs の 1 行を UPDATE: serverItemId を偽の UUID に、name に「（旧）」を付ける（同名だと突合で結び直される）
+$ADB push dev.db /data/local/tmp/ && $ADB shell "run-as dev.tseki.jellyfinradio sh -c 'rm -f databases/jellyfin-radio.db-wal databases/jellyfin-radio.db-shm; cat /data/local/tmp/dev.db > databases/jellyfin-radio.db'"
+```
+
+番組一覧を引っ張ると「1 番組はサーバ上で見つからず、そのままにしました」と出る。(c) では各回の ID が本物のままなので、各回はサーバの言うとおり
+本物の番組（新しい行）に移り、「（旧）」は各回 0 の空の行になる（本当の再取り込みでは各回の ID も変わるのでこの形にはならない）。
+
+### 実機チェックリスト（M3-c: 消失）
+
+2026-09-18 に Pixel 7a で (c) の方法で確認。
+
+- [x] 消失した番組の行に「サーバ上で見つかりません」と `CloudOff` アイコンが付き、並び順は変わらない（各回 0 なので末尾に来た）
+- [x] その番組の同期シートでスイッチが無効になり「サーバ上で見つかりません（2026-09-18 から）。同期は止まっています…」と出る。「この番組を今すぐ同期」は出ず「この番組を手元から消す」が出る
+- [ ] 消失した番組の手元の回はそのまま再生できる（(c) では各回が本物の行に移るため確認できず。固定していた 08-23 は移った先で残った）
+- [x] 「この番組を手元から消す」→ 確認 → 番組一覧に戻り、番組が消えている（DB でも行が無い）
+- [ ] 元のライブラリに戻して同期すると印が消える（`goneSince` が null に戻る）（実機では未実施。`RoomSyncTest` で全体同期・1 番組の同期・番組単位の更新の 3 経路を担保）
+- [x] 設定画面・接続画面にデバッグ節（シード）が出ない（#21）

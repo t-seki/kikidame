@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -98,11 +99,13 @@ private fun ProgramRow(summary: ProgramSummary, onClick: () -> Unit) {
                 "手元 ${summary.localEpisodeCount} / 全 ${summary.episodeCount} 回"
             }
             val latest = summary.latestAiredAt?.let { "最新 ${it.toAiredDateText()}" }
-            Text(listOfNotNull(station, count, latest).joinToString(" · "))
+            val gone = if (summary.program.isGone) "サーバ上で見つかりません" else null
+            Text(listOfNotNull(station, count, latest, gone).joinToString(" · "))
         },
         trailingContent = {
-            if (summary.program.syncEnabled) {
-                Icon(Icons.Filled.Sync, contentDescription = "同期対象", tint = MaterialTheme.colorScheme.primary)
+            when {
+                summary.program.isGone -> Icon(Icons.Filled.CloudOff, contentDescription = "サーバ上で見つかりません", tint = MaterialTheme.colorScheme.error)
+                summary.program.syncEnabled -> Icon(Icons.Filled.Sync, contentDescription = "同期対象", tint = MaterialTheme.colorScheme.primary)
             }
         },
     )

@@ -19,7 +19,6 @@ import dev.tseki.jellyfinradio.domain.ServerEpisode
 import dev.tseki.jellyfinradio.domain.ServerEpisodes
 import dev.tseki.jellyfinradio.domain.ServerException
 import dev.tseki.jellyfinradio.domain.ServerItemId
-import dev.tseki.jellyfinradio.domain.ServerProgram
 import dev.tseki.jellyfinradio.domain.ServerSnapshot
 import dev.tseki.jellyfinradio.domain.SnapshotScope
 import dev.tseki.jellyfinradio.domain.SessionState
@@ -63,13 +62,20 @@ class RoomLibraryRefreshRepository @Inject constructor(
 
     override suspend fun refreshProgram(programId: ProgramId): RefreshResult? {
         val ready = requireReady()
-        val program = db.programDao().findById(programId.value) ?: return null
-        val serverId = program.serverItemId?.let(::ServerItemId) ?: return null
-        val episodes = gateway.fetchProgramEpisodes(ready.session.credentials(), serverId)
-        // 番組の名前・放送局は手元の値のまま（番組一覧は取らない）。突合（結び直しを含む）はこの番組の各回だけを相手にする
+        val local = db.programDao().findById(programId.value) ?: return null
+        val serverId = local.serverItemId?.let(::ServerItemId) ?: return null
+        val credentials = ready.session.credentials()
+        // `ParentId` での各回取得は番組が無くても空を返すので、先に番組そのものを確かめて消失を立てる／戻す
+        val program = gateway.fetchProgram(credentials, serverId)
+        if (program == null) {
+            if (local.goneSince == null) db.programDao().setGoneSince(local.id, clock.now())
+            return RefreshResult(programs = 0, episodes = 0, linkedPrograms = 0, linkedEpisodes = 0, fetchedAt = clock.now(), onHold = 1)
+        }
+        if (local.goneSince != null) db.programDao().setGoneSince(local.id, null)
+        // 突合（結び直しを含む）はこの番組の各回だけを相手にする。削除も予約もしない
         val snapshot = ServerSnapshot(
-            programs = listOf(ServerProgram(serverId, program.name, program.stationName)),
-            episodes = episodes,
+            programs = listOf(program),
+            episodes = gateway.fetchProgramEpisodes(credentials, serverId),
             scope = SnapshotScope.Program(serverId),
         )
         return apply(snapshot)
@@ -82,9 +88,11 @@ class RoomLibraryRefreshRepository @Inject constructor(
         val credentials = ready.session.credentials()
         val program = gateway.fetchProgram(credentials, serverId)
         if (program == null) {
-            // 消失。何も落とさず何も消さない
+            // 消失。何も落とさず何も消さない。番組一覧が無いので結び直しは全体同期に任せる
+            if (local.goneSince == null) db.programDao().setGoneSince(local.id, clock.now())
             return RefreshResult(programs = 0, episodes = 0, linkedPrograms = 0, linkedEpisodes = 0, fetchedAt = clock.now(), onHold = 1)
         }
+        if (local.goneSince != null) db.programDao().setGoneSince(local.id, null)
         val snapshot = ServerSnapshot(
             programs = listOf(program),
             episodes = gateway.fetchProgramEpisodes(credentials, serverId),
@@ -154,7 +162,9 @@ class RoomLibraryRefreshRepository @Inject constructor(
      * サーバ ID を持たない番組は `Known` でも `Gone` でもない（サーバに在ると主張していない）ので入力に入れない。
      */
     internal suspend fun synchronize(snapshot: ServerSnapshot, excluded: Set<EpisodeId>, onlyProgramId: ProgramId? = null): SyncOutcome {
-        val plan = plan(snapshot, onlyProgramId)
+        val inputs = inputs(snapshot, onlyProgramId)
+        val plan = SyncPlanner.plan(inputs)
+        recordGone(inputs)
         var removed = 0
         for (id in plan.remove) {
             if (id in excluded) continue
@@ -171,8 +181,27 @@ class RoomLibraryRefreshRepository @Inject constructor(
         return SyncOutcome(enqueued = enqueued, deleted = deleted, removed = removed, onHold = plan.onHoldCount)
     }
 
+    /**
+     * 消失した番組に日時を立て、見つかった（結び直しを含む）番組は消す。到達不能は判断保留だが消失ではないので触らない。
+     * 1 番組の同期では対象がその番組だけ。
+     */
+    private suspend fun recordGone(inputs: List<SyncProgramInput>) {
+        val now = clock.now()
+        for (input in inputs) {
+            val row = db.programDao().findById(input.programId.value) ?: continue
+            when (input.server) {
+                ServerEpisodes.Gone -> if (row.goneSince == null) db.programDao().setGoneSince(row.id, now)
+                is ServerEpisodes.Known -> if (row.goneSince != null) db.programDao().setGoneSince(row.id, null)
+                ServerEpisodes.Unavailable -> Unit
+            }
+        }
+    }
+
+    internal suspend fun plan(snapshot: ServerSnapshot, onlyProgramId: ProgramId? = null): SyncPlan =
+        SyncPlanner.plan(inputs(snapshot, onlyProgramId))
+
     /** [onlyProgramId] を渡すとその番組だけを入力にする（1 番組の同期。他の番組は一覧に無くても消失扱いにしない）。 */
-    internal suspend fun plan(snapshot: ServerSnapshot, onlyProgramId: ProgramId? = null): SyncPlan {
+    private suspend fun inputs(snapshot: ServerSnapshot, onlyProgramId: ProgramId? = null): List<SyncProgramInput> {
         val serverProgramIds = snapshot.programs.map { it.serverId }.toSet()
         val serverEpisodesByProgram = snapshot.episodes.groupBy({ it.programServerId }, { it.serverId })
         val localByProgram = db.episodeDao().listSyncRows().groupBy { it.programId }
@@ -191,7 +220,7 @@ class RoomLibraryRefreshRepository @Inject constructor(
                 local = localByProgram[p.id].orEmpty().map { it.toDomain() },
             )
         }
-        return SyncPlanner.plan(inputs)
+        return inputs
     }
 
     /** サーバが返さない値（サイズ）は手元の値を残す。 */

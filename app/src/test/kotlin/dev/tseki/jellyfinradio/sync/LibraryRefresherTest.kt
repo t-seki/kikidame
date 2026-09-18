@@ -73,6 +73,7 @@ class LibraryRefresherTest {
         override suspend fun enqueue(episodeId: EpisodeId) = Unit
         override suspend fun enqueueForSync(episodeIds: List<EpisodeId>) = episodeIds.size
         override suspend fun removeEpisode(episodeId: EpisodeId) = Unit
+        override suspend fun removeProgram(programId: ProgramId) = Unit
         override suspend fun cancel(episodeId: EpisodeId) = Unit
         override suspend fun retry(episodeId: EpisodeId) = Unit
         override suspend fun unpin(episodeId: EpisodeId) = Unit
