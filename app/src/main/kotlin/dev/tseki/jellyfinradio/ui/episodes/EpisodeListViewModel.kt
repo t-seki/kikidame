@@ -129,6 +129,8 @@ class EpisodeListViewModel @Inject constructor(
         _programRemoved.tryEmit(Unit)
     }
 
+    /** よく聴くの印を付ける／外す（表示にだけ効く）。 */
+    fun setStarred(starred: Boolean) = act { library.setStarred(programId, starred) }
     fun setKeepLatest(keepLatest: Int?) = updateRule { it.copy(keepLatest = keepLatest) }
 
     fun setDeleteAfterPlayed(value: Boolean) = updateRule { it.copy(deleteAfterPlayed = value) }

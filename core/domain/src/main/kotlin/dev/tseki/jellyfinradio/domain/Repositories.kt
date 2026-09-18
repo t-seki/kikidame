@@ -39,6 +39,8 @@ interface LibraryRepository {
     /** 同期対象と保持ルールを保存する。適用は次の同期（保存した瞬間には何も消えない）。 */
     suspend fun updateSync(programId: ProgramId, syncEnabled: Boolean, rule: RetentionRule)
 
+    /** よく聴くの印を付ける／外す。表示にだけ効く。 */
+    suspend fun setStarred(programId: ProgramId, starred: Boolean)
     /** 同期対象を OFF にしたら次の同期で消える回の数（固定でない手元のファイル）。確認ダイアログ用。 */
     suspend fun countUnpinnedLocalFiles(programId: ProgramId): Int
 }

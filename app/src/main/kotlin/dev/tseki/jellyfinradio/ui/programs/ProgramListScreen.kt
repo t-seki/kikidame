@@ -6,11 +6,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -79,10 +83,22 @@ fun ProgramListScreen(
             when {
                 list == null -> Box(Modifier.fillMaxSize())
                 list.isEmpty() -> EmptyPrograms(canRefresh)
-                else -> LazyColumn(Modifier.fillMaxSize()) {
-                    items(list, key = { it.program.id.value }) { summary ->
-                        ProgramRow(summary, onClick = { onProgramClick(summary.program.id) })
-                        HorizontalDivider()
+                else -> {
+                    // よく聴く番組は上の節にまとめる（重複させない）。無ければ節ごと出さない。節内は従来どおり最新の放送日順
+                    val (starred, others) = list.partition { it.program.starred }
+                    val listState = rememberLazyListState()
+                    // 最初の ★ で見出しが先頭行の上に挿入されると、キー基準のスクロール位置維持で見出しが画面外に出る。
+                    // 先頭付近にいるときだけ先頭に戻す（下の方を見ているときは動かさない）
+                    LaunchedEffect(starred.isNotEmpty()) {
+                        if (listState.firstVisibleItemIndex <= 1) listState.scrollToItem(0)
+                    }
+                    LazyColumn(Modifier.fillMaxSize(), state = listState) {
+                        if (starred.isNotEmpty()) {
+                            item(key = "header-starred") { SectionHeader("よく聴く") }
+                            programItems(starred, onProgramClick, viewModel::setStarred)
+                            item(key = "header-others") { SectionHeader("その他") }
+                        }
+                        programItems(others, onProgramClick, viewModel::setStarred)
                     }
                 }
             }
@@ -90,10 +106,43 @@ fun ProgramListScreen(
     }
 }
 
+private fun LazyListScope.programItems(
+    list: List<ProgramSummary>,
+    onProgramClick: (ProgramId) -> Unit,
+    onSetStarred: (ProgramId, Boolean) -> Unit,
+) {
+    items(list, key = { it.program.id.value }) { summary ->
+        ProgramRow(
+            summary,
+            onClick = { onProgramClick(summary.program.id) },
+            onToggleStarred = { onSetStarred(summary.program.id, !summary.program.starred) },
+        )
+        HorizontalDivider()
+    }
+}
 @Composable
-private fun ProgramRow(summary: ProgramSummary, onClick: () -> Unit) {
+private fun SectionHeader(title: String) {
+    Text(
+        title,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 4.dp),
+    )
+}
+/** 左端の ★ でよく聴くを切り替える。右端は同期対象／消失の状態表示。 */
+@Composable
+private fun ProgramRow(summary: ProgramSummary, onClick: () -> Unit, onToggleStarred: () -> Unit) {
     ListItem(
         modifier = Modifier.clickable(onClick = onClick),
+        leadingContent = {
+            IconButton(onClick = onToggleStarred) {
+                if (summary.program.starred) {
+                    Icon(Icons.Filled.Star, contentDescription = "よく聴く（タップで外す）", tint = MaterialTheme.colorScheme.primary)
+                } else {
+                    Icon(Icons.Outlined.StarOutline, contentDescription = "よく聴くに入れる")
+                }
+            }
+        },
         headlineContent = { Text(summary.program.name) },
         supportingContent = {
             val station = summary.program.stationName

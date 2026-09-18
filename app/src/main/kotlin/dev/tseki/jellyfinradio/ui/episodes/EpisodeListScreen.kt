@@ -25,11 +25,13 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.SyncDisabled
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -118,6 +120,13 @@ fun EpisodeListScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { viewModel.setStarred(program?.starred != true) }, enabled = program != null) {
+                        if (program?.starred == true) {
+                            Icon(Icons.Filled.Star, contentDescription = "よく聴く（タップで外す）", tint = MaterialTheme.colorScheme.primary)
+                        } else {
+                            Icon(Icons.Outlined.StarOutline, contentDescription = "よく聴くに入れる")
+                        }
+                    }
                     IconButton(onClick = { showSyncSheet = true }, enabled = program != null) {
                         // filled と outlined の Sync は形がほぼ同じなので、OFF は斜線入りで区別する
                         if (program?.syncEnabled == true) {

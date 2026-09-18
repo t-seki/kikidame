@@ -64,6 +64,8 @@ interface ProgramDao {
     suspend fun listAll(): List<ProgramEntity>
     @Query("UPDATE programs SET goneSince = :at WHERE id = :id")
     suspend fun setGoneSince(id: Long, at: Instant?)
+    @Query("UPDATE programs SET starred = :starred WHERE id = :id")
+    suspend fun setStarred(id: Long, starred: Boolean)
     @Insert
     suspend fun insert(program: ProgramEntity): Long
     @Query("DELETE FROM programs")
