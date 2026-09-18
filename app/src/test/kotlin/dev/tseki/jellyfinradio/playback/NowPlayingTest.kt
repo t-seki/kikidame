@@ -26,14 +26,14 @@ class NowPlayingTest {
     @Test
     fun nothingLoadedMeansNoNowPlaying() {
         assertNull(nowPlaying.state.value)
-        assertNull(nowPlaying.current.value)
+        assertNull(nowPlaying.excludedFromSync)
     }
 
     @Test
     fun loadingAPlaylistPicksUpTheCurrentItemAndItsMetadata() {
         load(item(1, "第 1 回", "番組 A"), item(2, "第 2 回", "番組 A"))
         assertEquals(NowPlayingState(EpisodeId(1), "第 1 回", "番組 A", isPlaying = false), nowPlaying.state.value)
-        assertEquals(EpisodeId(1), nowPlaying.current.value)
+        assertEquals(EpisodeId(1), nowPlaying.excludedFromSync)
     }
 
     @Test
@@ -57,17 +57,23 @@ class NowPlayingTest {
         player.update { }
         assertEquals(EpisodeId(2), nowPlaying.state.value?.episodeId)
         assertEquals("第 2 回", nowPlaying.state.value?.title)
-        assertEquals(EpisodeId(2), nowPlaying.current.value)
+        assertEquals(EpisodeId(2), nowPlaying.excludedFromSync)
     }
 
+    /** 聴き終えた回は載ったまま（ミニプレイヤーは残る）だが、同期の削除除外からは外れる（#27）。 */
     @Test
-    fun endedKeepsTheItemLoadedButNotPlaying() {
+    fun endedKeepsTheItemLoadedButReleasesItToSync() {
         load(item(1, "第 1 回", "番組 A"))
         player.update { setPlaybackState(Player.STATE_READY) }
         player.playWhenReady = true
         player.update { }
+        assertEquals(EpisodeId(1), nowPlaying.excludedFromSync)
         player.update { setPlaybackState(Player.STATE_ENDED) }
-        assertEquals(NowPlayingState(EpisodeId(1), "第 1 回", "番組 A", isPlaying = false), nowPlaying.state.value)
+        assertEquals(
+            NowPlayingState(EpisodeId(1), "第 1 回", "番組 A", isPlaying = false, isEnded = true),
+            nowPlaying.state.value,
+        )
+        assertNull(nowPlaying.excludedFromSync)
     }
 
     @Test
@@ -75,7 +81,7 @@ class NowPlayingTest {
         load(item(1, "第 1 回", "番組 A"))
         player.update { setPlaylist(emptyList()) }
         assertNull(nowPlaying.state.value)
-        assertNull(nowPlaying.current.value)
+        assertNull(nowPlaying.excludedFromSync)
     }
 
     @Test
@@ -83,6 +89,6 @@ class NowPlayingTest {
         load(item(1, "第 1 回", "番組 A"))
         nowPlaying.set(null)
         assertNull(nowPlaying.state.value)
-        assertNull(nowPlaying.current.value)
+        assertNull(nowPlaying.excludedFromSync)
     }
 }

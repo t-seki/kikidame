@@ -1,9 +1,11 @@
 package dev.tseki.jellyfinradio.playback
 import android.app.PendingIntent
 import android.content.Intent
+import android.util.Log
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.CommandButton
@@ -36,6 +38,22 @@ class PlaybackService : MediaSessionService() {
     private var positionPersister: PositionPersister? = null
     private var resumeOnTransition: ResumeOnTransition? = null
     private var nowPlayingListener: Player.Listener? = null
+    /**
+     * 再生に失敗したら（原因を問わず）キューを空にし、理由を UI へ渡す。空にすれば聴いている回も無くなり、
+     * ミニプレイヤーと通知が消える。典型は、聴き終えて止まっている回を同期が消した（#27）後に ▶ を押してファイルが無い場合。
+     */
+    private val errorListener = object : Player.Listener {
+        override fun onPlayerError(error: PlaybackException) {
+            Log.w(TAG, "playback failed, clearing the queue", error)
+            session?.player?.clearMediaItems()
+            nowPlaying.say(
+                when (error.errorCode) {
+                    PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND -> "ファイルが見つからないため再生を止めました"
+                    else -> "再生に失敗したため止めました（${error.errorCodeName}）"
+                },
+            )
+        }
+    }
     override fun onCreate() {
         super.onCreate()
         val player = ExoPlayer.Builder(this)
@@ -78,6 +96,7 @@ class PlaybackService : MediaSessionService() {
             .also { it.attach() }
         resumeOnTransition = ResumeOnTransition(player, playbackStateRepository, scope).also { it.attach() }
         nowPlayingListener = nowPlaying.listener(player).also(player::addListener)
+        player.addListener(errorListener)
     }
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -91,6 +110,7 @@ class PlaybackService : MediaSessionService() {
         resumeOnTransition?.detach()
         session?.run {
             nowPlayingListener?.let(player::removeListener)
+            player.removeListener(errorListener)
             player.release()
             release()
         }
@@ -118,6 +138,7 @@ class PlaybackService : MediaSessionService() {
         }
     }
     companion object {
+        private const val TAG = "PlaybackService"
         const val SKIP_MS = 10_000L
     }
 }

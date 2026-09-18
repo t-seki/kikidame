@@ -80,7 +80,8 @@ class LibraryRefresher @Inject constructor(
         refreshRepository.syncProgram(programId, excluded = excluded())?.also { say(false, it.toProgramSyncMessage()) }
     }
 
-    private fun excluded(): Set<EpisodeId> = setOfNotNull(nowPlaying.current.value)
+    /** 聴いている回は削除から外す。ただし聴き終えて止まっている回は「再生済みなら削除」に任せる（#27）。 */
+    private fun excluded(): Set<EpisodeId> = setOfNotNull(nowPlaying.excludedFromSync)
 
     private fun say(silent: Boolean, message: String) {
         if (!silent) _messages.tryEmit(message)
