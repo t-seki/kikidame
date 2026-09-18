@@ -32,7 +32,7 @@ fun ProgramSummaryRow.toDomain(): ProgramSummary = ProgramSummary(
 fun ProgramKeyRow.toDomain(): LocalProgramKey =
     LocalProgramKey(ProgramId(id), serverItemId?.let(::ServerItemId), stationName, name)
 fun EpisodeKeyRow.toDomain(): LocalEpisodeKey =
-    LocalEpisodeKey(EpisodeId(id), serverItemId?.let(::ServerItemId), ProgramId(programId), title)
+    LocalEpisodeKey(EpisodeId(id), serverItemId?.let(::ServerItemId), ProgramId(programId), title, airedAt, Ticks.toDuration(runtimeTicks))
 fun EpisodeSyncRow.toDomain(): LocalEpisodeState = LocalEpisodeState(
     id = EpisodeId(id),
     serverItemId = serverItemId?.let(::ServerItemId),
