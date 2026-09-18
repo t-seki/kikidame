@@ -1,16 +1,21 @@
 package dev.tseki.jellyfinradio.ui.programs
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
@@ -25,15 +30,24 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -54,22 +68,40 @@ fun ProgramListScreen(
     val programs by viewModel.programs.collectAsStateWithLifecycle()
     val canRefresh by viewModel.canRefresh.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val query by viewModel.query.collectAsStateWithLifecycle()
+    val isSearching by viewModel.isSearching.collectAsStateWithLifecycle()
+    val isFiltering by viewModel.isFiltering.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
     }
 
+    // 検索欄が開いているときの戻るボタンは検索を閉じるだけ（番組一覧は根なので、そのままだとアプリを抜ける）
+    BackHandler(enabled = isSearching, onBack = viewModel::stopSearch)
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("番組") },
-                actions = {
-                    IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Default.Settings, contentDescription = "設定")
-                    }
-                },
-            )
+            // タイトルは検索中も残し、入力欄はその下に一段出す（#44）。虫眼鏡は検索中は × になる
+            Column {
+                TopAppBar(
+                    title = { Text("番組") },
+                    actions = {
+                        when {
+                            isSearching -> IconButton(onClick = viewModel::stopSearch) {
+                                Icon(Icons.Default.Close, contentDescription = "検索を閉じる")
+                            }
+                            // 絞る対象が無いときは虫眼鏡を出さない
+                            !programs.isNullOrEmpty() -> IconButton(onClick = viewModel::startSearch) {
+                                Icon(Icons.Default.Search, contentDescription = "検索")
+                            }
+                        }
+                        IconButton(onClick = onSettingsClick) {
+                            Icon(Icons.Default.Settings, contentDescription = "設定")
+                        }
+                    },
+                )
+                if (isSearching) SearchField(query, onQueryChange = viewModel::setQuery)
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = { MiniPlayer(onClick = onNowPlayingClick) },
@@ -82,24 +114,42 @@ fun ProgramListScreen(
             val list = programs
             when {
                 list == null -> Box(Modifier.fillMaxSize())
+                list.isEmpty() && isFiltering -> NoMatch(query)
                 list.isEmpty() -> EmptyPrograms(canRefresh)
                 else -> {
-                    // よく聴く番組は上の節にまとめる（重複させない）。無ければ節ごと出さない。節内は従来どおり最新の放送日順
-                    val (starred, others) = list.partition { it.program.starred }
                     val listState = rememberLazyListState()
-                    // 最初の ★ で見出しが先頭行の上に挿入されると、キー基準のスクロール位置維持で見出しが画面外に出る。
-                    // 先頭付近にいるときだけ先頭に戻す（下の方を見ているときは動かさない）
-                    LaunchedEffect(starred.isNotEmpty()) {
-                        if (listState.firstVisibleItemIndex <= 1) listState.scrollToItem(0)
-                    }
-                    LazyColumn(Modifier.fillMaxSize(), state = listState) {
-                        if (starred.isNotEmpty()) {
-                            item(key = "header-starred") { SectionHeader("よく聴く") }
-                            programItems(starred, onProgramClick, viewModel::setStarred)
-                            // 全部がよく聴くなら「その他」の見出しも出さない
-                            if (others.isNotEmpty()) item(key = "header-others") { SectionHeader("その他") }
+                    // 検索語が変わるたびに先頭へ（絞った結果は先頭から見たい。解除したときも先頭に戻す）。
+                    // 末尾の空白など絞り込みに効かない変化では動かさず、初回も動かさない（番組から戻ったときに復元された位置を潰さない）
+                    val effectiveQuery = ProgramFilter.normalize(query)
+                    var seenQuery by remember { mutableStateOf(effectiveQuery) }
+                    LaunchedEffect(effectiveQuery) {
+                        if (effectiveQuery != seenQuery) {
+                            seenQuery = effectiveQuery
+                            listState.scrollToItem(0)
                         }
-                        programItems(others, onProgramClick, viewModel::setStarred)
+                    }
+                    if (isFiltering) {
+                        // 絞り込み中は該当が少ないので節に分けずフラットに出す（#45 の局チップも同じ規則）
+                        LazyColumn(Modifier.fillMaxSize(), state = listState) {
+                            programItems(list, onProgramClick, viewModel::setStarred)
+                        }
+                    } else {
+                        // よく聴く番組は上の節にまとめる（重複させない）。無ければ節ごと出さない。節内は従来どおり最新の放送日順
+                        val (starred, others) = list.partition { it.program.starred }
+                        // 最初の ★ で見出しが先頭行の上に挿入されると、キー基準のスクロール位置維持で見出しが画面外に出る。
+                        // 先頭付近にいるときだけ先頭に戻す（下の方を見ているときは動かさない）
+                        LaunchedEffect(starred.isNotEmpty()) {
+                            if (listState.firstVisibleItemIndex <= 1) listState.scrollToItem(0)
+                        }
+                        LazyColumn(Modifier.fillMaxSize(), state = listState) {
+                            if (starred.isNotEmpty()) {
+                                item(key = "header-starred") { SectionHeader("よく聴く") }
+                                programItems(starred, onProgramClick, viewModel::setStarred)
+                                // 全部がよく聴くなら「その他」の見出しも出さない
+                                if (others.isNotEmpty()) item(key = "header-others") { SectionHeader("その他") }
+                            }
+                            programItems(others, onProgramClick, viewModel::setStarred)
+                        }
                     }
                 }
             }
@@ -107,6 +157,38 @@ fun ProgramListScreen(
     }
 }
 
+/**
+ * 検索の入力欄（#44）。TopAppBar の下に一段置き、文字は本文サイズ（タイトルと区別する）。× は空欄に戻すだけで閉じない（閉じるのは TopAppBar の ×）。
+ * M3 の SearchBar は全画面のサジェスト領域を持つ部品なので、その場で一覧を絞る用途には使わない。
+ */
+@Composable
+private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
+    val focusRequester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    // 開いた瞬間にフォーカスとキーボードを出す
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+        keyboard?.show()
+    }
+    TextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+        textStyle = MaterialTheme.typography.bodyLarge,
+        placeholder = { Text("番組名・放送局名") },
+        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(Icons.Default.Clear, contentDescription = "検索語を消す")
+                }
+            }
+        },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+    )
+}
 private fun LazyListScope.programItems(
     list: List<ProgramSummary>,
     onProgramClick: (ProgramId) -> Unit,
@@ -165,6 +247,21 @@ private fun ProgramRow(summary: ProgramSummary, onClick: () -> Unit, onToggleSta
     )
 }
 
+/** 絞り込みが効いていて該当が無いとき。番組自体が無いのとは別物なので、更新の案内は出さない。 */
+@Composable
+private fun NoMatch(query: String) {
+    LazyColumn(Modifier.fillMaxSize()) {
+        item {
+            Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                Text(
+                    "\"${ProgramFilter.normalize(query)}\" に一致する番組がありません",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
+}
 @Composable
 private fun EmptyPrograms(canRefresh: Boolean) {
     // PullToRefreshBox の中身はスクロール可能である必要があるので LazyColumn で包む
