@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.tseki.jellyfinradio.domain.LibraryRepository
+import dev.tseki.jellyfinradio.domain.ProgramId
 import dev.tseki.jellyfinradio.domain.ProgramSummary
 import dev.tseki.jellyfinradio.domain.SessionRepository
 import dev.tseki.jellyfinradio.domain.SessionState
@@ -18,7 +19,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class ProgramListViewModel @Inject constructor(
-    library: LibraryRepository,
+    private val library: LibraryRepository,
     sessionRepository: SessionRepository,
     private val refresher: LibraryRefresher,
 ) : ViewModel() {
@@ -35,5 +36,9 @@ class ProgramListViewModel @Inject constructor(
 
     fun refresh() {
         viewModelScope.launch { refresher.refresh() }
+    }
+    /** よく聴くの印を付ける／外す（表示にだけ効く）。 */
+    fun setStarred(programId: ProgramId, starred: Boolean) {
+        viewModelScope.launch { library.setStarred(programId, starred) }
     }
 }

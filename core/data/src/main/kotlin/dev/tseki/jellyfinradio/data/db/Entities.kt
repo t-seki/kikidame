@@ -1,4 +1,5 @@
 package dev.tseki.jellyfinradio.data.db
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -25,6 +26,8 @@ data class ProgramEntity(
     val deleteAfterPlayed: Boolean = false,
     /** 消失した日時。null ならサーバに在る。v4 で追加 */
     val goneSince: Instant? = null,
+    /** よく聴く（表示用の印。CONTEXT.md）。v5 で追加 */
+    @ColumnInfo(defaultValue = "0") val starred: Boolean = false,
 )
 /** 各回 = Audio。 */
 @Entity(
