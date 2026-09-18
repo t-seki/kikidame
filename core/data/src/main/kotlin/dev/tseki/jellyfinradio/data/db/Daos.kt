@@ -18,7 +18,7 @@ data class ProgramSummaryRow(
 )
 /** 突合に必要な列だけ。 */
 data class ProgramKeyRow(val id: Long, val serverItemId: String?, val stationName: String?, val name: String)
-data class EpisodeKeyRow(val id: Long, val serverItemId: String?, val programId: Long, val title: String)
+data class EpisodeKeyRow(val id: Long, val serverItemId: String?, val programId: Long, val title: String, val airedAt: Instant, val runtimeTicks: Long)
 /** 同期の判断に必要な列だけ（`SyncPlanner` の入力）。`local_files` / `playback_states` が無ければ null。 */
 data class EpisodeSyncRow(
     val id: Long,
@@ -90,7 +90,7 @@ interface EpisodeDao {
     suspend fun findById(id: Long): EpisodeRow?
     @Query("SELECT * FROM episodes WHERE serverItemId = :serverItemId")
     suspend fun findByServerItemId(serverItemId: String): EpisodeEntity?
-    @Query("SELECT id, serverItemId, programId, title FROM episodes")
+    @Query("SELECT id, serverItemId, programId, title, airedAt, runtimeTicks FROM episodes")
     suspend fun listKeys(): List<EpisodeKeyRow>
     /** 全各回を 1 クエリで（番組ごとに @Relation を引かない）。 */
     @Query(
