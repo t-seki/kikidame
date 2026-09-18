@@ -1,5 +1,6 @@
 package dev.tseki.jellyfinradio.playback
 import dev.tseki.jellyfinradio.domain.EpisodeId
+import dev.tseki.jellyfinradio.domain.PlaybackRules
 import dev.tseki.jellyfinradio.domain.PlaybackState
 import dev.tseki.jellyfinradio.domain.PlaybackStateRepository
 import kotlinx.coroutines.flow.Flow
@@ -14,8 +15,9 @@ class InMemoryPlaybackStateRepository(private val clock: Clock) : PlaybackStateR
     override fun observe(episodeId: EpisodeId): Flow<PlaybackState?> = states.map { it[episodeId] }
     override suspend fun update(episodeId: EpisodeId, transform: (PlaybackState) -> PlaybackState): PlaybackState {
         updateCount++
-        val next = transform(states.value[episodeId] ?: PlaybackState.initial(episodeId, clock.now()))
-        states.value = states.value + (episodeId to next)
+        val existing = states.value[episodeId]
+        val next = transform(existing ?: PlaybackState.initial(episodeId, clock.now()))
+        if (PlaybackRules.isWorthRecording(existing, next)) states.value = states.value + (episodeId to next)
         return next
     }
 }

@@ -80,6 +80,18 @@ class PositionPersisterTest {
         advanceTimeBy(60.seconds)
         assertEquals(afterPause, repo.updateCount, "ticker must stop when paused")
     }
+    /** 開いてすぐ ⏭ した回（位置 0〜数秒・未再生）には行を作らない（#7）。 */
+    @Test
+    fun skippingPastAnUnstartedEpisodeLeavesNoRow() = runTest(StandardTestDispatcher()) {
+        setup(this)
+        player.update { setContentPositionMs(2_000) }
+        player.seekToNextMediaItem()
+        player.update { }
+        runCurrent()
+        assertNull(repo.states.value[ep1])
+        assertEquals(1, repo.updateCount, "update 自体は呼ばれるが書かれない")
+    }
+
     @Test
     fun savesPreviousEpisodeWhenSkippingToNext() = runTest(StandardTestDispatcher()) {
         setup(this)
