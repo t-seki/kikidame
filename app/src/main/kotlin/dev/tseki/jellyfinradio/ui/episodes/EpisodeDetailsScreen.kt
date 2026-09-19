@@ -36,6 +36,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import dev.tseki.jellyfinradio.ui.SectionTitle
+import dev.tseki.jellyfinradio.ui.ValueRow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 /**
@@ -73,7 +75,7 @@ fun EpisodeDetailsScreen(onBack: () -> Unit, viewModel: EpisodeDetailsViewModel 
         LazyColumn(Modifier.padding(padding).fillMaxSize()) {
             for (section in EpisodeDetails.sections(current)) {
                 item { SectionTitle(section.title) }
-                items(section.rows) { row -> DetailRow(row.label, row.value) }
+                items(section.rows) { row -> ValueRow(row.label, row.value) }
             }
             item {
                 ListItem(
@@ -108,16 +110,4 @@ fun EpisodeDetailsScreen(onBack: () -> Unit, viewModel: EpisodeDetailsViewModel 
     }
 }
 /** ラベルが上・値が下（設定アプリと同じ向き）。ラベル／値の組が並ぶ画面はラベルを目で追うので、この向きが走査しやすい。 */
-@Composable
-private fun DetailRow(label: String, value: String) {
-    ListItem(overlineContent = { Text(label) }, headlineContent = { Text(value) })
-}
-@Composable
-private fun SectionTitle(title: String) {
-    Text(
-        title,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 4.dp),
-    )
-}
+
