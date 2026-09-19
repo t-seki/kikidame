@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Sync
@@ -71,6 +72,7 @@ import dev.tseki.jellyfinradio.domain.EpisodeId
 import dev.tseki.jellyfinradio.domain.EpisodeWithState
 import dev.tseki.jellyfinradio.domain.LocalStorageUsage
 import dev.tseki.jellyfinradio.domain.Program
+import dev.tseki.jellyfinradio.domain.ProgramId
 import dev.tseki.jellyfinradio.download.DownloadProgress
 import dev.tseki.jellyfinradio.playback.NowPlayingState
 import dev.tseki.jellyfinradio.ui.player.MiniPlayer
@@ -84,6 +86,7 @@ import kotlin.time.Duration
 fun EpisodeListScreen(
     onEpisodeClick: (EpisodeId) -> Unit,
     onNowPlayingClick: (EpisodeId) -> Unit,
+    onEpisodeDetails: (ProgramId, EpisodeId) -> Unit,
     onBack: () -> Unit,
     viewModel: EpisodeListViewModel = hiltViewModel(),
 ) {
@@ -217,6 +220,8 @@ fun EpisodeListScreen(
             onUnpin = { viewModel.unpin(target.episode.id) },
             onDelete = { viewModel.deleteLocal(target.episode.id) },
             onTogglePlayed = { viewModel.setPlayed(target.episode.id, target.playback?.played != true) },
+            // 詳細（#43）は画面へ。シートは閉じてから遷移する
+            onDetails = { sheetFor = null; onEpisodeDetails(target.episode.programId, target.episode.id) },
         )
     }
 }
@@ -329,6 +334,7 @@ private fun EpisodeActionsSheet(
     onUnpin: () -> Unit,
     onDelete: () -> Unit,
     onTogglePlayed: () -> Unit,
+    onDetails: () -> Unit,
 ) {
     val local = item.localFile
     val played = item.playback?.played == true
@@ -348,6 +354,7 @@ private fun EpisodeActionsSheet(
             if (played) Icons.Outlined.Circle else Icons.Filled.CheckCircle,
             if (played) "未再生にする" else "再生済みにする",
         ) { onTogglePlayed(); onDismiss() }
+        SheetAction(Icons.Outlined.Info, "詳細") { onDetails() }
         Spacer(Modifier.padding(bottom = 24.dp))
     }
 }

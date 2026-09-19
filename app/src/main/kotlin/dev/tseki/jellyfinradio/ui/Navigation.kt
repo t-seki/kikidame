@@ -19,6 +19,7 @@ import dev.tseki.jellyfinradio.domain.SessionRepository
 import dev.tseki.jellyfinradio.domain.SessionState
 import dev.tseki.jellyfinradio.download.DownloadScheduler
 import dev.tseki.jellyfinradio.ui.connect.ConnectScreen
+import dev.tseki.jellyfinradio.ui.episodes.EpisodeDetailsScreen
 import dev.tseki.jellyfinradio.ui.episodes.EpisodeListScreen
 import dev.tseki.jellyfinradio.ui.library.LibraryPickScreen
 import dev.tseki.jellyfinradio.ui.player.PlayerScreen
@@ -45,6 +46,9 @@ object ProgramListRoute
 
 @Serializable
 data class EpisodeListRoute(val programId: Long)
+/** 各回の詳細（#43）。番組の各回一覧から引くので programId も持つ。 */
+@Serializable
+data class EpisodeDetailsRoute(val programId: Long, val episodeId: Long)
 
 /** [play] が false なら再生を始めない（ミニプレイヤーから「見に行く」だけの遷移）。載っている回は触らず、載っていなければ積むだけ。 */
 @Serializable
@@ -64,7 +68,7 @@ class SessionViewModel @Inject constructor(
 }
 
 /**
- * 番組一覧 → 各回一覧 → 再生画面 の 3 階層に、接続画面・ライブラリ選択・設定を足したもの。
+ * 番組一覧 → 各回一覧 → 再生画面 の 3 階層に、接続画面・ライブラリ選択・設定・各回の詳細を足したもの。
  * 起動時はセッション状態で開始画面を決め、その後は状態の**変化**（ログアウト・401・ライブラリ選択）で遷移する。
  * デバッグ用に接続画面から番組一覧へ抜けても、状態が変わらない限り戻されない。
  */
@@ -109,8 +113,12 @@ fun JellyfinRadioNavHost(sessionViewModel: SessionViewModel = hiltViewModel()) {
             EpisodeListScreen(
                 onEpisodeClick = { navController.navigate(PlayerRoute(it.value)) },
                 onNowPlayingClick = { navController.navigate(PlayerRoute(it.value, play = false)) },
+                onEpisodeDetails = { programId, episodeId -> navController.navigate(EpisodeDetailsRoute(programId.value, episodeId.value)) },
                 onBack = navController::popIfNotRoot,
             )
+        }
+        composable<EpisodeDetailsRoute> {
+            EpisodeDetailsScreen(onBack = navController::popIfNotRoot)
         }
         composable<PlayerRoute> {
             PlayerScreen(onBack = navController::popIfNotRoot)
