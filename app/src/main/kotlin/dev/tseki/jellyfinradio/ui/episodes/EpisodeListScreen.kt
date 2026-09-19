@@ -290,13 +290,7 @@ private fun EpisodeRow(
         supportingContent = {
             // 補足行もタイトルと同じ位置から始める（枠＋間隔ぶんを空ける）
             Column(Modifier.padding(start = MARK_SIZE + MARK_GAP)) {
-                val status = when (state) {
-                    DownloadState.PENDING -> if (waitingForNetwork) " · Wi-Fi 待ち" else " · 待機中"
-                    DownloadState.RUNNING -> " · ダウンロード中"
-                    DownloadState.FAILED -> " · 失敗（タップで再試行）"
-                    else -> ""
-                }
-                Text("${item.episode.airedAt.toAiredDateText()} · ${runtime.toClockText()}$status")
+                Text(item.toSupportingText(waitingForNetwork))
                 if (playable && resume != null && runtime > Duration.ZERO) {
                     LinearProgressIndicator(
                         progress = { (resume / runtime).toFloat().coerceIn(0f, 1f) },
@@ -334,6 +328,23 @@ private fun EpisodeRow(
             }
         },
     )
+}
+
+/**
+ * 行の補足: `放送日 · 尺 · 状態`。状態はダウンロードの待機／進行／失敗のときだけ付く。
+ * 録音側が各回のタイトルを `YYYY-MM-DD` と付けるので、タイトルが放送日と同じ文字列なら同じ日付が 2 段に並んで
+ * 冗長になる。そのときだけ放送日を省いて `尺 · 状態` にする（#66）。判定は完全一致で、表記ゆれ（`2026/08/02`）や
+ * `(1)` 付きは一致とみなさない（そういう回では両方の値に意味がある）。
+ */
+internal fun EpisodeWithState.toSupportingText(waitingForNetwork: Boolean): String {
+    val aired = episode.airedAt.toAiredDateText().takeIf { it != episode.title }
+    val status = when (localFile?.state) {
+        DownloadState.PENDING -> if (waitingForNetwork) "Wi-Fi 待ち" else "待機中"
+        DownloadState.RUNNING -> "ダウンロード中"
+        DownloadState.FAILED -> "失敗（タップで再試行）"
+        else -> null
+    }
+    return listOfNotNull(aired, episode.runtime.toClockText(), status).joinToString(" · ")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

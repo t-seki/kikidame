@@ -11,7 +11,8 @@ import kotlin.time.Instant
 fun Instant.toAiredDateText(): String = toLocalDateTime(AiredAt.ZONE).date.toString()
 /**
  * 番組一覧の「最新」用の短い日付（#41）。今年なら MM-DD、それ以外は YYYY-MM-DD（古い番組は年が要る）。
- * 各回一覧の放送日は [toAiredDateText] のまま（一覧内で年をまたぐので省略しない）。
+ * 各回一覧の放送日は [toAiredDateText] のまま年を落とさない（一覧内で年をまたぐ）。出すかどうかは各回一覧側で決める
+ * （タイトルが放送日と同じ回では丸ごと省く。#66）。
  */
 fun Instant.toLatestDateText(today: LocalDate = Clock.System.todayIn(AiredAt.ZONE)): String {
     val date = toLocalDateTime(AiredAt.ZONE).date
