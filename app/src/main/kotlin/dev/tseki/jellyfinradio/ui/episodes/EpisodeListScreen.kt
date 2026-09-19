@@ -69,11 +69,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tseki.jellyfinradio.domain.DownloadState
 import dev.tseki.jellyfinradio.domain.EpisodeId
 import dev.tseki.jellyfinradio.domain.EpisodeWithState
+import dev.tseki.jellyfinradio.domain.LocalStorageUsage
 import dev.tseki.jellyfinradio.domain.Program
 import dev.tseki.jellyfinradio.download.DownloadProgress
 import dev.tseki.jellyfinradio.playback.NowPlayingState
 import dev.tseki.jellyfinradio.ui.player.MiniPlayer
 import dev.tseki.jellyfinradio.ui.toAiredDateText
+import dev.tseki.jellyfinradio.ui.toText
 import dev.tseki.jellyfinradio.ui.toClockText
 import kotlin.time.Duration
 
@@ -87,6 +89,7 @@ fun EpisodeListScreen(
 ) {
     val program by viewModel.program.collectAsStateWithLifecycle()
     val episodes by viewModel.episodes.collectAsStateWithLifecycle()
+    val localStorage by viewModel.localStorage.collectAsStateWithLifecycle()
     val canRefresh by viewModel.canRefresh.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val progress by viewModel.progress.collectAsStateWithLifecycle()
@@ -170,6 +173,7 @@ fun EpisodeListScreen(
     if (showSyncSheet && currentProgram != null) {
         ProgramSyncSheet(
             program = currentProgram,
+            localStorage = localStorage,
             onDismiss = { showSyncSheet = false },
             onSetEnabled = viewModel::setSyncEnabled,
             onKeepLatest = viewModel::setKeepLatest,
@@ -356,6 +360,7 @@ private fun EpisodeActionsSheet(
 @Composable
 private fun ProgramSyncSheet(
     program: Program,
+    localStorage: LocalStorageUsage?,
     onDismiss: () -> Unit,
     onSetEnabled: (Boolean) -> Unit,
     onKeepLatest: (Int?) -> Unit,
@@ -368,6 +373,14 @@ private fun ProgramSyncSheet(
     val enabled = program.syncEnabled
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Text(program.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+        // この番組の手元のファイル（#42）。保持ルールを触る前に目に入る位置に
+        localStorage?.let {
+            Text(
+                if (it.episodeCount > 0) "手元のファイル: ${it.toText()}" else "手元にファイルはありません",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 24.dp),
+            )
+        }
         ListItem(
             modifier = Modifier.combinedClickable(enabled = canSync) { onSetEnabled(!enabled) },
             headlineContent = { Text("この番組を同期する") },

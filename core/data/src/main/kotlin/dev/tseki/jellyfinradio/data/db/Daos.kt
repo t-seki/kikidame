@@ -17,6 +17,7 @@ data class ProgramSummaryRow(
     val unplayedLocalCount: Int,
     val latestAiredAt: Long?,
 )
+data class LocalUsageRow(val totalBytes: Long, val episodeCount: Int)
 /** 突合に必要な列だけ。 */
 data class ProgramKeyRow(val id: Long, val serverItemId: String?, val stationName: String?, val name: String)
 data class EpisodeKeyRow(val id: Long, val serverItemId: String?, val programId: Long, val title: String, val airedAt: Instant, val runtimeTicks: Long)
@@ -125,6 +126,15 @@ interface EpisodeDao {
 }
 @Dao
 interface LocalFileDao {
+    /** 手元のファイルの合計（#42）。sizeBytes はダウンロード完了時に実サイズで上書きされている。 */
+    @Query(
+        """
+        SELECT COALESCE(SUM(e.sizeBytes), 0) AS totalBytes, COUNT(lf.episodeId) AS episodeCount
+        FROM local_files lf JOIN episodes e ON e.id = lf.episodeId
+        WHERE lf.state = 'DONE' AND lf.path IS NOT NULL
+        """,
+    )
+    fun observeUsage(): Flow<LocalUsageRow>
     @Query("SELECT * FROM local_files WHERE path = :path")
     suspend fun findByPath(path: String): LocalFileEntity?
     @Query("SELECT * FROM local_files WHERE episodeId = :episodeId")
