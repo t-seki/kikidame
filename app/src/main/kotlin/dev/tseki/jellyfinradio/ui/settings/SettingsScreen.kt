@@ -29,10 +29,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tseki.jellyfinradio.domain.SessionState
+import dev.tseki.jellyfinradio.ui.SectionTitle
+import dev.tseki.jellyfinradio.ui.ValueRow
 import dev.tseki.jellyfinradio.ui.toDateTimeText
 import dev.tseki.jellyfinradio.ui.toText
 
@@ -76,25 +77,21 @@ fun SettingsScreen(
                 is SessionState.NeedsLibrary -> s.session
                 else -> null
             }
-            Text("サーバ", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(16.dp, 16.dp, 16.dp, 4.dp))
-            ListItem(headlineContent = { Text(current?.serverUrl ?: "未接続") }, supportingContent = { Text("URL") })
-            ListItem(headlineContent = { Text(current?.userName ?: "-") }, supportingContent = { Text("ユーザー") })
-            ListItem(
+            // 値を見せる行はラベル上・値下（#58、各回の詳細と同じ向き）。操作の行は操作名が上で説明が下
+            SectionTitle("サーバ")
+            ValueRow("URL", current?.serverUrl ?: "未接続")
+            ValueRow("ユーザー", current?.userName ?: "-")
+            ValueRow(
+                "ライブラリ",
+                (s as? SessionState.Ready)?.library?.name ?: "未選択",
                 modifier = Modifier.clickable(enabled = current != null, onClick = onChangeLibrary),
-                headlineContent = { Text((s as? SessionState.Ready)?.library?.name ?: "未選択") },
-                supportingContent = { Text("ライブラリ（タップで選び直す）") },
+                supporting = "タップで選び直す",
             )
-            ListItem(
-                headlineContent = { Text((s as? SessionState.Ready)?.lastFetchedAt?.toDateTimeText() ?: "-") },
-                supportingContent = { Text("最終同期") },
-            )
+            ValueRow("最終同期", (s as? SessionState.Ready)?.lastFetchedAt?.toDateTimeText() ?: "-")
             HorizontalDivider()
-            Text("ダウンロード", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(16.dp, 16.dp, 16.dp, 4.dp))
+            SectionTitle("ダウンロード")
             // 手元のファイルの合計（#42）。保持ルールや固定を調整する動機は容量なので、見えるようにする
-            ListItem(
-                headlineContent = { Text(localStorage?.toText() ?: "-") },
-                supportingContent = { Text("手元のファイル") },
-            )
+            ValueRow("手元のファイル", localStorage?.toText() ?: "-")
             ListItem(
                 modifier = Modifier.clickable { viewModel.setWifiOnly(!wifiOnly) },
                 headlineContent = { Text("Wi-Fi のみ") },
