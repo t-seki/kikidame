@@ -29,6 +29,7 @@ fun ProgramSummaryRow.toDomain(): ProgramSummary = ProgramSummary(
     program = program.toDomain(),
     episodeCount = episodeCount,
     localEpisodeCount = localEpisodeCount,
+    unplayedLocalCount = unplayedLocalCount,
     latestAiredAt = latestAiredAt?.let(Instant::fromEpochMilliseconds),
 )
 fun ProgramKeyRow.toDomain(): LocalProgramKey =

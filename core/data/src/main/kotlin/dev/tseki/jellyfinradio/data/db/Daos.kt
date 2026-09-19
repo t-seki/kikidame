@@ -14,6 +14,7 @@ data class ProgramSummaryRow(
     @Embedded val program: ProgramEntity,
     val episodeCount: Int,
     val localEpisodeCount: Int,
+    val unplayedLocalCount: Int,
     val latestAiredAt: Long?,
 )
 /** 突合に必要な列だけ。 */
@@ -36,10 +37,12 @@ interface ProgramDao {
         """
         SELECT p.*, COUNT(e.id) AS episodeCount,
                SUM(CASE WHEN lf.state = 'DONE' AND lf.path IS NOT NULL THEN 1 ELSE 0 END) AS localEpisodeCount,
+               SUM(CASE WHEN lf.state = 'DONE' AND lf.path IS NOT NULL AND COALESCE(ps.played, 0) = 0 THEN 1 ELSE 0 END) AS unplayedLocalCount,
                MAX(e.airedAt) AS latestAiredAt
         FROM programs p
           LEFT JOIN episodes e ON e.programId = p.id
           LEFT JOIN local_files lf ON lf.episodeId = e.id
+          LEFT JOIN playback_states ps ON ps.episodeId = e.id
         GROUP BY p.id
         ORDER BY latestAiredAt DESC, p.name ASC
         """,

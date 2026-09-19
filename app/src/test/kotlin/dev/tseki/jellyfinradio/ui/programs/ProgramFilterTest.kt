@@ -103,6 +103,7 @@ class ProgramFilterTest {
         program = Program(id = ProgramId(id), serverItemId = null, name = name, stationName = station),
         episodeCount = 0,
         localEpisodeCount = 0,
+        unplayedLocalCount = 0,
         latestAiredAt = null,
     )
 }
