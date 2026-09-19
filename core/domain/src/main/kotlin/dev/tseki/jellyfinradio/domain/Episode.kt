@@ -14,6 +14,8 @@ data class Episode(
     val runtime: Duration,
     val sizeBytes: Long,
     val container: String,
+    /** 出演者（Jellyfin の Audio の `Artists`）。回ごとに変わる。番組の放送局（AlbumArtist）とは別。サーバに無ければ空。 */
+    val performers: List<String> = emptyList(),
 )
 /**
  * 各回の正規の並び順: 放送日 → タイトルの辞書順 → ローカル ID。連続再生はこの順（古い順）。

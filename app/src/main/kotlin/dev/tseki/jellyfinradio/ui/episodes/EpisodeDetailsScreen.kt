@@ -48,6 +48,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun EpisodeDetailsScreen(onBack: () -> Unit, viewModel: EpisodeDetailsViewModel = hiltViewModel()) {
     val item by viewModel.item.collectAsStateWithLifecycle()
+    val program by viewModel.program.collectAsStateWithLifecycle()
     // 開き直すたびに畳んだ状態から（回転では保つ）
     var showTechnical by rememberSaveable { mutableStateOf(false) }
     // 見ている間にその回が消えたら（保持ルールの削除・番組ごと消した）一覧へ戻る。読み込み前の null とは区別する
@@ -71,8 +72,10 @@ fun EpisodeDetailsScreen(onBack: () -> Unit, viewModel: EpisodeDetailsViewModel 
         },
     ) { padding ->
         val current = item ?: return@Scaffold
+        // 番組も読めてから出す（先に各回だけ出すと放送局の行が一瞬「不明」になる）。各回があれば番組は必ずある（FK）
+        val currentProgram = program ?: return@Scaffold
         LazyColumn(Modifier.padding(padding).fillMaxSize()) {
-            for (section in EpisodeDetails.sections(current)) {
+            for (section in EpisodeDetails.sections(current, currentProgram)) {
                 item { SectionTitle(section.title) }
                 items(section.rows) { row -> ValueRow(row.label, row.value) }
             }

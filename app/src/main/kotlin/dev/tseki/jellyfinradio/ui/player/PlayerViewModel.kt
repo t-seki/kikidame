@@ -22,12 +22,15 @@ import dev.tseki.jellyfinradio.playback.SleepTimer
 import dev.tseki.jellyfinradio.playback.SleepTimerSetting
 import dev.tseki.jellyfinradio.ui.PlayerRoute
 import dev.tseki.jellyfinradio.ui.toClockText
+import dev.tseki.jellyfinradio.ui.toPerformersText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -76,6 +79,22 @@ class PlayerViewModel @Inject constructor(
         .distinctUntilChanged()
         .flatMapLatest { id -> if (id == null) flowOf(false) else playbackStates.observe(id).map { it?.played == true } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    /**
+     * タイトルの下の `放送局 · 出演者`（#70）。放送局は番組から、出演者は各回から取り、どちらも Room を購読する
+     * （この画面を開いたまま同期が出演者を書き換えても追従する）。どちらも無ければ null。番組 ID を知るために最初に 1 回だけ各回を引く。
+     */
+    val subtitle: StateFlow<String?> = _uiState
+        .map { it.episodeId }
+        .distinctUntilChanged()
+        .flatMapLatest { id ->
+            if (id == null) return@flatMapLatest flowOf(null)
+            flow<String?> {
+                val programId = library.getEpisode(id)?.episode?.programId ?: return@flow emit(null)
+                val performers = library.observeEpisodes(programId).map { list -> list.firstOrNull { it.episode.id == id }?.episode?.performers.orEmpty() }
+                emitAll(combine(library.observeProgram(programId), performers) { program, names -> playerSubtitle(program?.stationName, names) })
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     /** 倍速（#35）。アプリ全体の設定で、サービス側が同じ Flow を購読してプレイヤーに反映する。 */
     val speed: StateFlow<Float> = settings.playbackSpeed
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlaybackSpeed.DEFAULT)
@@ -223,3 +242,6 @@ class PlayerViewModel @Inject constructor(
         const val POSITION_REFRESH_MS = 500L
     }
 }
+/** `放送局 · 出演者`。無い方は省き、両方無ければ null。 */
+internal fun playerSubtitle(stationName: String?, performers: List<String>): String? =
+    listOfNotNull(stationName, performers.toPerformersText()).takeIf { it.isNotEmpty() }?.joinToString(" · ")

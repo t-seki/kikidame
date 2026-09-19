@@ -24,6 +24,8 @@ data class ServerEpisode(
     /** サーバが返さない場合は null（手元の値を残す）。 */
     val sizeBytes: Long?,
     val container: String,
+    /** 出演者（`Artists`）。サーバが返さなければ空（空で上書きする。サイズと違い「返さない」と「無い」を区別しない）。 */
+    val performers: List<String> = emptyList(),
 )
 
 /**

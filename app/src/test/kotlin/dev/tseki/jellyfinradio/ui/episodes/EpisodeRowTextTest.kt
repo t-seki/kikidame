@@ -55,9 +55,17 @@ class EpisodeRowTextTest {
         assertEquals("2:00:00", item(title = "2026-08-02", state = DownloadState.DONE).text())
     }
 
+    /** 出演者（#70）は放送日と尺の間。無い回は今までどおり。 */
+    @Test
+    fun performersSitBetweenAiredDateAndRuntime() {
+        assertEquals("岩井勇気、澤部佑 · 2:00:00", item(title = "2026-08-02", performers = listOf("岩井勇気", "澤部佑")).text())
+        assertEquals("2026-08-02 · 岩井勇気 · 2:00:00 · ダウンロード中", item(title = "第 12 回", performers = listOf("岩井勇気"), state = DownloadState.RUNNING).text())
+        assertEquals("2:00:00", item(title = "2026-08-02", performers = emptyList()).text())
+    }
+
     private fun EpisodeWithState.text(waitingForNetwork: Boolean = false) = toSupportingText(waitingForNetwork)
 
-    private fun item(title: String, airedAt: Instant = aired, state: DownloadState? = null): EpisodeWithState {
+    private fun item(title: String, airedAt: Instant = aired, state: DownloadState? = null, performers: List<String> = emptyList()): EpisodeWithState {
         val episode = Episode(
             id = EpisodeId(1),
             serverItemId = ServerItemId("abc"),
@@ -68,6 +76,7 @@ class EpisodeRowTextTest {
             runtime = 2.hours,
             sizeBytes = 0,
             container = "m4a",
+            performers = performers,
         )
         val local = state?.let { LocalFile(episode.id, it, path = null, pinned = false) }
         return EpisodeWithState(episode, local, null)
