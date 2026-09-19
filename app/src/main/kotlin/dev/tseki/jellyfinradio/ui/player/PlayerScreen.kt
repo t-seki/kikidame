@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -143,18 +144,19 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
                 onSeek = viewModel::seekTo,
             )
             // シークバーの下: 倍速（#35）・再生済み・スリープタイマー（#36）を中央 3 列に（#57）。
-            // 片手で使うので、TopAppBar（親指が届かない）ではなく下半分にまとめる
+            // 片手で使うので、親指が届かない TopAppBar ではなく主操作のすぐ上にまとめる。
+            // アイコンの contentDescription はラベルが名前にならないもの（倍速の「1×」、スリープの残り時間）にだけ文脈を足す
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                SubAction(Icons.Filled.Speed, contentDescription = null, label = PlaybackSpeed.label(speed)) { showSpeedSheet = true }
+                SubAction(Icons.Filled.Speed, contentDescription = "倍速", label = PlaybackSpeed.label(speed)) { showSpeedSheet = true }
                 if (played) {
-                    SubAction(Icons.Default.CheckCircle, contentDescription = "再生済み（タップで未再生に）", label = "再生済み", enabled = state.episodeId != null) { viewModel.setPlayed(false) }
+                    SubAction(Icons.Default.CheckCircle, contentDescription = null, label = "再生済み", enabled = state.episodeId != null) { viewModel.setPlayed(false) }
                 } else {
-                    SubAction(Icons.Outlined.Circle, contentDescription = "未再生（タップで再生済みに）", label = "未再生", enabled = state.episodeId != null) { viewModel.setPlayed(true) }
+                    SubAction(Icons.Outlined.Circle, contentDescription = null, label = "未再生", enabled = state.episodeId != null) { viewModel.setPlayed(true) }
                 }
                 if (sleepTimerSet) {
-                    SubAction(Icons.Filled.Bedtime, contentDescription = "スリープタイマー（設定中）", label = sleepTimerLabel ?: "スリープ") { showSleepSheet = true }
+                    SubAction(Icons.Filled.Bedtime, contentDescription = "スリープタイマー", label = sleepTimerLabel ?: "スリープ") { showSleepSheet = true }
                 } else {
-                    SubAction(Icons.Outlined.Bedtime, contentDescription = "スリープタイマー", label = "スリープ") { showSleepSheet = true }
+                    SubAction(Icons.Outlined.Bedtime, contentDescription = null, label = "スリープ") { showSleepSheet = true }
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -193,10 +195,10 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
         )
     }
 }
-/** シークバー下の 3 列の 1 つ。アイコン＋短いラベル。 */
+/** シークバー下の 3 列の 1 つ。アイコン＋短いラベル。左右のパディングを詰めて、狭い画面（360dp）でも `1.75×` `再生済み` `1:00:00` が並ぶ。 */
 @Composable
 private fun SubAction(icon: ImageVector, contentDescription: String?, label: String, enabled: Boolean = true, onClick: () -> Unit) {
-    TextButton(onClick = onClick, enabled = enabled) {
+    TextButton(onClick = onClick, enabled = enabled, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)) {
         Icon(icon, contentDescription = contentDescription, Modifier.size(18.dp))
         Spacer(Modifier.width(6.dp))
         Text(label, style = MaterialTheme.typography.labelLarge)
