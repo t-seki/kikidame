@@ -14,4 +14,15 @@ interface AppSettingsRepository {
     /** 倍速。[PlaybackSpeed.CHOICES] のどれか。既定 1.0。 */
     val playbackSpeed: Flow<Float>
     suspend fun setPlaybackSpeed(value: Float)
+    /** テーマ（#62）。既定は [ThemeMode.SYSTEM]。 */
+    val themeMode: Flow<ThemeMode>
+    suspend fun setThemeMode(value: ThemeMode)
+}
+/** ダーク／ライトの選び方（#62）。SYSTEM は端末の設定に追従。 */
+enum class ThemeMode {
+    SYSTEM, DARK, LIGHT;
+    companion object {
+        /** 保存された名前から。不明な値（将来の項目や壊れた値）は [SYSTEM] に丸める。 */
+        fun fromStorageName(name: String?): ThemeMode = entries.firstOrNull { it.name == name } ?: SYSTEM
+    }
 }

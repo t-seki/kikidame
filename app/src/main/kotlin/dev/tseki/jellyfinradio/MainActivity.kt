@@ -9,12 +9,18 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import dagger.hilt.android.AndroidEntryPoint
+import dev.tseki.jellyfinradio.domain.AppSettingsRepository
+import dev.tseki.jellyfinradio.domain.ThemeMode
 import dev.tseki.jellyfinradio.ui.JellyfinRadioNavHost
 import dev.tseki.jellyfinradio.ui.theme.JellyfinRadioTheme
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @Inject lateinit var settings: AppSettingsRepository
     private val requestPermissions =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { /* 拒否されても手元の再生はできる */ }
 
@@ -23,7 +29,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         requestRuntimePermissionsIfNeeded()
         setContent {
-            JellyfinRadioTheme {
+            // テーマの設定（#62）を読むまで何も出さない（一瞬。読めてから描けば既定色で一度描いてから切り替わる「ちらつき」が無い）
+            val themeMode by produceState<ThemeMode?>(initialValue = null) { settings.themeMode.collect { value = it } }
+            val mode = themeMode ?: return@setContent
+            JellyfinRadioTheme(themeMode = mode) {
                 JellyfinRadioNavHost()
             }
         }
