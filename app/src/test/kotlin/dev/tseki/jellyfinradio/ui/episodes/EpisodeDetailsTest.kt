@@ -66,12 +66,22 @@ class EpisodeDetailsTest {
         val rows = EpisodeDetails.technicalRows(item)
         assertEquals(Row("サーバ ID", "abc123"), rows[0])
         assertEquals(Row("ID（アプリ内）", "42"), rows[1])
-        assertEquals(Row("放送日（サーバの値）", "2026-09-17T15:00:00Z"), rows[2])
+        assertEquals(Row("放送日（記録の瞬間、UTC）", "2026-09-17T15:00:00Z"), rows[2])
         assertTrue(rows.any { it == Row("保存先", "なし") })
-        assertTrue(rows.any { it == Row("ダウンロードの試行", "3 回（最終 2026-09-18 12:04）") })
+        assertTrue(rows.any { it == Row("失敗回数", "3 回") })
+        assertTrue(rows.any { it == Row("最終試行", "2026-09-18 12:04") })
         assertFalse(rows.any { it.label.contains("同期") || it.label.contains("synced") })
     }
 
+    /** 1 回で成功した回: 失敗 0 回でも最終試行（開始時刻）はある。以前は「試行 0 回（最終 …）」と矛盾して見えた。 */
+    @Test
+    fun successfulDownloadShowsZeroFailuresAndLastAttempt() {
+        val rows = EpisodeDetails.technicalRows(
+            EpisodeWithState(episode, LocalFile(episode.id, DownloadState.DONE, "/x/a.m4a", pinned = false, attemptCount = 0, lastAttemptAt = at, downloadedAt = at), null),
+        )
+        assertTrue(rows.any { it == Row("失敗回数", "0 回") })
+        assertTrue(rows.any { it == Row("最終試行", "2026-09-18 12:04") })
+    }
     @Test
     fun localOnlyEpisodeSaysSo() {
         val rows = EpisodeDetails.technicalRows(EpisodeWithState(episode.copy(serverItemId = null, addedAt = null), null, null))
