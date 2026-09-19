@@ -5,6 +5,7 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tseki.jellyfinradio.domain.EpisodeId
+import kotlinx.coroutines.test.TestScope
 import org.junit.Test
 import org.junit.runner.RunWith
 import kotlin.test.assertEquals
@@ -13,7 +14,7 @@ import kotlin.test.assertNull
 @RunWith(AndroidJUnit4::class)
 class NowPlayingTest {
     private val player = FakePlayer()
-    private val nowPlaying = NowPlaying().also { player.addListener(it.listener(player)) }
+    private val nowPlaying = NowPlaying().also { player.addListener(it.listener(player, TestScope())) }
 
     private fun item(id: Long, title: String, program: String) = MediaItem.Builder()
         .setMediaId(id.toString())
@@ -32,7 +33,7 @@ class NowPlayingTest {
     @Test
     fun loadingAPlaylistPicksUpTheCurrentItemAndItsMetadata() {
         load(item(1, "第 1 回", "番組 A"), item(2, "第 2 回", "番組 A"))
-        assertEquals(NowPlayingState(EpisodeId(1), "第 1 回", "番組 A", isPlaying = false), nowPlaying.state.value)
+        assertEquals(NowPlayingState(EpisodeId(1), "第 1 回", "番組 A", isPlaying = false, durationMs = 1_800_000), nowPlaying.state.value)
         assertEquals(EpisodeId(1), nowPlaying.excludedFromSync)
     }
 
@@ -70,7 +71,7 @@ class NowPlayingTest {
         assertEquals(EpisodeId(1), nowPlaying.excludedFromSync)
         player.update { setPlaybackState(Player.STATE_ENDED) }
         assertEquals(
-            NowPlayingState(EpisodeId(1), "第 1 回", "番組 A", isPlaying = false, isEnded = true),
+            NowPlayingState(EpisodeId(1), "第 1 回", "番組 A", isPlaying = false, isEnded = true, durationMs = 1_800_000),
             nowPlaying.state.value,
         )
         assertNull(nowPlaying.excludedFromSync)
