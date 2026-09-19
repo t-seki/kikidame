@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -286,7 +287,9 @@ private fun FilterSheet(
         )
         if (stations.isNotEmpty()) {
             Text("放送局", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 4.dp))
-            LazyColumn {
+            // キーボードの上に収める（imePadding）。シートの高さいっぱいで測ると「全部収まっている」扱いになって
+            // 一覧がスクロールせず、ドラッグがシートに渡って閉じてしまう
+            LazyColumn(Modifier.weight(1f, fill = false).imePadding()) {
                 item(key = "all") {
                     StationChoice("すべて", stations.sumOf { it.programCount }, selected == null) { onSelectStation(null); onDismiss() }
                 }
