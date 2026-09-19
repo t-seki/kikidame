@@ -34,11 +34,10 @@ import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tseki.jellyfinradio.ui.SectionTitle
 import dev.tseki.jellyfinradio.ui.ValueRow
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 /**
  * 各回の詳細（#43）。利用者向けの 3 群を出し、末尾の「技術的な詳細」を展開すると ID・記録の生の値・パスが等幅で並ぶ。
