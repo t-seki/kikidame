@@ -80,15 +80,17 @@ Entity を変えたら version を上げ、書き出された JSON もコミッ�
 作業セッションは自分の issue しか見ていないので、横断する仕事は main のチェックアウトにいるセッションが持つ。
 
 - 入口: epic を sub-issue に割り、各 issue に「触るファイル」を書く。作業セッションは issue を読んで自分で EnterWorktree する
-- 出口: PR が来たら `/code-review:code-review` を回し、マージ順を決め、`gh pr merge --squash --delete-branch` → `git pull --ff-only` → `installDebug`。Room のスキーマ版数を上げる PR の後に古いビルドを入れないチェックもここ
+- 出口: PR が来たら `/code-review:code-review` を回し、マージ順を決め、`gh pr merge --squash --delete-branch` → `git pull --ff-only` → `installDebug`。Room のスキーマ版数を上げる PR の後に古いビルドを入れないチェックもここ。レビュー用の subagent は `pr-reviewer`（read-only）に振る。general-purpose に振ると `gh pr checkout` して main 側に `pr-N` ブランチを作ることがある
 - 掃除（マージのたび、セッション終了時に必ず）:
   ```bash
   git fetch --prune
   git worktree prune
   git worktree list      # 残っていれば git worktree remove <path>
   git branch --no-color -vv | grep ': gone]' | awk '{print $1}' | xargs -r git branch -D
+  git branch --no-color --format='%(refname:short) %(upstream:short)' | awk '$2=="" && $1!="main"{print $1}' | xargs -r git branch -D
   ```
-  `gone` はリモートが消えたブランチ（`--delete-branch` でマージ済みのもの）。チェックアウト中のブランチは `-D` が失敗して次に進むだけなので安全
+  `gone` はリモートが消えたブランチ（`--delete-branch` でマージ済みのもの）。チェックアウト中のブランチは `-D` が失敗して次に進むだけなので安全。
+  最後の行は upstream の無いブランチを消す。`gone` には掛からず、`Agent` の worktree が残す `worktree-agent-<id>` と、レビュー subagent が `gh pr checkout` で作る `pr-N` がこれ（2026-09-20 に #85 のマージ後、この 2 本が残った）。main のチェックアウトは統合専用で未 push の WIP を置かないので消して安全
 - 横串: 先にマージされた PR が後の PR に影響するとき、該当 issue にコメントを書く（「#N がマージされたので rebase して」）。同じマシンのセッションには `SendMessage` で通知してもよいが、正とするのは issue コメント（メッセージは揮発する）
 - やらないこと: 実装（小物でも worktree に振る）、会話を状態の置き場にすること（cold start しても GitHub だけで復帰できる状態を保つ）、`/loop` での PR 監視（人が「PR 出た」と一言投げる）
 - 対話が要らない issue（docs、issue を読めば完結する小さな実装）は、調整役から `Agent` を `isolation: "worktree"` で起動して任せてもよい。subagent は人に質問できないので、grill は起動前に調整役で済ませて issue / ADR に落としておく。subagent の worktree は変更があれば残るので、マージ後に上の掃除で消す
