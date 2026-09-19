@@ -252,7 +252,7 @@ private fun SleepTimerSheet(
     }
 }
 
-/** ドラッグ中は指の位置を表示し、離した時点で 1 回だけシークする。 */
+/** ドラッグ中は指の位置を表示し、離した時点で 1 回だけシークする。時間は titleMedium（#75。labelMedium は小さくて読みにくかった。大きな時間表示は見送り）。 */
 @Composable
 private fun SeekBar(positionMs: Long, durationMs: Long, onSeek: (Long) -> Unit) {
     var dragging by remember { mutableStateOf<Float?>(null) }
@@ -269,8 +269,8 @@ private fun SeekBar(positionMs: Long, durationMs: Long, onSeek: (Long) -> Unit) 
             enabled = durationMs > 0,
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(shown.toLong().milliseconds.toClockText(), style = MaterialTheme.typography.labelMedium)
-            Text(durationMs.milliseconds.toClockText(), style = MaterialTheme.typography.labelMedium)
+            Text(shown.toLong().milliseconds.toClockText(), style = MaterialTheme.typography.titleMedium)
+            Text(durationMs.milliseconds.toClockText(), style = MaterialTheme.typography.titleMedium)
         }
     }
 }
