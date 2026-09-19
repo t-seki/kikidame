@@ -66,7 +66,11 @@ import dev.tseki.jellyfinradio.domain.ProgramSummary
 import dev.tseki.jellyfinradio.ui.player.MiniPlayer
 import dev.tseki.jellyfinradio.ui.programs.ProgramFilter.Station
 import dev.tseki.jellyfinradio.ui.programs.ProgramFilter.StationKey
-import dev.tseki.jellyfinradio.ui.toAiredDateText
+import dev.tseki.jellyfinradio.domain.AiredAt
+import dev.tseki.jellyfinradio.ui.toLatestDateText
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.todayIn
+import kotlin.time.Clock
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -262,17 +266,7 @@ private fun ProgramRow(summary: ProgramSummary, onClick: () -> Unit, onToggleSta
             }
         },
         headlineContent = { Text(summary.program.name) },
-        supportingContent = {
-            val station = summary.program.stationName
-            val count = if (summary.localEpisodeCount == summary.episodeCount) {
-                "${summary.episodeCount} 回"
-            } else {
-                "手元 ${summary.localEpisodeCount} / 全 ${summary.episodeCount} 回"
-            }
-            val latest = summary.latestAiredAt?.let { "最新 ${it.toAiredDateText()}" }
-            val gone = if (summary.program.isGone) "サーバ上で見つかりません" else null
-            Text(listOfNotNull(station, count, latest, gone).joinToString(" · "))
-        },
+        supportingContent = { Text(summary.toSupportingText()) },
         trailingContent = {
             when {
                 summary.program.isGone -> Icon(Icons.Filled.CloudOff, contentDescription = "サーバ上で見つかりません", tint = MaterialTheme.colorScheme.error)
@@ -349,6 +343,21 @@ private fun NoMatch(query: String, station: StationKey?) {
             }
         }
     }
+}
+/**
+ * 行の補足（#41）: `局 · 未再生 N / 手元 L · 全 E 回 · 最新 MM-DD`。
+ * 未再生 0 なら「未再生 N /」を省き、手元 = 全なら「全 E 回」を「回」に畳む（「/」が 2 つ並ばないよう「全」の前は「·」）。
+ */
+internal fun ProgramSummary.toSupportingText(today: LocalDate = Clock.System.todayIn(AiredAt.ZONE)): String {
+    val unplayed = if (unplayedLocalCount > 0) "未再生 $unplayedLocalCount / " else ""
+    val count = if (localEpisodeCount == episodeCount) {
+        "${unplayed}手元 $localEpisodeCount 回"
+    } else {
+        "${unplayed}手元 $localEpisodeCount · 全 $episodeCount 回"
+    }
+    val latest = latestAiredAt?.let { "最新 ${it.toLatestDateText(today)}" }
+    val gone = if (program.isGone) "サーバ上で見つかりません" else null
+    return listOfNotNull(program.stationName, count, latest, gone).joinToString(" · ")
 }
 @Composable
 private fun EmptyPrograms(canRefresh: Boolean) {
