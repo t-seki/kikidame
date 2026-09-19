@@ -87,9 +87,12 @@ class NowPlaying @Inject constructor() {
             pausedAtEndOfItem = !playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM
             read(player, pausedAtEndOfItem)
         }
-        // シークは止まっていても位置が変わる
-        override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) =
+        // シークは止まっていても位置が変わる。回をまたぐシークなら「回の終わりで止めた」も下ろす
+        // （onMediaItemTransition より先に呼ばれるので、古い回の印を新しい回に一瞬付けない）
+        override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+            if (oldPosition.mediaItemIndex != newPosition.mediaItemIndex) pausedAtEndOfItem = false
             read(player, pausedAtEndOfItem)
+        }
         private fun startTicker() {
             if (ticker?.isActive == true) return
             ticker = scope.launch {

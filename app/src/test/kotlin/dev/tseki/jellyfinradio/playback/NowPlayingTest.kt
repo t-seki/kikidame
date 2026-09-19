@@ -5,6 +5,9 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tseki.jellyfinradio.domain.EpisodeId
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.TestScope
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -92,6 +95,34 @@ class NowPlayingTest {
         assertEquals(EpisodeId(1), nowPlaying.excludedFromSync)
     }
 
+    /** 止まっていてもシークで位置が変わる（ミニプレイヤーの線、#59）。 */
+    @Test
+    fun seekingUpdatesThePositionWhilePaused() {
+        load(item(1, "第 1 回", "番組 A"))
+        player.update { setPlaybackState(Player.STATE_READY) }
+        assertEquals(0L, nowPlaying.state.value?.positionMs)
+        player.seekTo(600_000)
+        assertEquals(600_000L, nowPlaying.state.value?.positionMs)
+        assertEquals(1_800_000L, nowPlaying.state.value?.durationMs)
+    }
+    /** 「回の終わりまで」で止めた後に次の回へシークしても、新しい回に聴き終えた印が一瞬でも付かない（#59 で onPositionDiscontinuity を読むようにした）。 */
+    @Test
+    fun seekingToTheNextItemDropsPausedAtEndOfItem() = runTest {
+        load(item(1, "第 1 回", "番組 A"), item(2, "第 2 回", "番組 A"))
+        player.update { setPlaybackState(Player.STATE_READY) }
+        player.playWhenReady = true
+        player.update { }
+        player.update { setPlayWhenReady(false, Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM) }
+        assertEquals(true, nowPlaying.state.value?.isEnded)
+        // 一瞬の値も拾うため StateFlow を購読する（onPositionDiscontinuity → onMediaItemTransition の間）
+        val seen = mutableListOf<NowPlayingState?>()
+        val collector = launch(UnconfinedTestDispatcher(testScheduler)) { nowPlaying.state.collect { seen += it } }
+        player.seekToNextMediaItem()
+        collector.cancel()
+        assertEquals(EpisodeId(2), nowPlaying.state.value?.episodeId)
+        assertEquals(false, nowPlaying.state.value?.isEnded)
+        assertEquals(emptyList<NowPlayingState?>(), seen.filter { it?.episodeId == EpisodeId(2) && it.isEnded })
+    }
     @Test
     fun clearingThePlaylistClearsNowPlaying() {
         load(item(1, "第 1 回", "番組 A"))
