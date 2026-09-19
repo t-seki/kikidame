@@ -22,10 +22,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipEntry
@@ -45,8 +47,13 @@ import kotlinx.coroutines.launch
 @Composable
 fun EpisodeDetailsScreen(onBack: () -> Unit, viewModel: EpisodeDetailsViewModel = hiltViewModel()) {
     val item by viewModel.item.collectAsStateWithLifecycle()
-    // 開き直すたびに畳んだ状態から
-    var showTechnical by remember { mutableStateOf(false) }
+    // 開き直すたびに畳んだ状態から（回転では保つ）
+    var showTechnical by rememberSaveable { mutableStateOf(false) }
+    // 見ている間にその回が消えたら（保持ルールの削除・番組ごと消した）一覧へ戻る。読み込み前の null とは区別する
+    var loaded by remember { mutableStateOf(false) }
+    LaunchedEffect(item) {
+        if (item != null) loaded = true else if (loaded) onBack()
+    }
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()

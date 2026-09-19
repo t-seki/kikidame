@@ -8,7 +8,7 @@ import dev.tseki.jellyfinradio.ui.toDateTimeText
 import dev.tseki.jellyfinradio.ui.toSizeText
 
 /**
- * 各回の詳細シート（#43）に並べる値。Room にあるものを整形するだけで、サーバへは問い合わせない。
+ * 各回の詳細画面（#43）に並べる値。Room にあるものを整形するだけで、サーバへは問い合わせない。
  * 利用者向けの群と、デバッグ向けの「技術的な詳細」に分ける（後者は折り畳み、長押しでコピー）。
  */
 object EpisodeDetails {
