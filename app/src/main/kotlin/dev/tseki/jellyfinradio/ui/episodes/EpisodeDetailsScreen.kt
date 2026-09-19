@@ -66,9 +66,7 @@ fun EpisodeDetailsScreen(onBack: () -> Unit, viewModel: EpisodeDetailsViewModel 
         LazyColumn(Modifier.padding(padding).fillMaxSize()) {
             for (section in EpisodeDetails.sections(current)) {
                 item { SectionTitle(section.title) }
-                items(section.rows) { row ->
-                    ListItem(headlineContent = { Text(row.value) }, supportingContent = { Text(row.label) })
-                }
+                items(section.rows) { row -> DetailRow(row.label, row.value) }
             }
             item {
                 ListItem(
@@ -94,13 +92,18 @@ fun EpisodeDetailsScreen(onBack: () -> Unit, viewModel: EpisodeDetailsViewModel 
                                 }
                             },
                         ),
+                        overlineContent = { Text(row.label) },
                         headlineContent = { Text(row.value, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace) },
-                        supportingContent = { Text(row.label) },
                     )
                 }
             }
         }
     }
+}
+/** ラベルが上・値が下（設定アプリと同じ向き）。ラベル／値の組が並ぶ画面はラベルを目で追うので、この向きが走査しやすい。 */
+@Composable
+private fun DetailRow(label: String, value: String) {
+    ListItem(overlineContent = { Text(label) }, headlineContent = { Text(value) })
 }
 @Composable
 private fun SectionTitle(title: String) {
