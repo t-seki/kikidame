@@ -1,6 +1,7 @@
 package dev.tseki.jellyfinradio.data.repository
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tseki.jellyfinradio.data.db.LocalFileEntity
+import dev.tseki.jellyfinradio.data.db.PlaybackStateEntity
 import dev.tseki.jellyfinradio.domain.DownloadState
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -62,6 +63,27 @@ class RoomLibraryRepositoryTest : RoomTestBase() {
         assertEquals(false, repo.observeProgram(programId).first()?.starred)
     }
 
+    /** 未再生の数（#41）: 手元にあって再生済みでない回。再生済みの切替と、ファイルが手元に無くなる（DONE でなくなる）ことに追従する。 */
+    @Test
+    fun unplayedLocalCountFollowsPlayedAndLocalFiles() = runTest {
+        val programId = seedProgram()
+        suspend fun summary() = repo.observePrograms().first().single()
+        // seed は 4 回とも DONE のファイル付きで、再生記録は無い
+        assertEquals(4, summary().unplayedLocalCount)
+        val episodes = repo.observeEpisodes(programId).first()
+        val id = { title: String -> episodes.first { it.episode.title == title }.episode.id.value }
+        // 1 回を再生済みにすると減る。途中まで聴いただけ（played = false）の回は減らない
+        db.playbackStateDao().upsert(PlaybackStateEntity(id("X 2026-06-19"), positionTicks = 0, played = true, updatedAt = now))
+        db.playbackStateDao().upsert(PlaybackStateEntity(id("X 2026-06-12"), positionTicks = 1_000, played = false, updatedAt = now))
+        assertEquals(3, summary().unplayedLocalCount)
+        // ファイルが手元に無い（PENDING）回は数えない
+        db.localFileDao().upsert(LocalFileEntity(id("X 2026-06-05"), DownloadState.PENDING, path = null, pinned = false))
+        assertEquals(2, summary().unplayedLocalCount)
+        assertEquals(3, summary().localEpisodeCount)
+        // 未再生に戻すと増える
+        db.playbackStateDao().upsert(PlaybackStateEntity(id("X 2026-06-19"), positionTicks = 0, played = false, updatedAt = now))
+        assertEquals(3, summary().unplayedLocalCount)
+    }
     @Test
     fun getEpisodeReturnsNullForUnknownId() = runTest {
         assertNull(repo.getEpisode(dev.tseki.jellyfinradio.domain.EpisodeId(999)))

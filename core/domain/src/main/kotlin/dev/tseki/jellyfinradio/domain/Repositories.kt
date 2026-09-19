@@ -9,6 +9,8 @@ data class ProgramSummary(
     val episodeCount: Int,
     /** 手元にファイルがある各回の数。 */
     val localEpisodeCount: Int,
+    /** 手元にファイルがあって再生済みでない各回の数（#41）。聴きかけ・聴いている回も再生済みでなければ数える。サーバ上にしか無い回は数えない。 */
+    val unplayedLocalCount: Int,
     val latestAiredAt: Instant?,
 )
 /** 各回一覧・再生画面が使う、各回とその手元の状態。 */

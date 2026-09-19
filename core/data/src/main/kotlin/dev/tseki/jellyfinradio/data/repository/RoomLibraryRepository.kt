@@ -12,6 +12,7 @@ import dev.tseki.jellyfinradio.domain.ProgramId
 import dev.tseki.jellyfinradio.domain.ProgramSummary
 import dev.tseki.jellyfinradio.domain.RetentionRule
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -21,8 +22,9 @@ class RoomLibraryRepository @Inject constructor(
     private val episodeDao: EpisodeDao,
     private val localFileDao: LocalFileDao,
 ) : LibraryRepository {
+    // 集計は playback_states も見るので、再生中の再生位置の保存（10 秒ごと）でも再実行される。結果が同じなら下流に流さない
     override fun observePrograms(): Flow<List<ProgramSummary>> =
-        programDao.observeSummaries().map { rows -> rows.map { it.toDomain() } }
+        programDao.observeSummaries().map { rows -> rows.map { it.toDomain() } }.distinctUntilChanged()
     override fun observeProgram(programId: ProgramId): Flow<Program?> =
         programDao.observeById(programId.value).map { it?.toDomain() }
     override fun observeEpisodes(programId: ProgramId): Flow<List<EpisodeWithState>> =
