@@ -81,16 +81,18 @@ private val TabularTypography: Typography = Typography().let { t ->
     )
 }
 
+/** この [ThemeMode] でダークになるか。SYSTEM なら端末の設定に追従（#62）。システムバーの文字色にも使う。 */
+@Composable
+fun ThemeMode.isDark(): Boolean = when (this) {
+    ThemeMode.SYSTEM -> isSystemInDarkTheme()
+    ThemeMode.DARK -> true
+    ThemeMode.LIGHT -> false
+}
 /** [themeMode] が SYSTEM なら端末の設定に追従、それ以外は指定どおり（#62）。 */
 @Composable
 fun JellyfinRadioTheme(themeMode: ThemeMode = ThemeMode.SYSTEM, content: @Composable () -> Unit) {
-    val dark = when (themeMode) {
-        ThemeMode.SYSTEM -> isSystemInDarkTheme()
-        ThemeMode.DARK -> true
-        ThemeMode.LIGHT -> false
-    }
     MaterialTheme(
-        colorScheme = if (dark) DarkColors else LightColors,
+        colorScheme = if (themeMode.isDark()) DarkColors else LightColors,
         typography = TabularTypography,
         content = content,
     )
