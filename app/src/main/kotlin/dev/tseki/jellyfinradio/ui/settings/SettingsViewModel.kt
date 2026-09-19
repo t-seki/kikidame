@@ -52,7 +52,7 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** テーマ（#62）。null は読み込み前（チップを出さない）。 */
+    /** テーマ（#62）。null は読み込み前（チップは出すが無効にする）。 */
     val themeMode: StateFlow<ThemeMode?> = settings.themeMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     fun setThemeMode(value: ThemeMode) {

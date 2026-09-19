@@ -33,7 +33,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         requestRuntimePermissionsIfNeeded()
         setContent {
-            // テーマの設定（#62）を読むまで何も出さない（一瞬。読めてから描けば既定色で一度描いてから切り替わる「ちらつき」が無い）
+            // テーマの設定（#62）を読むまで何も出さない（読めてから描けば既定色で一度描いてから切り替わる「ちらつき」が無い）。
+            // この後 NavHost もセッションを読むまで描かないので待ちは直列になるが、どちらも小さな DataStore の読み込みで一瞬
             val themeMode by produceState<ThemeMode?>(initialValue = null) { settings.themeMode.collect { value = it } }
             val mode = themeMode ?: return@setContent
             // システムバーの文字色は enableEdgeToEdge() が端末のダーク設定で決めるので、アプリのテーマが端末と違うとき
