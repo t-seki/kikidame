@@ -11,8 +11,8 @@ import androidx.compose.ui.graphics.Color
 
 /**
  * 固定パレット（#54、docs/ui.md の「色」）。温かい黒にアンバーのアクセント。ダークが主で、ライトはシステム設定に追従して同じ構成で出す。
- * 状態を表す色は primary（よく聴く・同期対象・再生中）と error（消失・失敗・破壊的操作）の 2 系統だけ。
- * 下に無いスロットは Material3 の既定のまま。dynamic color は使わない（アプリの個性は色で出す）。
+ * 状態を表す色は primary（よく聴く・同期対象・再生中）と error（消失・失敗・破壊的操作）の 2 系統だけ（聴いている回の行の背景だけ secondaryContainer）。
+ * background は Scaffold の地なので surface と同じ値にする（既定のままだと Material3 の素の色が透ける）。下に無いスロットは Material3 の既定のまま。dynamic color は使わない（アプリの個性は色で出す）。
  */
 private val DarkColors: ColorScheme = darkColorScheme(
     primary = Color(0xFFF5A623),
@@ -23,6 +23,8 @@ private val DarkColors: ColorScheme = darkColorScheme(
     onSecondaryContainer = Color(0xFFF2DDB8),
     surface = Color(0xFF141210),
     onSurface = Color(0xFFEDE5DA),
+    background = Color(0xFF141210),
+    onBackground = Color(0xFFEDE5DA),
     onSurfaceVariant = Color(0xFFB3A58F),
     surfaceContainerLow = Color(0xFF1B1815),
     surfaceContainer = Color(0xFF211D18),
@@ -43,6 +45,8 @@ private val LightColors: ColorScheme = lightColorScheme(
     onSecondaryContainer = Color(0xFF2E2312),
     surface = Color(0xFFFBF7F1),
     onSurface = Color(0xFF1F1A14),
+    background = Color(0xFFFBF7F1),
+    onBackground = Color(0xFF1F1A14),
     onSurfaceVariant = Color(0xFF5E5347),
     surfaceContainerLow = Color(0xFFF5F0E8),
     surfaceContainer = Color(0xFFEFE9DF),
