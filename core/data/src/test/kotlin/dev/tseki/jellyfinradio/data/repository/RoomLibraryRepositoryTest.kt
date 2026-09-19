@@ -99,6 +99,19 @@ class RoomLibraryRepositoryTest : RoomTestBase() {
         db.localFileDao().delete(id("X 2026-06-12"))
         assertEquals(LocalStorageUsage(30_000_000 + 1024L, 2), repo.observeLocalStorage().first())
     }
+    /** 出演者（#70）は 1 列に畳んで保存し、複数名も空も元の一覧のまま読める。 */
+    @Test
+    fun performersRoundTripThroughTheColumn() = runTest {
+        val programId = seedProgram()
+        val episodes = repo.observeEpisodes(programId).first()
+        val id = { title: String -> episodes.first { it.episode.title == title }.episode.id.value }
+        val entity = db.episodeDao().findById(id("X 2026-06-19"))!!.episode
+        db.episodeDao().update(entity.copy(performers = listOf("岩井勇気", "澤部佑")))
+        val reloaded = repo.observeEpisodes(programId).first()
+        assertEquals(listOf("岩井勇気", "澤部佑"), reloaded.first { it.episode.title == "X 2026-06-19" }.episode.performers)
+        assertEquals(emptyList(), reloaded.first { it.episode.title == "X 2026-06-05" }.episode.performers)
+    }
+
     @Test
     fun getEpisodeReturnsNullForUnknownId() = runTest {
         assertNull(repo.getEpisode(dev.tseki.jellyfinradio.domain.EpisodeId(999)))

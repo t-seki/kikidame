@@ -7,6 +7,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.tseki.jellyfinradio.domain.EpisodeId
 import dev.tseki.jellyfinradio.domain.EpisodeWithState
 import dev.tseki.jellyfinradio.domain.LibraryRepository
+import dev.tseki.jellyfinradio.domain.Program
 import dev.tseki.jellyfinradio.domain.ProgramId
 import dev.tseki.jellyfinradio.ui.EpisodeDetailsRoute
 import kotlinx.coroutines.flow.SharingStarted
@@ -25,5 +26,8 @@ class EpisodeDetailsViewModel @Inject constructor(
     /** null は読み込み前か、その回が消えた後。 */
     val item: StateFlow<EpisodeWithState?> = library.observeEpisodes(ProgramId(route.programId))
         .map { list -> list.firstOrNull { it.episode.id == episodeId } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    /** 番組（放送局の行に使う、#70）。 */
+    val program: StateFlow<Program?> = library.observeProgram(ProgramId(route.programId))
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 }

@@ -233,5 +233,6 @@ class RoomLibraryRefreshRepository @Inject constructor(
         runtimeTicks = Ticks.fromDuration(runtime),
         sizeBytes = sizeBytes ?: existingSize ?: 0L,
         container = container,
+        performers = performers,
     )
 }

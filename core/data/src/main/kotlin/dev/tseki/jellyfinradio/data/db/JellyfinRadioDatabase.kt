@@ -5,7 +5,7 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 @Database(
     entities = [ProgramEntity::class, EpisodeEntity::class, LocalFileEntity::class, PlaybackStateEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = true,
     autoMigrations = [
         // v2: programs の (stationName, name) を unique でなくした（サーバに同名の番組があり得る）
@@ -16,6 +16,8 @@ import androidx.room.TypeConverters
         AutoMigration(from = 3, to = 4),
         // v5: programs.starred（よく聴く、#16）
         AutoMigration(from = 4, to = 5),
+        // v6: episodes.performers（出演者、#70）
+        AutoMigration(from = 5, to = 6),
     ],
 )
 @TypeConverters(Converters::class)

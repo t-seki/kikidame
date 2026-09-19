@@ -55,6 +55,7 @@ fun EpisodeEntity.toDomain(): Episode = Episode(
     runtime = Ticks.toDuration(runtimeTicks),
     sizeBytes = sizeBytes,
     container = container,
+    performers = performers,
 )
 fun LocalFileEntity.toDomain(): LocalFile = LocalFile(
     episodeId = EpisodeId(episodeId),

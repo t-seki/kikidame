@@ -3,6 +3,7 @@ package dev.tseki.jellyfinradio.data.repository
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tseki.jellyfinradio.data.files.EpisodesDirectory
+import dev.tseki.jellyfinradio.domain.EpisodeWithState
 import dev.tseki.jellyfinradio.domain.LibraryView
 import dev.tseki.jellyfinradio.domain.PlaybackRules
 import dev.tseki.jellyfinradio.domain.ServerEpisode
@@ -146,6 +147,41 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
         assertEquals("$program（改）", summary.program.name)
         assertEquals(3, summary.episodeCount)
         assertTrue(library.observeEpisodes(summary.program.id).first().any { it.episode.title == "renamed" })
+    }
+
+    /** 出演者（#70）: 取り込みで各回に入り、次の取り込みでサーバの値で上書きされる（サーバに無くなれば空になる）。 */
+    @Test
+    fun performersAreStoredAndOverwrittenBySync() = runTest {
+        signInAndSelect()
+        gateway.snapshot = snapshot.copy(
+            episodes = snapshot.episodes.map {
+                when (it.serverId.value) {
+                    "audio-1" -> it.copy(performers = listOf("向井慧", "ゲスト A"))
+                    else -> it
+                }
+            },
+        )
+        repo.refresh()
+        val programId = library.observePrograms().first().single().program.id
+        fun List<EpisodeWithState>.performersOf(id: String) =
+            first { it.episode.serverItemId?.value == id }.episode.performers
+        var episodes = library.observeEpisodes(programId).first()
+        assertEquals(listOf("向井慧", "ゲスト A"), episodes.performersOf("audio-1"))
+        assertEquals(emptyList(), episodes.performersOf("audio-2"))
+
+        gateway.snapshot = snapshot.copy(
+            episodes = snapshot.episodes.map {
+                when (it.serverId.value) {
+                    "audio-1" -> it.copy(performers = emptyList())
+                    "audio-2" -> it.copy(performers = listOf("向井慧"))
+                    else -> it
+                }
+            },
+        )
+        repo.refresh()
+        episodes = library.observeEpisodes(programId).first()
+        assertEquals(emptyList(), episodes.performersOf("audio-1"))
+        assertEquals(listOf("向井慧"), episodes.performersOf("audio-2"))
     }
 
     /** 番組ごとサーバの一覧から消えたら消失 = 判断保留（各回が消えた場合は RoomSyncTest）。 */

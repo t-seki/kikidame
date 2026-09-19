@@ -6,6 +6,7 @@ import dev.tseki.jellyfinradio.domain.EpisodeId
 import dev.tseki.jellyfinradio.domain.EpisodeWithState
 import dev.tseki.jellyfinradio.domain.LocalFile
 import dev.tseki.jellyfinradio.domain.PlaybackState
+import dev.tseki.jellyfinradio.domain.Program
 import dev.tseki.jellyfinradio.domain.ProgramId
 import dev.tseki.jellyfinradio.domain.ServerItemId
 import dev.tseki.jellyfinradio.ui.episodes.EpisodeDetails.Row
@@ -31,12 +32,16 @@ class EpisodeDetailsTest {
         sizeBytes = 21_900_000,
         container = "m4a",
     )
+    private val program = Program(id = ProgramId(1), serverItemId = null, name = "ハライチのターン！", stationName = "TBSラジオ")
 
     @Test
     fun userSectionsCollapseMissingFileAndPlayback() {
-        val sections = EpisodeDetails.sections(EpisodeWithState(episode, null, null))
+        val sections = EpisodeDetails.sections(EpisodeWithState(episode, null, null), program)
         assertEquals(listOf("各回", "手元", "再生"), sections.map { it.title })
-        assertEquals(listOf(Row("放送日", "2026-09-18"), Row("尺", "1:00:00"), Row("サイズ", "21.9 MB")), sections[0].rows)
+        assertEquals(
+            listOf(Row("放送日", "2026-09-18"), Row("出演者", "なし"), Row("放送局", "TBSラジオ"), Row("尺", "1:00:00"), Row("サイズ", "21.9 MB")),
+            sections[0].rows,
+        )
         assertEquals(listOf(Row("状態", "手元に無い")), sections[1].rows)
         assertEquals(listOf(Row("再生位置", "記録なし")), sections[2].rows)
     }
@@ -48,12 +53,20 @@ class EpisodeDetailsTest {
             LocalFile(episode.id, DownloadState.DONE, "/x/a.m4a", pinned = true, downloadedAt = at),
             PlaybackState(episode.id, 12.minutes, played = false, updatedAt = at),
         )
-        val sections = EpisodeDetails.sections(item)
+        val sections = EpisodeDetails.sections(item, program)
         assertEquals(
             listOf(Row("状態", "ダウンロード済み"), Row("固定", "固定（保持ルールの対象外）"), Row("ダウンロード日時", "2026-09-18 12:04")),
             sections[1].rows,
         )
         assertEquals(listOf(Row("再生位置", "12:00 / 1:00:00"), Row("再生済み", "未再生")), sections[2].rows)
+    }
+
+    /** 出演者（#70）は「、」で並べ、放送局は番組から。番組が読めていなければ「不明」。 */
+    @Test
+    fun performersAndStationRows() {
+        val item = EpisodeWithState(episode.copy(performers = listOf("岩井勇気", "澤部佑")), null, null)
+        assertEquals(Row("出演者", "岩井勇気、澤部佑"), EpisodeDetails.sections(item, program)[0].rows[1])
+        assertEquals(Row("放送局", "不明"), EpisodeDetails.sections(item, null)[0].rows[2])
     }
 
     @Test

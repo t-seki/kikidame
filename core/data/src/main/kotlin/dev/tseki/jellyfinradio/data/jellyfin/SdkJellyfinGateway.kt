@@ -235,6 +235,8 @@ class SdkJellyfinGateway @Inject constructor(
             // ファイルサイズは基本フィールドに無い（MediaSources を避けるため）。M3 のダウンロードで確定する
             sizeBytes = null,
             container = container ?: "",
+            // 出演者（#70）。`Artists` は基本フィールドで返る。名前だけの一覧が無ければ `ArtistItems` から拾う
+            performers = (artists ?: artistItems?.mapNotNull { it.name }).orEmpty().filter { it.isNotBlank() },
         )
     }
 

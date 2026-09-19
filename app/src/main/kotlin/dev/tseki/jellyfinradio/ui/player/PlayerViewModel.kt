@@ -22,12 +22,14 @@ import dev.tseki.jellyfinradio.playback.SleepTimer
 import dev.tseki.jellyfinradio.playback.SleepTimerSetting
 import dev.tseki.jellyfinradio.ui.PlayerRoute
 import dev.tseki.jellyfinradio.ui.toClockText
+import dev.tseki.jellyfinradio.ui.toPerformersText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -76,6 +78,18 @@ class PlayerViewModel @Inject constructor(
         .distinctUntilChanged()
         .flatMapLatest { id -> if (id == null) flowOf(false) else playbackStates.observe(id).map { it?.played == true } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    /** タイトルの下の `放送局 · 出演者`（#70）。放送局は番組から、出演者は各回から取る。どちらも無ければ null で行ごと出さない。 */
+    val subtitle: StateFlow<String?> = _uiState
+        .map { it.episodeId }
+        .distinctUntilChanged()
+        .flatMapLatest { id ->
+            if (id == null) return@flatMapLatest flowOf(null)
+            flow<String?> {
+                val item = library.getEpisode(id) ?: return@flow emit(null)
+                emitAll(library.observeProgram(item.episode.programId).map { playerSubtitle(it?.stationName, item.episode.performers) })
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     /** 倍速（#35）。アプリ全体の設定で、サービス側が同じ Flow を購読してプレイヤーに反映する。 */
     val speed: StateFlow<Float> = settings.playbackSpeed
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlaybackSpeed.DEFAULT)
@@ -223,3 +237,6 @@ class PlayerViewModel @Inject constructor(
         const val POSITION_REFRESH_MS = 500L
     }
 }
+/** `放送局 · 出演者`。無い方は省き、両方無ければ null。 */
+internal fun playerSubtitle(stationName: String?, performers: List<String>): String? =
+    listOfNotNull(stationName, performers.toPerformersText()).takeIf { it.isNotEmpty() }?.joinToString(" · ")
