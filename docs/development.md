@@ -73,14 +73,14 @@ Entity を変えたら version を上げ、書き出された JSON もコミッ�
   /usr/bin/git branch -D feat/<自分で切ったブランチ>
   ```
   そのあと ExitWorktree(remove)。ExitWorktree はユーザーが言ったときだけ動くので、マージ後に「worktree を消して抜けて」と一言（セッション終了時の keep/remove で remove でもよい）。ExitWorktree が消すのは EnterWorktree が作った `worktree-<name>` ブランチだけなので、自分で切ったブランチは先に消しておく
-- レビューは `gh pr diff` / `gh pr view` で読む。動かして確かめるときだけ worktree に入って checkout し、終わったら同じ手順で消す。main 側に `pr-N` ブランチを作らない
+- レビューは `gh pr diff` / `gh pr view` で読む。テストを走らせて確かめるときだけ worktree に入って checkout し、終わったら同じ手順で消す。実機に入れるのは上の通り main からだけ。main 側に `pr-N` ブランチを作らない
 
 ### 調整役セッション（main のチェックアウト）の責務
 
 作業セッションは自分の issue しか見ていないので、横断する仕事は main のチェックアウトにいるセッションが持つ。
 
 - 入口: epic を sub-issue に割り、各 issue に「触るファイル」を書く。作業セッションは issue を読んで自分で EnterWorktree する
-- 出口: PR が来たら `/code-review` を回し、マージ順を決め、`gh pr merge --squash --delete-branch` → `git pull --ff-only` → `installDebug`。Room のスキーマ版数を上げる PR の後に古いビルドを入れないチェックもここ
+- 出口: PR が来たら `/code-review:code-review` を回し、マージ順を決め、`gh pr merge --squash --delete-branch` → `git pull --ff-only` → `installDebug`。Room のスキーマ版数を上げる PR の後に古いビルドを入れないチェックもここ
 - 掃除（マージのたび、セッション終了時に必ず）:
   ```bash
   git fetch --prune
@@ -89,7 +89,7 @@ Entity を変えたら version を上げ、書き出された JSON もコミッ�
   git branch --no-color -vv | grep ': gone]' | awk '{print $1}' | xargs -r git branch -D
   ```
   `gone` はリモートが消えたブランチ（`--delete-branch` でマージ済みのもの）。チェックアウト中のブランチは `-D` が失敗して次に進むだけなので安全
-- 横串: 先にマージされた PR が後の PR に影響するとき、該当 issue にコメントを書く（「#N がマージされたので rebase して」）。同じマシンのセッションには `SendMessage` で通知してもよいが、一次資料は issue コメント
+- 横串: 先にマージされた PR が後の PR に影響するとき、該当 issue にコメントを書く（「#N がマージされたので rebase して」）。同じマシンのセッションには `SendMessage` で通知してもよいが、正とするのは issue コメント（メッセージは揮発する）
 - やらないこと: 実装（小物でも worktree に振る）、会話を状態の置き場にすること（cold start しても GitHub だけで復帰できる状態を保つ）、`/loop` での PR 監視（人が「PR 出た」と一言投げる）
 - 対話が要らない issue（docs、issue を読めば完結する小さな実装）は、調整役から `Agent` を `isolation: "worktree"` で起動して任せてもよい。subagent は人に質問できないので、grill は起動前に調整役で済ませて issue / ADR に落としておく。subagent の worktree は変更があれば残るので、マージ後に上の掃除で消す
 
