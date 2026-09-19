@@ -63,7 +63,7 @@ class RoomLibraryRepositoryTest : RoomTestBase() {
         assertEquals(false, repo.observeProgram(programId).first()?.starred)
     }
 
-    /** 未再生の数（#41）: 手元にあって再生済みでない回。再生済みにする・ファイルを消す・手元に無い回、で追従する。 */
+    /** 未再生の数（#41）: 手元にあって再生済みでない回。再生済みの切替と、ファイルが手元に無くなる（DONE でなくなる）ことに追従する。 */
     @Test
     fun unplayedLocalCountFollowsPlayedAndLocalFiles() = runTest {
         val programId = seedProgram()

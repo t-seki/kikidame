@@ -347,6 +347,7 @@ private fun NoMatch(query: String, station: StationKey?) {
 /**
  * 行の補足（#41）: `局 · 未再生 N / 手元 L · 全 E 回 · 最新 MM-DD`。
  * 未再生 0 なら「未再生 N /」を省き、手元 = 全なら「全 E 回」を「回」に畳む（「/」が 2 つ並ばないよう「全」の前は「·」）。
+ * 局が無い・各回が無い（最新なし）ならその部分を省き、消失なら末尾に「サーバ上で見つかりません」を足す。
  */
 internal fun ProgramSummary.toSupportingText(today: LocalDate = Clock.System.todayIn(AiredAt.ZONE)): String {
     val unplayed = if (unplayedLocalCount > 0) "未再生 $unplayedLocalCount / " else ""
