@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Sync
@@ -98,6 +99,7 @@ fun EpisodeListScreen(
     val pendingDisable by viewModel.pendingDisable.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var sheetFor by remember { mutableStateOf<EpisodeId?>(null) }
+    var detailsFor by remember { mutableStateOf<EpisodeId?>(null) }
     var showSyncSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -217,7 +219,13 @@ fun EpisodeListScreen(
             onUnpin = { viewModel.unpin(target.episode.id) },
             onDelete = { viewModel.deleteLocal(target.episode.id) },
             onTogglePlayed = { viewModel.setPlayed(target.episode.id, target.playback?.played != true) },
+            onDetails = { sheetFor = null; detailsFor = target.episode.id },
         )
+    }
+    // 詳細（#43）は操作シートを閉じてから開く。一覧の更新に追従するよう ID で引き直す
+    val detailsTarget = detailsFor?.let { id -> episodes?.firstOrNull { it.episode.id == id } }
+    if (detailsTarget != null) {
+        EpisodeDetailsSheet(item = detailsTarget, onDismiss = { detailsFor = null })
     }
 }
 
@@ -329,6 +337,7 @@ private fun EpisodeActionsSheet(
     onUnpin: () -> Unit,
     onDelete: () -> Unit,
     onTogglePlayed: () -> Unit,
+    onDetails: () -> Unit,
 ) {
     val local = item.localFile
     val played = item.playback?.played == true
@@ -348,6 +357,7 @@ private fun EpisodeActionsSheet(
             if (played) Icons.Outlined.Circle else Icons.Filled.CheckCircle,
             if (played) "未再生にする" else "再生済みにする",
         ) { onTogglePlayed(); onDismiss() }
+        SheetAction(Icons.Outlined.Info, "詳細") { onDetails() }
         Spacer(Modifier.padding(bottom = 24.dp))
     }
 }
