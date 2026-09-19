@@ -118,7 +118,8 @@ class NowPlaying @Inject constructor() {
                     isPlaying = player.isPlaying,
                     isEnded = player.playbackState == Player.STATE_ENDED || pausedAtEndOfItem,
                     positionMs = player.currentPosition.coerceAtLeast(0),
-                    durationMs = player.duration.takeIf { it != C.TIME_UNSET } ?: item.mediaMetadata.durationMs ?: 0,
+                    // PositionPersister.currentRuntime と同じ判定（0 も「分からない」）
+                    durationMs = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: item.mediaMetadata.durationMs ?: 0,
                 )
             },
         )

@@ -48,7 +48,8 @@ fun MiniPlayer(onClick: (EpisodeId) -> Unit, viewModel: MiniPlayerViewModel = hi
 private fun MiniPlayerBar(state: NowPlayingState, onClick: () -> Unit, onTogglePlayPause: () -> Unit) {
     // 面は surfaceContainer に primary を少し混ぜたアンバー系（#59、docs/ui.md）。primaryContainer だと濃すぎる
     val tint = lerp(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.colorScheme.primary, 0.18f)
-    Surface(color = tint) {
+    // 混ぜた色は contentColorFor で引けないので、文字色は明示する
+    Surface(color = tint, contentColor = MaterialTheme.colorScheme.onSurface) {
         Column(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
             // 上端の再生位置の線（#59）。尺が分からないときは出さない
             if (state.durationMs > 0) {
