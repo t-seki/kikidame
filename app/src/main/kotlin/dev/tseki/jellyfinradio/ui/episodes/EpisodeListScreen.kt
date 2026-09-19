@@ -220,7 +220,6 @@ fun EpisodeListScreen(
             onDownload = { viewModel.download(target.episode.id) },
             onUnpin = { viewModel.unpin(target.episode.id) },
             onDelete = { viewModel.deleteLocal(target.episode.id) },
-            onTogglePlayed = { viewModel.setPlayed(target.episode.id, target.playback?.played != true) },
             // 詳細（#43）は画面へ。シートは閉じてから遷移する
             onDetails = { sheetFor = null; onEpisodeDetails(target.episode.programId, target.episode.id) },
         )
@@ -356,11 +355,9 @@ private fun EpisodeActionsSheet(
     onDownload: () -> Unit,
     onUnpin: () -> Unit,
     onDelete: () -> Unit,
-    onTogglePlayed: () -> Unit,
     onDetails: () -> Unit,
 ) {
     val local = item.localFile
-    val played = item.playback?.played == true
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Text(item.episode.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
         if (local == null && item.episode.serverItemId != null) {
@@ -373,10 +370,6 @@ private fun EpisodeActionsSheet(
             val label = if (item.episode.serverItemId != null) "ファイルを削除（再生位置は残る）" else "この回を消す（サーバに無いため戻せない）"
             SheetAction(Icons.Filled.Delete, label) { onDelete(); onDismiss() }
         }
-        SheetAction(
-            if (played) Icons.Outlined.Circle else Icons.Filled.CheckCircle,
-            if (played) "未再生にする" else "再生済みにする",
-        ) { onTogglePlayed(); onDismiss() }
         SheetAction(Icons.Outlined.Info, "詳細") { onDetails() }
         Spacer(Modifier.padding(bottom = 24.dp))
     }
