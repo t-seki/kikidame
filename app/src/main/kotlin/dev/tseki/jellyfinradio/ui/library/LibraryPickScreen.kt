@@ -33,7 +33,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tseki.jellyfinradio.domain.LibraryView
 
 /**
- * ライブラリ選択。全ライブラリを列挙し、音楽ライブラリだけ選べる（他は理由付きでグレーアウト）。
+ * ライブラリ選択。全ライブラリを列挙し、音楽ライブラリだけ選べる（他はグレーアウトし、理由は一覧の上に 1 回）。
  * 音楽ライブラリが 1 つでも画面は出す。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -86,6 +86,17 @@ fun LibraryPickScreen(
                 TextButton(onClick = viewModel::load) { Text("再読み込み") }
             }
             else -> LazyColumn(Modifier.padding(padding)) {
+                // 選べない理由は行ごとに繰り返さず、一覧の上に 1 回だけ（#71）。音楽以外が無ければ出さない
+                if (state.libraries.orEmpty().any { !it.isMusic }) {
+                    item(key = "note") {
+                        Text(
+                            "音楽ライブラリのみ選べます",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                }
                 items(state.libraries.orEmpty(), key = { it.id.value }) { library ->
                     LibraryRow(library, selected = library.id == state.selectedId, onClick = { viewModel.select(library) })
                     HorizontalDivider()
@@ -105,9 +116,9 @@ private fun LibraryRow(library: LibraryView, selected: Boolean, onClick: () -> U
             Text(library.name, color = if (library.isMusic) MaterialTheme.colorScheme.onSurface else disabledColor)
         },
         supportingContent = {
-            val type = library.collectionType?.let { collectionTypeLabel(it) }
-            val text = if (library.isMusic) type ?: "音楽" else listOfNotNull(type, "音楽ライブラリのみ選べます").joinToString(" · ")
-            Text(text, color = if (library.isMusic) MaterialTheme.colorScheme.onSurfaceVariant else disabledColor)
+            // 補足は種類だけ（種類が取れない音楽ライブラリは「音楽」、それ以外で取れなければ何も出さない）
+            val type = library.collectionType?.let { collectionTypeLabel(it) } ?: if (library.isMusic) "音楽" else null
+            if (type != null) Text(type, color = if (library.isMusic) MaterialTheme.colorScheme.onSurfaceVariant else disabledColor)
         },
     )
 }
