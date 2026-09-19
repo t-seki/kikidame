@@ -32,13 +32,12 @@ class ProgramListViewModel @Inject constructor(
     nowPlaying: NowPlaying,
 ) : ViewModel() {
     /**
-     * 検索（#44）。検索語と検索欄の開閉は ViewModel に持つので、画面回転でも、番組を開いて戻っても残る
+     * 検索語（#44）。ViewModel に持つので、画面回転でも、番組を開いて戻っても残る
      * （番組一覧はバックスタックの根で、この ViewModel は生き続ける）。プロセス死からは復元しない。
+     * 絞り込みシートの開閉は画面側の remember（他のシートと同じ）。
      */
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
-    private val _isSearching = MutableStateFlow(false)
-    val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
     /** 放送局の絞り込み（#45）の選択。null は「すべて」。検索とは独立で、検索を閉じても残る。 */
     private val _station = MutableStateFlow<StationKey?>(null)
     /**
@@ -76,21 +75,13 @@ class ProgramListViewModel @Inject constructor(
     /** 更新の結果と、ミニプレイヤーが消えた理由をスナックバーへ。 */
     val messages: Flow<String> = merge(refresher.messages, nowPlaying.messages)
 
+    /** 絞り込みシートの検索欄。空にすれば検索の絞り込みは解除される（選択中のチップの × も同じ）。 */
     fun setQuery(query: String) {
         _query.value = query
     }
-    /** シートで局を選ぶ。null は「すべて」（選択中のチップの × も同じ）。 */
+    /** 絞り込みシートで局を選ぶ。null は「すべて」（選択中のチップの × も同じ）。 */
     fun selectStation(station: StationKey?) {
         _station.value = station
-    }
-    /** 虫眼鏡で開く。 */
-    fun startSearch() {
-        _isSearching.value = true
-    }
-    /** ← か戻るボタンで閉じる。検索語も消すので絞り込みは解除される。 */
-    fun stopSearch() {
-        _isSearching.value = false
-        _query.value = ""
     }
     fun refresh() {
         viewModelScope.launch { refresher.refresh() }

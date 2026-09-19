@@ -1,12 +1,12 @@
 package dev.tseki.jellyfinradio.ui.programs
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,10 +17,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.Badge
@@ -55,6 +55,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
@@ -84,49 +85,37 @@ fun ProgramListScreen(
     val canRefresh by viewModel.canRefresh.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
-    val isSearching by viewModel.isSearching.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     // 他のシートと同じく remember（プロセス死で開き直さない。絞り込みの状態も復元しないので）
-    var showStationSheet by remember { mutableStateOf(false) }
-
+    var showFilterSheet by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
     }
-
-    // 入口のアイコンと同じ条件（局が 2 種類以上）。開いている間に同期で局が減ったら閉じる
+    // 絞り込みの入口（#55）は番組が 1 つでもあれば出す。局の段は 2 種類以上のときだけ（1 種類なら絞る意味が無い）
     val stations = filtered?.stations.orEmpty()
-    if (showStationSheet && stations.size >= 2) {
-        StationSheet(
-            stations = stations,
+    if (showFilterSheet && stations.isNotEmpty()) {
+        FilterSheet(
+            query = query,
+            onQueryChange = viewModel::setQuery,
+            stations = stations.takeIf { it.size >= 2 }.orEmpty(),
             selected = filtered?.station,
-            onSelect = viewModel::selectStation,
-            onDismiss = { showStationSheet = false },
+            onSelectStation = viewModel::selectStation,
+            onDismiss = { showFilterSheet = false },
         )
     }
-    // 検索欄が開いているときの戻るボタンは検索を閉じるだけ（番組一覧は根なので、そのままだとアプリを抜ける）
-    BackHandler(enabled = isSearching, onBack = viewModel::stopSearch)
     Scaffold(
         topBar = {
-            // タイトルは検索中も残し、入力欄はその下に一段出す（#44）。虫眼鏡は検索中は × になる
+            // 検索（#44）と局（#45）の入口を 1 つの「絞り込み」に統合（#55）。効いている間は点を付け、
+            // 何で絞っているかは TopAppBar 下のチップで示す
             Column {
                 TopAppBar(
                     title = { Text("番組") },
                     actions = {
-                        // 放送局で絞る（#45）。局が 2 種類未満なら絞る意味が無いので出さない。選択中は点を付ける
-                        if (stations.size >= 2) {
-                            IconButton(onClick = { showStationSheet = true }) {
-                                BadgedBox(badge = { if (filtered?.station != null) Badge() }) {
-                                    Icon(Icons.Default.FilterList, contentDescription = "放送局で絞る")
+                        if (stations.isNotEmpty()) {
+                            IconButton(onClick = { showFilterSheet = true }) {
+                                BadgedBox(badge = { if (filtered?.isFiltering == true) Badge() }) {
+                                    Icon(Icons.Default.Tune, contentDescription = "絞り込み")
                                 }
-                            }
-                        }
-                        when {
-                            isSearching -> IconButton(onClick = viewModel::stopSearch) {
-                                Icon(Icons.Default.Close, contentDescription = "検索を閉じる")
-                            }
-                            // 絞る対象が無いときは虫眼鏡を出さない
-                            filtered?.stations?.isNotEmpty() == true -> IconButton(onClick = viewModel::startSearch) {
-                                Icon(Icons.Default.Search, contentDescription = "検索")
                             }
                         }
                         IconButton(onClick = onSettingsClick) {
@@ -134,10 +123,12 @@ fun ProgramListScreen(
                         }
                     },
                 )
-                if (isSearching) SearchField(query, onQueryChange = viewModel::setQuery)
-                filtered?.station?.let { station ->
-                    SelectedStationRow(station, onClear = { viewModel.selectStation(null) })
-                }
+                FilterChipsRow(
+                    query = ProgramFilter.normalize(query),
+                    station = filtered?.station,
+                    onClearQuery = { viewModel.setQuery("") },
+                    onClearStation = { viewModel.selectStation(null) },
+                )
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -196,38 +187,6 @@ fun ProgramListScreen(
     }
 }
 
-/**
- * 検索の入力欄（#44）。TopAppBar の下に一段置き、文字は本文サイズ（タイトルと区別する）。× は空欄に戻すだけで閉じない（閉じるのは TopAppBar の ×）。
- * M3 の SearchBar は全画面のサジェスト領域を持つ部品なので、その場で一覧を絞る用途には使わない。
- */
-@Composable
-private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
-    val focusRequester = remember { FocusRequester() }
-    val keyboard = LocalSoftwareKeyboardController.current
-    // 開いた瞬間にフォーカスとキーボードを出す
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-        keyboard?.show()
-    }
-    TextField(
-        value = query,
-        onValueChange = onQueryChange,
-        modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
-        textStyle = MaterialTheme.typography.bodyLarge,
-        placeholder = { Text("番組名・放送局名") },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-        trailingIcon = {
-            if (query.isNotEmpty()) {
-                IconButton(onClick = { onQueryChange("") }) {
-                    Icon(Icons.Default.Clear, contentDescription = "検索語を消す")
-                }
-            }
-        },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
-    )
-}
 private fun LazyListScope.programItems(
     list: List<ProgramSummary>,
     onProgramClick: (ProgramId) -> Unit,
@@ -277,30 +236,62 @@ private fun ProgramRow(summary: ProgramSummary, onClick: () -> Unit, onToggleSta
 }
 
 /**
- * 放送局を選ぶシート（#45）。「すべて」＋ 手元の番組から集めた局を番組数付きで縦に並べる。
- * 局が増えても横にはみ出さず全局が一目で分かる。選んだら閉じる。
+ * 絞り込みのシート（#55）。上段が検索欄（#44）、下段が「すべて」＋ 手元の番組から集めた局（#45、番組数付き）。
+ * 検索語はその場で背後の一覧に効き、局は選んだら閉じる。局が 2 種類未満なら [stations] は空で、下段を出さない。
+ * 縦に並べるので局が増えても横にはみ出さず、半開きで下の局が隠れないよう最初から全開。
+ * M3 の SearchBar は全画面のサジェスト領域を持つ部品なので、その場で一覧を絞る用途には使わない。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun StationSheet(
+private fun FilterSheet(
+    query: String,
+    onQueryChange: (String) -> Unit,
     stations: List<Station>,
     selected: StationKey?,
-    onSelect: (StationKey?) -> Unit,
+    onSelectStation: (StationKey?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    // 半開きだと下の局が隠れて「全局が一目」にならないので最初から全開
+    val focusRequester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    // 開いた瞬間に検索欄へフォーカスしてキーボードを出す（開く目的の大半は検索）
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+        keyboard?.show()
+    }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Text("放送局", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
-        LazyColumn {
-            item(key = "all") {
-                StationChoice("すべて", stations.sumOf { it.programCount }, selected == null) { onSelect(null); onDismiss() }
+        Text("絞り込み", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+        // 文字は本文サイズ（見出しと区別する）。× は空欄に戻すだけで閉じない
+        TextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).focusRequester(focusRequester),
+            textStyle = MaterialTheme.typography.bodyLarge,
+            placeholder = { Text("番組名・放送局名") },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = { onQueryChange("") }) {
+                        Icon(Icons.Default.Clear, contentDescription = "検索語を消す")
+                    }
+                }
+            },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+        )
+        if (stations.isNotEmpty()) {
+            Text("放送局", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 4.dp))
+            LazyColumn {
+                item(key = "all") {
+                    StationChoice("すべて", stations.sumOf { it.programCount }, selected == null) { onSelectStation(null); onDismiss() }
+                }
+                // 「すべて」「局なし」と局名が衝突しないよう接頭辞を付ける
+                items(stations, key = { it.key.name?.let { n -> "station:$n" } ?: "none" }) { station ->
+                    StationChoice(station.key.label, station.programCount, station.key == selected) { onSelectStation(station.key); onDismiss() }
+                }
             }
-            // 「すべて」「局なし」と局名が衝突しないよう接頭辞を付ける
-            items(stations, key = { it.key.name?.let { n -> "station:$n" } ?: "none" }) { station ->
-                StationChoice(station.key.label, station.programCount, station.key == selected) { onSelect(station.key); onDismiss() }
-            }
-            item { Spacer(Modifier.padding(bottom = 32.dp)) }
         }
+        Spacer(Modifier.padding(bottom = 32.dp))
     }
 }
 @Composable
@@ -313,18 +304,31 @@ private fun StationChoice(label: String, programCount: Int, selected: Boolean, o
     )
 }
 /**
- * 選択中の局を 1 チップで示す。チップのタップ（× を含む）で「すべて」に戻す。局を変えるのは TopAppBar のアイコンから。
- * × だけを別の clickable にすると当たり判定が小さくなるので、チップ全体を解除にする。
+ * 効いている絞り込みを 1 つずつチップで示す（検索語は「」で囲み、局は局名）。チップのタップ（× を含む）でその絞り込みだけ解除する。
+ * × だけを別の clickable にすると当たり判定が小さくなるので、チップ全体を解除にする。変えるのは TopAppBar の絞り込みから。
  */
 @Composable
-private fun SelectedStationRow(station: StationKey, onClear: () -> Unit) {
-    Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-        InputChip(
-            selected = true,
-            onClick = onClear,
-            label = { Text(station.label) },
-            trailingIcon = { Icon(Icons.Default.Close, contentDescription = "局の絞り込みを解除") },
-        )
+private fun FilterChipsRow(query: String, station: StationKey?, onClearQuery: () -> Unit, onClearStation: () -> Unit) {
+    if (query.isEmpty() && station == null) return
+    Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (query.isNotEmpty()) {
+            InputChip(
+                selected = true,
+                onClick = onClearQuery,
+                label = { Text("「$query」", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                trailingIcon = { Icon(Icons.Default.Close, contentDescription = "検索の絞り込みを解除") },
+                modifier = Modifier.weight(1f, fill = false),
+            )
+        }
+        if (station != null) {
+            InputChip(
+                selected = true,
+                onClick = onClearStation,
+                label = { Text(station.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                trailingIcon = { Icon(Icons.Default.Close, contentDescription = "局の絞り込みを解除") },
+                modifier = Modifier.weight(1f, fill = false),
+            )
+        }
     }
 }
 /** 絞り込みが効いていて該当が無いとき。番組自体が無いのとは別物なので、更新の案内は出さない。 */
@@ -336,7 +340,7 @@ private fun NoMatch(query: String, station: StationKey?) {
                 // 局だけで 0 件にはならない（局の候補は手元の番組から集めるので）。検索語は必ずある
                 val prefix = station?.let { "${it.label}に " } ?: ""
                 Text(
-                    "$prefix\"${ProgramFilter.normalize(query)}\" に一致する番組がありません",
+                    "$prefix「${ProgramFilter.normalize(query)}」に一致する番組がありません",
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                 )
