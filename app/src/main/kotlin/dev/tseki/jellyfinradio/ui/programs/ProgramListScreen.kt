@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -242,7 +243,7 @@ private fun ProgramRow(summary: ProgramSummary, onClick: () -> Unit, onToggleSta
 /**
  * 絞り込みのシート（#55）。上段が検索欄（#44）、下段が「すべて」＋ 手元の番組から集めた局（#45、番組数付き）。
  * 検索語はその場で背後の一覧に効き、キーボードの検索（決定）か局の選択で閉じる。局が 2 種類未満なら [stations] は空で、下段を出さない。
- * 縦に並べるので局が増えても横にはみ出さず、半開きで下の局が隠れないよう最初から全開。
+ * 縦に並べるので局が増えても横にはみ出さず、半開きで下の局が隠れないよう最初から全開。ドラッグでは閉じない。
  * M3 の SearchBar は全画面のサジェスト領域を持つ部品なので、その場で一覧を絞る用途には使わない。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -255,7 +256,14 @@ private fun FilterSheet(
     onSelectStation: (StationKey?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    // 局の一覧を先頭を越えて引っ張ると、余ったドラッグがシートに渡って閉じてしまう。最初から全開でドラッグで閉じる意味は薄いので
+    // シートのドラッグ操作ごと無効にする（閉じるのは外側タップ・戻る・検索キー・局の選択）。取っ手も引けないので出さない
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetGesturesEnabled = false,
+        dragHandle = null,
+    ) {
         // シートの中身は別ウィンドウに描かれるので、フォーカスとキーボードの取得もこの中で行う
         val focusRequester = remember { FocusRequester() }
         val keyboard = LocalSoftwareKeyboardController.current
@@ -286,7 +294,9 @@ private fun FilterSheet(
         )
         if (stations.isNotEmpty()) {
             Text("放送局", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 4.dp))
-            LazyColumn {
+            // キーボードの上に収める（imePadding）。シートの高さいっぱいで測ると「全部収まっている」扱いになって
+            // 一覧がスクロールせず、ドラッグがシートに渡って閉じてしまう
+            LazyColumn(Modifier.weight(1f, fill = false).imePadding()) {
                 item(key = "all") {
                     StationChoice("すべて", stations.sumOf { it.programCount }, selected == null) { onSelectStation(null); onDismiss() }
                 }
