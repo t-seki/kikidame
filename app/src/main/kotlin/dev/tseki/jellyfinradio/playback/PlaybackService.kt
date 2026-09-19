@@ -102,7 +102,7 @@ class PlaybackService : MediaSessionService() {
         positionPersister = PositionPersister(player, playbackStateRepository, clock, scope, applicationScope)
             .also { it.attach() }
         resumeOnTransition = ResumeOnTransition(player, playbackStateRepository, scope).also { it.attach() }
-        nowPlayingListener = nowPlaying.listener(player).also(player::addListener)
+        nowPlayingListener = nowPlaying.listener(player, scope).also(player::addListener)
         player.addListener(errorListener)
         // 倍速（#35）: アプリ全体で 1 つ。設定が変われば即反映。ピッチは変えない
         speedJob = scope.launch { settings.playbackSpeed.collect { speed -> player.setPlaybackSpeed(speed) } }
@@ -118,11 +118,12 @@ class PlaybackService : MediaSessionService() {
         }
     }
     override fun onDestroy() {
-        // player に触るものは release() の前に止める
+        // player に触るものは release() の前に止める。scope の cancel もここ（NowPlaying の位置の ticker が scope に住む）
         speedJob?.cancel()
         sleepTimerRunner?.detach()
         positionPersister?.detach()
         resumeOnTransition?.detach()
+        scope.cancel()
         session?.run {
             nowPlayingListener?.let(player::removeListener)
             player.removeListener(errorListener)
@@ -131,7 +132,6 @@ class PlaybackService : MediaSessionService() {
         }
         nowPlaying.set(null)
         session = null
-        scope.cancel()
         super.onDestroy()
     }
     /**

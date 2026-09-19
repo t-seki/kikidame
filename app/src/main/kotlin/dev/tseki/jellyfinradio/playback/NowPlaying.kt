@@ -1,6 +1,14 @@
 package dev.tseki.jellyfinradio.playback
 
 import androidx.media3.common.MediaItem
+import androidx.media3.common.C
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import dev.tseki.jellyfinradio.domain.EpisodeId
@@ -23,6 +31,9 @@ data class NowPlayingState(
      * 「この回の終わりまで」で回の終わりで止めたとき（#36）。載ったままだが、同期はもう削除から外さない（#27）。
      */
     val isEnded: Boolean = false,
+    /** ミニプレイヤーの再生位置の線（#59）。再生中は 1 秒ごとに更新する。尺が分からなければ [durationMs] は 0。 */
+    val positionMs: Long = 0,
+    val durationMs: Long = 0,
 )
 
 /**
@@ -54,28 +65,48 @@ class NowPlaying @Inject constructor() {
         _messages.trySend(message)
     }
 
-    /** [Player] に付けて現在の [MediaItem] と再生中かどうかを追う。サービス終了時は [set] に null を渡す。 */
-    fun listener(player: Player): Player.Listener = object : Player.Listener {
+    /**
+     * [Player] に付けて現在の [MediaItem] と再生中かどうか、再生位置を追う。サービス終了時は [set] に null を渡す。
+     * 位置は再生中だけ [tick] ごとに読む（[scope] は [player] のアプリケーションスレッドで動くこと。サービス破棄で cancel される）。
+     */
+    fun listener(player: Player, scope: CoroutineScope, tick: Duration = 1.seconds): Player.Listener = object : Player.Listener {
         /** 回の終わりで止めた（`pauseAtEndOfMediaItems`）。再開するか回が変われば下ろす。 */
         private var pausedAtEndOfItem = false
-
+        private var ticker: Job? = null
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             pausedAtEndOfItem = false
             read(player, pausedAtEndOfItem)
         }
-
         override fun onTimelineChanged(timeline: Timeline, reason: Int) = read(player, pausedAtEndOfItem)
-
-        override fun onIsPlayingChanged(isPlaying: Boolean) = read(player, pausedAtEndOfItem)
-
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            read(player, pausedAtEndOfItem)
+            if (isPlaying) startTicker() else stopTicker()
+        }
         override fun onPlaybackStateChanged(playbackState: Int) = read(player, pausedAtEndOfItem)
-
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
             pausedAtEndOfItem = !playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM
             read(player, pausedAtEndOfItem)
         }
+        // シークは止まっていても位置が変わる。回をまたぐシークなら「回の終わりで止めた」も下ろす
+        // （onMediaItemTransition より先に呼ばれるので、古い回の印を新しい回に一瞬付けない）
+        override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+            if (oldPosition.mediaItemIndex != newPosition.mediaItemIndex) pausedAtEndOfItem = false
+            read(player, pausedAtEndOfItem)
+        }
+        private fun startTicker() {
+            if (ticker?.isActive == true) return
+            ticker = scope.launch {
+                while (isActive) {
+                    delay(tick)
+                    read(player, pausedAtEndOfItem)
+                }
+            }
+        }
+        private fun stopTicker() {
+            ticker?.cancel()
+            ticker = null
+        }
     }
-
     private fun read(player: Player, pausedAtEndOfItem: Boolean) {
         val item = player.currentMediaItem
         val episodeId = EpisodeMediaItems.episodeId(item)
@@ -89,6 +120,9 @@ class NowPlaying @Inject constructor() {
                     programName = item.mediaMetadata.artist?.toString(),
                     isPlaying = player.isPlaying,
                     isEnded = player.playbackState == Player.STATE_ENDED || pausedAtEndOfItem,
+                    positionMs = player.currentPosition.coerceAtLeast(0),
+                    // PositionPersister.currentRuntime と同じ判定（0 も「分からない」）
+                    durationMs = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: item.mediaMetadata.durationMs ?: 0,
                 )
             },
         )

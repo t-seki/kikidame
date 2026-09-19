@@ -70,8 +70,13 @@ class EpisodeListViewModel @Inject constructor(
 
     val isRefreshing: StateFlow<Boolean> = refresher.isRefreshing
 
-    /** 聴いている回（別の番組の回のこともある）。この番組の回なら行にマークを出す。 */
+    /**
+     * 聴いている回（別の番組の回のこともある）。この番組の回なら行にマークを出す。
+     * 再生位置（ミニプレイヤー用、1 秒ごとに変わる）は行に要らないので落とし、行を毎秒作り直さない。
+     */
     val nowPlaying: StateFlow<NowPlayingState?> = nowPlaying.state
+        .map { it?.copy(positionMs = 0, durationMs = 0) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), nowPlaying.state.value?.copy(positionMs = 0, durationMs = 0))
 
     /** 進行中のダウンロード（各回 ID と割合）。 */
     val progress: StateFlow<DownloadProgress?> = scheduler.progress
