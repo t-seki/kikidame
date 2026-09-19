@@ -4,6 +4,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -231,8 +232,12 @@ fun EpisodeListScreen(
  * 右端のアイコンは状態を表し、タップで最も自然な 1 操作をする:
  * 雲 → ダウンロード（= 固定）、待機／進捗 → キャンセル、警告 → 再試行、手元にある回 → 再生済み切替。
  * 残りの操作は長押しのボトムシート。手元に無い回はタップで再生画面へ行かない。
- * 聴いている回（[nowPlaying] がこの回）は背景を変え、補足行の先頭に固定・再生中／一時停止の印を出す（タイトルは 1 行）。
+ * タイトルの前の枠に印を出す: 聴いている回（[nowPlaying] がこの回）は背景も変えて再生中／一時停止、それ以外で固定なら固定。
+ * 枠は印の無い行にも確保し、タイトル（1 行）と補足行の開始位置を揃える。
  */
+/** タイトル前の印の枠の大きさと、枠とタイトルの間隔。補足行の字下げにも使う。 */
+private val MARK_SIZE = 14.dp
+private val MARK_GAP = 4.dp
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun EpisodeRow(
@@ -260,36 +265,34 @@ private fun EpisodeRow(
         colors = ListItemDefaults.colors(
             containerColor = if (nowPlaying != null) MaterialTheme.colorScheme.secondaryContainer else ListItemDefaults.containerColor,
         ),
-        // タイトルは 1 行で読めるように、固定・再生中の印は補足行の先頭へ（#56）。行ごとにタイトルの開始位置がずれない
-        headlineContent = { Text(item.episode.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        headlineContent = {
+            // 印（固定・再生中／一時停止）はタイトルの前に置くが、印の無い行にも同じ幅の枠を確保して
+            // タイトルの開始位置を揃える（#56）。再生中と固定が同時なら再生中を優先（背景色でも分かる回なので固定は一時的に隠れる）
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(MARK_SIZE), contentAlignment = Alignment.Center) {
+                    when {
+                        nowPlaying != null && nowPlaying.isPlaying ->
+                            Icon(Icons.Filled.GraphicEq, contentDescription = "聴いている回（再生中）", Modifier.size(MARK_SIZE), tint = MaterialTheme.colorScheme.primary)
+                        nowPlaying != null ->
+                            Icon(Icons.Filled.Pause, contentDescription = "聴いている回（一時停止中）", Modifier.size(MARK_SIZE), tint = MaterialTheme.colorScheme.primary)
+                        local?.pinned == true && state == DownloadState.DONE ->
+                            Icon(Icons.Filled.PushPin, contentDescription = "固定", Modifier.size(MARK_SIZE))
+                    }
+                }
+                Spacer(Modifier.width(MARK_GAP))
+                Text(item.episode.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        },
         supportingContent = {
-            Column {
+            // 補足行もタイトルと同じ位置から始める（枠＋間隔ぶんを空ける）
+            Column(Modifier.padding(start = MARK_SIZE + MARK_GAP)) {
                 val status = when (state) {
                     DownloadState.PENDING -> if (waitingForNetwork) " · Wi-Fi 待ち" else " · 待機中"
                     DownloadState.RUNNING -> " · ダウンロード中"
                     DownloadState.FAILED -> " · 失敗（タップで再試行）"
                     else -> ""
                 }
-                // 補足行の文脈ではアイコンだけだと意味が取りにくいので、アイコン＋短い語で並べる
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (local?.pinned == true && state == DownloadState.DONE) {
-                        Icon(Icons.Filled.PushPin, contentDescription = "固定", Modifier.size(14.dp))
-                        Spacer(Modifier.width(2.dp))
-                        Text("固定 · ")
-                    }
-                    if (nowPlaying != null) {
-                        if (nowPlaying.isPlaying) {
-                            Icon(Icons.Filled.GraphicEq, contentDescription = "聴いている回（再生中）", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.width(2.dp))
-                            Text("再生中 · ", color = MaterialTheme.colorScheme.primary)
-                        } else {
-                            Icon(Icons.Filled.Pause, contentDescription = "聴いている回（一時停止中）", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.width(2.dp))
-                            Text("一時停止 · ", color = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                    Text("${item.episode.airedAt.toAiredDateText()} · ${runtime.toClockText()}$status", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
+                Text("${item.episode.airedAt.toAiredDateText()} · ${runtime.toClockText()}$status")
                 if (playable && resume != null && runtime > Duration.ZERO) {
                     LinearProgressIndicator(
                         progress = { (resume / runtime).toFloat().coerceIn(0f, 1f) },
