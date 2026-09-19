@@ -110,7 +110,7 @@ fun SettingsScreen(
             ListItem(
                 modifier = Modifier.clickable { confirmReset = true },
                 headlineContent = { Text("別のサーバに接続", color = MaterialTheme.colorScheme.error) },
-                supportingContent = { Text("手元の番組・各回・再生位置をすべて消してから接続画面へ。音声ファイルは消しません") },
+                supportingContent = { Text("手元の番組・各回・再生位置・音声ファイルをすべて消してから接続画面へ") },
             )
         }
     }
@@ -128,7 +128,7 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { confirmReset = false },
             title = { Text("手元のデータを消して別のサーバに接続しますか？") },
-            text = { Text("番組・各回・再生位置・再生済みがすべて消えます。この操作は取り消せません。音声ファイルは消しません。") },
+            text = { Text("番組・各回・再生位置・再生済み・音声ファイルがすべて消えます。この操作は取り消せません。") },
             confirmButton = {
                 TextButton(onClick = { confirmReset = false; viewModel.resetAndConnectElsewhere() }) {
                     Text("消して接続画面へ", color = MaterialTheme.colorScheme.error)

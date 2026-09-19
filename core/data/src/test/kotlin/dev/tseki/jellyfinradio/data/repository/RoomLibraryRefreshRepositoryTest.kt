@@ -26,6 +26,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
@@ -171,15 +172,19 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
         assertEquals(1, library.observePrograms().first().size)
     }
 
+    /** 「別のサーバに接続」は行・セッションに加えて音声ファイルも消す（#50。残しても到達する手段が無い）。 */
     @Test
-    fun resetAllClearsRowsAndSession() = runTest {
+    fun resetAllClearsRowsSessionAndFiles() = runTest {
         signInAndSelect()
         gateway.snapshot = snapshot
         repo.refresh()
-
-        RoomLocalDataReset(db, store).resetAll()
-
+        val directory = EpisodesDirectory(ApplicationProvider.getApplicationContext())
+        val file = directory.resolve("TBS/X/X 2026-06-12.m4a").apply { parentFile!!.mkdirs(); writeBytes(ByteArray(16)) }
+        assertTrue(file.isFile)
+        RoomLocalDataReset(db, store, directory).resetAll()
         assertTrue(library.observePrograms().first().isEmpty())
         assertIs<SessionState.SignedOut>(session.state.first())
+        assertFalse(file.exists())
+        assertTrue(directory.root!!.listFiles().isNullOrEmpty())
     }
 }
