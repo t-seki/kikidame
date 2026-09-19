@@ -64,6 +64,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -230,7 +231,7 @@ fun EpisodeListScreen(
  * 右端のアイコンは状態を表し、タップで最も自然な 1 操作をする:
  * 雲 → ダウンロード（= 固定）、待機／進捗 → キャンセル、警告 → 再試行、手元にある回 → 再生済み切替。
  * 残りの操作は長押しのボトムシート。手元に無い回はタップで再生画面へ行かない。
- * 聴いている回（[nowPlaying] がこの回）は背景を変え、タイトルの前に再生中／一時停止のアイコンを出す。
+ * 聴いている回（[nowPlaying] がこの回）は背景を変え、補足行の先頭に固定・再生中／一時停止の印を出す（タイトルは 1 行）。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -259,23 +260,8 @@ private fun EpisodeRow(
         colors = ListItemDefaults.colors(
             containerColor = if (nowPlaying != null) MaterialTheme.colorScheme.secondaryContainer else ListItemDefaults.containerColor,
         ),
-        headlineContent = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (local?.pinned == true && state == DownloadState.DONE) {
-                    Icon(Icons.Filled.PushPin, contentDescription = "固定", Modifier.size(14.dp))
-                    Spacer(Modifier.width(4.dp))
-                }
-                if (nowPlaying != null) {
-                    if (nowPlaying.isPlaying) {
-                        Icon(Icons.Filled.GraphicEq, contentDescription = "聴いている回（再生中）", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
-                    } else {
-                        Icon(Icons.Filled.Pause, contentDescription = "聴いている回（一時停止中）", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
-                    }
-                    Spacer(Modifier.width(4.dp))
-                }
-                Text(item.episode.title)
-            }
-        },
+        // タイトルは 1 行で読めるように、固定・再生中の印は補足行の先頭へ（#56）。行ごとにタイトルの開始位置がずれない
+        headlineContent = { Text(item.episode.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         supportingContent = {
             Column {
                 val status = when (state) {
@@ -284,7 +270,26 @@ private fun EpisodeRow(
                     DownloadState.FAILED -> " · 失敗（タップで再試行）"
                     else -> ""
                 }
-                Text("${item.episode.airedAt.toAiredDateText()} · ${runtime.toClockText()}$status")
+                // 補足行の文脈ではアイコンだけだと意味が取りにくいので、アイコン＋短い語で並べる
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (local?.pinned == true && state == DownloadState.DONE) {
+                        Icon(Icons.Filled.PushPin, contentDescription = "固定", Modifier.size(14.dp))
+                        Spacer(Modifier.width(2.dp))
+                        Text("固定 · ")
+                    }
+                    if (nowPlaying != null) {
+                        if (nowPlaying.isPlaying) {
+                            Icon(Icons.Filled.GraphicEq, contentDescription = "聴いている回（再生中）", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(2.dp))
+                            Text("再生中 · ", color = MaterialTheme.colorScheme.primary)
+                        } else {
+                            Icon(Icons.Filled.Pause, contentDescription = "聴いている回（一時停止中）", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(2.dp))
+                            Text("一時停止 · ", color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                    Text("${item.episode.airedAt.toAiredDateText()} · ${runtime.toClockText()}$status", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
                 if (playable && resume != null && runtime > Duration.ZERO) {
                     LinearProgressIndicator(
                         progress = { (resume / runtime).toFloat().coerceIn(0f, 1f) },
