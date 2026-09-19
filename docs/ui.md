@@ -15,7 +15,7 @@
 
 固定パレット。ダークが主（寝る前の利用）で、ライトはシステム設定に追従して同じ構成で出す。手動の切替は付けない。
 
-温かい黒（赤みのある黒）にアンバーのアクセント。状態を表す色は **`primary`（アンバー）と `error`（赤）の 2 系統だけ** にし、それ以外の意味を色に持たせない。
+温かい黒（赤みのある黒）にアンバーのアクセント。状態を表す色は **`primary`（アンバー）と `error`（赤）の 2 系統だけ** にし、それ以外の意味を色に持たせない（聴いている回の行の背景だけ `secondaryContainer` で示す）。
 
 | スロット | ダーク | ライト | 使いどころ |
 | --- | --- | --- | --- |
@@ -27,6 +27,7 @@
 | `onSecondaryContainer` | `#F2DDB8` | `#2E2312` | |
 | `surface` | `#141210` | `#FBF7F1` | 画面の地 |
 | `onSurface` | `#EDE5DA` | `#1F1A14` | 本文 |
+| `background` / `onBackground` | surface / onSurface と同じ | 同左 | Scaffold の地。既定のままだと Material3 の素の色が透ける |
 | `onSurfaceVariant` | `#B3A58F` | `#5E5347` | 補足行・ラベル |
 | `surfaceContainerLow` | `#1B1815` | `#F5F0E8` | |
 | `surfaceContainer` | `#211D18` | `#EFE9DF` | TopAppBar・ミニプレイヤーの地 |
@@ -59,7 +60,7 @@
 ### 共通の規則
 
 - 値を見せる行は `overlineContent` = ラベル、`headlineContent` = 値。操作の行は `headlineContent` = 操作名、`supportingContent` = 説明
-- 状態の色は `primary`（よく聴く・同期対象・再生中）と `error`（消失・失敗・破壊的操作）だけ
+- 状態の色は `primary`（よく聴く・同期対象・再生中）と `error`（消失・失敗・破壊的操作）だけ。聴いている回の行の背景は `secondaryContainer`
 - ボトムシートは「その画面に留まったまま 1 つ選ぶ」ときに使い、スクロールする長い一覧は画面にする（#43 の判断）
 - ジャケット・波形など、データに無い視覚要素で埋めない（ラジオ録音にジャケットは無い。偽の波形も置かない）
 
