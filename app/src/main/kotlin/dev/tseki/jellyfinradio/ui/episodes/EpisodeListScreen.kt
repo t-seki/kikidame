@@ -4,7 +4,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -228,16 +227,16 @@ fun EpisodeListScreen(
     }
 }
 
+/** タイトル前の印の大きさと、印とタイトルの間隔。印の無い行の枠と補足行の字下げにも使う。 */
+private val MARK_SIZE = 14.dp
+private val MARK_GAP = 4.dp
 /**
  * 右端のアイコンは状態を表し、タップで最も自然な 1 操作をする:
  * 雲 → ダウンロード（= 固定）、待機／進捗 → キャンセル、警告 → 再試行、手元にある回 → 再生済み切替。
  * 残りの操作は長押しのボトムシート。手元に無い回はタップで再生画面へ行かない。
- * タイトルの前の枠に印を出す: 聴いている回（[nowPlaying] がこの回）は背景も変えて再生中／一時停止、それ以外で固定なら固定。
- * 枠は印の無い行にも確保し、タイトル（1 行）と補足行の開始位置を揃える。
+ * タイトルの前に印を出す: 固定（ダウンロード済みで固定された回）のピンと、聴いている回（[nowPlaying] がこの回。背景も変える）の
+ * 再生中／一時停止。両方あれば並べる。印の無い行にも同じ幅を確保し、タイトル（1 行）と補足行の開始位置を揃える。
  */
-/** タイトル前の印の枠の大きさと、枠とタイトルの間隔。補足行の字下げにも使う。 */
-private val MARK_SIZE = 14.dp
-private val MARK_GAP = 4.dp
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun EpisodeRow(
@@ -266,20 +265,25 @@ private fun EpisodeRow(
             containerColor = if (nowPlaying != null) MaterialTheme.colorScheme.secondaryContainer else ListItemDefaults.containerColor,
         ),
         headlineContent = {
-            // 印（固定・再生中／一時停止）はタイトルの前に置くが、印の無い行にも同じ幅の枠を確保して
-            // タイトルの開始位置を揃える（#56）。再生中と固定が同時なら再生中を優先（背景色でも分かる回なので固定は一時的に隠れる）
+            // 印（固定・再生中／一時停止）はタイトルの前に置くが、印の無い行にも同じ幅の枠を確保してタイトルの開始位置を揃える（#56）。
+            // 固定と聴いている回は独立した状態なので両方出す（両方ある行だけ 1 つ分右にずれるが、背景色で目立つ 1 行なので許容）
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(MARK_SIZE), contentAlignment = Alignment.Center) {
-                    when {
-                        nowPlaying != null && nowPlaying.isPlaying ->
-                            Icon(Icons.Filled.GraphicEq, contentDescription = "聴いている回（再生中）", Modifier.size(MARK_SIZE), tint = MaterialTheme.colorScheme.primary)
-                        nowPlaying != null ->
-                            Icon(Icons.Filled.Pause, contentDescription = "聴いている回（一時停止中）", Modifier.size(MARK_SIZE), tint = MaterialTheme.colorScheme.primary)
-                        local?.pinned == true && state == DownloadState.DONE ->
-                            Icon(Icons.Filled.PushPin, contentDescription = "固定", Modifier.size(MARK_SIZE))
-                    }
+                val pinned = local?.pinned == true && state == DownloadState.DONE
+                if (pinned) {
+                    Icon(Icons.Filled.PushPin, contentDescription = "固定", Modifier.size(MARK_SIZE))
+                    Spacer(Modifier.width(MARK_GAP))
                 }
-                Spacer(Modifier.width(MARK_GAP))
+                when {
+                    nowPlaying != null && nowPlaying.isPlaying -> {
+                        Icon(Icons.Filled.GraphicEq, contentDescription = "聴いている回（再生中）", Modifier.size(MARK_SIZE), tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(MARK_GAP))
+                    }
+                    nowPlaying != null -> {
+                        Icon(Icons.Filled.Pause, contentDescription = "聴いている回（一時停止中）", Modifier.size(MARK_SIZE), tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(MARK_GAP))
+                    }
+                    !pinned -> Spacer(Modifier.width(MARK_SIZE + MARK_GAP)) // 印が無い行の枠
+                }
                 Text(item.episode.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         },
