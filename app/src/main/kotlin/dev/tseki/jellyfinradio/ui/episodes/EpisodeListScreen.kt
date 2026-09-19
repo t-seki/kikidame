@@ -346,6 +346,7 @@ internal fun EpisodeWithState.toSupportingText(waitingForNetwork: Boolean): Stri
     }
     return listOfNotNull(aired, episode.runtime.toClockText(), status).joinToString(" · ")
 }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EpisodeActionsSheet(
