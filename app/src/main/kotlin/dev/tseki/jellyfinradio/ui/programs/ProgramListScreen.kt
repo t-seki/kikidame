@@ -66,6 +66,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tseki.jellyfinradio.domain.EpisodeId
 import dev.tseki.jellyfinradio.domain.ProgramId
 import dev.tseki.jellyfinradio.domain.ProgramSummary
+import dev.tseki.jellyfinradio.ui.SectionTitle
 import dev.tseki.jellyfinradio.ui.player.MiniPlayer
 import dev.tseki.jellyfinradio.ui.programs.ProgramFilter.Station
 import dev.tseki.jellyfinradio.ui.programs.ProgramFilter.StationKey
@@ -178,10 +179,10 @@ fun ProgramListScreen(
                         }
                         LazyColumn(Modifier.fillMaxSize(), state = listState) {
                             if (starred.isNotEmpty()) {
-                                item(key = "header-starred") { SectionHeader("よく聴く") }
+                                item(key = "header-starred") { SectionTitle("よく聴く") }
                                 programItems(starred, onProgramClick, viewModel::setStarred)
                                 // 全部がよく聴くなら「その他」の見出しも出さない
-                                if (others.isNotEmpty()) item(key = "header-others") { SectionHeader("その他") }
+                                if (others.isNotEmpty()) item(key = "header-others") { SectionTitle("その他") }
                             }
                             programItems(others, onProgramClick, viewModel::setStarred)
                         }
@@ -205,15 +206,6 @@ private fun LazyListScope.programItems(
         )
         HorizontalDivider()
     }
-}
-@Composable
-private fun SectionHeader(title: String) {
-    Text(
-        title,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 4.dp),
-    )
 }
 /** 左端の ★ でよく聴くを切り替える。右端は同期対象／消失の状態表示。 */
 @Composable
