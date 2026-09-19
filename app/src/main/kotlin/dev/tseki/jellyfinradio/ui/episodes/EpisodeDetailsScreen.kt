@@ -109,4 +109,3 @@ fun EpisodeDetailsScreen(onBack: () -> Unit, viewModel: EpisodeDetailsViewModel 
         }
     }
 }
-/** ラベルが上・値が下（設定アプリと同じ向き）。ラベル／値の組が並ぶ画面はラベルを目で追うので、この向きが走査しやすい。 */
