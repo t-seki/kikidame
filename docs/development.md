@@ -54,6 +54,13 @@ Robolectric が SDK 37 で JDK 内部 API へアクセスするための `--add-
 Room のスキーマは `core/data/schemas/` に書き出す（`room { schemaDirectory(...) }`）。
 Entity を変えたら version を上げ、書き出された JSON もコミットする。
 
+## 並行作業（複数の Claude Code セッション）
+方針は `~/.claude/CLAUDE.md` の「Parallel Work」（作業セッションは全部 worktree、main のチェックアウトは統合専用）。この repo 固有の手順:
+- worktree は repo 直下の `.claude/worktrees/`（`.gitignore` 済み）。`local.properties` は git 管理外なので、新しい worktree に `cp local.properties <worktree>/` する
+- Gradle の成果物（`build/`）は worktree ごとに別なので初回ビルドが重い。`~/.gradle` のキャッシュは共有されるので依存の再ダウンロードは無い
+- 実機は 1 台。`adb install` は main のチェックアウトからだけ行い、作業セッションは実機を触らない（触るならひと言告げる）。再生画面を開く確認は音が出るので避ける
+- Room のスキーマを上げる PR がマージされたら、それより古いビルドを実機に入れない（DB のダウングレードで落ちる）
+- 担当は「同じファイルを触らない」単位で分ける（例: 2026-09-20 は `EpisodeListScreen.kt` 周りの #66→#68→#70 と、テーマ・設定・ミニプレイヤーの #59→#62 に分けて衝突なし）
 ## 実機で試す（M1）
 
 ### 接続: WSL2 の adb からワイヤレスデバッグで直接つなぐ（推奨）
