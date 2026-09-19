@@ -1,24 +1,26 @@
 package dev.tseki.jellyfinradio.ui.episodes
-
 import android.content.ClipData
 import android.os.Build
 import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,28 +33,38 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import dev.tseki.jellyfinradio.domain.EpisodeWithState
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
-
 /**
- * 各回の詳細（#43）。利用者向けの 3 群を出し、末尾の「技術的な詳細」を展開すると ID・生の値・パスが等幅で並ぶ。
+ * 各回の詳細（#43）。利用者向けの 3 群を出し、末尾の「技術的な詳細」を展開すると ID・記録の生の値・パスが等幅で並ぶ。
  * 展開した行は長押しでコピー。Android 13 以降は OS がコピーを通知するので何も出さず、それより前（minSdk 31）は Toast で知らせる。
- * 画面は増やさない（番組の詳細画面を作らないのと同じ判断）。
+ * 当初はボトムシートだったが、スクロールする長い一覧はシートのドラッグと取り合いになるので画面にした（2026-09-19）。
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-internal fun EpisodeDetailsSheet(item: EpisodeWithState, onDismiss: () -> Unit) {
+fun EpisodeDetailsScreen(onBack: () -> Unit, viewModel: EpisodeDetailsViewModel = hiltViewModel()) {
+    val item by viewModel.item.collectAsStateWithLifecycle()
     // 開き直すたびに畳んだ状態から
     var showTechnical by remember { mutableStateOf(false) }
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        LazyColumn {
-            item {
-                Text(item.episode.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
-            }
-            for (section in EpisodeDetails.sections(item)) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(item?.episode?.title ?: "各回の詳細") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        val current = item ?: return@Scaffold
+        LazyColumn(Modifier.padding(padding).fillMaxSize()) {
+            for (section in EpisodeDetails.sections(current)) {
                 item { SectionTitle(section.title) }
                 items(section.rows) { row ->
                     ListItem(headlineContent = { Text(row.value) }, supportingContent = { Text(row.label) })
@@ -60,7 +72,7 @@ internal fun EpisodeDetailsSheet(item: EpisodeWithState, onDismiss: () -> Unit) 
             }
             item {
                 ListItem(
-                    modifier = Modifier.combinedClickable { showTechnical = !showTechnical },
+                    modifier = Modifier.clickable { showTechnical = !showTechnical },
                     headlineContent = { Text("技術的な詳細") },
                     supportingContent = { Text("ID・記録の生の値・保存先など。長押しでコピー") },
                     trailingContent = {
@@ -69,7 +81,7 @@ internal fun EpisodeDetailsSheet(item: EpisodeWithState, onDismiss: () -> Unit) 
                 )
             }
             if (showTechnical) {
-                items(EpisodeDetails.technicalRows(item)) { row ->
+                items(EpisodeDetails.technicalRows(current)) { row ->
                     ListItem(
                         modifier = Modifier.combinedClickable(
                             onClick = {},
@@ -87,11 +99,9 @@ internal fun EpisodeDetailsSheet(item: EpisodeWithState, onDismiss: () -> Unit) 
                     )
                 }
             }
-            item { Spacer(Modifier.padding(bottom = 24.dp)) }
         }
     }
 }
-
 @Composable
 private fun SectionTitle(title: String) {
     Text(

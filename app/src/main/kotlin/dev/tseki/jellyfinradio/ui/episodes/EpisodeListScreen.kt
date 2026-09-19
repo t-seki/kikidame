@@ -72,6 +72,7 @@ import dev.tseki.jellyfinradio.domain.EpisodeId
 import dev.tseki.jellyfinradio.domain.EpisodeWithState
 import dev.tseki.jellyfinradio.domain.LocalStorageUsage
 import dev.tseki.jellyfinradio.domain.Program
+import dev.tseki.jellyfinradio.domain.ProgramId
 import dev.tseki.jellyfinradio.download.DownloadProgress
 import dev.tseki.jellyfinradio.playback.NowPlayingState
 import dev.tseki.jellyfinradio.ui.player.MiniPlayer
@@ -85,6 +86,7 @@ import kotlin.time.Duration
 fun EpisodeListScreen(
     onEpisodeClick: (EpisodeId) -> Unit,
     onNowPlayingClick: (EpisodeId) -> Unit,
+    onEpisodeDetails: (ProgramId, EpisodeId) -> Unit,
     onBack: () -> Unit,
     viewModel: EpisodeListViewModel = hiltViewModel(),
 ) {
@@ -99,7 +101,6 @@ fun EpisodeListScreen(
     val pendingDisable by viewModel.pendingDisable.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var sheetFor by remember { mutableStateOf<EpisodeId?>(null) }
-    var detailsFor by remember { mutableStateOf<EpisodeId?>(null) }
     var showSyncSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -219,13 +220,9 @@ fun EpisodeListScreen(
             onUnpin = { viewModel.unpin(target.episode.id) },
             onDelete = { viewModel.deleteLocal(target.episode.id) },
             onTogglePlayed = { viewModel.setPlayed(target.episode.id, target.playback?.played != true) },
-            onDetails = { sheetFor = null; detailsFor = target.episode.id },
+            // 詳細（#43）は画面へ。シートは閉じてから遷移する
+            onDetails = { sheetFor = null; onEpisodeDetails(target.episode.programId, target.episode.id) },
         )
-    }
-    // 詳細（#43）は操作シートを閉じてから開く。一覧の更新に追従するよう ID で引き直す
-    val detailsTarget = detailsFor?.let { id -> episodes?.firstOrNull { it.episode.id == id } }
-    if (detailsTarget != null) {
-        EpisodeDetailsSheet(item = detailsTarget, onDismiss = { detailsFor = null })
     }
 }
 
