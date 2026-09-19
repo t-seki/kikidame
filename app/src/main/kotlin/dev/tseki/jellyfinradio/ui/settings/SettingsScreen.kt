@@ -124,6 +124,8 @@ fun SettingsScreen(
                 },
             )
             HorizontalDivider()
+            // 見出しが無いと「表示」の続きに見えるので群にする（#62 のレビュー指摘）
+            SectionTitle("アカウント")
             ListItem(
                 modifier = Modifier.clickable(enabled = current != null) { confirmSignOut = true },
                 headlineContent = { Text("ログアウト") },
