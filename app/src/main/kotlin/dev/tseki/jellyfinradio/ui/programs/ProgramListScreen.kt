@@ -47,7 +47,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,15 +82,18 @@ fun ProgramListScreen(
     val query by viewModel.query.collectAsStateWithLifecycle()
     val isSearching by viewModel.isSearching.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    var showStationSheet by rememberSaveable { mutableStateOf(false) }
+    // 他のシートと同じく remember（プロセス死で開き直さない。絞り込みの状態も復元しないので）
+    var showStationSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
     }
 
-    if (showStationSheet) {
+    // 入口のアイコンと同じ条件（局が 2 種類以上）。開いている間に同期で局が減ったら閉じる
+    val stations = filtered?.stations.orEmpty()
+    if (showStationSheet && stations.size >= 2) {
         StationSheet(
-            stations = filtered?.stations.orEmpty(),
+            stations = stations,
             selected = filtered?.station,
             onSelect = viewModel::selectStation,
             onDismiss = { showStationSheet = false },
@@ -107,7 +109,6 @@ fun ProgramListScreen(
                     title = { Text("番組") },
                     actions = {
                         // 放送局で絞る（#45）。局が 2 種類未満なら絞る意味が無いので出さない。選択中は点を付ける
-                        val stations = filtered?.stations.orEmpty()
                         if (stations.size >= 2) {
                             IconButton(onClick = { showStationSheet = true }) {
                                 BadgedBox(badge = { if (filtered?.station != null) Badge() }) {
@@ -131,7 +132,7 @@ fun ProgramListScreen(
                 )
                 if (isSearching) SearchField(query, onQueryChange = viewModel::setQuery)
                 filtered?.station?.let { station ->
-                    SelectedStationRow(station, onClick = { showStationSheet = true }, onClear = viewModel::clearStation)
+                    SelectedStationRow(station, onClear = { viewModel.selectStation(null) })
                 }
             }
         },
@@ -163,7 +164,7 @@ fun ProgramListScreen(
                         }
                     }
                     if (state.isFiltering) {
-                        // 絞り込み中は該当が少ないので節に分けずフラットに出す（#45 の局チップも同じ規則）
+                        // 何らかの絞り込みが効いていれば節に分けずフラットに出す（#44・#45 共通の規則。検索は該当が少なく節が邪魔、局はそれに揃えた）
                         LazyColumn(Modifier.fillMaxSize(), state = listState) {
                             programItems(list, onProgramClick, viewModel::setStarred)
                         }
@@ -317,21 +318,18 @@ private fun StationChoice(label: String, programCount: Int, selected: Boolean, o
         trailingContent = { Text("$programCount", style = MaterialTheme.typography.bodyMedium) },
     )
 }
-/** 選択中の局を 1 チップで示す。タップでシートを開き直し、× で「すべて」に戻す。未選択なら何も出さない。 */
+/**
+ * 選択中の局を 1 チップで示す。チップのタップ（× を含む）で「すべて」に戻す。局を変えるのは TopAppBar のアイコンから。
+ * × だけを別の clickable にすると当たり判定が小さくなるので、チップ全体を解除にする。
+ */
 @Composable
-private fun SelectedStationRow(station: StationKey, onClick: () -> Unit, onClear: () -> Unit) {
+private fun SelectedStationRow(station: StationKey, onClear: () -> Unit) {
     Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
         InputChip(
             selected = true,
-            onClick = onClick,
+            onClick = onClear,
             label = { Text(station.label) },
-            trailingIcon = {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = "局の絞り込みを解除",
-                    modifier = Modifier.clickable(onClick = onClear),
-                )
-            },
+            trailingIcon = { Icon(Icons.Default.Close, contentDescription = "局の絞り込みを解除") },
         )
     }
 }
@@ -341,7 +339,7 @@ private fun NoMatch(query: String, station: StationKey?) {
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-                // 局だけで 0 件にはならない（チップは手元の番組から集めるので）。検索語は必ずある
+                // 局だけで 0 件にはならない（局の候補は手元の番組から集めるので）。検索語は必ずある
                 val prefix = station?.let { "${it.label}に " } ?: ""
                 Text(
                     "$prefix\"${ProgramFilter.normalize(query)}\" に一致する番組がありません",

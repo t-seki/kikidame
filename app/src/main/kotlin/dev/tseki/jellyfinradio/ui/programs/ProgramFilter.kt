@@ -4,7 +4,7 @@ import dev.tseki.jellyfinradio.domain.ProgramSummary
 
 /**
  * 番組一覧の絞り込み。検索（#44）は番組名と放送局名の部分一致で、大文字小文字は区別しない。
- * 放送局のチップ（#45）は局名の完全一致。両方あれば AND。
+ * 放送局の絞り込み（#45）は局名の完全一致。両方あれば AND。
  * 全角・半角やかなの表記揺れは吸収しない（サーバの表記そのまま）。
  */
 object ProgramFilter {
@@ -13,7 +13,7 @@ object ProgramFilter {
         val label: String get() = name ?: "局なし"
     }
 
-    /** チップ 1 つ分。 */
+    /** 局を選ぶシートの 1 行分。[programCount] は手元の番組全体での数で、検索語では絞らない。 */
     data class Station(val key: StationKey, val programCount: Int)
 
     /** 検索語として意味のある形にする（前後の空白を落とす）。空なら絞り込みなし。 */

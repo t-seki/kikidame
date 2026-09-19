@@ -61,7 +61,7 @@ class ProgramFilterTest {
         assertEquals(listOf(haraichi, ann), ProgramFilter.apply(all, "ー"))
     }
 
-    // ---- 放送局のチップ（#45） ----
+    // ---- 放送局の絞り込み（#45） ----
     private val tbs = StationKey("TBS")
     private val lfr = StationKey("LFR")
     private val none = StationKey(null)

@@ -39,18 +39,18 @@ class ProgramListViewModel @Inject constructor(
     val query: StateFlow<String> = _query.asStateFlow()
     private val _isSearching = MutableStateFlow(false)
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
-    /** 放送局のチップ（#45）の選択。null は「すべて」。検索とは独立で、検索を閉じても残る。 */
+    /** 放送局の絞り込み（#45）の選択。null は「すべて」。検索とは独立で、検索を閉じても残る。 */
     private val _station = MutableStateFlow<StationKey?>(null)
     /**
      * 絞り込みの入力（検索語・局）と手元の番組から導いた、画面が出すもの一式。
-     * 一覧・チップ・絞り込み中かどうかを別々の Flow にすると一瞬食い違うことがあるので 1 つにまとめる。
+     * 一覧・局の候補・絞り込み中かどうかを別々の Flow にすると一瞬食い違うことがあるので 1 つにまとめる。
      */
     data class Filtered(
         /** 絞った後の一覧。 */
         val programs: List<ProgramSummary>,
-        /** チップに出す局（手元の番組から集めたもの）。空なら番組が 1 つも無い。 */
+        /** 局を選ぶシートに出す候補（手元の番組から集めたもの。番組数は検索語で絞らない）。空なら番組が 1 つも無い。 */
         val stations: List<Station>,
-        /** 選択中の局。チップに無い局、チップ列を出さない（局が 2 種類未満）ときは選ばれていない扱い。 */
+        /** 選択中の局。候補に無い局、絞り込み自体を出さない（局が 2 種類未満）ときは選ばれていない扱い。 */
         val station: StationKey?,
         /** 絞り込みが効いているか。効いていれば画面は「よく聴く」「その他」の節を解除する。 */
         val isFiltering: Boolean,
@@ -60,7 +60,7 @@ class ProgramListViewModel @Inject constructor(
         val stations = ProgramFilter.stations(list)
         val station = selected?.takeIf { key -> stations.size >= 2 && stations.any { it.key == key } }
         if (selected != null && station == null) {
-            // 同期で選択中の局の番組が消えた（か、他の局が消えてチップ列ごと出なくなった）ら「すべて」に戻す。
+            // 同期で選択中の局の番組が消えた（か、他の局が消えて絞り込み自体を出さなくなった）ら「すべて」に戻す。
             // 絞り込みだけ残って解除できない状態にしない。この計算の元になった選択と同じときだけ戻す（その間の操作は潰さない）
             _station.compareAndSet(selected, null)
         }
@@ -79,12 +79,9 @@ class ProgramListViewModel @Inject constructor(
     fun setQuery(query: String) {
         _query.value = query
     }
-    /** シートで局を選ぶ。null は「すべて」。 */
+    /** シートで局を選ぶ。null は「すべて」（選択中のチップの × も同じ）。 */
     fun selectStation(station: StationKey?) {
         _station.value = station
-    }
-    fun clearStation() {
-        _station.value = null
     }
     /** 虫眼鏡で開く。 */
     fun startSearch() {
