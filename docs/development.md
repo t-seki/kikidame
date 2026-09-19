@@ -61,6 +61,42 @@ Entity を変えたら version を上げ、書き出された JSON もコミッ�
 - 実機は 1 台。`adb install` は main のチェックアウトからだけ行い、作業セッションは実機を触らない（触るならひと言告げる）。再生画面を開く確認は音が出るので避ける
 - Room のスキーマを上げる PR がマージされたら、それより古いビルドを実機に入れない（DB のダウングレードで落ちる）
 - 担当は「同じファイルを触らない」単位で分ける（例: 2026-09-20 は `EpisodeListScreen.kt` 周りの #66→#68→#70 と、テーマ・設定・ミニプレイヤーの #59→#62 に分けて衝突なし）
+
+### 作業セッションの閉じ方（#84）
+
+2026-09-20 に main のローカルにマージ済みブランチ 8 本と用済みの worktree 1 つが残っていた。原因は、1 つの worktree で #66→#68→#70→#82 と 4 本の PR を回して worktree とブランチが 1:1 でなかったこと、`gh pr merge --delete-branch` がチェックアウト中のブランチをローカルでは消せないこと、レビュー用に `gh pr checkout` した `pr-N` ブランチを消していなかったこと。
+
+- worktree の寿命は 1 セッション = 1 issue（密結合した issue の連鎖 1 本まで）。マージしたら別の仕事に流用せず閉じる。次の仕事は EnterWorktree で入り直す（既定で `origin/main` から切るので「main の HEAD から切る」も満たす）
+- 閉じる手順（worktree の中で）:
+  ```bash
+  /usr/bin/git checkout --detach origin/main     # 掴んでいるブランチを離す
+  /usr/bin/git branch -D feat/<自分で切ったブランチ>
+  ```
+  そのあと ExitWorktree(remove)。ExitWorktree はユーザーが言ったときだけ動くので、マージ後に「worktree を消して抜けて」と一言（セッション終了時の keep/remove で remove でもよい）。ExitWorktree が消すのは EnterWorktree が作った `worktree-<name>` ブランチだけなので、自分で切ったブランチは先に消しておく
+- レビューは `gh pr diff` / `gh pr view` で読む。テストを走らせて確かめるときだけ worktree に入って checkout し、終わったら同じ手順で消す。実機に入れるのは上の通り main からだけ。main 側に `pr-N` ブランチを作らない
+
+### 調整役セッション（main のチェックアウト）の責務
+
+作業セッションは自分の issue しか見ていないので、横断する仕事は main のチェックアウトにいるセッションが持つ。
+
+- 入口: epic を sub-issue に割り、各 issue に「触るファイル」を書く。作業セッションは issue を読んで自分で EnterWorktree する
+- 出口: PR が来たら `/code-review:code-review` を回し、マージ順を決め、`gh pr merge --squash --delete-branch` → `git pull --ff-only` → `installDebug`。Room のスキーマ版数を上げる PR の後に古いビルドを入れないチェックもここ
+- 掃除（マージのたび、セッション終了時に必ず）:
+  ```bash
+  git fetch --prune
+  git worktree prune
+  git worktree list      # 残っていれば git worktree remove <path>
+  git branch --no-color -vv | grep ': gone]' | awk '{print $1}' | xargs -r git branch -D
+  ```
+  `gone` はリモートが消えたブランチ（`--delete-branch` でマージ済みのもの）。チェックアウト中のブランチは `-D` が失敗して次に進むだけなので安全
+- 横串: 先にマージされた PR が後の PR に影響するとき、該当 issue にコメントを書く（「#N がマージされたので rebase して」）。同じマシンのセッションには `SendMessage` で通知してもよいが、正とするのは issue コメント（メッセージは揮発する）
+- やらないこと: 実装（小物でも worktree に振る）、会話を状態の置き場にすること（cold start しても GitHub だけで復帰できる状態を保つ）、`/loop` での PR 監視（人が「PR 出た」と一言投げる）
+- 対話が要らない issue（docs、issue を読めば完結する小さな実装）は、調整役から `Agent` を `isolation: "worktree"` で起動して任せてもよい。subagent は人に質問できないので、grill は起動前に調整役で済ませて issue / ADR に落としておく。subagent の worktree は変更があれば残るので、マージ後に上の掃除で消す
+
+### `~/.claude/CLAUDE.md` の「Parallel Work」との関係
+
+方針（全部 worktree・main は統合専用・共有は GitHub と docs と実機だけ）はそのまま。上の 2 節は repo 固有の手順で、CLAUDE.md は変えない。閉じ方と調整役の責務が他の repo でも使えると分かったら、その時点で CLAUDE.md（dotfiles）に格上げする。
+
 ## 実機で試す（M1）
 
 ### 接続: WSL2 の adb からワイヤレスデバッグで直接つなぐ（推奨）
