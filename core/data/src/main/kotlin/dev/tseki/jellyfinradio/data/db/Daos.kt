@@ -126,7 +126,10 @@ interface EpisodeDao {
 }
 @Dao
 interface LocalFileDao {
-    /** 手元のファイルの合計（#42）。sizeBytes はダウンロード完了時に実サイズで上書きされている。 */
+    /**
+     * 手元のファイルの合計（#42）。sizeBytes はダウンロード完了時に実サイズで上書きされている
+     * （`SdkJellyfinGateway` はサイズを返さないので、同期の取り込みで上書きされることはない。返すようにするなら DONE の行は守ること）。
+     */
     @Query(
         """
         SELECT COALESCE(SUM(e.sizeBytes), 0) AS totalBytes, COUNT(lf.episodeId) AS episodeCount
