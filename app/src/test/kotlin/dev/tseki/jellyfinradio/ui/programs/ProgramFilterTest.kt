@@ -89,10 +89,11 @@ class ProgramFilterTest {
             summary(1, "a", "LFR"), summary(2, "b", "LFR"),
             summary(3, "c", "TBS"), summary(4, "d", "TBS"),
             summary(5, "e", "ABC"),
-            summary(6, "f", null), summary(7, "g", null),
+            // 局なしが一番多くても最後
+            summary(6, "f", null), summary(7, "g", null), summary(8, "h", null),
         )
         assertEquals(
-            listOf(Station(lfr, 2), Station(tbs, 2), Station(none, 2), Station(StationKey("ABC"), 1)),
+            listOf(Station(lfr, 2), Station(tbs, 2), Station(StationKey("ABC"), 1), Station(none, 3)),
             ProgramFilter.stations(list),
         )
         assertEquals("局なし", none.label)

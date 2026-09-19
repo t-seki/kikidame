@@ -30,13 +30,13 @@ object ProgramFilter {
         return list.filter { (station == null || it.program.stationName == station.name) && (q.isEmpty() || it.matches(q)) }
     }
 
-    /** 手元の番組から集めた放送局。番組数が多い順、同数は局名の辞書順（同期のたびに順序が入れ替わらない）。「局なし」は最後。 */
+    /** 手元の番組から集めた放送局。番組数が多い順、同数は局名の辞書順（同期のたびに順序が入れ替わらない）。「局なし」は番組数に関わらず最後。 */
     fun stations(list: List<ProgramSummary>): List<Station> =
         list.groupingBy { it.program.stationName }.eachCount()
             .map { (name, count) -> Station(StationKey(name), count) }
             .sortedWith(
-                compareByDescending<Station> { it.programCount }
-                    .thenBy { it.key.name == null }
+                compareBy<Station> { it.key.name == null }
+                    .thenByDescending { it.programCount }
                     .thenBy { it.key.name },
             )
 

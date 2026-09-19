@@ -125,8 +125,9 @@ fun ProgramListScreen(
             val list = state?.programs
             when {
                 state == null || list == null -> Box(Modifier.fillMaxSize())
-                list.isEmpty() && state.isFiltering -> NoMatch(query, state.station)
-                list.isEmpty() -> EmptyPrograms(canRefresh)
+                // 番組自体が無い（局も集まらない）なら、検索中でも「一致なし」ではなく空の案内
+                state.stations.isEmpty() -> EmptyPrograms(canRefresh)
+                list.isEmpty() -> NoMatch(query, state.station)
                 else -> {
                     val listState = rememberLazyListState()
                     // 検索語か局が変わるたびに先頭へ（絞った結果は先頭から見たい。解除したときも先頭に戻す）。
@@ -260,7 +261,7 @@ private fun ProgramRow(summary: ProgramSummary, onClick: () -> Unit, onToggleSta
 
 /**
  * 放送局のチップ列（#45）。「すべて」＋ 手元の番組から集めた局を 1 行横スクロールで並べる。
- * 選んだチップが右に隠れていたら見える位置まで寄せる。
+ * 選んだチップが画面外（左右どちらでも）にあれば見える位置まで寄せる。
  */
 @Composable
 private fun StationChips(
@@ -284,7 +285,8 @@ private fun StationChips(
         item(key = "all") {
             FilterChip(selected = selected == null, onClick = onClearStation, label = { Text("すべて") })
         }
-        items(stations, key = { it.key.name ?: "" }) { station ->
+        // 「すべて」「局なし」と局名が衝突しないよう接頭辞を付ける
+        items(stations, key = { it.key.name?.let { n -> "station:$n" } ?: "none" }) { station ->
             FilterChip(
                 selected = station.key == selected,
                 onClick = { onToggle(station.key) },

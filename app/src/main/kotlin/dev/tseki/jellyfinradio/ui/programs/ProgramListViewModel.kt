@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -51,7 +50,7 @@ class ProgramListViewModel @Inject constructor(
         val programs: List<ProgramSummary>,
         /** チップに出す局（手元の番組から集めたもの）。空なら番組が 1 つも無い。 */
         val stations: List<Station>,
-        /** 選択中の局。チップに無い局は選ばれていない扱い。 */
+        /** 選択中の局。チップに無い局、チップ列を出さない（局が 2 種類未満）ときは選ばれていない扱い。 */
         val station: StationKey?,
         /** 絞り込みが効いているか。効いていれば画面は「よく聴く」「その他」の節を解除する。 */
         val isFiltering: Boolean,
@@ -59,12 +58,14 @@ class ProgramListViewModel @Inject constructor(
     /** null は読み込み前。 */
     val filtered: StateFlow<Filtered?> = combine(library.observePrograms(), _query, _station) { list, q, selected ->
         val stations = ProgramFilter.stations(list)
-        val station = selected?.takeIf { key -> stations.any { it.key == key } }
+        val station = selected?.takeIf { key -> stations.size >= 2 && stations.any { it.key == key } }
+        if (selected != null && station == null) {
+            // 同期で選択中の局の番組が消えた（か、他の局が消えてチップ列ごと出なくなった）ら「すべて」に戻す。
+            // 絞り込みだけ残って解除できない状態にしない。この計算の元になった選択と同じときだけ戻す（その間の操作は潰さない）
+            _station.compareAndSet(selected, null)
+        }
         Filtered(ProgramFilter.apply(list, q, station), stations, station, ProgramFilter.isActive(q, station))
-    }
-        // 同期で選択中の局の番組が全部消えたら「すべて」に戻す（局だけの絞り込みで 0 件のまま固まらない）
-        .onEach { if (it.station == null && _station.value != null) _station.value = null }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** サーバに接続済み（ライブラリ選択済み）なら「引っ張って更新」ができる。 */
     val canRefresh: StateFlow<Boolean> = sessionRepository.state
