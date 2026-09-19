@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.tseki.jellyfinradio.domain.AppSettingsRepository
+import dev.tseki.jellyfinradio.domain.ThemeMode
 import dev.tseki.jellyfinradio.domain.LocalDataReset
 import dev.tseki.jellyfinradio.domain.LibraryRepository
 import dev.tseki.jellyfinradio.domain.LocalStorageUsage
@@ -51,6 +52,20 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /** テーマ（#62）。null は読み込み前（チップは出すが無効にする）。 */
+    val themeMode: StateFlow<ThemeMode?> = settings.themeMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    fun setThemeMode(value: ThemeMode) {
+        viewModelScope.launch {
+            try {
+                settings.setThemeMode(value)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _message.value = "設定の保存に失敗しました: ${e::class.simpleName}"
+            }
+        }
+    }
     val session: StateFlow<SessionState?> = sessionRepository.state
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 

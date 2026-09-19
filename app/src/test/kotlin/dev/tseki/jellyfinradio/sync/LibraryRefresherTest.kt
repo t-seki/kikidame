@@ -2,6 +2,7 @@ package dev.tseki.jellyfinradio.sync
 
 import app.cash.turbine.test
 import dev.tseki.jellyfinradio.domain.AppSettingsRepository
+import dev.tseki.jellyfinradio.domain.ThemeMode
 import dev.tseki.jellyfinradio.domain.DownloadRepository
 import dev.tseki.jellyfinradio.domain.EpisodeId
 import dev.tseki.jellyfinradio.domain.LibraryRefreshRepository
@@ -109,6 +110,10 @@ class LibraryRefresherTest {
         override val playbackSpeed = MutableStateFlow(1.0f)
         override suspend fun setPlaybackSpeed(value: Float) {
             playbackSpeed.value = value
+        }
+        override val themeMode = MutableStateFlow(ThemeMode.SYSTEM)
+        override suspend fun setThemeMode(value: ThemeMode) {
+            themeMode.value = value
         }
     }
 
