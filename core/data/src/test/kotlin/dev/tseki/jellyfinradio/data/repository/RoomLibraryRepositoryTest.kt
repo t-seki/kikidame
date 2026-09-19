@@ -3,6 +3,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tseki.jellyfinradio.data.db.LocalFileEntity
 import dev.tseki.jellyfinradio.data.db.PlaybackStateEntity
 import dev.tseki.jellyfinradio.domain.DownloadState
+import dev.tseki.jellyfinradio.domain.LocalStorageUsage
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -83,6 +84,20 @@ class RoomLibraryRepositoryTest : RoomTestBase() {
         // 未再生に戻すと増える
         db.playbackStateDao().upsert(PlaybackStateEntity(id("X 2026-06-19"), positionTicks = 0, played = false, updatedAt = now))
         assertEquals(3, summary().unplayedLocalCount)
+    }
+    /** 手元のファイルの合計（#42）: DONE でパスがある回の sizeBytes を足す。ダウンロード途中・パス無しは数えない。 */
+    @Test
+    fun localStorageSumsDoneFilesOnly() = runTest {
+        val programId = seedProgram()
+        // seed は 4 回とも DONE・1024 B
+        assertEquals(LocalStorageUsage(4 * 1024L, 4), repo.observeLocalStorage().first())
+        val episodes = repo.observeEpisodes(programId).first()
+        val id = { title: String -> episodes.first { it.episode.title == title }.episode.id.value }
+        db.episodeDao().updateSize(id("X 2026-06-19"), 30_000_000)
+        db.localFileDao().upsert(LocalFileEntity(id("X 2026-06-05"), DownloadState.PENDING, path = null, pinned = false))
+        assertEquals(LocalStorageUsage(30_000_000 + 2 * 1024L, 3), repo.observeLocalStorage().first())
+        db.localFileDao().delete(id("X 2026-06-12"))
+        assertEquals(LocalStorageUsage(30_000_000 + 1024L, 2), repo.observeLocalStorage().first())
     }
     @Test
     fun getEpisodeReturnsNullForUnknownId() = runTest {

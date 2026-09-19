@@ -7,6 +7,7 @@ import dev.tseki.jellyfinradio.domain.EpisodeId
 import dev.tseki.jellyfinradio.domain.EpisodeOrder
 import dev.tseki.jellyfinradio.domain.EpisodeWithState
 import dev.tseki.jellyfinradio.domain.LibraryRepository
+import dev.tseki.jellyfinradio.domain.LocalStorageUsage
 import dev.tseki.jellyfinradio.domain.Program
 import dev.tseki.jellyfinradio.domain.ProgramId
 import dev.tseki.jellyfinradio.domain.ProgramSummary
@@ -25,6 +26,8 @@ class RoomLibraryRepository @Inject constructor(
     // 集計は playback_states も見るので、再生中の再生位置の保存（10 秒ごと）でも再実行される。結果が同じなら下流に流さない
     override fun observePrograms(): Flow<List<ProgramSummary>> =
         programDao.observeSummaries().map { rows -> rows.map { it.toDomain() } }.distinctUntilChanged()
+    override fun observeLocalStorage(): Flow<LocalStorageUsage> =
+        localFileDao.observeUsage().map { LocalStorageUsage(it.totalBytes, it.episodeCount) }
     override fun observeProgram(programId: ProgramId): Flow<Program?> =
         programDao.observeById(programId.value).map { it?.toDomain() }
     override fun observeEpisodes(programId: ProgramId): Flow<List<EpisodeWithState>> =
