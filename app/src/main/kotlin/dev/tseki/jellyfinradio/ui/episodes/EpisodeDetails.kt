@@ -19,9 +19,9 @@ object EpisodeDetails {
 
     /**
      * 利用者向け: 各回・手元・再生の 3 群。手元に無い／再生記録が無いときはその群を 1 行に畳む。サイズが記録されていなければ「不明」。
-     * 出演者と放送局（#70）は「全部の値を並べる」画面なので無くても行を出す。放送局は番組の値（[program] が null なら「不明」）。
+     * 出演者と放送局（#70）は「全部の値を並べる」画面なので無くても行を出す（出演者は「なし」、放送局が無い番組は「不明」）。
      */
-    fun sections(item: EpisodeWithState, program: Program?): List<Section> {
+    fun sections(item: EpisodeWithState, program: Program): List<Section> {
         val e = item.episode
         val local = item.localFile
         val playback = item.playback
@@ -30,7 +30,7 @@ object EpisodeDetails {
             listOf(
                 Row("放送日", e.airedAt.toAiredDateText()),
                 Row("出演者", e.performers.toPerformersText() ?: "なし"),
-                Row("放送局", program?.stationName ?: "不明"),
+                Row("放送局", program.stationName ?: "不明"),
                 Row("尺", e.runtime.toClockText()),
                 Row("サイズ", if (e.sizeBytes > 0) e.sizeBytes.toSizeText() else "不明"),
             ),

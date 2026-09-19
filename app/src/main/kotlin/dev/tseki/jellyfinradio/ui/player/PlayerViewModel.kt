@@ -28,6 +28,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.StateFlow
@@ -78,15 +79,19 @@ class PlayerViewModel @Inject constructor(
         .distinctUntilChanged()
         .flatMapLatest { id -> if (id == null) flowOf(false) else playbackStates.observe(id).map { it?.played == true } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
-    /** タイトルの下の `放送局 · 出演者`（#70）。放送局は番組から、出演者は各回から取る。どちらも無ければ null で行ごと出さない。 */
+    /**
+     * タイトルの下の `放送局 · 出演者`（#70）。放送局は番組から、出演者は各回から取り、どちらも Room を購読する
+     * （この画面を開いたまま同期が出演者を書き換えても追従する）。どちらも無ければ null。番組 ID を知るために最初に 1 回だけ各回を引く。
+     */
     val subtitle: StateFlow<String?> = _uiState
         .map { it.episodeId }
         .distinctUntilChanged()
         .flatMapLatest { id ->
             if (id == null) return@flatMapLatest flowOf(null)
             flow<String?> {
-                val item = library.getEpisode(id) ?: return@flow emit(null)
-                emitAll(library.observeProgram(item.episode.programId).map { playerSubtitle(it?.stationName, item.episode.performers) })
+                val programId = library.getEpisode(id)?.episode?.programId ?: return@flow emit(null)
+                val performers = library.observeEpisodes(programId).map { list -> list.firstOrNull { it.episode.id == id }?.episode?.performers.orEmpty() }
+                emitAll(combine(library.observeProgram(programId), performers) { program, names -> playerSubtitle(program?.stationName, names) })
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)

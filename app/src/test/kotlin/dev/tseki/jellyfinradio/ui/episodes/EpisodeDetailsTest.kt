@@ -61,12 +61,12 @@ class EpisodeDetailsTest {
         assertEquals(listOf(Row("再生位置", "12:00 / 1:00:00"), Row("再生済み", "未再生")), sections[2].rows)
     }
 
-    /** 出演者（#70）は「、」で並べ、放送局は番組から。番組が読めていなければ「不明」。 */
+    /** 出演者（#70）は「、」で並べ、放送局は番組から。放送局の無い番組は「不明」。 */
     @Test
     fun performersAndStationRows() {
         val item = EpisodeWithState(episode.copy(performers = listOf("岩井勇気", "澤部佑")), null, null)
         assertEquals(Row("出演者", "岩井勇気、澤部佑"), EpisodeDetails.sections(item, program)[0].rows[1])
-        assertEquals(Row("放送局", "不明"), EpisodeDetails.sections(item, null)[0].rows[2])
+        assertEquals(Row("放送局", "不明"), EpisodeDetails.sections(item, program.copy(stationName = null))[0].rows[2])
     }
 
     @Test

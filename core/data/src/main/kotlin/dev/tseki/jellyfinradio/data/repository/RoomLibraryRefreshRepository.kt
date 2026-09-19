@@ -32,7 +32,7 @@ import kotlin.time.Clock
 
 /**
  * サーバの一覧を取得し、突合（[LibraryMatching]）して Room に 1 トランザクションで適用する。
- * サーバ由来の各回はサーバの値で上書きし（サーバが返さない値は手元の値を残す）、`LocalFile` / `PlaybackState` は触らない。
+ * サーバ由来の各回はサーバの値で上書きし（サーバが返さないサイズだけ手元の値を残す。出演者は空でも上書き）、`LocalFile` / `PlaybackState` は触らない。
  *
  * 全走査（[refresh]）は同期そのもの: 取り込んだ後に [SyncPlanner] を回し、保持ルールによる削除・サーバから消えた各回の除去・
  * ダウンロードの予約まで行う（ADR 0004）。番組単位（[refreshProgram]）は取り込みだけで、削除はしない。

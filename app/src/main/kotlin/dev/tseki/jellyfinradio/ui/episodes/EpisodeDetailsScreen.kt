@@ -72,8 +72,10 @@ fun EpisodeDetailsScreen(onBack: () -> Unit, viewModel: EpisodeDetailsViewModel 
         },
     ) { padding ->
         val current = item ?: return@Scaffold
+        // 番組も読めてから出す（先に各回だけ出すと放送局の行が一瞬「不明」になる）。各回があれば番組は必ずある（FK）
+        val currentProgram = program ?: return@Scaffold
         LazyColumn(Modifier.padding(padding).fillMaxSize()) {
-            for (section in EpisodeDetails.sections(current, program)) {
+            for (section in EpisodeDetails.sections(current, currentProgram)) {
                 item { SectionTitle(section.title) }
                 items(section.rows) { row -> ValueRow(row.label, row.value) }
             }
