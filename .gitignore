@@ -16,3 +16,6 @@ captures/
 *.iml
 .vscode/
 .DS_Store
+
+# Claude Code（並行作業用の worktree。セッションが repo 直下に作る）
+.claude/worktrees/
