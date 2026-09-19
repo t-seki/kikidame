@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -49,6 +50,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -74,15 +76,6 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.setPlayed(!played) }, enabled = state.episodeId != null) {
-                        if (played) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = "再生済み（タップで未再生に）")
-                        } else {
-                            Icon(Icons.Outlined.Circle, contentDescription = "未再生（タップで再生済みに）")
-                        }
                     }
                 },
             )
@@ -149,21 +142,19 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
                 durationMs = state.durationMs,
                 onSeek = viewModel::seekTo,
             )
-            // シークバーの下: 倍速（#35）とスリープタイマー（#36）
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start, verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = { showSpeedSheet = true }) {
-                    Text(PlaybackSpeed.label(speed), style = MaterialTheme.typography.labelLarge)
+            // シークバーの下: 倍速（#35）・再生済み・スリープタイマー（#36）を中央 3 列に（#57）。
+            // 片手で使うので、TopAppBar（親指が届かない）ではなく下半分にまとめる
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                SubAction(Icons.Filled.Speed, contentDescription = null, label = PlaybackSpeed.label(speed)) { showSpeedSheet = true }
+                if (played) {
+                    SubAction(Icons.Default.CheckCircle, contentDescription = "再生済み（タップで未再生に）", label = "再生済み", enabled = state.episodeId != null) { viewModel.setPlayed(false) }
+                } else {
+                    SubAction(Icons.Outlined.Circle, contentDescription = "未再生（タップで再生済みに）", label = "未再生", enabled = state.episodeId != null) { viewModel.setPlayed(true) }
                 }
-                TextButton(onClick = { showSleepSheet = true }) {
-                    if (sleepTimerSet) {
-                        Icon(Icons.Filled.Bedtime, contentDescription = "スリープタイマー（設定中）", Modifier.size(18.dp))
-                    } else {
-                        Icon(Icons.Outlined.Bedtime, contentDescription = "スリープタイマー", Modifier.size(18.dp))
-                    }
-                    sleepTimerLabel?.let {
-                        Spacer(Modifier.width(6.dp))
-                        Text(it, style = MaterialTheme.typography.labelLarge)
-                    }
+                if (sleepTimerSet) {
+                    SubAction(Icons.Filled.Bedtime, contentDescription = "スリープタイマー（設定中）", label = sleepTimerLabel ?: "スリープ") { showSleepSheet = true }
+                } else {
+                    SubAction(Icons.Outlined.Bedtime, contentDescription = "スリープタイマー", label = "スリープ") { showSleepSheet = true }
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -200,6 +191,15 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
             onSelectEndOfEpisode = viewModel::setSleepTimerToEndOfEpisode,
             onDismiss = { showSleepSheet = false },
         )
+    }
+}
+/** シークバー下の 3 列の 1 つ。アイコン＋短いラベル。 */
+@Composable
+private fun SubAction(icon: ImageVector, contentDescription: String?, label: String, enabled: Boolean = true, onClick: () -> Unit) {
+    TextButton(onClick = onClick, enabled = enabled) {
+        Icon(icon, contentDescription = contentDescription, Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(label, style = MaterialTheme.typography.labelLarge)
     }
 }
 /** 倍速を選ぶシート。保存と反映は ViewModel → 設定 → サービスの経路で、ここは選択肢を見せるだけ。狭い画面では折り返す。 */
