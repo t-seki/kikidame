@@ -64,6 +64,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -226,11 +227,15 @@ fun EpisodeListScreen(
     }
 }
 
+/** タイトル前の印の大きさと、印とタイトルの間隔。印の無い行の枠と補足行の字下げにも使う。 */
+private val MARK_SIZE = 14.dp
+private val MARK_GAP = 4.dp
 /**
  * 右端のアイコンは状態を表し、タップで最も自然な 1 操作をする:
  * 雲 → ダウンロード（= 固定）、待機／進捗 → キャンセル、警告 → 再試行、手元にある回 → 再生済み切替。
  * 残りの操作は長押しのボトムシート。手元に無い回はタップで再生画面へ行かない。
- * 聴いている回（[nowPlaying] がこの回）は背景を変え、タイトルの前に再生中／一時停止のアイコンを出す。
+ * タイトルの前に印を出す: 固定（ダウンロード済みで固定された回）のピンと、聴いている回（[nowPlaying] がこの回。背景も変える）の
+ * 再生中／一時停止。両方あれば並べる。印の無い行にも同じ幅を確保し、タイトル（1 行）と補足行の開始位置を揃える。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -260,24 +265,31 @@ private fun EpisodeRow(
             containerColor = if (nowPlaying != null) MaterialTheme.colorScheme.secondaryContainer else ListItemDefaults.containerColor,
         ),
         headlineContent = {
+            // 印（固定・再生中／一時停止）はタイトルの前に置くが、印の無い行にも同じ幅の枠を確保してタイトルの開始位置を揃える（#56）。
+            // 固定と聴いている回は独立した状態なので両方出す（両方ある行だけ 1 つ分右にずれるが、背景色で目立つ 1 行なので許容）
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (local?.pinned == true && state == DownloadState.DONE) {
-                    Icon(Icons.Filled.PushPin, contentDescription = "固定", Modifier.size(14.dp))
-                    Spacer(Modifier.width(4.dp))
+                val pinned = local?.pinned == true && state == DownloadState.DONE
+                if (pinned) {
+                    Icon(Icons.Filled.PushPin, contentDescription = "固定", Modifier.size(MARK_SIZE))
+                    Spacer(Modifier.width(MARK_GAP))
                 }
-                if (nowPlaying != null) {
-                    if (nowPlaying.isPlaying) {
-                        Icon(Icons.Filled.GraphicEq, contentDescription = "聴いている回（再生中）", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
-                    } else {
-                        Icon(Icons.Filled.Pause, contentDescription = "聴いている回（一時停止中）", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                when {
+                    nowPlaying != null && nowPlaying.isPlaying -> {
+                        Icon(Icons.Filled.GraphicEq, contentDescription = "聴いている回（再生中）", Modifier.size(MARK_SIZE), tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(MARK_GAP))
                     }
-                    Spacer(Modifier.width(4.dp))
+                    nowPlaying != null -> {
+                        Icon(Icons.Filled.Pause, contentDescription = "聴いている回（一時停止中）", Modifier.size(MARK_SIZE), tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(MARK_GAP))
+                    }
+                    !pinned -> Spacer(Modifier.width(MARK_SIZE + MARK_GAP)) // 印が無い行の枠
                 }
-                Text(item.episode.title)
+                Text(item.episode.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         },
         supportingContent = {
-            Column {
+            // 補足行もタイトルと同じ位置から始める（枠＋間隔ぶんを空ける）
+            Column(Modifier.padding(start = MARK_SIZE + MARK_GAP)) {
                 val status = when (state) {
                     DownloadState.PENDING -> if (waitingForNetwork) " · Wi-Fi 待ち" else " · 待機中"
                     DownloadState.RUNNING -> " · ダウンロード中"
