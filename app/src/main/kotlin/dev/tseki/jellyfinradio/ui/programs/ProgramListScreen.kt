@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -15,12 +17,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarOutline
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.InputChip
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,6 +64,8 @@ import dev.tseki.jellyfinradio.domain.EpisodeId
 import dev.tseki.jellyfinradio.domain.ProgramId
 import dev.tseki.jellyfinradio.domain.ProgramSummary
 import dev.tseki.jellyfinradio.ui.player.MiniPlayer
+import dev.tseki.jellyfinradio.ui.programs.ProgramFilter.Station
+import dev.tseki.jellyfinradio.ui.programs.ProgramFilter.StationKey
 import dev.tseki.jellyfinradio.ui.toAiredDateText
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,18 +76,29 @@ fun ProgramListScreen(
     onNowPlayingClick: (EpisodeId) -> Unit,
     viewModel: ProgramListViewModel = hiltViewModel(),
 ) {
-    val programs by viewModel.programs.collectAsStateWithLifecycle()
+    val filtered by viewModel.filtered.collectAsStateWithLifecycle()
     val canRefresh by viewModel.canRefresh.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
     val isSearching by viewModel.isSearching.collectAsStateWithLifecycle()
-    val isFiltering by viewModel.isFiltering.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    // 他のシートと同じく remember（プロセス死で開き直さない。絞り込みの状態も復元しないので）
+    var showStationSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
     }
 
+    // 入口のアイコンと同じ条件（局が 2 種類以上）。開いている間に同期で局が減ったら閉じる
+    val stations = filtered?.stations.orEmpty()
+    if (showStationSheet && stations.size >= 2) {
+        StationSheet(
+            stations = stations,
+            selected = filtered?.station,
+            onSelect = viewModel::selectStation,
+            onDismiss = { showStationSheet = false },
+        )
+    }
     // 検索欄が開いているときの戻るボタンは検索を閉じるだけ（番組一覧は根なので、そのままだとアプリを抜ける）
     BackHandler(enabled = isSearching, onBack = viewModel::stopSearch)
     Scaffold(
@@ -86,12 +108,20 @@ fun ProgramListScreen(
                 TopAppBar(
                     title = { Text("番組") },
                     actions = {
+                        // 放送局で絞る（#45）。局が 2 種類未満なら絞る意味が無いので出さない。選択中は点を付ける
+                        if (stations.size >= 2) {
+                            IconButton(onClick = { showStationSheet = true }) {
+                                BadgedBox(badge = { if (filtered?.station != null) Badge() }) {
+                                    Icon(Icons.Default.FilterList, contentDescription = "放送局で絞る")
+                                }
+                            }
+                        }
                         when {
                             isSearching -> IconButton(onClick = viewModel::stopSearch) {
                                 Icon(Icons.Default.Close, contentDescription = "検索を閉じる")
                             }
                             // 絞る対象が無いときは虫眼鏡を出さない
-                            !programs.isNullOrEmpty() -> IconButton(onClick = viewModel::startSearch) {
+                            filtered?.stations?.isNotEmpty() == true -> IconButton(onClick = viewModel::startSearch) {
                                 Icon(Icons.Default.Search, contentDescription = "検索")
                             }
                         }
@@ -101,6 +131,9 @@ fun ProgramListScreen(
                     },
                 )
                 if (isSearching) SearchField(query, onQueryChange = viewModel::setQuery)
+                filtered?.station?.let { station ->
+                    SelectedStationRow(station, onClear = { viewModel.selectStation(null) })
+                }
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -111,25 +144,27 @@ fun ProgramListScreen(
             onRefresh = { if (canRefresh) viewModel.refresh() },
             modifier = Modifier.padding(padding).fillMaxSize(),
         ) {
-            val list = programs
+            val state = filtered
+            val list = state?.programs
             when {
-                list == null -> Box(Modifier.fillMaxSize())
-                list.isEmpty() && isFiltering -> NoMatch(query)
-                list.isEmpty() -> EmptyPrograms(canRefresh)
+                state == null || list == null -> Box(Modifier.fillMaxSize())
+                // 番組自体が無い（局も集まらない）なら、検索中でも「一致なし」ではなく空の案内
+                state.stations.isEmpty() -> EmptyPrograms(canRefresh)
+                list.isEmpty() -> NoMatch(query, state.station)
                 else -> {
                     val listState = rememberLazyListState()
-                    // 検索語が変わるたびに先頭へ（絞った結果は先頭から見たい。解除したときも先頭に戻す）。
+                    // 検索語か局が変わるたびに先頭へ（絞った結果は先頭から見たい。解除したときも先頭に戻す）。
                     // 末尾の空白など絞り込みに効かない変化では動かさず、初回も動かさない（番組から戻ったときに復元された位置を潰さない）
-                    val effectiveQuery = ProgramFilter.normalize(query)
-                    var seenQuery by remember { mutableStateOf(effectiveQuery) }
-                    LaunchedEffect(effectiveQuery) {
-                        if (effectiveQuery != seenQuery) {
-                            seenQuery = effectiveQuery
+                    val filterKey = ProgramFilter.normalize(query) to state.station
+                    var seenKey by remember { mutableStateOf(filterKey) }
+                    LaunchedEffect(filterKey) {
+                        if (filterKey != seenKey) {
+                            seenKey = filterKey
                             listState.scrollToItem(0)
                         }
                     }
-                    if (isFiltering) {
-                        // 絞り込み中は該当が少ないので節に分けずフラットに出す（#45 の局チップも同じ規則）
+                    if (state.isFiltering) {
+                        // 何らかの絞り込みが効いていれば節に分けずフラットに出す（#44・#45 共通の規則。検索は該当が少なく節が邪魔、局はそれに揃えた）
                         LazyColumn(Modifier.fillMaxSize(), state = listState) {
                             programItems(list, onProgramClick, viewModel::setStarred)
                         }
@@ -247,14 +282,67 @@ private fun ProgramRow(summary: ProgramSummary, onClick: () -> Unit, onToggleSta
     )
 }
 
+/**
+ * 放送局を選ぶシート（#45）。「すべて」＋ 手元の番組から集めた局を番組数付きで縦に並べる。
+ * 局が増えても横にはみ出さず全局が一目で分かる。選んだら閉じる。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun StationSheet(
+    stations: List<Station>,
+    selected: StationKey?,
+    onSelect: (StationKey?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    // 半開きだと下の局が隠れて「全局が一目」にならないので最初から全開
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Text("放送局", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+        LazyColumn {
+            item(key = "all") {
+                StationChoice("すべて", stations.sumOf { it.programCount }, selected == null) { onSelect(null); onDismiss() }
+            }
+            // 「すべて」「局なし」と局名が衝突しないよう接頭辞を付ける
+            items(stations, key = { it.key.name?.let { n -> "station:$n" } ?: "none" }) { station ->
+                StationChoice(station.key.label, station.programCount, station.key == selected) { onSelect(station.key); onDismiss() }
+            }
+            item { Spacer(Modifier.padding(bottom = 32.dp)) }
+        }
+    }
+}
+@Composable
+private fun StationChoice(label: String, programCount: Int, selected: Boolean, onClick: () -> Unit) {
+    ListItem(
+        modifier = Modifier.clickable(onClick = onClick),
+        leadingContent = { RadioButton(selected = selected, onClick = null) },
+        headlineContent = { Text(label) },
+        trailingContent = { Text("$programCount", style = MaterialTheme.typography.bodyMedium) },
+    )
+}
+/**
+ * 選択中の局を 1 チップで示す。チップのタップ（× を含む）で「すべて」に戻す。局を変えるのは TopAppBar のアイコンから。
+ * × だけを別の clickable にすると当たり判定が小さくなるので、チップ全体を解除にする。
+ */
+@Composable
+private fun SelectedStationRow(station: StationKey, onClear: () -> Unit) {
+    Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+        InputChip(
+            selected = true,
+            onClick = onClear,
+            label = { Text(station.label) },
+            trailingIcon = { Icon(Icons.Default.Close, contentDescription = "局の絞り込みを解除") },
+        )
+    }
+}
 /** 絞り込みが効いていて該当が無いとき。番組自体が無いのとは別物なので、更新の案内は出さない。 */
 @Composable
-private fun NoMatch(query: String) {
+private fun NoMatch(query: String, station: StationKey?) {
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                // 局だけで 0 件にはならない（局の候補は手元の番組から集めるので）。検索語は必ずある
+                val prefix = station?.let { "${it.label}に " } ?: ""
                 Text(
-                    "\"${ProgramFilter.normalize(query)}\" に一致する番組がありません",
+                    "$prefix\"${ProgramFilter.normalize(query)}\" に一致する番組がありません",
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                 )
