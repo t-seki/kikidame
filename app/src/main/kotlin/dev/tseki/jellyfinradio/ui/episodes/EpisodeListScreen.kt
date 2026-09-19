@@ -78,6 +78,7 @@ import dev.tseki.jellyfinradio.download.DownloadProgress
 import dev.tseki.jellyfinradio.playback.NowPlayingState
 import dev.tseki.jellyfinradio.ui.player.MiniPlayer
 import dev.tseki.jellyfinradio.ui.toAiredDateText
+import dev.tseki.jellyfinradio.ui.toPerformersText
 import dev.tseki.jellyfinradio.ui.toText
 import dev.tseki.jellyfinradio.ui.toClockText
 import kotlin.time.Duration
@@ -330,9 +331,9 @@ private fun EpisodeRow(
 }
 
 /**
- * 行の補足: `放送日 · 尺 · 状態`。状態はダウンロードの待機／進行／失敗のときだけ付く。
+ * 行の補足: `放送日 · 出演者 · 尺 · 状態`。出演者（#70）は無い回では省き、状態はダウンロードの待機／進行／失敗のときだけ付く。
  * 録音側が各回のタイトルを `YYYY-MM-DD` と付けるので、タイトルが放送日と同じ文字列なら同じ日付が 2 段に並んで
- * 冗長になる。そのときだけ放送日を省いて `尺 · 状態` にする（#66）。判定は完全一致で、表記ゆれ（`2026/08/02`）や
+ * 冗長になる。そのときだけ放送日を省いて `出演者 · 尺 · 状態` にする（#66）。判定は完全一致で、表記ゆれ（`2026/08/02`）や
  * `(1)` 付きは一致とみなさない（そういう回では両方の値に意味がある）。
  */
 internal fun EpisodeWithState.toSupportingText(waitingForNetwork: Boolean): String {
@@ -343,7 +344,7 @@ internal fun EpisodeWithState.toSupportingText(waitingForNetwork: Boolean): Stri
         DownloadState.FAILED -> "失敗（タップで再試行）"
         else -> null
     }
-    return listOfNotNull(aired, episode.runtime.toClockText(), status).joinToString(" · ")
+    return listOfNotNull(aired, episode.performers.toPerformersText(), episode.runtime.toClockText(), status).joinToString(" · ")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

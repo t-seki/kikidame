@@ -32,6 +32,8 @@ fun Long.toSizeText(): String {
 }
 /** 「12.3 GB（123 回）」。手元のファイルの合計と回数を並べる。 */
 fun LocalStorageUsage.toText(): String = "${totalBytes.toSizeText()}（$episodeCount 回）"
+/** 出演者（#70）を 1 つの文字列に。「岩井勇気、澤部佑」。無ければ null（一覧と再生画面はその部分を省き、詳細は「なし」と出す）。 */
+fun List<String>.toPerformersText(): String? = takeIf { it.isNotEmpty() }?.joinToString("、")
 fun Duration.toClockText(): String = toComponents { hours, minutes, seconds, _ ->
     if (hours > 0) "%d:%02d:%02d".format(hours, minutes, seconds) else "%d:%02d".format(minutes, seconds)
 }

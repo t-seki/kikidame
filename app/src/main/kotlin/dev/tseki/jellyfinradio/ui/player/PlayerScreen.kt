@@ -65,6 +65,7 @@ import kotlin.time.Duration.Companion.milliseconds
 fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val played by viewModel.played.collectAsStateWithLifecycle()
+    val subtitle by viewModel.subtitle.collectAsStateWithLifecycle()
     val speed by viewModel.speed.collectAsStateWithLifecycle()
     var showSpeedSheet by remember { mutableStateOf(false) }
     val sleepTimerLabel by viewModel.sleepTimerLabel.collectAsStateWithLifecycle()
@@ -125,6 +126,14 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
             verticalArrangement = Arrangement.Center,
         ) {
             Text(state.title, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+            // `放送局 · 出演者`（#70）。無い回や読み込み前も 1 行分の場所は確保して、回が進んだときにタイトルが跳ねないようにする
+            Spacer(Modifier.height(4.dp))
+            Text(
+                subtitle ?: " ",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
             state.error?.let {
                 Spacer(Modifier.height(8.dp))
                 Text(it, color = MaterialTheme.colorScheme.error)

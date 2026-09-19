@@ -55,6 +55,8 @@ data class EpisodeEntity(
     val runtimeTicks: Long,
     val sizeBytes: Long,
     val container: String,
+    /** 出演者（Audio.Artists、#70）。[Converters] で 1 列に畳む。v6 で追加 */
+    @ColumnInfo(defaultValue = "") val performers: List<String> = emptyList(),
 )
 /** ダウンロード状態の唯一の正（ADR 0003）。 */
 @Entity(
