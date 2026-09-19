@@ -31,7 +31,7 @@ data class NowPlayingState(
      * 「この回の終わりまで」で回の終わりで止めたとき（#36）。載ったままだが、同期はもう削除から外さない（#27）。
      */
     val isEnded: Boolean = false,
-    /** ミニプレイヤーの進捗線（#59）。再生中は 1 秒ごとに更新する。尺が分からなければ [durationMs] は 0。 */
+    /** ミニプレイヤーの再生位置の線（#59）。再生中は 1 秒ごとに更新する。尺が分からなければ [durationMs] は 0。 */
     val positionMs: Long = 0,
     val durationMs: Long = 0,
 )

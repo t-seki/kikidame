@@ -30,7 +30,7 @@
 | `background` / `onBackground` | surface / onSurface と同じ | 同左 | Scaffold の地。既定のままだと Material3 の素の色が透ける |
 | `onSurfaceVariant` | `#B3A58F` | `#5E5347` | 補足行・ラベル |
 | `surfaceContainerLow` | `#1B1815` | `#F5F0E8` | |
-| `surfaceContainer` | `#211D18` | `#EFE9DF` | TopAppBar・ミニプレイヤーの地 |
+| `surfaceContainer` | `#211D18` | `#EFE9DF` | TopAppBar の地。ミニプレイヤーはこれに `primary` を 18% 混ぜた面（#59） |
 | `surfaceContainerHigh` | `#2B261F` | `#E8E1D5` | ボトムシート |
 | `surfaceContainerHighest` | `#35302A` | `#E1D9CC` | 入力欄 |
 | `error` | `#FF7A68` | `#B3261E` | 消失（雲）・ダウンロード失敗・破壊的操作 |
