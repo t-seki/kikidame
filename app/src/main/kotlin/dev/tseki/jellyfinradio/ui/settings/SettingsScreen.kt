@@ -34,6 +34,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tseki.jellyfinradio.domain.SessionState
 import dev.tseki.jellyfinradio.ui.toDateTimeText
+import dev.tseki.jellyfinradio.ui.toText
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,6 +45,7 @@ fun SettingsScreen(
 ) {
     val session by viewModel.session.collectAsStateWithLifecycle()
     val wifiOnly by viewModel.wifiOnly.collectAsStateWithLifecycle()
+    val localStorage by viewModel.localStorage.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var confirmSignOut by remember { mutableStateOf(false) }
@@ -88,6 +90,11 @@ fun SettingsScreen(
             )
             HorizontalDivider()
             Text("ダウンロード", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(16.dp, 16.dp, 16.dp, 4.dp))
+            // 手元のファイルの合計（#42）。保持ルールや固定を調整する動機は容量なので、見えるようにする
+            ListItem(
+                headlineContent = { Text(localStorage?.toText() ?: "-") },
+                supportingContent = { Text("手元のファイル") },
+            )
             ListItem(
                 modifier = Modifier.clickable { viewModel.setWifiOnly(!wifiOnly) },
                 headlineContent = { Text("Wi-Fi のみ") },

@@ -28,9 +28,21 @@ data class EpisodeWithState(
         get() = playback?.let { PlaybackRules.resumePosition(it.position, episode.runtime) }
             ?.takeIf { it > Duration.ZERO }
 }
+/** 手元のファイルの合計（#42）。手元にある（DONE でパスがある）各回だけで、ダウンロード途中の分は入らない。 */
+data class LocalStorageUsage(val totalBytes: Long, val episodeCount: Int) {
+    companion object {
+        /** 一覧（番組の各回など）から数える。[LibraryRepository.observeLocalStorage] の全体の集計と同じ定義。 */
+        fun of(episodes: List<EpisodeWithState>): LocalStorageUsage {
+            val local = episodes.filter { it.isPlayable }
+            return LocalStorageUsage(local.sumOf { it.episode.sizeBytes }, local.size)
+        }
+    }
+}
 interface LibraryRepository {
     /** 最新の各回の放送日が新しい順。 */
     fun observePrograms(): Flow<List<ProgramSummary>>
+    /** 手元のファイルの合計。ダウンロード・削除で追従する。 */
+    fun observeLocalStorage(): Flow<LocalStorageUsage>
     fun observeProgram(programId: ProgramId): Flow<Program?>
     /** [EpisodeOrder.newestFirst]（放送日の新しい順、同着はタイトルの辞書順）。 */
     fun observeEpisodes(programId: ProgramId): Flow<List<EpisodeWithState>>

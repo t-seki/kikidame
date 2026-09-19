@@ -11,6 +11,7 @@ import dev.tseki.jellyfinradio.domain.EpisodeId
 import dev.tseki.jellyfinradio.domain.EpisodeWithState
 import dev.tseki.jellyfinradio.domain.LibraryRepository
 import dev.tseki.jellyfinradio.domain.LocalDeletionScope
+import dev.tseki.jellyfinradio.domain.LocalStorageUsage
 import dev.tseki.jellyfinradio.domain.PlaybackRules
 import dev.tseki.jellyfinradio.domain.PlaybackStateRepository
 import dev.tseki.jellyfinradio.domain.Program
@@ -57,6 +58,10 @@ class EpisodeListViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     val episodes: StateFlow<List<EpisodeWithState>?> = library.observeEpisodes(programId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    /** この番組の手元のファイルの合計（#42）。一覧から数えるので新しいクエリは要らない。null は読み込み前。 */
+    val localStorage: StateFlow<LocalStorageUsage?> = episodes
+        .map { list -> list?.let(LocalStorageUsage::of) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     val canRefresh: StateFlow<Boolean> = sessionRepository.state
