@@ -79,9 +79,9 @@ class ProgramListViewModel @Inject constructor(
     fun setQuery(query: String) {
         _query.value = query
     }
-    /** チップをタップ。選択中の局をもう一度タップしたら解除（「すべて」）。 */
-    fun toggleStation(station: StationKey) {
-        _station.value = if (_station.value == station) null else station
+    /** シートで局を選ぶ。null は「すべて」。 */
+    fun selectStation(station: StationKey?) {
+        _station.value = station
     }
     fun clearStation() {
         _station.value = null

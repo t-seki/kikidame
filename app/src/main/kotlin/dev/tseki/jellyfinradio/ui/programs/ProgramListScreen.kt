@@ -7,24 +7,29 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarOutline
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.InputChip
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,6 +47,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,11 +83,20 @@ fun ProgramListScreen(
     val query by viewModel.query.collectAsStateWithLifecycle()
     val isSearching by viewModel.isSearching.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    var showStationSheet by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
     }
 
+    if (showStationSheet) {
+        StationSheet(
+            stations = filtered?.stations.orEmpty(),
+            selected = filtered?.station,
+            onSelect = viewModel::selectStation,
+            onDismiss = { showStationSheet = false },
+        )
+    }
     // 検索欄が開いているときの戻るボタンは検索を閉じるだけ（番組一覧は根なので、そのままだとアプリを抜ける）
     BackHandler(enabled = isSearching, onBack = viewModel::stopSearch)
     Scaffold(
@@ -91,6 +106,15 @@ fun ProgramListScreen(
                 TopAppBar(
                     title = { Text("番組") },
                     actions = {
+                        // 放送局で絞る（#45）。局が 2 種類未満なら絞る意味が無いので出さない。選択中は点を付ける
+                        val stations = filtered?.stations.orEmpty()
+                        if (stations.size >= 2) {
+                            IconButton(onClick = { showStationSheet = true }) {
+                                BadgedBox(badge = { if (filtered?.station != null) Badge() }) {
+                                    Icon(Icons.Default.FilterList, contentDescription = "放送局で絞る")
+                                }
+                            }
+                        }
                         when {
                             isSearching -> IconButton(onClick = viewModel::stopSearch) {
                                 Icon(Icons.Default.Close, contentDescription = "検索を閉じる")
@@ -106,10 +130,8 @@ fun ProgramListScreen(
                     },
                 )
                 if (isSearching) SearchField(query, onQueryChange = viewModel::setQuery)
-                // 放送局のチップ（#45）。局が 2 種類未満なら絞る意味が無いので出さない
-                val stations = filtered?.stations.orEmpty()
-                if (stations.size >= 2) {
-                    StationChips(stations, filtered?.station, onToggle = viewModel::toggleStation, onClearStation = viewModel::clearStation)
+                filtered?.station?.let { station ->
+                    SelectedStationRow(station, onClick = { showStationSheet = true }, onClear = viewModel::clearStation)
                 }
             }
         },
@@ -260,39 +282,57 @@ private fun ProgramRow(summary: ProgramSummary, onClick: () -> Unit, onToggleSta
 }
 
 /**
- * 放送局のチップ列（#45）。「すべて」＋ 手元の番組から集めた局を 1 行横スクロールで並べる。
- * 選んだチップが画面外（左右どちらでも）にあれば見える位置まで寄せる。
+ * 放送局を選ぶシート（#45）。「すべて」＋ 手元の番組から集めた局を番組数付きで縦に並べる。
+ * 局が増えても横にはみ出さず全局が一目で分かる。選んだら閉じる。
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun StationChips(
+private fun StationSheet(
     stations: List<Station>,
     selected: StationKey?,
-    onToggle: (StationKey) -> Unit,
-    onClearStation: () -> Unit,
+    onSelect: (StationKey?) -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    val rowState = rememberLazyListState()
-    LaunchedEffect(selected) {
-        val index = stations.indexOfFirst { it.key == selected } + 1 // 0 は「すべて」
-        val info = rowState.layoutInfo
-        val visible = info.visibleItemsInfo.any { it.index == index && it.offset >= info.viewportStartOffset && it.offset + it.size <= info.viewportEndOffset }
-        if (!visible) rowState.animateScrollToItem(index)
+    // 半開きだと下の局が隠れて「全局が一目」にならないので最初から全開
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Text("放送局", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+        LazyColumn {
+            item(key = "all") {
+                StationChoice("すべて", stations.sumOf { it.programCount }, selected == null) { onSelect(null); onDismiss() }
+            }
+            // 「すべて」「局なし」と局名が衝突しないよう接頭辞を付ける
+            items(stations, key = { it.key.name?.let { n -> "station:$n" } ?: "none" }) { station ->
+                StationChoice(station.key.label, station.programCount, station.key == selected) { onSelect(station.key); onDismiss() }
+            }
+            item { Spacer(Modifier.padding(bottom = 32.dp)) }
+        }
     }
-    LazyRow(
-        state = rowState,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        item(key = "all") {
-            FilterChip(selected = selected == null, onClick = onClearStation, label = { Text("すべて") })
-        }
-        // 「すべて」「局なし」と局名が衝突しないよう接頭辞を付ける
-        items(stations, key = { it.key.name?.let { n -> "station:$n" } ?: "none" }) { station ->
-            FilterChip(
-                selected = station.key == selected,
-                onClick = { onToggle(station.key) },
-                label = { Text(station.key.label) },
-            )
-        }
+}
+@Composable
+private fun StationChoice(label: String, programCount: Int, selected: Boolean, onClick: () -> Unit) {
+    ListItem(
+        modifier = Modifier.clickable(onClick = onClick),
+        leadingContent = { RadioButton(selected = selected, onClick = null) },
+        headlineContent = { Text(label) },
+        trailingContent = { Text("$programCount", style = MaterialTheme.typography.bodyMedium) },
+    )
+}
+/** 選択中の局を 1 チップで示す。タップでシートを開き直し、× で「すべて」に戻す。未選択なら何も出さない。 */
+@Composable
+private fun SelectedStationRow(station: StationKey, onClick: () -> Unit, onClear: () -> Unit) {
+    Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+        InputChip(
+            selected = true,
+            onClick = onClick,
+            label = { Text(station.label) },
+            trailingIcon = {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "局の絞り込みを解除",
+                    modifier = Modifier.clickable(onClick = onClear),
+                )
+            },
+        )
     }
 }
 /** 絞り込みが効いていて該当が無いとき。番組自体が無いのとは別物なので、更新の案内は出さない。 */
