@@ -59,7 +59,7 @@
 
 ### 共通の規則
 
-- 値を見せる行は `overlineContent` = ラベル、`headlineContent` = 値。操作の行は `headlineContent` = 操作名、`supportingContent` = 説明
+- 値を見せる行は `overlineContent` = ラベル、`headlineContent` = 値。操作の行は `headlineContent` = 操作名、`supportingContent` = 説明。少数の選択肢から 1 つ選ぶ行は `overlineContent` = ラベル、`headlineContent` = `FilterChip` の並び（保持ルールの「最新 N 回」、設定の「テーマ」）
 - 状態の色は `primary`（よく聴く・同期対象・再生中）と `error`（消失・失敗・破壊的操作）だけ。聴いている回の行の背景は `secondaryContainer`
 - ボトムシートは「その画面に留まったまま 1 つ選ぶ」ときに使い、スクロールする長い一覧は画面にする（#43 の判断）
 - ジャケット・波形など、データに無い視覚要素で埋めない（ラジオ録音にジャケットは無い。偽の波形も置かない）
