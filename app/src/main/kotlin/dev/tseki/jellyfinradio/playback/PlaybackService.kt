@@ -118,11 +118,12 @@ class PlaybackService : MediaSessionService() {
         }
     }
     override fun onDestroy() {
-        // player に触るものは release() の前に止める
+        // player に触るものは release() の前に止める。scope の cancel もここ（NowPlaying の位置の ticker が scope に住む）
         speedJob?.cancel()
         sleepTimerRunner?.detach()
         positionPersister?.detach()
         resumeOnTransition?.detach()
+        scope.cancel()
         session?.run {
             nowPlayingListener?.let(player::removeListener)
             player.removeListener(errorListener)
@@ -131,7 +132,6 @@ class PlaybackService : MediaSessionService() {
         }
         nowPlaying.set(null)
         session = null
-        scope.cancel()
         super.onDestroy()
     }
     /**
