@@ -8,9 +8,10 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import dev.tseki.jellyfinradio.domain.ThemeMode
 
 /**
- * 固定パレット（#54、docs/ui.md の「色」）。温かい黒にアンバーのアクセント。ダークが主で、ライトはシステム設定に追従して同じ構成で出す。
+ * 固定パレット（#54、docs/ui.md の「色」）。温かい黒にアンバーのアクセント。ダークが主で、ライトも同じ構成（既定は端末の設定に追従、設定で固定もできる #62）。
  * 状態を表す色は primary（よく聴く・同期対象・再生中）と error（消失・失敗・破壊的操作）の 2 系統だけ（聴いている回の行の背景だけ secondaryContainer）。
  * background は Scaffold の地なので surface と同じ値にする（既定のままだと Material3 の素の色が透ける）。下に無いスロットは Material3 の既定のまま。dynamic color は使わない（アプリの個性は色で出す）。
  */
@@ -80,10 +81,18 @@ private val TabularTypography: Typography = Typography().let { t ->
     )
 }
 
+/** この [ThemeMode] でダークになるか。SYSTEM なら端末の設定に追従（#62）。システムバーの文字色にも使う。 */
 @Composable
-fun JellyfinRadioTheme(content: @Composable () -> Unit) {
+fun ThemeMode.isDark(): Boolean = when (this) {
+    ThemeMode.SYSTEM -> isSystemInDarkTheme()
+    ThemeMode.DARK -> true
+    ThemeMode.LIGHT -> false
+}
+/** [themeMode] が SYSTEM なら端末の設定に追従、それ以外は指定どおり（#62）。 */
+@Composable
+fun JellyfinRadioTheme(themeMode: ThemeMode = ThemeMode.SYSTEM, content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) DarkColors else LightColors,
+        colorScheme = if (themeMode.isDark()) DarkColors else LightColors,
         typography = TabularTypography,
         content = content,
     )

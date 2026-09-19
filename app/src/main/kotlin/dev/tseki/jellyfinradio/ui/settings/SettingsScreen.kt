@@ -13,6 +13,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.material3.FilterChip
+import dev.tseki.jellyfinradio.domain.ThemeMode
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -29,6 +34,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tseki.jellyfinradio.domain.SessionState
@@ -37,7 +43,7 @@ import dev.tseki.jellyfinradio.ui.ValueRow
 import dev.tseki.jellyfinradio.ui.toDateTimeText
 import dev.tseki.jellyfinradio.ui.toText
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
@@ -47,6 +53,7 @@ fun SettingsScreen(
     val session by viewModel.session.collectAsStateWithLifecycle()
     val wifiOnly by viewModel.wifiOnly.collectAsStateWithLifecycle()
     val localStorage by viewModel.localStorage.collectAsStateWithLifecycle()
+    val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var confirmSignOut by remember { mutableStateOf(false) }
@@ -99,6 +106,26 @@ fun SettingsScreen(
                 trailingContent = { Switch(checked = wifiOnly, onCheckedChange = viewModel::setWifiOnly) },
             )
             HorizontalDivider()
+            SectionTitle("表示")
+            // テーマ（#62）。ラベル上・選択肢下。選んだ瞬間に MainActivity 側で切り替わる（再起動不要）
+            ListItem(
+                overlineContent = { Text("テーマ") },
+                headlineContent = {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+                        for (choice in ThemeMode.entries) {
+                            FilterChip(
+                                selected = themeMode == choice,
+                                onClick = { viewModel.setThemeMode(choice) },
+                                enabled = themeMode != null,
+                                label = { Text(choice.label()) },
+                            )
+                        }
+                    }
+                },
+            )
+            HorizontalDivider()
+            // 見出しが無いと「表示」の続きに見えるので群にする（#62 のレビュー指摘）
+            SectionTitle("アカウント")
             ListItem(
                 modifier = Modifier.clickable(enabled = current != null) { confirmSignOut = true },
                 headlineContent = { Text("ログアウト") },
@@ -134,4 +161,9 @@ fun SettingsScreen(
             dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("キャンセル") } },
         )
     }
+}
+private fun ThemeMode.label(): String = when (this) {
+    ThemeMode.SYSTEM -> "システム"
+    ThemeMode.DARK -> "ダーク"
+    ThemeMode.LIGHT -> "ライト"
 }
