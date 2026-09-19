@@ -237,7 +237,7 @@ private fun ProgramRow(summary: ProgramSummary, onClick: () -> Unit, onToggleSta
 
 /**
  * 絞り込みのシート（#55）。上段が検索欄（#44）、下段が「すべて」＋ 手元の番組から集めた局（#45、番組数付き）。
- * 検索語はその場で背後の一覧に効き、局は選んだら閉じる。局が 2 種類未満なら [stations] は空で、下段を出さない。
+ * 検索語はその場で背後の一覧に効き、キーボードの検索（決定）か局の選択で閉じる。局が 2 種類未満なら [stations] は空で、下段を出さない。
  * 縦に並べるので局が増えても横にはみ出さず、半開きで下の局が隠れないよう最初から全開。
  * M3 の SearchBar は全画面のサジェスト領域を持つ部品なので、その場で一覧を絞る用途には使わない。
  */
@@ -260,7 +260,7 @@ private fun FilterSheet(
     }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Text("絞り込み", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
-        // 文字は本文サイズ（見出しと区別する）。× は空欄に戻すだけで閉じない
+        // 文字は本文サイズ（見出しと区別する）。× は空欄に戻すだけで閉じない。キーボードの検索（決定）で閉じて、絞った一覧を見せる
         TextField(
             value = query,
             onValueChange = onQueryChange,
@@ -277,7 +277,7 @@ private fun FilterSheet(
             },
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+            keyboardActions = KeyboardActions(onSearch = { keyboard?.hide(); onDismiss() }),
         )
         if (stations.isNotEmpty()) {
             Text("放送局", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 4.dp))
