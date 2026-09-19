@@ -83,6 +83,11 @@ class ProgramListViewModel @Inject constructor(
     fun selectStation(station: StationKey?) {
         _station.value = station
     }
+    /** 戻るボタンで絞り込みをまとめて解除する（検索語と局の両方）。 */
+    fun clearFilters() {
+        _query.value = ""
+        _station.value = null
+    }
     fun refresh() {
         viewModelScope.launch { refresher.refresh() }
     }

@@ -1,5 +1,6 @@
 package dev.tseki.jellyfinradio.ui.programs
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -103,6 +104,9 @@ fun ProgramListScreen(
             onDismiss = { showFilterSheet = false },
         )
     }
+    // 絞り込みが効いている間の戻るボタンは絞り込みを解除するだけ（番組一覧は根なので、そのままだとアプリを抜ける）。
+    // シートが開いている間はシート自身が戻るで閉じるので、こちらは効かせない
+    BackHandler(enabled = filtered?.isFiltering == true && !showFilterSheet, onBack = viewModel::clearFilters)
     Scaffold(
         topBar = {
             // 検索（#44）と局（#45）の入口を 1 つの「絞り込み」に統合（#55）。効いている間は点を付け、
@@ -251,14 +255,15 @@ private fun FilterSheet(
     onSelectStation: (StationKey?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val focusRequester = remember { FocusRequester() }
-    val keyboard = LocalSoftwareKeyboardController.current
-    // 開いた瞬間に検索欄へフォーカスしてキーボードを出す（開く目的の大半は検索）
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-        keyboard?.show()
-    }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        // シートの中身は別ウィンドウに描かれるので、フォーカスとキーボードの取得もこの中で行う
+        val focusRequester = remember { FocusRequester() }
+        val keyboard = LocalSoftwareKeyboardController.current
+        // 開いた瞬間に検索欄へフォーカスしてキーボードを出す（開く目的の大半は検索）
+        LaunchedEffect(Unit) {
+            focusRequester.requestFocus()
+            keyboard?.show()
+        }
         Text("絞り込み", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
         // 文字は本文サイズ（見出しと区別する）。× は空欄に戻すだけで閉じない。キーボードの検索（決定）で閉じて、絞った一覧を見せる
         TextField(
@@ -289,9 +294,12 @@ private fun FilterSheet(
                 items(stations, key = { it.key.name?.let { n -> "station:$n" } ?: "none" }) { station ->
                     StationChoice(station.key.label, station.programCount, station.key == selected) { onSelectStation(station.key); onDismiss() }
                 }
+                // 末尾の余白は一覧の中に置く（外に置くと、局が多くて一覧が高さを使い切ったとき 0 になる）
+                item { Spacer(Modifier.padding(bottom = 32.dp)) }
             }
+        } else {
+            Spacer(Modifier.padding(bottom = 32.dp))
         }
-        Spacer(Modifier.padding(bottom = 32.dp))
     }
 }
 @Composable
