@@ -67,6 +67,15 @@ class DownloadScheduler @Inject constructor(
         kick()
     }
 
+    /**
+     * 「別のサーバに接続」（#50）の前に、キューの Worker を止めて完了を待つ。実行中の転送も切る
+     * （行とファイルをこれから消すので、続けても `.part` が残るか、古いサーバへ無駄に取りに行くだけ）。
+     */
+    suspend fun cancelAll() {
+        workManager.cancelUniqueWork(DownloadWorker.UNIQUE_NAME)
+        workManager.getWorkInfosForUniqueWorkFlow(DownloadWorker.UNIQUE_NAME)
+            .first { infos -> infos.all { it.state.isFinished } }
+    }
     /** 進行中の各回とその割合。走っていなければ null。 */
     val progress: Flow<DownloadProgress?> =
         workManager.getWorkInfosForUniqueWorkFlow(DownloadWorker.UNIQUE_NAME).map { infos ->

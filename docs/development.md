@@ -140,7 +140,7 @@ M1 ではサーバ無しで試すため、`getExternalFilesDir("episodes")/<放�
 - [x] ログアウト → 接続画面に URL とユーザー名が入力済み → ログインし直すと番組・再生位置が残っている
 - [x] アプリを kill して再起動しても接続画面は出ず番組一覧
 - [x] 機内モードで更新 → 「サーバに接続できません。手元の一覧を表示しています」→ 手元の回を再生できる
-- [x] 「別のサーバに接続」→ 番組・各回・再生位置・セッションが消え、音声ファイルは残る（#50 で音声ファイルも消すように変更）（DB で確認）
+- [x] 「別のサーバに接続」→ 番組・各回・再生位置・セッションが消え、音声ファイルは残る（M2 当時。#50 からは音声ファイルも消える）（DB で確認）
 
 ## 実機で試す（M3-a: ダウンロード）
 
@@ -236,21 +236,43 @@ $ADB push dev.db /data/local/tmp/ && $ADB shell "run-as dev.tseki.jellyfinradio 
 - [x] 「この番組を手元から消す」→ 確認 → 番組一覧に戻り、番組が消えている（DB でも行が無い）
 - [ ] 元のライブラリに戻して同期すると印が消える（`goneSince` が null に戻る）（実機では未実施。`RoomSyncTest` で全体同期・1 番組の同期・番組単位の更新の 3 経路を担保）
 - [x] 設定画面・接続画面にデバッグ節（シード）が出ない（#21）
-`files/episodes/` にあるのに `local_files` のどの行の `path` でもないファイル（孤児）は、アプリからは二度と到達できず、容量の表示（#42）にも数えられない。
-アプリの削除経路はすべて行のあとにファイルも消し、「別のサーバに接続」も #50 でファイルを消すようになったので、孤児が生まれるのは**開発手順で DB だけを消した／書き換えたとき**だけ。
-DB を消すときは `files/episodes/` も一緒に消すこと（`$ADB shell rm -rf '/storage/emulated/0/Android/data/dev.tseki.jellyfinradio/files/episodes'`）。
-孤児の有無を確かめる:
+
+## 手元のファイルと DB の突き合わせ（#50）
+
+`files/episodes/` にあるのに `local_files` のどの行の `path` でもないファイル（行の無いファイル）は、アプリからは二度と到達できず、容量の表示（#42）にも数えられない。
+アプリの削除経路はすべて行のあとにファイルも消し、「別のサーバに接続」も #50 でファイルを消すようになった（再生とダウンロード・同期の Worker を止めてから消す）。
+それでも残るのは、**開発手順で DB だけを消した／書き換えたとき**と、消している最中にプロセスが死んだときくらい。
+DB を消すときは `files/episodes/` も一緒に消すこと:
+
 ```bash
 D=/storage/emulated/0/Android/data/dev.tseki.jellyfinradio/files/episodes
-# ループ内の adb shell は標準入力を食うので < /dev/null を付ける（付けないと 1 周で止まる）
-for f in jellyfin-radio.db jellyfin-radio.db-wal; do $ADB shell "run-as dev.tseki.jellyfinradio sh -c 'cat databases/$f'" > dev-$f < /dev/null; done
+$ADB shell "rm -rf '$D'"
+```
+
+突き合わせ（行の無いファイルと、行はあるのにファイルが無い回を列挙し、前者を `stray.txt` に書く）:
+
+```bash
+D=/storage/emulated/0/Android/data/dev.tseki.jellyfinradio/files/episodes
+for f in jellyfin-radio.db jellyfin-radio.db-wal; do
+  $ADB shell "run-as dev.tseki.jellyfinradio sh -c 'cat databases/$f'" > dev-$f < /dev/null
+done
 $ADB shell "find '$D' -type f ! -name '*.part'" | sort > disk.txt
 python3 - <<'PY'
 import sqlite3
 db = {r[0] for r in sqlite3.connect('dev-jellyfin-radio.db').execute("SELECT path FROM local_files WHERE path IS NOT NULL")}
 disk = {l.strip() for l in open('disk.txt')}
-print('孤児（ディスクにあって DB に無い）:', *sorted(disk - db), sep='\n  ')
-print('欠落（DB にあってディスクに無い）:', *sorted(db - disk), sep='\n  ')
+stray = sorted(disk - db)
+print('行の無いファイル:', *stray, sep='\n  ')
+print('ファイルの無い行:', *sorted(db - disk), sep='\n  ')
+open('stray.txt', 'w').write(''.join(p + '\n' for p in stray))
 PY
 ```
-孤児は `while IFS= read -r p; do $ADB shell "rm -f '$p'" < /dev/null; done < orphans.txt` で消し、空になったフォルダは `find -type d -empty -delete`（2026-09-19 に M1 のシードの名残 6 ファイル・164.6 MB をこの手順で消し、ディスクと DB の合計が一致した）。欠落は `reconcileMissingFiles`（#5）が次の同期で整える。
+
+行の無いファイルを消す（ループ内の `adb shell` は標準入力を食うので `< /dev/null` を付ける。付けないと 1 周で止まる）:
+
+```bash
+while IFS= read -r p; do $ADB shell "rm -f '$p'" < /dev/null; done < stray.txt
+$ADB shell "find '$D' -type d -empty -delete"
+```
+
+ファイルの無い行は `reconcileMissingFiles`（#5）が次の同期で整える。2026-09-19 に M1 のシードの名残 6 ファイル・164.6 MB をこの手順で消し、ディスクと DB の合計が一致した。

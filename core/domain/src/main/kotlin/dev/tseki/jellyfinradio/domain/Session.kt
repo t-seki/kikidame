@@ -101,7 +101,7 @@ data class RefreshResult(
     val onHold: Int = 0,
 )
 
-/** 「別のサーバに接続」。手元の番組・各回・再生位置・セッションを全部消す。ファイルは消さない。 */
+/** 「別のサーバに接続」。手元の番組・各回・再生位置・セッションを全部消し、音声ファイルも消す（#50）。 */
 interface LocalDataReset {
     suspend fun resetAll()
 }

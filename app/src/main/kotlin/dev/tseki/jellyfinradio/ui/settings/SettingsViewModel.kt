@@ -1,5 +1,6 @@
 package dev.tseki.jellyfinradio.ui.settings
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -10,6 +11,7 @@ import dev.tseki.jellyfinradio.domain.LocalStorageUsage
 import dev.tseki.jellyfinradio.domain.SessionRepository
 import dev.tseki.jellyfinradio.domain.SessionState
 import dev.tseki.jellyfinradio.download.DownloadScheduler
+import dev.tseki.jellyfinradio.playback.PlayerConnection
 import dev.tseki.jellyfinradio.sync.SyncScheduler
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +28,7 @@ class SettingsViewModel @Inject constructor(
     private val settings: AppSettingsRepository,
     private val scheduler: DownloadScheduler,
     private val syncScheduler: SyncScheduler,
+    private val connection: PlayerConnection,
     library: LibraryRepository,
 ) : ViewModel() {
     /** 手元のファイルの合計（#42）。null は読み込み前。 */
@@ -59,9 +62,18 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { sessionRepository.signOut() }
     }
 
-    /** 「別のサーバに接続」。手元のデータを全部消してから接続画面へ（セッション状態の変化で遷移する）。 */
+    /**
+     * 「別のサーバに接続」。再生とダウンロード・同期の Worker を止めてから、手元のデータと音声ファイルを全部消して接続画面へ
+     * （セッション状態の変化で遷移する）。止めずに消すと、開いているファイルを消したり、Worker が行を作り直したりする（#50）。
+     */
     fun resetAndConnectElsewhere() {
-        viewModelScope.launch { reset.resetAll() }
+        viewModelScope.launch {
+            runCatching { connection.use { it.stop(); it.clearMediaItems() } }
+                .onFailure { Log.w("SettingsViewModel", "stop playback before reset failed", it) }
+            scheduler.cancelAll()
+            syncScheduler.cancelAll()
+            reset.resetAll()
+        }
     }
 
     fun consumeMessage() {
