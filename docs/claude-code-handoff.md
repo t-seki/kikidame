@@ -14,7 +14,7 @@ Android 向けの Jellyfin クライアントを新規に作ります。以下�
 
 ## プロダクト概要
 
-- ラジオ録音（AAC/M4A）を Jellyfin サーバから取得し、**オフラインで聴く**ための Android アプリ
+- 番組型の音声（ラジオ録音・ポッドキャスト。AAC/M4A・MP3）を Jellyfin サーバから取得し、**オフラインで聴く**ための Android アプリ
 - コンセプトは 2 つ
   1. **オフライン優先**: サーバに到達できなくてもアプリが完全に成立する
   2. **フォルダ同期**: 番組単位でルールを決めて自動的にダウンロード／削除する
@@ -67,15 +67,15 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 
 ## ライブラリ構造のマッピング
 
-サーバ側のラジオ録音は**音楽ライブラリ**として取り込まれている。アプリ内では自前モデルに正規化する。
+サーバ側の音声は**音楽ライブラリ**として取り込まれている。アプリ内では自前モデルに正規化する。
 
 | Jellyfin | アプリ内の概念（`CONTEXT.md` 参照） |
 | --- | --- |
 | MusicAlbum | 番組 (Program) |
 | Audio | 各回 (Episode) |
-| `AlbumArtist` | 放送局 (Station) — `radirec-tool` が albumartist に放送局を書く |
-| `PremiereDate` → `DateCreated` → ファイル更新日時 | 放送日 (Aired At) — 並び順・「最新 N 回」の基準。この順でフォールバック |
-| `DateCreated` | 取り込み日時 (Added At) — 保存するが新しさの判定には使わない。放送日の代用として並び順に効くのは上の行の経路（差分取得は ADR 0004 で見送り） |
+| `AlbumArtist` | 配信元 (Publisher) — ラジオ録音なら配信元（`radirec-tool` が albumartist に書く）、ポッドキャストなら配信者やネットワーク |
+| `PremiereDate` → `DateCreated` → ファイル更新日時 | 公開日 (Published At) — 並び順・「最新 N 回」の基準。この順でフォールバック |
+| `DateCreated` | 取り込み日時 (Added At) — 保存するが新しさの判定には使わない。公開日の代用として並び順に効くのは上の行の経路（差分取得は ADR 0004 で見送り） |
 | `Id` | サーバ ID — アプリ内の主キーではない（ADR 0001） |
 
 主に使う取得パス（SDK 経由で呼ぶ）:
@@ -105,11 +105,11 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 
 ```kotlin
 @Entity(indices = [Index("serverItemId", unique = true), Index("stationName", "name")])
-data class ProgramEntity(          // 番組 = MusicAlbum。(放送局, 番組名) は突合のキーだが一意ではない（v2）
+data class ProgramEntity(          // 番組 = MusicAlbum。(配信元, 番組名) は突合のキーだが一意ではない（v2）
   @PrimaryKey(autoGenerate = true) val id: Long = 0,
   val serverItemId: String?,
   val name: String,
-  val stationName: String?,        // 放送局（MusicAlbum.AlbumArtist）
+  @ColumnInfo(name = "stationName") val publisherName: String?,  // 配信元（MusicAlbum.AlbumArtist）。カラム名は改名前のまま（#92）
   val syncEnabled: Boolean,        // 同期対象か（既定 false）
   val keepLatest: Int?,            // 最新 N 回まで保持（null = 上限なし）
   val deleteAfterPlayed: Boolean
@@ -121,7 +121,7 @@ data class EpisodeEntity(          // 各回 = Audio
   val serverItemId: String?,
   val programId: Long,
   val title: String,
-  val airedAt: Instant,            // 放送日（PremiereDate、無ければ DateCreated）
+  @ColumnInfo(name = "airedAt") val publishedAt: Instant,  // 公開日（PremiereDate、無ければ DateCreated）。カラム名は改名前のまま（#92）
   val addedAt: Instant?,           // 取り込み日時（DateCreated）
   val runtimeTicks: Long, val sizeBytes: Long,
   val container: String
@@ -191,8 +191,8 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
   「サーバ上で見つかりません」と表示し、新しいサーバ ID への突合は ADR 0001 の未決事項（M3）に委ねる
 - 同期対象でない番組 → 保持ルールを適用しない。固定された各回だけが手元に残る
 - **保持ルールは独立した削除理由**。「最新 N 回まで保持」と「再生済みなら削除」のどちらかに該当すれば
-  手元に置かない（保持は AND）。「最新 N 回」は再生済み・未再生を問わず放送日の新しい順、
-  同着（放送日は日単位なので同日パートで起きる）は各回のタイトルの辞書順 → ローカル ID で安定ソート。
+  手元に置かない（保持は AND）。「最新 N 回」は再生済み・未再生を問わず公開日の新しい順、
+  同着（公開日は日単位なので同日パートで起きる）は各回のタイトルの辞書順 → ローカル ID で安定ソート。
   この順序は各回一覧・連続再生と共通
 - **固定**された各回は保持ルールの対象外。利用者が固定を外すか手動削除するまで残る（例外はサーバの一覧から消えた回。次項）
 - サーバの一覧（`Known`）から消えた各回は手元からも削除する。サーバが各回の存在の正、手元はキャッシュ。
@@ -207,7 +207,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 - アプリ起動時: 前回同期から 1 時間以上経っていれば実行（同じ制約で待つ）。番組一覧の手動プルは同期そのもの（M3-b の範囲を参照）
 - ダウンロード: Worker 内で HTTP ストリームを `.part` ファイルへ書き、完了後にリネーム。
   再開は `Range` ヘッダ。進捗は `setProgress` で UI へ
-- 置き場所: `getExternalFilesDir("episodes")/<放送局>/<番組>/<ファイル>`（radirec-tool の出力と同じ階層）
+- 置き場所: `getExternalFilesDir("episodes")/<配信元>/<番組>/<ファイル>`（radirec-tool の出力と同じ階層）
 
 ## 実装順序
 
@@ -224,13 +224,13 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 オフラインを後から足すと破綻するため、必ずこの順序で積む。
 
 ### M1 の範囲
-- **ファイルの供給**（**M3-c で削除**、#21。以下は M1 当時の記録）: `getExternalFilesDir("episodes")/<放送局>/<番組名>/<ファイル>.m4a|.mp3` に `adb push` する。
+- **ファイルの供給**（**M3-c で削除**、#21。以下は M1 当時の記録）: `getExternalFilesDir("episodes")/<配信元>/<番組名>/<ファイル>.m4a|.mp3` に `adb push` する。
   この 2 階層は `radirec-tool` の出力（`<albumartist = 放送局>/<album = 番組>/<番組> YYYY-MM-DD.m4a`）を
   そのまま持ち込めるように合わせてある。デバッグビルド限定の番組一覧画面の「シード」ボタンが
-  このフォルダを走査し、親フォルダを放送局（`stationName`）、サブフォルダを番組、ファイルを各回として
+  このフォルダを走査し、親フォルダを配信元（`publisherName`）、サブフォルダを番組、ファイルを各回として
   `ProgramEntity` / `EpisodeEntity` / `LocalFileEntity(state = DONE, pinned = true)` を生成する。
   - 各回のタイトルはファイル名（拡張子なし）
-  - 放送日は タグ（M4A `©day` / MP3 `TDRC`、`YYYY-MM-DD`）→ ファイル名の `YYYY-MM-DD` → ファイル更新日時 の順。
+  - 公開日は タグ（M4A `©day` / MP3 `TDRC`、`YYYY-MM-DD`）→ ファイル名の `YYYY-MM-DD` → ファイル更新日時 の順。
     日単位なので JST 00:00 の `Instant` にする。フォールバックの選択は `:core:domain` の純粋関数、
     タグ読み取りは `:app` のシードに閉じ込める
   - 尺は `MediaMetadataRetriever` の duration から。`sizeBytes` はファイルサイズ、`container` は拡張子
@@ -240,11 +240,11 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
     Receiver を `exported` にして `am broadcast` で叩く方式は取らない
 - **画面**: 番組一覧 → 各回一覧 → 再生画面 の 3 階層（#43 で各回一覧から各回の詳細画面へも行ける）。M2 で Jellyfin から番組が来ても画面は変えず、
   データソースだけ差し替わる。保持ルール編集画面は M3
-  - 番組一覧は「最新の各回の放送日が新しい順」（#16 以降は「よく聴く」の番組を上の節に分け、各節内でこの順）、各回一覧は「放送日の新しい順」（同着はタイトルの辞書順）
+  - 番組一覧は「最新の各回の公開日が新しい順」（#16 以降は「よく聴く」の番組を上の節に分け、各節内でこの順）、各回一覧は「公開日の新しい順」（同着はタイトルの辞書順）
   - 各回の行に再生済みマークと、次に開いたとき途中から再開する回（再開位置の規則で先頭に戻らない回。
     再生済みかどうかは見ない）には進捗（再開位置 / 尺）を出す
 - **再生操作**: 再生／一時停止／シーク／±10 秒スキップ（M1 では ±30 秒。#29 で 10 秒にし、左右スワイプの秒単位シークを足した）／前後の回へ移動。
-  連続再生は同じ番組内で **放送日の古い順** に次の回へ。再生済みの回は飛ばさない。再生済み／未再生の手動切替
+  連続再生は同じ番組内で **公開日の古い順** に次の回へ。再生済みの回は飛ばさない。再生済み／未再生の手動切替
   - 各回を開いた時点で、その番組の手元にある全各回（古い順）を Media3 のプレイリストとして
     `MediaSessionService` に積み、選んだ回を開始インデックス・再開位置で `setMediaItems` する。
     `mediaId` = ローカル `episodeId`。Media3 のプレイリストは先頭の回にしか開始位置を持てないので、
@@ -283,12 +283,12 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
   パスワードは保存しない。`SessionStore`（`:core:data`）が持つ
 - **取得の起点**（M2 時点）: ログイン直後と、番組一覧・各回一覧の「引っ張って更新」だけ。M3-b で番組一覧の更新は同期、各回一覧の更新は番組単位取得になり、定期・起動時の同期が加わった（「M3-b の範囲」）。
   失敗はスナックバーで、一覧は Room のまま
-- **突合（CONTEXT.md「突合」）**: `serverItemId = NULL` の行にだけ行う。番組は (放送局, 番組名) = (`AlbumArtist`, `Name`)、
+- **突合（CONTEXT.md「突合」）**: `serverItemId = NULL` の行にだけ行う。番組は (配信元, 番組名) = (`AlbumArtist`, `Name`)、
   各回は同じ番組内の `Name` 完全一致。候補が複数なら結ばない（新規行）。表記ゆれは吸収しない（radirec-tool の alias の責務）
-- **取り込み**: サーバ由来の各回はサーバの値で上書き（タイトル・放送日・取り込み日時・尺・サイズ・コンテナ）。
+- **取り込み**: サーバ由来の各回はサーバの値で上書き（タイトル・公開日・取り込み日時・尺・サイズ・コンテナ）。
   `LocalFile` と `PlaybackState` は触らない。サーバの一覧に無い番組・各回は M2 では何もしない（削除・判断保留は M3）
 - **手元に無い各回**: 一覧に同じ並びで出すが薄く表示し、タップしても再生画面へ行かない。右端は雲アイコン（M3 でダウンロードボタンになる）。
-  番組一覧は「手元 M / 全 N 回」（#41 で「局 · 未再生 N / 手元 L · 全 E 回 · 最新 MM-DD」に）。連続再生のキューは手元にある回だけ（手元に無い回は飛ばす）
+  番組一覧は「手元 M / 全 N 回」（#41 で「配信元 · 未再生 N / 手元 L · 全 E 回 · 最新 MM-DD」に）。連続再生のキューは手元にある回だけ（手元に無い回は飛ばす）
 - **ライブラリ切替**: 同じサーバなので手元の行は触らない。旧ライブラリの番組は M3 の判断保留と同じ扱いになる
 - **コードの置き場**: `:core:domain` にサーバのスナップショット型（`ServerProgram` / `ServerEpisode`）と突合の純粋関数
   `LibraryMatching.match`（JUnit 5）。`:core:data` に `JellyfinGateway` インターフェース（`signIn` / `listLibraries` / `fetchLibrary`）と
@@ -309,7 +309,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   戻り値は `resumedFrom`（206 で `Range` が効いたか）・`totalBytes`・本文ストリーム。サーバが `Range` を無視して 200 を返したら
   `.part` を書き直す。テストはフェイク（206 再開／200 全体再送の両方）
 - **Worker**: WorkManager のユニーク Worker（`download-queue`、`KEEP`）が `LocalFile.state = PENDING` の行を**キューに入れた順（FIFO、
-  `enqueuedAt`。実機確認で「タップした順に落ちてほしい」と決定）**に **1 本ずつ**処理する。再試行は列の末尾へ。M3-b の同期が積む分の優先順位はそこで決める。`<局>/<番組>/<タイトル>.<container>.part` に追記し、完了でリネーム。既存の `.part` は `Range: bytes=<size>-` で再開。
+  `enqueuedAt`。実機確認で「タップした順に落ちてほしい」と決定）**に **1 本ずつ**処理する。再試行は列の末尾へ。M3-b の同期が積む分の優先順位はそこで決める。`<配信元>/<番組>/<タイトル>.<container>.part` に追記し、完了でリネーム。既存の `.part` は `Range: bytes=<size>-` で再開。
   進捗は `setProgress`。通知は出さない（フォアグラウンドサービスにしない）
 - **条件**: 設定の「Wi-Fi のみ」（既定 ON、`AppSettings` DataStore。倍速（#35）も同じ DataStore）。ON なら `UNMETERED`、OFF なら `CONNECTED`。待ちの間は「Wi-Fi 待ち」表示
 - **失敗**: 1 本失敗しても次へ。`attemptCount` +1、`lastAttemptAt`、`FAILED`。同一実行内では再試行しない。次の起動で
@@ -328,7 +328,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   自動で適用し、スナックバー「ファイルが見つかりません」
 - **完了時**: `LocalFile(DONE, path, pinned = true, downloadedAt)`、`Episode.sizeBytes` を実バイト数で更新（M2 で保留した値をここで確定）。
   同期によるダウンロード（M3-b）は `pinned = false`
-- **命名**: 放送局 null は `_`、`container` 空は `m4a`、禁止文字（`/ \ : * ? " < > |`）は `_`、同名衝突は ` (2)`
+- **命名**: 配信元 null は `_`、`container` 空は `m4a`、禁止文字（`/ \ : * ? " < > |`）は `_`、同名衝突は ` (2)`
 - 「手元 M / 全 N 回」の M は `DONE` のみ。手元に無い回の再生は M3-a でも不可（ストリーミングは M4 以降）
 
 ### M3-b の範囲（2026-09-17 の grilling で確定）
@@ -356,7 +356,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   - **`syncEnabled = false` でも関数は動く**: `download` は空、`delete` は非固定の手元ファイル全部、`remove` はサーバから消えた
     `serverItemId != null` の回（固定含む）。`syncEnabled` が効くのは保持ルールの適用（何を `download` し、固定でない何を `delete` するか）だけ。
     `Unavailable` / `Gone` は `syncEnabled` に関わらず全部空 + `onHold`
-  - **固定は N に数えない**（別枠）。`keepLatest` は固定を除いた放送日の新しい順で数える（同着は `EpisodeOrder`）
+  - **固定は N に数えない**（別枠）。`keepLatest` は固定を除いた公開日の新しい順で数える（同着は `EpisodeOrder`）
   - **サーバの一覧から消えた `serverItemId != null` の各回は固定でも `Episode` 行ごと消す**（`remove`。`LocalFile` / `PlaybackState` は cascade、
     ファイルも消す）。保持ルールによる削除（`delete`）は M3-a の削除の規則に従う: `serverItemId` がある回は `FILE_ONLY`（`PlaybackState` は残す、ADR 0002）、
     無い回（サーバを経由していない回）は落とし直せないので `Episode` ごと。`Known` の番組で各回が 0 になっても番組は残す
@@ -364,7 +364,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 - **実行側の例外**（`planSync` の外）: 削除対象が PENDING / RUNNING / FAILED なら `cancel` 相当。**聴いている回（現在の `MediaItem`）は今回は削除しない**
   （次回に持ち越し。ただし最後まで聴き終えて止まっている回は除外しない — #27。消された後に ▶ を押すと再生に失敗し、キューを空にして理由をスナックバーに出す）。聴いている回は `PlaybackService` が `Player.Listener` で `@Singleton` の `NowPlaying`（`StateFlow<NowPlayingState?>`、`:app`）に
   書き、同期の実行側はそれを読む（Worker と Service は同一プロセス。MediaController を Worker から結ばない）。
-  実行順は削除 → enqueue。同期分の enqueue 順は **番組をまたいで放送日の新しい順**
+  実行順は削除 → enqueue。同期分の enqueue 順は **番組をまたいで公開日の新しい順**
 - **キューの優先順位**（M3-a から持ち越し）: `nextPending()` を `pinned DESC, enqueuedAt IS NULL, enqueuedAt ASC, airedAt DESC` に変える（手動が常に先。
   `enqueuedAt` は v3 で足した nullable なので NULL を先頭に来させない）。
   同期分（`pinned = false`）の行に利用者が「ダウンロード」を選んだら `pinned = true` にする（既存の `enqueue` の「行があれば何もしない」を変える）
@@ -392,9 +392,9 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 #9 は「シードは実運用で使わない」と判断して close（2026-09-18）。第二段の突合は再取り込みと同時にタイトルを付け直したケースの保険として残す。
 
 - **突合の対象を「未結合」に広げる**（CONTEXT.md「未結合」「突合」、ADR 0005）: サーバ ID を持たない行に加えて、**持っているサーバ ID が今回の完全な一覧に無い行**も
-  対象にする。`LibraryMatching.match` の「`serverItemId == null` だけ」を「未結合」に変え、キーは従来どおり（番組は (放送局, 番組名)、各回は同じ番組内のタイトル完全一致、双方 1 対 1）。
+  対象にする。`LibraryMatching.match` の「`serverItemId == null` だけ」を「未結合」に変え、キーは従来どおり（番組は (配信元, 番組名)、各回は同じ番組内のタイトル完全一致、双方 1 対 1）。
   結び付けたら `serverItemId` を書き換えるだけで `LocalFile` / `PlaybackState` は触らない。突合は `newPrograms` の挿入より前（今の順序）なので、再取り込み後に番組が二重になることは無い
-- **第二段（元 #9）**: タイトルで結べなかった未結合の各回に対し、同じ番組内で **放送日（日単位）が同じ ＋ 尺の差が 5 秒以内** の候補が双方 1 対 1 なら結ぶ。
+- **第二段（元 #9）**: タイトルで結べなかった未結合の各回に対し、同じ番組内で **公開日（日単位）が同じ ＋ 尺の差が 5 秒以内** の候補が双方 1 対 1 なら結ぶ。
   尺 0（不明）は対象外。同日に複数本あって尺で絞れなければ結ばない。古い ID の行にも同じ第二段を適用する。
   結んだ後はサーバの値で上書き（タイトルは `2026-09-16 (1)` になる）。`EpisodeKeyRow` / `LocalEpisodeKey` に `airedAt` と `runtime` を足す
 - **同期との順序**: 全体同期（`refresh`）も 1 番組の同期（`syncProgram`）も、取り込み（突合を含む）→ `planSync` の順は今のまま。結び直せなかった古い ID の各回だけが
@@ -413,7 +413,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 
 - 同期エンジンとデータ層はテストを先に書く
   - `:core:domain`: プレーン JUnit5。M1 分は 再生済み判定、ticks ↔ `Duration` 変換、
-    放送日フォールバック（`PremiereDate` → 取り込み日時）、再開位置、各回の並び順（同着のタイブレーク）
+    公開日フォールバック（`PremiereDate` → 取り込み日時）、再開位置、各回の並び順（同着のタイブレーク）
   - `:core:data`: Robolectric + `Room.inMemoryDatabaseBuilder` で DAO / TypeConverter
   - Media3: 「`Player` から位置を受け取って Room に書く」部分だけフェイク `Player` で JVM テスト
   - CI は `./gradlew test`（エミュレータ不要）
@@ -432,15 +432,20 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 - 他端末・Web との再生位置の共有（ローカル正。送信もしない、ADR 0007）
 - Media3 DownloadManager / SimpleCache によるダウンロード
 - `/Sessions/Playing/*` による「再生中」のサーバ通知（必要になれば M4 以降で検討）
+- オーディオブック（古い章から順に聴くので「最新 N 回」が合わない。番組に「向き」を足す設計が要る。CONTEXT.md「番組型の音声」）
+- Google Play での配布と課金（ADR 0008。需要が見えたら併売を検討）
 
 ## 参照
 
-- `CONTEXT.md` — 用語集（番組／各回／放送日／同期対象／保持ルール／固定／判断保留／再生済み）
+- `CONTEXT.md` — 用語集（番組／各回／公開日／同期対象／保持ルール／固定／判断保留／再生済み）
 - `docs/adr/0001-local-surrogate-key.md` — 主キーはサーバ ID ではなく代理キー
 - `docs/adr/0002-playback-position-local-authority.md` — 再生位置・再生済みはローカル正
 - `docs/adr/0003-download-without-media3-downloadmanager.md` — DownloadManager を使わない
 - `docs/adr/0004-sync-deletes-only-from-full-listing.md` — 同期の削除の権限は全走査の一覧だけ
 - `docs/adr/0005-rematch-unlinked-rows-before-sync-deletes.md` — 突合の対象を未結合に広げ、同期の削除判断の前に走らせる
+- `docs/adr/0006-now-playing-from-in-process-state-not-media-controller.md` — 聴いている回はプロセス内の状態から取る
+- `docs/adr/0007-playback-state-stays-local.md` — 再生位置と再生済みはサーバへ送らない
+- `docs/adr/0008-open-source-distributed-outside-play.md` — MPL-2.0 の OSS として Play を通さず配布する
 - Jellyfin 12 認証仕様: https://gist.github.com/nielsvanvelzen/ea047d9028f676185832e51ffaf12a6f
 - jellyfin-sdk-kotlin Releases: https://github.com/jellyfin/jellyfin-sdk-kotlin/releases
 - Jellyfin OpenAPI (stable): https://api.jellyfin.org/openapi/jellyfin-openapi-stable.json
