@@ -17,10 +17,12 @@ import dev.tseki.kikidame.ui.toPublishedDateText
 import kotlinx.coroutines.flow.first
 import kotlin.time.Duration
 /**
- * Android Auto のブラウズツリー（#96）。ルートの下は「よく聴く」「番組」のタブ → 番組 → 手元にある各回の 3 階層
- * （Auto が推奨する上限内）。手元に無い回は出さない（運転中に落とさせない）。
+ * Android Auto のブラウズツリー（#96）。ルートの下は「続きから」「よく聴く」「番組」のタブ → 番組 → 手元にある各回の
+ * 3 階層（Auto が推奨する上限内）。手元に無い回は出さない（運転中に落とさせない）。
+ * 「続きから」（#108）は最近聴いた各回（[LibraryRepository.getRecentlyListened]）を直接並べ、1 つも無ければタブごと出さない。
  * 「よく聴く」は、印が付いていて手元に回がある番組が 1 つも無ければタブごと出さない。
- * 「続きから」と再開（`onPlaybackResumption`）は #108。
+ * 「最近」（`LibraryParams.isRecent`。端末の再起動直後などにシステムが出す再開の候補）は [Node.Recent] で、
+ * 最近聴いた各回の先頭 1 件だけを返す。
  *
  * ID の形は [Node]。各回の ID は [EpisodeMediaItems.mediaId] と同じなので、ツリーから選ばれた回は
  * 既存の `onAddMediaItems` / `onSetMediaItems` がそのまま解決できる。
@@ -32,10 +34,12 @@ class BrowseTree(
     private val labels: Labels,
 ) {
     /** タブの表示名。Service が `getString` して渡す（ADR 0009 の例外）。 */
-    data class Labels(val starred: String, val programs: String)
+    data class Labels(val continueListening: String, val starred: String, val programs: String)
 
     sealed interface Node {
         data object Root : Node
+        data object Continue : Node
+        data object Recent : Node
         data object Starred : Node
         data object Programs : Node
         data class Program(val id: ProgramId) : Node
@@ -44,10 +48,15 @@ class BrowseTree(
 
     fun root(): MediaItem = folder(ROOT_ID, "", MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
 
+    /** `isRecent` のルート。子は [recentlyListened] の先頭 1 件（無ければ空）。 */
+    fun recentRoot(): MediaItem = folder(RECENT_ID, "", MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
+
     /** [parentId] の子。ツリーに無い ID なら null（`RESULT_ERROR_BAD_VALUE`）。各回は葉なので空リスト。 */
     suspend fun children(parentId: String): List<MediaItem>? = when (val node = parse(parentId)) {
         null -> null
         Node.Root -> rootChildren()
+        Node.Continue -> recentlyListened(CONTINUE_LIMIT).map { (episode, program) -> episodeItem(episode, program) }
+        Node.Recent -> recentlyListened(1).map { (episode, program) -> episodeItem(episode, program) }
         Node.Starred -> programsWithLocalEpisodes().filter { it.program.starred }.map(::programItem)
         Node.Programs -> programsWithLocalEpisodes().map(::programItem)
         is Node.Program -> {
@@ -60,6 +69,8 @@ class BrowseTree(
     suspend fun item(mediaId: String): MediaItem? = when (val node = parse(mediaId)) {
         null -> null
         Node.Root -> root()
+        Node.Continue -> folder(CONTINUE_ID, labels.continueListening, MediaMetadata.MEDIA_TYPE_FOLDER_PODCASTS)
+        Node.Recent -> recentRoot()
         Node.Starred -> folder(STARRED_ID, labels.starred, MediaMetadata.MEDIA_TYPE_FOLDER_PODCASTS)
         Node.Programs -> folder(PROGRAMS_ID, labels.programs, MediaMetadata.MEDIA_TYPE_FOLDER_PODCASTS)
         is Node.Program -> library.observeProgram(node.id).first()?.let { programItem(it) }
@@ -73,6 +84,7 @@ class BrowseTree(
     private suspend fun rootChildren(): List<MediaItem> {
         val programs = programsWithLocalEpisodes()
         return buildList {
+            if (recentlyListened(1).isNotEmpty()) add(folder(CONTINUE_ID, labels.continueListening, MediaMetadata.MEDIA_TYPE_FOLDER_PODCASTS))
             if (programs.any { it.program.starred }) add(folder(STARRED_ID, labels.starred, MediaMetadata.MEDIA_TYPE_FOLDER_PODCASTS))
             add(folder(PROGRAMS_ID, labels.programs, MediaMetadata.MEDIA_TYPE_FOLDER_PODCASTS))
         }
@@ -81,6 +93,12 @@ class BrowseTree(
     /** [LibraryRepository.observePrograms] の順（最新回の公開日が新しい順）のまま、手元に回がある番組だけ。 */
     private suspend fun programsWithLocalEpisodes(): List<ProgramSummary> =
         library.observePrograms().first().filter { it.localEpisodeCount > 0 }
+
+    /** 最近聴いた各回とその番組。番組が消えている回（無いはず）は飛ばす。 */
+    private suspend fun recentlyListened(limit: Int): List<Pair<EpisodeWithState, Program>> =
+        library.getRecentlyListened(limit).mapNotNull { episode ->
+            library.observeProgram(episode.episode.programId).first()?.let { episode to it }
+        }
 
     private fun programItem(summary: ProgramSummary): MediaItem = programItem(summary.program)
 
@@ -137,7 +155,11 @@ class BrowseTree(
 
     companion object {
         const val ROOT_ID = "root"
+        const val RECENT_ID = "recent"
+        const val CONTINUE_ID = "continue"
         const val STARRED_ID = "starred"
+        /** 「続きから」に並べる上限。運転中に辿る一覧なので多くしない。 */
+        const val CONTINUE_LIMIT = 20
         const val PROGRAMS_ID = "programs"
         private const val PROGRAM_PREFIX = "program:"
 
@@ -152,6 +174,8 @@ class BrowseTree(
 
         fun parse(mediaId: String): Node? = when {
             mediaId == ROOT_ID -> Node.Root
+            mediaId == RECENT_ID -> Node.Recent
+            mediaId == CONTINUE_ID -> Node.Continue
             mediaId == STARRED_ID -> Node.Starred
             mediaId == PROGRAMS_ID -> Node.Programs
             mediaId.startsWith(PROGRAM_PREFIX) ->

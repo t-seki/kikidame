@@ -8,10 +8,12 @@ import dev.tseki.kikidame.domain.EpisodeOrder
 import dev.tseki.kikidame.domain.EpisodeWithState
 import dev.tseki.kikidame.domain.LibraryRepository
 import dev.tseki.kikidame.domain.LocalStorageUsage
+import dev.tseki.kikidame.domain.PlaybackRules
 import dev.tseki.kikidame.domain.Program
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.ProgramSummary
 import dev.tseki.kikidame.domain.RetentionRule
+import dev.tseki.kikidame.domain.Ticks
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -41,6 +43,11 @@ class RoomLibraryRepository @Inject constructor(
             .map { it.toDomain() }
             .filter { it.isPlayable }
             .sortedWith(compareBy(EpisodeOrder) { it.episode })
+    // 「聴き始めている」の閾値は PlaybackRules から取り、SQL にバインドして LIMIT の前に絞る（Kotlin 側で絞り直すと
+    // 上位が未開始の回で埋まったとき limit 件に満たなくなる）
+    override suspend fun getRecentlyListened(limit: Int): List<EpisodeWithState> =
+        episodeDao.listRecentlyListened(limit, Ticks.fromDuration(PlaybackRules.NOT_STARTED_THRESHOLD))
+            .map { it.toDomain() }
     override suspend fun updateSync(programId: ProgramId, syncEnabled: Boolean, rule: RetentionRule) =
         programDao.updateSync(programId.value, syncEnabled, rule.keepLatest, rule.deleteAfterPlayed)
     override suspend fun setStarred(programId: ProgramId, starred: Boolean) =

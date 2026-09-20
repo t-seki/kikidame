@@ -23,6 +23,7 @@ import dev.tseki.kikidame.R
 import dev.tseki.kikidame.ui.UiText
 import dev.tseki.kikidame.di.ApplicationScope
 import dev.tseki.kikidame.domain.AppSettingsRepository
+import dev.tseki.kikidame.domain.EpisodeWithState
 import dev.tseki.kikidame.domain.LibraryRepository
 import dev.tseki.kikidame.domain.PlaybackRules
 import dev.tseki.kikidame.domain.PlaybackStateRepository
@@ -80,7 +81,11 @@ class PlaybackService : MediaLibraryService() {
         super.onCreate()
         browseTree = BrowseTree(
             libraryRepository,
-            BrowseTree.Labels(starred = getString(R.string.auto_root_starred), programs = getString(R.string.auto_root_programs)),
+            BrowseTree.Labels(
+                continueListening = getString(R.string.auto_root_continue),
+                starred = getString(R.string.auto_root_starred),
+                programs = getString(R.string.auto_root_programs),
+            ),
         )
         val player = ExoPlayer.Builder(this)
             .setAudioAttributes(
@@ -181,13 +186,35 @@ class PlaybackService : MediaLibraryService() {
             }
             val target = libraryRepository.getEpisode(episodeId)?.takeIf { it.isPlayable }
                 ?: return@future MediaSession.MediaItemsWithStartPosition(emptyList(), C.INDEX_UNSET, C.TIME_UNSET)
+            programQueueStartingAt(target)
+        }
+        /**
+         * 再開（#108）: プレイヤーが空のとき（プロセス死後の通知の ▶、Auto の「最近」、端末の再起動後）に
+         * 最後に聴いていた回を復元する。最近聴いた各回（[dev.tseki.kikidame.domain.LibraryRepository.getRecentlyListened]）の
+         * 先頭から、[onSetMediaItems] と同じ番組のキューを組む。無ければ空のリスト（Media3 の既定と同じ扱い）。
+         * 「聴いている回」（ADR 0006）はこの結果がプレイヤーに載った時点で立つ。
+         */
+        override fun onPlaybackResumption(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> = scope.future {
+            val recent = libraryRepository.getRecentlyListened(1).firstOrNull()
+                ?: return@future MediaSession.MediaItemsWithStartPosition(emptyList(), C.INDEX_UNSET, C.TIME_UNSET)
+            programQueueStartingAt(recent)
+        }
+        /**
+         * [target] の番組の手元にある回を古い順に全部積み、その回から、保存位置の規則（[PlaybackRules.resumePosition]）で始める
+         * （`PlayerViewModel.open` と同じ）。
+         */
+        private suspend fun programQueueStartingAt(target: EpisodeWithState): MediaSession.MediaItemsWithStartPosition {
+            val episodeId = target.episode.id
             val program = libraryRepository.observeProgram(target.episode.programId).first()
             val queue = libraryRepository.getPlayableEpisodes(target.episode.programId)
             val index = queue.indexOfFirst { it.episode.id == episodeId }.coerceAtLeast(0)
             val saved = playbackStateRepository.get(episodeId)
             val startMs = saved?.let { PlaybackRules.resumePosition(it.position, target.episode.runtime) }
                 ?.inWholeMilliseconds ?: 0L
-            MediaSession.MediaItemsWithStartPosition(queue.map { EpisodeMediaItems.toMediaItem(it, program) }, index, startMs)
+            return MediaSession.MediaItemsWithStartPosition(queue.map { EpisodeMediaItems.toMediaItem(it, program) }, index, startMs)
         }
         private suspend fun resolve(mediaItems: List<MediaItem>): List<MediaItem> = mediaItems.mapNotNull { item ->
             val episodeId = EpisodeMediaItems.episodeId(item) ?: return@mapNotNull null
@@ -195,13 +222,14 @@ class PlaybackService : MediaLibraryService() {
             val program = libraryRepository.observeProgram(episode.episode.programId).first()
             EpisodeMediaItems.toMediaItem(episode, program)
         }
-        /** 「最近」（端末起動後の再開。`isRecent`）は #108 で。今はツリーを渡さず「無い」と答える。 */
+        /** ルート。「最近」（`isRecent`。端末起動後にシステムが出す再開の候補）は [BrowseTree.recentRoot]（#108）。 */
         override fun onGetLibraryRoot(
             session: MediaLibrarySession,
             browser: MediaSession.ControllerInfo,
             params: LibraryParams?,
         ): ListenableFuture<LibraryResult<MediaItem>> = scope.future {
-            if (params?.isRecent == true) LibraryResult.ofError(SessionError.ERROR_NOT_SUPPORTED)
+            // 「最近」（isRecent）は再開候補 1 件だけのルート（#108）。それ以外は通常のツリー
+            if (params?.isRecent == true) LibraryResult.ofItem(browseTree.recentRoot(), params)
             else LibraryResult.ofItem(browseTree.root(), params)
         }
         override fun onGetChildren(
