@@ -55,9 +55,11 @@ dependencies {
 }
 
 // 統合テスト（#97）: 環境変数はテストタスクの入力に数えられないので、KIKIDAME_JELLYFIN_URL が付いているときは
-// 毎回走らせる（サーバの中身が変わっても up-to-date で飛ばされないように）。付いていなければ今までどおりキャッシュが効く
+// up-to-date と build cache（gradle.properties の org.gradle.caching=true）の両方を無効にして毎回走らせる
+// （サーバの中身が変わっても飛ばされないように）。付いていなければ今までどおりキャッシュが効く
 tasks.withType<Test>().configureEach {
     val jellyfinUrl = System.getenv("KIKIDAME_JELLYFIN_URL") ?: ""
     inputs.property("kikidameJellyfinUrl", jellyfinUrl)
     outputs.upToDateWhen { jellyfinUrl.isEmpty() }
+    outputs.cacheIf { jellyfinUrl.isEmpty() }
 }

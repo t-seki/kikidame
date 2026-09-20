@@ -11,7 +11,7 @@
 # スキャンが終わるまで待つ。終わると統合テスト用の環境変数を表示する:
 #
 #   KIKIDAME_JELLYFIN_URL=http://localhost:8097 KIKIDAME_JELLYFIN_USER=kikidame KIKIDAME_JELLYFIN_PASSWORD=kikidame-test \
-#     ./gradlew :core:data:test --tests dev.tseki.kikidame.data.jellyfin.SdkJellyfinGatewayIntegrationTest
+#     ./gradlew :core:data:testDebugUnitTest --tests dev.tseki.kikidame.data.jellyfin.SdkJellyfinGatewayIntegrationTest
 #
 # 置き場は $KIKIDAME_JF_DIR（既定 /tmp/kikidame-jf）。docker と ffmpeg と curl と python3 が要る。
 set -euo pipefail
@@ -108,13 +108,14 @@ up() {
       -d '{"LibraryOptions":{"PathInfos":[{"Path":"/media"}],"EnableEmbeddedTitles":true,"SaveLocalMetadata":false,"MetadataSavers":[],"TypeOptions":[{"Type":"MusicAlbum","MetadataFetchers":[],"ImageFetchers":[]},{"Type":"MusicArtist","MetadataFetchers":[],"ImageFetchers":[]},{"Type":"Audio","MetadataFetchers":[],"ImageFetchers":[]}]}}'
     echo "library: radio created, scanning"
   fi
-  local expected count
+  local expected count scanned=0
   expected=$(find "$MEDIA" -name '*.m4a' | wc -l)
   for _ in $(seq 1 60); do
     count=$(curl -sf -H "$token_header" "$URL/Items?userId=$user_id&IncludeItemTypes=Audio&Recursive=true&Limit=0" | python3 -c 'import json,sys; print(json.load(sys.stdin)["TotalRecordCount"])' 2>/dev/null || echo 0)
-    [ "$count" -ge "$expected" ] && break
+    if [ "$count" -ge "$expected" ]; then scanned=1; break; fi
     sleep 2
   done
+  if [ "$scanned" -ne 1 ]; then echo "timed out: scan ($count / $expected tracks)"; exit 1; fi
   echo "scan: $count / $expected tracks"
   echo
   echo "KIKIDAME_JELLYFIN_URL=$URL KIKIDAME_JELLYFIN_USER=$USER_NAME KIKIDAME_JELLYFIN_PASSWORD=$PASSWORD"

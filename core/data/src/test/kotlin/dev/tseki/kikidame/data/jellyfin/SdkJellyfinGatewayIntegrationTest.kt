@@ -29,7 +29,7 @@ import kotlin.time.Duration.Companion.seconds
  * 環境変数 `KIKIDAME_JELLYFIN_URL`（と `KIKIDAME_JELLYFIN_USER` / `KIKIDAME_JELLYFIN_PASSWORD`、既定は
  * スクリプトと同じ `kikidame` / `kikidame-test`）が無ければスキップするので、CI と普段の `./gradlew test` には影響しない:
  *
- *   KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:test \
+ *   KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTest \
  *     --tests dev.tseki.kikidame.data.jellyfin.SdkJellyfinGatewayIntegrationTest
  *
  * Robolectric なのは [SdkJellyfinGateway] が SDK の初期化に Android の `Context` を要るため。通信は本物。
