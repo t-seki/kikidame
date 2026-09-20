@@ -9,7 +9,9 @@ import dev.tseki.kikidame.domain.LibraryRefreshRepository
 import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.LocalDeletionScope
 import dev.tseki.kikidame.domain.ProgramId
+import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.RefreshResult
+import dev.tseki.kikidame.ui.UiText
 import dev.tseki.kikidame.domain.SelectedLibrary
 import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.ServerItemId
@@ -148,18 +150,27 @@ class LibraryRefresherTest {
 
         refresher.messages.test {
             assertEquals(3, refresher.refresh()?.programs)
-            assertEquals("番組 3 / 各回 40 を取得", awaitItem())
+            assertEquals(sentences(UiText.Res(R.string.sync_fetched, 3, 40)), awaitItem())
         }
         assertFalse(refresher.isRefreshing.value)
     }
 
     @Test
     fun syncMessageListsWhatHappened() {
+        // 「番組 3 / 各回 40 を取得。5 回をダウンロード予約、3 回を削除。1 番組はサーバ上で見つからず、そのままにしました」
         assertEquals(
-            "番組 3 / 各回 40 を取得。5 回をダウンロード予約、3 回を削除。1 番組はサーバ上で見つからず、そのままにしました",
+            sentences(
+                UiText.Res(R.string.sync_fetched, 3, 40),
+                actions(UiText.Plural(R.plurals.sync_enqueued, 5), UiText.Plural(R.plurals.sync_deleted, 3)),
+                UiText.Plural(R.plurals.sync_on_hold, 1),
+            ),
             RefreshResult(3, 40, 0, 0, now, enqueued = 5, deleted = 2, removed = 1, onHold = 1).toSyncMessage(),
         )
-        assertEquals("番組 3 / 各回 40 を取得。2 回を削除", RefreshResult(3, 40, 0, 0, now, deleted = 2).toSyncMessage())
+        // 「番組 3 / 各回 40 を取得。2 回を削除」
+        assertEquals(
+            sentences(UiText.Res(R.string.sync_fetched, 3, 40), actions(UiText.Plural(R.plurals.sync_deleted, 2))),
+            RefreshResult(3, 40, 0, 0, now, deleted = 2).toSyncMessage(),
+        )
     }
 
     @Test
@@ -199,8 +210,8 @@ class LibraryRefresherTest {
 
         refresher.messages.test {
             assertNull(refresher.refresh())
-            assertTrue(awaitItem().contains("1 回"))
-            assertEquals("Wi-Fi に接続していないため更新しません", awaitItem())
+            assertEquals(UiText.Plural(R.plurals.sync_reconciled, 1), awaitItem())
+            assertEquals(UiText.Res(R.string.sync_not_on_wifi), awaitItem())
         }
         assertEquals(0, repo.calls)
     }
@@ -239,7 +250,10 @@ class LibraryRefresherTest {
         val refresher = refresher(repo, kicker = kicker, nowPlaying = nowPlaying)
         refresher.messages.test {
             assertEquals(2, refresher.syncProgram(ProgramId(1))?.enqueued)
-            assertEquals("各回 6 を確認。2 回をダウンロード予約、1 回を削除", awaitItem())
+            assertEquals(
+                sentences(UiText.Res(R.string.sync_program_checked, 6), actions(UiText.Plural(R.plurals.sync_enqueued, 2), UiText.Plural(R.plurals.sync_deleted, 1))),
+                awaitItem(),
+            )
         }
         assertEquals(1, kicker.kicks)
         assertEquals(setOf(EpisodeId(7)), repo.lastExcluded)
@@ -248,8 +262,11 @@ class LibraryRefresherTest {
 
     @Test
     fun programSyncMessages() {
-        assertEquals("各回 6 を確認。手元は最新です", RefreshResult(1, 6, 0, 0, now).toProgramSyncMessage())
-        assertEquals("この番組はサーバ上で見つかりません。何も変えていません", RefreshResult(0, 0, 0, 0, now, onHold = 1).toProgramSyncMessage())
+        assertEquals(
+            sentences(UiText.Res(R.string.sync_program_checked, 6), UiText.Res(R.string.sync_program_up_to_date)),
+            RefreshResult(1, 6, 0, 0, now).toProgramSyncMessage(),
+        )
+        assertEquals(UiText.Res(R.string.sync_program_gone), RefreshResult(0, 0, 0, 0, now, onHold = 1).toProgramSyncMessage())
     }
 
     @Test
@@ -258,7 +275,7 @@ class LibraryRefresherTest {
         val refresher = refresher(repo)
         refresher.messages.test {
             assertEquals(7, refresher.refreshProgram(ProgramId(1))?.episodes)
-            assertEquals("各回 7 を取得しました", awaitItem())
+            assertEquals(UiText.Res(R.string.sync_program_fetched, 7), awaitItem())
         }
         assertEquals(1, repo.programCalls)
         assertEquals(0, repo.calls)
@@ -270,7 +287,7 @@ class LibraryRefresherTest {
         val refresher = refresher(repo)
         refresher.messages.test {
             assertEquals(9, refresher.refreshProgram(ProgramId(1))?.episodes)
-            assertEquals("番組 2 / 各回 9 を取得", awaitItem())
+            assertEquals(sentences(UiText.Res(R.string.sync_fetched, 2, 9)), awaitItem())
         }
         assertEquals(1, repo.calls)
     }
@@ -281,8 +298,8 @@ class LibraryRefresherTest {
         val refresher = refresher(repo, downloads = FakeDownloads(missing = 2))
         refresher.messages.test {
             refresher.refresh()
-            assertTrue(awaitItem().contains("2 回"))
-            assertEquals("番組 1 / 各回 2 を取得", awaitItem())
+            assertEquals(UiText.Plural(R.plurals.sync_reconciled, 2), awaitItem())
+            assertEquals(sentences(UiText.Res(R.string.sync_fetched, 1, 2)), awaitItem())
         }
     }
 
@@ -294,7 +311,7 @@ class LibraryRefresherTest {
 
         refresher.messages.test {
             assertNull(refresher.refresh())
-            assertTrue(awaitItem().contains("ログイン"))
+            assertEquals(UiText.Res(R.string.sync_error_session_expired), awaitItem())
         }
         assertTrue(session.signedOut)
     }
@@ -307,7 +324,7 @@ class LibraryRefresherTest {
 
         refresher.messages.test {
             assertNull(refresher.refresh())
-            assertTrue(awaitItem().contains("接続できません"))
+            assertEquals(UiText.Res(R.string.sync_error_unreachable), awaitItem())
         }
         assertFalse(session.signedOut)
     }
@@ -328,3 +345,9 @@ class LibraryRefresherTest {
         assertFalse(refresher.isRefreshing.value)
     }
 }
+
+/** 文を「。」でつないだ形（[LibraryRefresher] が作る [UiText.Joined] と同じ構造）。 */
+private fun sentences(vararg parts: UiText): UiText = UiText.Joined(parts.toList(), UiText.Res(R.string.sync_sentence_separator))
+
+/** 「N 回をダウンロード予約、M 回を削除」の部分。 */
+private fun actions(vararg parts: UiText): UiText = UiText.Joined(parts.toList(), UiText.Res(R.string.common_list_separator))

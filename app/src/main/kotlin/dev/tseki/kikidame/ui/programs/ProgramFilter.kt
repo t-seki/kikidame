@@ -1,6 +1,8 @@
 package dev.tseki.kikidame.ui.programs
 
+import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.ProgramSummary
+import dev.tseki.kikidame.ui.UiText
 
 /**
  * 番組一覧の絞り込み。検索（#44）は番組名と配信元名の部分一致で、大文字小文字は区別しない。
@@ -10,7 +12,7 @@ import dev.tseki.kikidame.domain.ProgramSummary
 object ProgramFilter {
     /** 配信元の選択の鍵。[name] が null は「配信元なし」（配信元を持たない番組）。未選択は [PublisherKey] 自体を null にして区別する。 */
     data class PublisherKey(val name: String?) {
-        val label: String get() = name ?: "配信元なし"
+        val label: UiText get() = name?.let(UiText::Plain) ?: UiText.Res(R.string.program_list_no_publisher)
     }
 
     /** 配信元を選ぶシートの 1 行分。[programCount] は手元の番組全体での数で、検索語では絞らない。 */

@@ -6,7 +6,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.DownloadRepository
+import dev.tseki.kikidame.ui.UiText
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.EpisodeWithState
 import dev.tseki.kikidame.domain.LibraryRepository
@@ -86,10 +88,10 @@ class EpisodeListViewModel @Inject constructor(
     val waitingForNetwork: StateFlow<Boolean> = scheduler.isWaitingForConstraints
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
-    private val localMessages = MutableSharedFlow<String>(extraBufferCapacity = 4, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    private val localMessages = MutableSharedFlow<UiText>(extraBufferCapacity = 4, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     /** 更新の結果、この画面での操作の結果、ミニプレイヤーが消えた理由を 1 本にまとめてスナックバーへ。 */
-    val messages: Flow<String> = merge(refresher.messages, localMessages, nowPlaying.messages)
+    val messages: Flow<UiText> = merge(refresher.messages, localMessages, nowPlaying.messages)
 
     /** 各回一覧の「引っ張って更新」= この番組だけ取り込む（#12）。削除はしない。 */
     fun refresh() {
@@ -164,7 +166,7 @@ class EpisodeListViewModel @Inject constructor(
 
     fun unpin(episodeId: EpisodeId) = act {
         downloads.unpin(episodeId)
-        localMessages.tryEmit("固定を外しました。保持ルールの対象になります")
+        localMessages.tryEmit(UiText.Res(R.string.episode_list_msg_unpinned))
     }
 
     fun deleteLocal(episodeId: EpisodeId) = act {
@@ -174,9 +176,9 @@ class EpisodeListViewModel @Inject constructor(
             when (scope) {
                 // 同期対象なら保持すべき回は次の同期で落とし直される（handoff「手動削除と同期の往復」）
                 LocalDeletionScope.FILE_ONLY ->
-                    if (syncEnabled) "ファイルを削除しました。同期対象の番組なので、保持すべき回なら次の同期で落とし直されます"
-                    else "ファイルを削除しました。再生位置は残っています"
-                LocalDeletionScope.EPISODE -> "この回はサーバに無いため、一覧からも消しました"
+                    if (syncEnabled) UiText.Res(R.string.episode_list_msg_file_deleted_synced)
+                    else UiText.Res(R.string.episode_list_msg_file_deleted)
+                LocalDeletionScope.EPISODE -> UiText.Res(R.string.episode_list_msg_episode_removed)
             },
         )
     }
@@ -190,7 +192,7 @@ class EpisodeListViewModel @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 Log.e(TAG, "episode action failed", e)
-                localMessages.tryEmit("操作に失敗しました: ${e::class.simpleName}")
+                localMessages.tryEmit(UiText.Res(R.string.episode_list_msg_action_failed, e::class.simpleName.orEmpty()))
             }
         }
     }

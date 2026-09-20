@@ -1,8 +1,10 @@
 package dev.tseki.kikidame.ui.episodes
 
+import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.DownloadState
 import dev.tseki.kikidame.domain.EpisodeWithState
 import dev.tseki.kikidame.domain.Program
+import dev.tseki.kikidame.ui.UiText
 import dev.tseki.kikidame.ui.toPublishedDateText
 import dev.tseki.kikidame.ui.toPerformersText
 import dev.tseki.kikidame.ui.toClockText
@@ -12,10 +14,17 @@ import dev.tseki.kikidame.ui.toSizeText
 /**
  * 各回の詳細画面（#43）に並べる値。Room にあるものを整形するだけで、サーバへは問い合わせない。
  * 利用者向けの群と、デバッグ向けの「技術的な詳細」に分ける（後者は折り畳み、長押しでコピー）。
+ * ラベルと定型の値は [UiText]（ADR 0009）。サーバから来た値・日付・尺は [UiText.Plain]。
  */
 object EpisodeDetails {
-    data class Row(val label: String, val value: String)
-    data class Section(val title: String, val rows: List<Row>)
+    data class Row(val label: UiText, val value: UiText) {
+        constructor(label: Int, value: UiText) : this(UiText.Res(label), value)
+        constructor(label: Int, value: String) : this(UiText.Res(label), UiText.Plain(value))
+        constructor(label: Int, value: Int) : this(UiText.Res(label), UiText.Res(value))
+    }
+    data class Section(val title: UiText, val rows: List<Row>) {
+        constructor(title: Int, rows: List<Row>) : this(UiText.Res(title), rows)
+    }
 
     /**
      * 利用者向け: 各回・手元・再生の 3 群。手元に無い／再生記録が無いときはその群を 1 行に畳む。サイズが記録されていなければ「不明」。
@@ -26,35 +35,35 @@ object EpisodeDetails {
         val local = item.localFile
         val playback = item.playback
         val episode = Section(
-            "各回",
+            R.string.episode_details_section_episode,
             listOf(
-                Row("公開日", e.publishedAt.toPublishedDateText()),
-                Row("出演者", e.performers.toPerformersText() ?: "なし"),
-                Row("配信元", program.publisherName ?: "不明"),
-                Row("尺", e.runtime.toClockText()),
-                Row("サイズ", if (e.sizeBytes > 0) e.sizeBytes.toSizeText() else "不明"),
+                Row(R.string.episode_details_published, e.publishedAt.toPublishedDateText()),
+                Row(R.string.episode_details_performers, e.performers.toPerformersText() ?: UiText.Res(R.string.common_none)),
+                Row(R.string.episode_details_publisher, program.publisherName?.let(UiText::Plain) ?: UiText.Res(R.string.common_unknown)),
+                Row(R.string.episode_details_runtime, e.runtime.toClockText()),
+                Row(R.string.episode_details_size, if (e.sizeBytes > 0) UiText.Plain(e.sizeBytes.toSizeText()) else UiText.Res(R.string.common_unknown)),
             ),
         )
         val file = Section(
-            "手元",
+            R.string.episode_details_section_device,
             if (local == null) {
-                listOf(Row("状態", "手元に無い"))
+                listOf(Row(R.string.episode_details_state, R.string.episode_details_not_on_device))
             } else {
                 listOfNotNull(
-                    Row("状態", local.state.label()),
-                    Row("固定", if (local.pinned) "固定（保持ルールの対象外）" else "固定していない"),
-                    local.downloadedAt?.let { Row("ダウンロード日時", it.toDateTimeText()) },
+                    Row(R.string.episode_details_state, local.state.label()),
+                    Row(R.string.episode_details_pin, if (local.pinned) R.string.episode_details_pinned else R.string.episode_details_not_pinned),
+                    local.downloadedAt?.let { Row(R.string.episode_details_downloaded_at, it.toDateTimeText()) },
                 )
             },
         )
         val play = Section(
-            "再生",
+            R.string.episode_details_section_playback,
             if (playback == null) {
-                listOf(Row("再生位置", "記録なし"))
+                listOf(Row(R.string.episode_details_position, R.string.episode_details_no_record))
             } else {
                 listOf(
-                    Row("再生位置", "${playback.position.toClockText()} / ${e.runtime.toClockText()}"),
-                    Row("再生済み", if (playback.played) "再生済み" else "未再生"),
+                    Row(R.string.episode_details_position, "${playback.position.toClockText()} / ${e.runtime.toClockText()}"),
+                    Row(R.string.common_played, if (playback.played) R.string.common_played else R.string.common_unplayed),
                 )
             },
         )
@@ -71,24 +80,24 @@ object EpisodeDetails {
         val local = item.localFile
         val playback = item.playback
         return listOfNotNull(
-            Row("サーバ ID", e.serverItemId?.value ?: "なし（手元だけの各回）"),
-            Row("ID（アプリ内）", e.id.value.toString()),
-            Row("公開日（記録の瞬間、UTC）", e.publishedAt.toString()),
-            Row("取り込み日時", e.addedAt?.toString() ?: "なし"),
-            Row("コンテナ", e.container),
-            local?.let { Row("保存先", it.path ?: "なし") },
+            Row(R.string.episode_details_server_id, e.serverItemId?.value?.let(UiText::Plain) ?: UiText.Res(R.string.episode_details_server_id_none)),
+            Row(R.string.episode_details_app_id, e.id.value.toString()),
+            Row(R.string.episode_details_published_raw, e.publishedAt.toString()),
+            Row(R.string.episode_details_added_at, e.addedAt?.toString()?.let(UiText::Plain) ?: UiText.Res(R.string.common_none)),
+            Row(R.string.episode_details_container, e.container),
+            local?.let { Row(R.string.episode_details_path, it.path?.let(UiText::Plain) ?: UiText.Res(R.string.common_none)) },
             // attemptCount は失敗のたびに増える（再試行の上限判定用）。lastAttemptAt は開始のたびに入るので、別の行にする
-            local?.let { Row("失敗回数", "${it.attemptCount} 回") },
-            local?.lastAttemptAt?.let { Row("最終試行", it.toDateTimeText()) },
-            playback?.let { Row("再生記録の更新日時", it.updatedAt.toDateTimeText()) },
+            local?.let { Row(R.string.episode_details_attempts, UiText.Plural(R.plurals.episode_details_attempts_value, it.attemptCount)) },
+            local?.lastAttemptAt?.let { Row(R.string.episode_details_last_attempt, it.toDateTimeText()) },
+            playback?.let { Row(R.string.episode_details_playback_updated_at, it.updatedAt.toDateTimeText()) },
         )
     }
 
     /** 各回一覧の行の状態に対応する語（行は Wi-Fi 待ち・再試行の案内を足し、ダウンロード済みは何も出さない）。 */
-    private fun DownloadState.label(): String = when (this) {
-        DownloadState.PENDING -> "待機中"
-        DownloadState.RUNNING -> "ダウンロード中"
-        DownloadState.DONE -> "ダウンロード済み"
-        DownloadState.FAILED -> "失敗"
+    private fun DownloadState.label(): Int = when (this) {
+        DownloadState.PENDING -> R.string.common_download_pending
+        DownloadState.RUNNING -> R.string.common_download_running
+        DownloadState.DONE -> R.string.common_download_done
+        DownloadState.FAILED -> R.string.common_download_failed
     }
 }

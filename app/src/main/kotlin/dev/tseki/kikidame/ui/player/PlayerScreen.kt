@@ -51,13 +51,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.PlaybackSpeed
 import dev.tseki.kikidame.playback.SleepTimer
+import dev.tseki.kikidame.ui.resolve
 import dev.tseki.kikidame.ui.toClockText
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -78,7 +82,7 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
                 title = { Text(state.programName ?: "") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
             )
@@ -130,19 +134,19 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
             // `配信元 · 出演者`（#70）。無い回や読み込み前も 1 行分の場所は確保して、回が進んだときにタイトルが跳ねないようにする
             Spacer(Modifier.height(4.dp))
             Text(
-                subtitle ?: " ",
+                subtitle?.resolve() ?: " ",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
             state.error?.let {
                 Spacer(Modifier.height(8.dp))
-                Text(it, color = MaterialTheme.colorScheme.error)
+                Text(it.resolve(), color = MaterialTheme.colorScheme.error)
             }
             Spacer(Modifier.height(8.dp))
             // スワイプ中だけ見せる。場所は常に確保してレイアウトが跳ねないようにする
             Text(
-                text = swipeTargetMs?.let { "${SwipeSeek.deltaText(it - swipeStartMs)} → ${it.milliseconds.toClockText()}" } ?: " ",
+                text = swipeTargetMs?.let { "${SwipeSeek.deltaText(it - swipeStartMs).resolve()} → ${it.milliseconds.toClockText()}" } ?: " ",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.alpha(if (swipeTargetMs != null) 1f else 0f),
@@ -157,38 +161,38 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
             // 片手で使うので、親指が届かない TopAppBar ではなく主操作のすぐ上にまとめる。
             // アイコンの contentDescription はラベルが名前にならないもの（倍速の「1×」、スリープの残り時間）にだけ文脈を足す
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                SubAction(Icons.Filled.Speed, contentDescription = "倍速", label = PlaybackSpeed.label(speed)) { showSpeedSheet = true }
+                SubAction(Icons.Filled.Speed, contentDescription = stringResource(R.string.player_speed), label = PlaybackSpeed.label(speed)) { showSpeedSheet = true }
                 if (played) {
-                    SubAction(Icons.Default.CheckCircle, contentDescription = null, label = "再生済み", enabled = state.episodeId != null) { viewModel.setPlayed(false) }
+                    SubAction(Icons.Default.CheckCircle, contentDescription = null, label = stringResource(R.string.common_played), enabled = state.episodeId != null) { viewModel.setPlayed(false) }
                 } else {
-                    SubAction(Icons.Outlined.Circle, contentDescription = null, label = "未再生", enabled = state.episodeId != null) { viewModel.setPlayed(true) }
+                    SubAction(Icons.Outlined.Circle, contentDescription = null, label = stringResource(R.string.common_unplayed), enabled = state.episodeId != null) { viewModel.setPlayed(true) }
                 }
                 if (sleepTimerSet) {
-                    SubAction(Icons.Filled.Bedtime, contentDescription = "スリープタイマー", label = sleepTimerLabel ?: "スリープ") { showSleepSheet = true }
+                    SubAction(Icons.Filled.Bedtime, contentDescription = stringResource(R.string.player_sleep_timer), label = sleepTimerLabel?.resolve() ?: stringResource(R.string.player_sleep)) { showSleepSheet = true }
                 } else {
-                    SubAction(Icons.Outlined.Bedtime, contentDescription = null, label = "スリープ") { showSleepSheet = true }
+                    SubAction(Icons.Outlined.Bedtime, contentDescription = null, label = stringResource(R.string.player_sleep)) { showSleepSheet = true }
                 }
             }
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 IconButton(onClick = viewModel::previous, enabled = state.hasPrevious) {
-                    Icon(Icons.Default.SkipPrevious, contentDescription = "前の回", Modifier.size(32.dp))
+                    Icon(Icons.Default.SkipPrevious, contentDescription = stringResource(R.string.player_previous), Modifier.size(32.dp))
                 }
                 IconButton(onClick = viewModel::seekBack) {
-                    Icon(Icons.Default.Replay10, contentDescription = "10 秒戻る", Modifier.size(32.dp))
+                    Icon(Icons.Default.Replay10, contentDescription = stringResource(R.string.player_seek_back), Modifier.size(32.dp))
                 }
                 FilledIconButton(onClick = viewModel::togglePlayPause, modifier = Modifier.size(72.dp)) {
                     if (state.isPlaying) {
-                        Icon(Icons.Default.Pause, contentDescription = "一時停止", Modifier.size(40.dp))
+                        Icon(Icons.Default.Pause, contentDescription = stringResource(R.string.common_pause), Modifier.size(40.dp))
                     } else {
-                        Icon(Icons.Default.PlayArrow, contentDescription = "再生", Modifier.size(40.dp))
+                        Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.common_play), Modifier.size(40.dp))
                     }
                 }
                 IconButton(onClick = viewModel::seekForward) {
-                    Icon(Icons.Default.Forward10, contentDescription = "10 秒進む", Modifier.size(32.dp))
+                    Icon(Icons.Default.Forward10, contentDescription = stringResource(R.string.player_seek_forward), Modifier.size(32.dp))
                 }
                 IconButton(onClick = viewModel::next, enabled = state.hasNext) {
-                    Icon(Icons.Default.SkipNext, contentDescription = "次の回", Modifier.size(32.dp))
+                    Icon(Icons.Default.SkipNext, contentDescription = stringResource(R.string.player_next), Modifier.size(32.dp))
                 }
             }
         }
@@ -219,7 +223,7 @@ private fun SubAction(icon: ImageVector, contentDescription: String?, label: Str
 @Composable
 private fun SpeedSheet(current: Float, onSelect: (Float) -> Unit, onDismiss: () -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Text("倍速", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+        Text(stringResource(R.string.player_speed), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
         FlowRow(Modifier.padding(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for (choice in PlaybackSpeed.CHOICES) {
                 FilterChip(
@@ -243,19 +247,19 @@ private fun SleepTimerSheet(
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Text("スリープタイマー", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+        Text(stringResource(R.string.player_sleep_timer), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
         Text(
-            "時間が来るか今の回が終わったら一時停止します。一時停止している間は時間が進みません",
+            stringResource(R.string.player_sleep_description),
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(horizontal = 24.dp),
         )
         FlowRow(Modifier.padding(horizontal = 24.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for (choice in SleepTimer.CHOICES) {
-                FilterChip(selected = false, onClick = { onSelectAfter(choice); onDismiss() }, label = { Text("${choice.inWholeMinutes} 分") })
+                FilterChip(selected = false, onClick = { onSelectAfter(choice); onDismiss() }, label = { Text(pluralStringResource(R.plurals.player_sleep_minutes, choice.inWholeMinutes.toInt(), choice.inWholeMinutes.toInt())) })
             }
-            FilterChip(selected = false, onClick = { onSelectEndOfEpisode(); onDismiss() }, label = { Text("この回の終わりまで") })
+            FilterChip(selected = false, onClick = { onSelectEndOfEpisode(); onDismiss() }, label = { Text(stringResource(R.string.player_sleep_until_end)) })
             if (isSet) {
-                FilterChip(selected = false, onClick = { onSelectAfter(null); onDismiss() }, label = { Text("解除") })
+                FilterChip(selected = false, onClick = { onSelectAfter(null); onDismiss() }, label = { Text(stringResource(R.string.player_sleep_off)) })
             }
         }
         Spacer(Modifier.padding(bottom = 32.dp))

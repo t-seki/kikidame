@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.LinearProgressIndicator
@@ -29,6 +30,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.playback.NowPlayingState
 
@@ -77,9 +79,9 @@ private fun MiniPlayerBar(state: NowPlayingState, onClick: () -> Unit, onToggleP
                 }
                 IconButton(onClick = onTogglePlayPause) {
                     if (state.isPlaying) {
-                        Icon(Icons.Default.Pause, contentDescription = "一時停止")
+                        Icon(Icons.Default.Pause, contentDescription = stringResource(R.string.common_pause))
                     } else {
-                        Icon(Icons.Default.PlayArrow, contentDescription = "再生")
+                        Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.common_play))
                     }
                 }
             }

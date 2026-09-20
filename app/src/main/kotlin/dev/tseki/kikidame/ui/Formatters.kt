@@ -1,4 +1,5 @@
 package dev.tseki.kikidame.ui
+import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.PublishedAt
 import dev.tseki.kikidame.domain.LocalStorageUsage
 import kotlinx.datetime.LocalDate
@@ -30,10 +31,14 @@ fun Long.toSizeText(): String {
     val mb = Math.round(this / 1e5) / 10.0
     return if (mb >= 1000.0) "%.1f GB".format(Locale.ROOT, this / 1e9) else "%.1f MB".format(Locale.ROOT, mb)
 }
-/** 「12.3 GB（123 回）」。手元のファイルの合計と回数を並べる。 */
-fun LocalStorageUsage.toText(): String = "${totalBytes.toSizeText()}（$episodeCount 回）"
-/** 出演者（#70）を 1 つの文字列に。「岩井勇気、澤部佑」。無ければ null（一覧と再生画面はその部分を省き、詳細は「なし」と出す）。 */
-fun List<String>.toPerformersText(): String? = takeIf { it.isNotEmpty() }?.joinToString("、")
+/** 「12.3 GB（123 回）」。手元のファイルの合計と回数を並べる。括弧と「回」は言語で変わるので [UiText]。 */
+fun LocalStorageUsage.toText(): UiText = UiText.Plural(R.plurals.common_storage_usage, episodeCount, totalBytes.toSizeText(), episodeCount)
+/**
+ * 出演者（#70）を 1 つの文言に。「岩井勇気、澤部佑」。無ければ null（一覧と再生画面はその部分を省き、詳細は「なし」と出す）。
+ * 区切りは言語で変わる（`R.string.common_list_separator`）ので [UiText.Joined] にして Composable に解決させる。
+ */
+fun List<String>.toPerformersText(): UiText? =
+    takeIf { it.isNotEmpty() }?.let { UiText.Joined(it.map(UiText::Plain), UiText.Res(R.string.common_list_separator)) }
 fun Duration.toClockText(): String = toComponents { hours, minutes, seconds, _ ->
     if (hours > 0) "%d:%02d:%02d".format(hours, minutes, seconds) else "%d:%02d".format(minutes, seconds)
 }

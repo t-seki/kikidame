@@ -1,9 +1,255 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 日本語。キーの説明と用語は values/strings.xml（英語、既定）を見る。両方に同じキーを置く（lint: MissingTranslation） -->
 <resources>
+    <!-- common -->
+    <string name="common_back">戻る</string>
+    <string name="common_cancel">キャンセル</string>
+    <string name="common_list_separator">、</string>
+    <string name="common_none">なし</string>
+    <string name="common_unknown">不明</string>
+    <string name="common_play">再生</string>
+    <string name="common_pause">一時停止</string>
+    <string name="common_played">再生済み</string>
+    <string name="common_unplayed">未再生</string>
+    <string name="common_program_gone">サーバ上で見つかりません</string>
+    <plurals name="common_storage_usage">
+        <item quantity="other">%1$s（%2$d 回）</item>
+    </plurals>
+    <string name="common_download_pending">待機中</string>
+    <string name="common_download_running">ダウンロード中</string>
+    <string name="common_download_done">ダウンロード済み</string>
+    <string name="common_download_failed">失敗</string>
+    <string name="common_error_save_settings">設定の保存に失敗しました: %1$s</string>
+
+    <!-- connect -->
+    <string name="connect_title">Jellyfin に接続</string>
+    <string name="connect_server">サーバ</string>
+    <string name="connect_server_hint">https:// のみ。スキームは省略できます</string>
+    <string name="connect_user_name">ユーザー名</string>
+    <string name="connect_password">パスワード</string>
+    <string name="connect_submit">接続</string>
+    <string name="connect_error_https_only">https:// の URL だけ使えます</string>
+    <string name="connect_error_save_failed">保存に失敗しました: %1$s</string>
+    <string name="connect_hint_local_network_permission">\n「ローカルネットワーク」の権限が許可されていません。設定 → アプリ → Kikidame → 権限 から許可してください</string>
+
+    <!-- library_pick -->
+    <string name="library_pick_title">ライブラリを選ぶ</string>
+    <string name="library_pick_no_music">音楽ライブラリがありません。Jellyfin 側でラジオ録音を音楽ライブラリとして追加してから再読み込みしてください</string>
+    <string name="library_pick_confirm">決定</string>
+    <string name="library_pick_reload">再読み込み</string>
+    <string name="library_pick_music_only">音楽ライブラリのみ選べます</string>
+    <string name="library_pick_type_music">音楽</string>
+    <string name="library_pick_type_movies">映画</string>
+    <string name="library_pick_type_tvshows">番組（TV）</string>
+    <string name="library_pick_type_photos">写真・ホームビデオ</string>
+    <string name="library_pick_type_books">本</string>
+    <string name="library_pick_type_musicvideos">ミュージックビデオ</string>
+    <string name="library_pick_type_boxsets">コレクション</string>
+    <string name="library_pick_type_playlists">プレイリスト</string>
+    <string name="library_pick_type_livetv">ライブ TV</string>
+
+    <!-- program_list -->
+    <string name="program_list_title">番組</string>
+    <string name="program_list_filter">絞り込み</string>
+    <string name="program_list_settings">設定</string>
+    <string name="program_list_starred">よく聴く</string>
+    <string name="program_list_others">その他</string>
+    <string name="program_list_star_remove">よく聴く（タップで外す）</string>
+    <string name="program_list_star_add">よく聴くに入れる</string>
+    <string name="program_list_sync_enabled">同期対象</string>
+    <string name="program_list_filter_placeholder">番組名・配信元名</string>
+    <string name="program_list_clear_query">検索語を消す</string>
+    <string name="program_list_publisher">配信元</string>
+    <string name="program_list_all">すべて</string>
+    <string name="program_list_no_publisher">配信元なし</string>
+    <string name="program_list_query_chip">「%1$s」</string>
+    <string name="program_list_clear_query_filter">検索の絞り込みを解除</string>
+    <string name="program_list_clear_publisher_filter">配信元の絞り込みを解除</string>
+    <string name="program_list_no_match">「%1$s」に一致する番組がありません</string>
+    <string name="program_list_no_match_in_publisher">%2$sに 「%1$s」に一致する番組がありません</string>
+    <string name="program_list_on_device">手元 %1$d 回</string>
+    <string name="program_list_on_device_of_total">手元 %1$d · 全 %2$d 回</string>
+    <string name="program_list_unplayed_on_device">未再生 %1$d / 手元 %2$d 回</string>
+    <string name="program_list_unplayed_on_device_of_total">未再生 %1$d / 手元 %2$d · 全 %3$d 回</string>
+    <string name="program_list_latest">最新 %1$s</string>
+    <string name="program_list_empty_title">番組がありません</string>
+    <string name="program_list_empty_pull">引っ張って更新するとサーバから取得します</string>
+    <string name="program_list_empty_connect">設定からサーバに接続してください</string>
+
+    <!-- episode_list -->
+    <string name="episode_list_sync_settings_on">同期の設定（同期対象）</string>
+    <string name="episode_list_sync_settings_off">同期の設定（同期していない）</string>
+    <string name="episode_list_remove_program_title">この番組を手元から消しますか？</string>
+    <string name="episode_list_remove_program_text">「%1$s」の各回・ファイル・再生位置をすべて消します。この操作は取り消せません。</string>
+    <string name="episode_list_remove_program_confirm">手元から消す</string>
+    <string name="episode_list_disable_sync_title">同期をやめますか？</string>
+    <plurals name="episode_list_disable_sync_text">
+        <item quantity="other">固定されていない %1$d 回のファイルが次の同期で削除されます。残したい回は先に固定してください。</item>
+    </plurals>
+    <string name="episode_list_disable_sync_confirm">同期をやめる</string>
+    <string name="episode_list_pinned">固定</string>
+    <string name="episode_list_now_playing_playing">聴いている回（再生中）</string>
+    <string name="episode_list_now_playing_paused">聴いている回（一時停止中）</string>
+    <string name="episode_list_download">ダウンロード</string>
+    <string name="episode_list_pending_tap_cancel">待機中（タップでキャンセル）</string>
+    <string name="episode_list_failed_tap_retry">失敗（タップで再試行）</string>
+    <string name="episode_list_played_tap">再生済み（タップで未再生に）</string>
+    <string name="episode_list_unplayed_tap">未再生（タップで再生済みに）</string>
+    <string name="episode_list_status_waiting_wifi">Wi-Fi 待ち</string>
+    <string name="episode_list_action_download">ダウンロード（固定）</string>
+    <string name="episode_list_action_unpin">固定を外す（保持ルールの対象にする）</string>
+    <string name="episode_list_action_delete_file">ファイルを削除（再生位置は残る）</string>
+    <string name="episode_list_action_delete_episode">この回を消す（サーバに無いため戻せない）</string>
+    <string name="episode_list_action_details">詳細</string>
+    <string name="episode_list_storage">手元のファイル: %1$s</string>
+    <string name="episode_list_storage_empty">手元にファイルはありません</string>
+    <string name="episode_list_sync_this_program">この番組を同期する</string>
+    <string name="episode_list_sync_gone">サーバ上で見つかりません（%1$s から）。同期は止まっています。手元の回はそのまま聴けます</string>
+    <string name="episode_list_sync_unavailable">サーバ上で見つかっていないため同期できません</string>
+    <string name="episode_list_sync_description">保持ルールに従って自動でダウンロードし、外れた回を削除します。固定した回は残ります</string>
+    <string name="episode_list_keep_latest">最新 N 回まで保持</string>
+    <plurals name="episode_list_keep_latest_choice">
+        <item quantity="other">%d 回</item>
+    </plurals>
+    <string name="episode_list_keep_unlimited">上限なし</string>
+    <string name="episode_list_delete_after_played">再生済みなら削除</string>
+    <string name="episode_list_delete_after_played_description">聴き終えた回を次の同期で手元から消します</string>
+    <string name="episode_list_sync_now">この番組を今すぐ同期</string>
+    <string name="episode_list_remove_program">この番組を手元から消す</string>
+    <string name="episode_list_msg_unpinned">固定を外しました。保持ルールの対象になります</string>
+    <string name="episode_list_msg_file_deleted_synced">ファイルを削除しました。同期対象の番組なので、保持すべき回なら次の同期で落とし直されます</string>
+    <string name="episode_list_msg_file_deleted">ファイルを削除しました。再生位置は残っています</string>
+    <string name="episode_list_msg_episode_removed">この回はサーバに無いため、一覧からも消しました</string>
+    <string name="episode_list_msg_action_failed">操作に失敗しました: %1$s</string>
+
+    <!-- episode_details -->
+    <string name="episode_details_title">各回の詳細</string>
+    <string name="episode_details_section_episode">各回</string>
+    <string name="episode_details_published">公開日</string>
+    <string name="episode_details_performers">出演者</string>
+    <string name="episode_details_publisher">配信元</string>
+    <string name="episode_details_runtime">尺</string>
+    <string name="episode_details_size">サイズ</string>
+    <string name="episode_details_section_device">手元</string>
+    <string name="episode_details_state">状態</string>
+    <string name="episode_details_not_on_device">手元に無い</string>
+    <string name="episode_details_pin">固定</string>
+    <string name="episode_details_pinned">固定（保持ルールの対象外）</string>
+    <string name="episode_details_not_pinned">固定していない</string>
+    <string name="episode_details_downloaded_at">ダウンロード日時</string>
+    <string name="episode_details_section_playback">再生</string>
+    <string name="episode_details_position">再生位置</string>
+    <string name="episode_details_no_record">記録なし</string>
+    <string name="episode_details_server_id">サーバ ID</string>
+    <string name="episode_details_server_id_none">なし（手元だけの各回）</string>
+    <string name="episode_details_app_id">ID（アプリ内）</string>
+    <string name="episode_details_published_raw">公開日（記録の瞬間、UTC）</string>
+    <string name="episode_details_added_at">取り込み日時</string>
+    <string name="episode_details_container">コンテナ</string>
+    <string name="episode_details_path">保存先</string>
+    <string name="episode_details_attempts">失敗回数</string>
+    <plurals name="episode_details_attempts_value">
+        <item quantity="other">%d 回</item>
+    </plurals>
+    <string name="episode_details_last_attempt">最終試行</string>
+    <string name="episode_details_playback_updated_at">再生記録の更新日時</string>
+    <string name="episode_details_technical">技術的な詳細</string>
+    <string name="episode_details_technical_description">ID・記録の生の値・保存先など。長押しでコピー</string>
+    <string name="episode_details_collapse">畳む</string>
+    <string name="episode_details_expand">展開</string>
+    <string name="episode_details_copied">コピーしました</string>
+
+    <!-- player -->
+    <string name="player_speed">倍速</string>
+    <string name="player_sleep_timer">スリープタイマー</string>
+    <string name="player_sleep">スリープ</string>
+    <string name="player_end_of_episode">回の終わり</string>
+    <string name="player_previous">前の回</string>
+    <string name="player_next">次の回</string>
+    <string name="player_seek_back">10 秒戻る</string>
+    <string name="player_seek_forward">10 秒進む</string>
+    <string name="player_sleep_description">時間が来るか今の回が終わったら一時停止します。一時停止している間は時間が進みません</string>
+    <plurals name="player_sleep_minutes">
+        <item quantity="other">%d 分</item>
+    </plurals>
+    <string name="player_sleep_until_end">この回の終わりまで</string>
+    <string name="player_sleep_off">解除</string>
+    <string name="player_swipe_delta">%1$s 秒</string>
+    <string name="player_error_not_on_device">この回は手元にありません</string>
+    <string name="player_error_file_missing">ファイルが見つかりません。手元の記録を整理しました</string>
+
+    <!-- settings -->
+    <string name="settings_title">設定</string>
+    <string name="settings_section_server">サーバ</string>
+    <string name="settings_not_connected">未接続</string>
+    <string name="settings_user">ユーザー</string>
+    <string name="settings_library">ライブラリ</string>
+    <string name="settings_library_none">未選択</string>
+    <string name="settings_library_tap">タップで選び直す</string>
+    <string name="settings_last_sync">最終同期</string>
+    <string name="settings_section_download">ダウンロード</string>
+    <string name="settings_storage">手元のファイル</string>
+    <string name="settings_wifi_only">Wi-Fi のみ</string>
+    <string name="settings_wifi_only_description">オフにするとモバイル回線でもダウンロードします</string>
+    <string name="settings_section_display">表示</string>
+    <string name="settings_theme">テーマ</string>
+    <string name="settings_theme_system">システム</string>
+    <string name="settings_theme_dark">ダーク</string>
+    <string name="settings_theme_light">ライト</string>
+    <string name="settings_language">言語</string>
+    <string name="settings_language_description">このアプリの言語を OS の設定で選ぶ</string>
+    <string name="settings_section_account">アカウント</string>
+    <string name="settings_sign_out">ログアウト</string>
+    <string name="settings_sign_out_description">認証情報だけを消します。手元の番組・各回・再生位置は残ります</string>
+    <string name="settings_connect_elsewhere">別のサーバに接続</string>
+    <string name="settings_connect_elsewhere_description">手元の番組・各回・再生位置・音声ファイルをすべて消してから接続画面へ</string>
+    <string name="settings_section_about">このアプリについて</string>
+    <string name="settings_version">バージョン</string>
+    <string name="settings_license">ライセンス</string>
+    <string name="settings_license_description">Jellyfin プロジェクトとは無関係の非公式クライアント。タップでソースコードへ</string>
+    <string name="settings_open_source_licenses">オープンソースライセンス</string>
+    <string name="settings_open_source_licenses_description">使っているライブラリとそのライセンス</string>
+    <string name="settings_sign_out_title">ログアウトしますか？</string>
+    <string name="settings_sign_out_text">手元のデータは残ります。次回はもう一度ログインが必要です。</string>
+    <string name="settings_reset_title">手元のデータを消して別のサーバに接続しますか？</string>
+    <string name="settings_reset_text">番組・各回・再生位置・再生済み・音声ファイルがすべて消えます。この操作は取り消せません。</string>
+    <string name="settings_reset_confirm">消して接続画面へ</string>
+
+    <!-- sync -->
+    <string name="sync_sentence_separator">。</string>
+    <string name="sync_fetched">番組 %1$d / 各回 %2$d を取得</string>
+    <plurals name="sync_enqueued">
+        <item quantity="other">%d 回をダウンロード予約</item>
+    </plurals>
+    <plurals name="sync_deleted">
+        <item quantity="other">%d 回を削除</item>
+    </plurals>
+    <plurals name="sync_on_hold">
+        <item quantity="other">%d 番組はサーバ上で見つからず、そのままにしました</item>
+    </plurals>
+    <string name="sync_program_fetched">各回 %1$d を取得しました</string>
+    <string name="sync_program_gone">この番組はサーバ上で見つかりません。何も変えていません</string>
+    <string name="sync_program_checked">各回 %1$d を確認</string>
+    <string name="sync_program_up_to_date">手元は最新です</string>
+    <plurals name="sync_reconciled">
+        <item quantity="other">手元に無くなっていた %d 回の記録を整理しました</item>
+    </plurals>
+    <string name="sync_not_on_wifi">Wi-Fi に接続していないため更新しません</string>
+    <string name="sync_error_session_expired">サーバの認証が切れました。もう一度ログインしてください</string>
+    <string name="sync_error_unreachable">サーバに接続できません。手元の一覧を表示しています</string>
+    <string name="sync_error_fetch_failed">取得に失敗しました: %1$s</string>
+    <string name="sync_error_import_failed">取り込みに失敗しました: %1$s</string>
+    <string name="sync_error_unauthorized">ユーザー名またはパスワードが違います</string>
+    <string name="sync_error_unreachable_connect">サーバに接続できません。URL とネットワークを確認してください</string>
+    <string name="sync_error_server_failed">サーバがエラーを返しました: %1$s</string>
+
+    <!-- playback -->
     <string name="playback_skip_back">10 秒戻る</string>
     <string name="playback_skip_forward">10 秒進む</string>
     <string name="playback_error_file_not_found">ファイルが見つからないため再生を止めました</string>
     <string name="playback_error_failed">再生に失敗したため止めました（%1$s）</string>
 
+    <!-- auto -->
     <string name="auto_root_starred">よく聴く</string>
     <string name="auto_root_programs">番組</string>
 </resources>

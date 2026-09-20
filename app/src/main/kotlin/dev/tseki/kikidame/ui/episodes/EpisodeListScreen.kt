@@ -65,10 +65,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.DownloadState
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.EpisodeWithState
@@ -77,7 +81,9 @@ import dev.tseki.kikidame.domain.Program
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.download.DownloadProgress
 import dev.tseki.kikidame.playback.NowPlayingState
+import dev.tseki.kikidame.ui.UiText
 import dev.tseki.kikidame.ui.player.MiniPlayer
+import dev.tseki.kikidame.ui.resolve
 import dev.tseki.kikidame.ui.toPublishedDateText
 import dev.tseki.kikidame.ui.toPerformersText
 import dev.tseki.kikidame.ui.toText
@@ -106,8 +112,9 @@ fun EpisodeListScreen(
     var sheetFor by remember { mutableStateOf<EpisodeId?>(null) }
     var showSyncSheet by remember { mutableStateOf(false) }
 
+    val context = LocalContext.current
     LaunchedEffect(Unit) {
-        viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
+        viewModel.messages.collect { snackbarHostState.showSnackbar(it.resolve(context)) }
     }
     LaunchedEffect(Unit) {
         viewModel.programRemoved.collect { onBack() }
@@ -125,23 +132,23 @@ fun EpisodeListScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.setStarred(program?.starred != true) }, enabled = program != null) {
                         if (program?.starred == true) {
-                            Icon(Icons.Filled.Star, contentDescription = "よく聴く（タップで外す）", tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Filled.Star, contentDescription = stringResource(R.string.program_list_star_remove), tint = MaterialTheme.colorScheme.primary)
                         } else {
-                            Icon(Icons.Outlined.StarOutline, contentDescription = "よく聴くに入れる")
+                            Icon(Icons.Outlined.StarOutline, contentDescription = stringResource(R.string.program_list_star_add))
                         }
                     }
                     IconButton(onClick = { showSyncSheet = true }, enabled = program != null) {
                         // filled と outlined の Sync は形がほぼ同じなので、OFF は斜線入りで区別する
                         if (program?.syncEnabled == true) {
-                            Icon(Icons.Filled.Sync, contentDescription = "同期の設定（同期対象）", tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Filled.Sync, contentDescription = stringResource(R.string.episode_list_sync_settings_on), tint = MaterialTheme.colorScheme.primary)
                         } else {
-                            Icon(Icons.Filled.SyncDisabled, contentDescription = "同期の設定（同期していない）")
+                            Icon(Icons.Filled.SyncDisabled, contentDescription = stringResource(R.string.episode_list_sync_settings_off))
                         }
                     }
                 },
@@ -191,25 +198,25 @@ fun EpisodeListScreen(
     if (confirmRemoveProgram && currentProgram != null) {
         AlertDialog(
             onDismissRequest = { confirmRemoveProgram = false },
-            title = { Text("この番組を手元から消しますか？") },
-            text = { Text("「${currentProgram.name}」の各回・ファイル・再生位置をすべて消します。この操作は取り消せません。") },
+            title = { Text(stringResource(R.string.episode_list_remove_program_title)) },
+            text = { Text(stringResource(R.string.episode_list_remove_program_text, currentProgram.name)) },
             confirmButton = {
                 TextButton(onClick = { confirmRemoveProgram = false; viewModel.removeProgram() }) {
-                    Text("手元から消す", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.episode_list_remove_program_confirm), color = MaterialTheme.colorScheme.error)
                 }
             },
-            dismissButton = { TextButton(onClick = { confirmRemoveProgram = false }) { Text("キャンセル") } },
+            dismissButton = { TextButton(onClick = { confirmRemoveProgram = false }) { Text(stringResource(R.string.common_cancel)) } },
         )
     }
     pendingDisable?.let { count ->
         AlertDialog(
             onDismissRequest = viewModel::cancelDisableSync,
-            title = { Text("同期をやめますか？") },
-            text = { Text("固定されていない $count 回のファイルが次の同期で削除されます。残したい回は先に固定してください。") },
+            title = { Text(stringResource(R.string.episode_list_disable_sync_title)) },
+            text = { Text(pluralStringResource(R.plurals.episode_list_disable_sync_text, count, count)) },
             confirmButton = {
-                TextButton(onClick = viewModel::confirmDisableSync) { Text("同期をやめる", color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = viewModel::confirmDisableSync) { Text(stringResource(R.string.episode_list_disable_sync_confirm), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = viewModel::cancelDisableSync) { Text("キャンセル") } },
+            dismissButton = { TextButton(onClick = viewModel::cancelDisableSync) { Text(stringResource(R.string.common_cancel)) } },
         )
     }
 
@@ -271,16 +278,16 @@ private fun EpisodeRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val pinned = local?.pinned == true && state == DownloadState.DONE
                 if (pinned) {
-                    Icon(Icons.Filled.PushPin, contentDescription = "固定", Modifier.size(MARK_SIZE))
+                    Icon(Icons.Filled.PushPin, contentDescription = stringResource(R.string.episode_list_pinned), Modifier.size(MARK_SIZE))
                     Spacer(Modifier.width(MARK_GAP))
                 }
                 when {
                     nowPlaying != null && nowPlaying.isPlaying -> {
-                        Icon(Icons.Filled.GraphicEq, contentDescription = "聴いている回（再生中）", Modifier.size(MARK_SIZE), tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Filled.GraphicEq, contentDescription = stringResource(R.string.episode_list_now_playing_playing), Modifier.size(MARK_SIZE), tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(MARK_GAP))
                     }
                     nowPlaying != null -> {
-                        Icon(Icons.Filled.Pause, contentDescription = "聴いている回（一時停止中）", Modifier.size(MARK_SIZE), tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Filled.Pause, contentDescription = stringResource(R.string.episode_list_now_playing_paused), Modifier.size(MARK_SIZE), tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(MARK_GAP))
                     }
                     !pinned -> Spacer(Modifier.width(MARK_SIZE + MARK_GAP)) // 印が無い行の枠
@@ -291,7 +298,7 @@ private fun EpisodeRow(
         supportingContent = {
             // 補足行もタイトルと同じ位置から始める（枠＋間隔ぶんを空ける）
             Column(Modifier.padding(start = MARK_SIZE + MARK_GAP)) {
-                Text(item.toSupportingText(waitingForNetwork))
+                Text(item.toSupportingText(waitingForNetwork).resolve())
                 if (playable && resume != null && runtime > Duration.ZERO) {
                     LinearProgressIndicator(
                         progress = { (resume / runtime).toFloat().coerceIn(0f, 1f) },
@@ -303,10 +310,10 @@ private fun EpisodeRow(
         trailingContent = {
             when (state) {
                 null -> IconButton(onClick = onDownload, enabled = item.episode.serverItemId != null) {
-                    Icon(Icons.Outlined.CloudDownload, contentDescription = "ダウンロード")
+                    Icon(Icons.Outlined.CloudDownload, contentDescription = stringResource(R.string.episode_list_download))
                 }
                 DownloadState.PENDING -> IconButton(onClick = onCancel) {
-                    Icon(Icons.Filled.Schedule, contentDescription = "待機中（タップでキャンセル）")
+                    Icon(Icons.Filled.Schedule, contentDescription = stringResource(R.string.episode_list_pending_tap_cancel))
                 }
                 DownloadState.RUNNING -> IconButton(onClick = onCancel) {
                     val fraction = progress?.fraction
@@ -317,13 +324,13 @@ private fun EpisodeRow(
                     }
                 }
                 DownloadState.FAILED -> IconButton(onClick = onRetry) {
-                    Icon(Icons.Filled.ErrorOutline, contentDescription = "失敗（タップで再試行）", tint = MaterialTheme.colorScheme.error)
+                    Icon(Icons.Filled.ErrorOutline, contentDescription = stringResource(R.string.episode_list_failed_tap_retry), tint = MaterialTheme.colorScheme.error)
                 }
                 DownloadState.DONE -> IconButton(onClick = onTogglePlayed) {
                     if (played) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = "再生済み（タップで未再生に）")
+                        Icon(Icons.Default.CheckCircle, contentDescription = stringResource(R.string.episode_list_played_tap))
                     } else {
-                        Icon(Icons.Outlined.Circle, contentDescription = "未再生（タップで再生済みに）")
+                        Icon(Icons.Outlined.Circle, contentDescription = stringResource(R.string.episode_list_unplayed_tap))
                     }
                 }
             }
@@ -337,15 +344,16 @@ private fun EpisodeRow(
  * 冗長になる。そのときだけ公開日を省いて `出演者 · 尺 · 状態` にする（#66）。判定は完全一致で、表記ゆれ（`2026/08/02`）や
  * `(1)` 付きは一致とみなさない（そういう回では両方の値に意味がある）。
  */
-internal fun EpisodeWithState.toSupportingText(waitingForNetwork: Boolean): String {
-    val published = episode.publishedAt.toPublishedDateText().takeIf { it != episode.title }
+internal fun EpisodeWithState.toSupportingText(waitingForNetwork: Boolean): UiText {
+    val published = episode.publishedAt.toPublishedDateText().takeIf { it != episode.title }?.let(UiText::Plain)
     val status = when (localFile?.state) {
-        DownloadState.PENDING -> if (waitingForNetwork) "Wi-Fi 待ち" else "待機中"
-        DownloadState.RUNNING -> "ダウンロード中"
-        DownloadState.FAILED -> "失敗（タップで再試行）"
+        DownloadState.PENDING -> UiText.Res(if (waitingForNetwork) R.string.episode_list_status_waiting_wifi else R.string.common_download_pending)
+        DownloadState.RUNNING -> UiText.Res(R.string.common_download_running)
+        DownloadState.FAILED -> UiText.Res(R.string.episode_list_failed_tap_retry)
         else -> null
     }
-    return listOfNotNull(published, episode.performers.toPerformersText(), episode.runtime.toClockText(), status).joinToString(" · ")
+    val parts = listOfNotNull(published, episode.performers.toPerformersText(), UiText.Plain(episode.runtime.toClockText()), status)
+    return UiText.Joined(parts, UiText.Plain(" · "))
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -363,16 +371,16 @@ private fun EpisodeActionsSheet(
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Text(item.episode.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
         if (local == null && item.episode.serverItemId != null) {
-            SheetAction(Icons.Filled.Download, "ダウンロード（固定）") { onDownload(); onDismiss() }
+            SheetAction(Icons.Filled.Download, stringResource(R.string.episode_list_action_download)) { onDownload(); onDismiss() }
         }
         if (local?.state == DownloadState.DONE && local.pinned && syncEnabled) {
-            SheetAction(Icons.Outlined.PushPin, "固定を外す（保持ルールの対象にする）") { onUnpin(); onDismiss() }
+            SheetAction(Icons.Outlined.PushPin, stringResource(R.string.episode_list_action_unpin)) { onUnpin(); onDismiss() }
         }
         if (local != null) {
-            val label = if (item.episode.serverItemId != null) "ファイルを削除（再生位置は残る）" else "この回を消す（サーバに無いため戻せない）"
+            val label = stringResource(if (item.episode.serverItemId != null) R.string.episode_list_action_delete_file else R.string.episode_list_action_delete_episode)
             SheetAction(Icons.Filled.Delete, label) { onDelete(); onDismiss() }
         }
-        SheetAction(Icons.Outlined.Info, "詳細") { onDetails() }
+        SheetAction(Icons.Outlined.Info, stringResource(R.string.episode_list_action_details)) { onDetails() }
         Spacer(Modifier.padding(bottom = 24.dp))
     }
 }
@@ -401,20 +409,20 @@ private fun ProgramSyncSheet(
         // この番組の手元のファイル（#42）。保持ルールを触る前に目に入る位置に
         localStorage?.let {
             Text(
-                if (it.episodeCount > 0) "手元のファイル: ${it.toText()}" else "手元にファイルはありません",
+                if (it.episodeCount > 0) stringResource(R.string.episode_list_storage, it.toText().resolve()) else stringResource(R.string.episode_list_storage_empty),
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(horizontal = 24.dp),
             )
         }
         ListItem(
             modifier = Modifier.combinedClickable(enabled = canSync) { onSetEnabled(!enabled) },
-            headlineContent = { Text("この番組を同期する") },
+            headlineContent = { Text(stringResource(R.string.episode_list_sync_this_program)) },
             supportingContent = {
                 Text(
                     when {
-                        program.isGone -> "サーバ上で見つかりません（${program.goneSince?.toPublishedDateText()} から）。同期は止まっています。手元の回はそのまま聴けます"
-                        !canSync -> "サーバ上で見つかっていないため同期できません"
-                        else -> "保持ルールに従って自動でダウンロードし、外れた回を削除します。固定した回は残ります"
+                        program.isGone -> stringResource(R.string.episode_list_sync_gone, program.goneSince?.toPublishedDateText().orEmpty())
+                        !canSync -> stringResource(R.string.episode_list_sync_unavailable)
+                        else -> stringResource(R.string.episode_list_sync_description)
                     },
                 )
             },
@@ -422,7 +430,7 @@ private fun ProgramSyncSheet(
         )
         ListItem(
             modifier = Modifier.alpha(if (enabled) 1f else 0.5f),
-            headlineContent = { Text("最新 N 回まで保持") },
+            headlineContent = { Text(stringResource(R.string.episode_list_keep_latest)) },
             supportingContent = {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
                     for (choice in EpisodeListViewModel.KEEP_LATEST_CHOICES) {
@@ -430,7 +438,7 @@ private fun ProgramSyncSheet(
                             selected = program.retentionRule.keepLatest == choice,
                             onClick = { onKeepLatest(choice) },
                             enabled = enabled,
-                            label = { Text(choice?.let { "$it 回" } ?: "上限なし") },
+                            label = { Text(choice?.let { pluralStringResource(R.plurals.episode_list_keep_latest_choice, it, it) } ?: stringResource(R.string.episode_list_keep_unlimited)) },
                         )
                     }
                 }
@@ -440,19 +448,19 @@ private fun ProgramSyncSheet(
             modifier = Modifier
                 .alpha(if (enabled) 1f else 0.5f)
                 .combinedClickable(enabled = enabled) { onDeleteAfterPlayed(!program.retentionRule.deleteAfterPlayed) },
-            headlineContent = { Text("再生済みなら削除") },
-            supportingContent = { Text("聴き終えた回を次の同期で手元から消します") },
+            headlineContent = { Text(stringResource(R.string.episode_list_delete_after_played)) },
+            supportingContent = { Text(stringResource(R.string.episode_list_delete_after_played_description)) },
             trailingContent = {
                 Switch(checked = program.retentionRule.deleteAfterPlayed, onCheckedChange = onDeleteAfterPlayed, enabled = enabled)
             },
         )
         if (canSync) {
             Button(onClick = onSyncNow, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
-                Text("この番組を今すぐ同期")
+                Text(stringResource(R.string.episode_list_sync_now))
             }
         } else {
             // サーバに在る番組を消しても次の同期で戻ってくる（再生位置だけ失う）ので、消せるのはサーバに無い番組だけ
-            SheetAction(Icons.Filled.Delete, "この番組を手元から消す") { onRemoveProgram() }
+            SheetAction(Icons.Filled.Delete, stringResource(R.string.episode_list_remove_program)) { onRemoveProgram() }
         }
         Spacer(Modifier.padding(bottom = 24.dp))
     }

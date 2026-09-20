@@ -54,6 +54,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -63,10 +65,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.ProgramSummary
 import dev.tseki.kikidame.ui.SectionTitle
+import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.ui.resolve
 import dev.tseki.kikidame.ui.player.MiniPlayer
 import dev.tseki.kikidame.ui.programs.ProgramFilter.Publisher
 import dev.tseki.kikidame.ui.programs.ProgramFilter.PublisherKey
@@ -91,8 +96,9 @@ fun ProgramListScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     // 他のシートと同じく remember（プロセス死で開き直さない。絞り込みの状態も復元しないので）
     var showFilterSheet by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     LaunchedEffect(Unit) {
-        viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
+        viewModel.messages.collect { snackbarHostState.showSnackbar(it.resolve(context)) }
     }
     // 絞り込みの入口（#55）は番組が 1 つでもあれば出す。配信元の段は 2 種類以上のときだけ（1 種類なら絞る意味が無い）
     val publishers = filtered?.publishers.orEmpty()
@@ -115,17 +121,17 @@ fun ProgramListScreen(
             // 何で絞っているかは TopAppBar 下のチップで示す
             Column {
                 TopAppBar(
-                    title = { Text("番組") },
+                    title = { Text(stringResource(R.string.program_list_title)) },
                     actions = {
                         if (publishers.isNotEmpty()) {
                             IconButton(onClick = { showFilterSheet = true }) {
                                 BadgedBox(badge = { if (filtered?.isFiltering == true) Badge() }) {
-                                    Icon(Icons.Default.Tune, contentDescription = "絞り込み")
+                                    Icon(Icons.Default.Tune, contentDescription = stringResource(R.string.program_list_filter))
                                 }
                             }
                         }
                         IconButton(onClick = onSettingsClick) {
-                            Icon(Icons.Default.Settings, contentDescription = "設定")
+                            Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.program_list_settings))
                         }
                     },
                 )
@@ -179,10 +185,10 @@ fun ProgramListScreen(
                         }
                         LazyColumn(Modifier.fillMaxSize(), state = listState) {
                             if (starred.isNotEmpty()) {
-                                item(key = "header-starred") { SectionTitle("よく聴く") }
+                                item(key = "header-starred") { SectionTitle(stringResource(R.string.program_list_starred)) }
                                 programItems(starred, onProgramClick, viewModel::setStarred)
                                 // 全部がよく聴くなら「その他」の見出しも出さない
-                                if (others.isNotEmpty()) item(key = "header-others") { SectionTitle("その他") }
+                                if (others.isNotEmpty()) item(key = "header-others") { SectionTitle(stringResource(R.string.program_list_others)) }
                             }
                             programItems(others, onProgramClick, viewModel::setStarred)
                         }
@@ -215,18 +221,18 @@ private fun ProgramRow(summary: ProgramSummary, onClick: () -> Unit, onToggleSta
         leadingContent = {
             IconButton(onClick = onToggleStarred) {
                 if (summary.program.starred) {
-                    Icon(Icons.Filled.Star, contentDescription = "よく聴く（タップで外す）", tint = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Filled.Star, contentDescription = stringResource(R.string.program_list_star_remove), tint = MaterialTheme.colorScheme.primary)
                 } else {
-                    Icon(Icons.Outlined.StarOutline, contentDescription = "よく聴くに入れる")
+                    Icon(Icons.Outlined.StarOutline, contentDescription = stringResource(R.string.program_list_star_add))
                 }
             }
         },
         headlineContent = { Text(summary.program.name) },
-        supportingContent = { Text(summary.toSupportingText()) },
+        supportingContent = { Text(summary.toSupportingText().resolve()) },
         trailingContent = {
             when {
-                summary.program.isGone -> Icon(Icons.Filled.CloudOff, contentDescription = "サーバ上で見つかりません", tint = MaterialTheme.colorScheme.error)
-                summary.program.syncEnabled -> Icon(Icons.Filled.Sync, contentDescription = "同期対象", tint = MaterialTheme.colorScheme.primary)
+                summary.program.isGone -> Icon(Icons.Filled.CloudOff, contentDescription = stringResource(R.string.common_program_gone), tint = MaterialTheme.colorScheme.error)
+                summary.program.syncEnabled -> Icon(Icons.Filled.Sync, contentDescription = stringResource(R.string.program_list_sync_enabled), tint = MaterialTheme.colorScheme.primary)
             }
         },
     )
@@ -264,19 +270,19 @@ private fun FilterSheet(
             focusRequester.requestFocus()
             keyboard?.show()
         }
-        Text("絞り込み", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+        Text(stringResource(R.string.program_list_filter), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
         // 文字は本文サイズ（見出しと区別する）。× は空欄に戻すだけで閉じない。キーボードの検索（決定）で閉じて、絞った一覧を見せる
         TextField(
             value = query,
             onValueChange = onQueryChange,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).focusRequester(focusRequester),
             textStyle = MaterialTheme.typography.bodyLarge,
-            placeholder = { Text("番組名・配信元名") },
+            placeholder = { Text(stringResource(R.string.program_list_filter_placeholder)) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             trailingIcon = {
                 if (query.isNotEmpty()) {
                     IconButton(onClick = { onQueryChange("") }) {
-                        Icon(Icons.Default.Clear, contentDescription = "検索語を消す")
+                        Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.program_list_clear_query))
                     }
                 }
             },
@@ -285,16 +291,16 @@ private fun FilterSheet(
             keyboardActions = KeyboardActions(onSearch = { keyboard?.hide(); onDismiss() }),
         )
         if (publishers.isNotEmpty()) {
-            Text("配信元", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 4.dp))
+            Text(stringResource(R.string.program_list_publisher), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 4.dp))
             // キーボードの上に収める（imePadding）。シートの高さいっぱいで測ると「全部収まっている」扱いになって
             // 一覧がスクロールせず、ドラッグがシートに渡って閉じてしまう
             LazyColumn(Modifier.weight(1f, fill = false).imePadding()) {
                 item(key = "all") {
-                    PublisherChoice("すべて", publishers.sumOf { it.programCount }, selected == null) { onSelectPublisher(null); onDismiss() }
+                    PublisherChoice(stringResource(R.string.program_list_all), publishers.sumOf { it.programCount }, selected == null) { onSelectPublisher(null); onDismiss() }
                 }
                 // 「すべて」「配信元なし」と配信元名が衝突しないよう接頭辞を付ける
                 items(publishers, key = { it.key.name?.let { n -> "publisher:$n" } ?: "none" }) { publisher ->
-                    PublisherChoice(publisher.key.label, publisher.programCount, publisher.key == selected) { onSelectPublisher(publisher.key); onDismiss() }
+                    PublisherChoice(publisher.key.label.resolve(), publisher.programCount, publisher.key == selected) { onSelectPublisher(publisher.key); onDismiss() }
                 }
                 // 末尾の余白は一覧の中に置く（外に置くと、配信元が多くて一覧が高さを使い切ったとき 0 になる）
                 item { Spacer(Modifier.padding(bottom = 32.dp)) }
@@ -325,8 +331,8 @@ private fun FilterChipsRow(query: String, publisher: PublisherKey?, onClearQuery
             InputChip(
                 selected = true,
                 onClick = onClearQuery,
-                label = { Text("「$query」", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                trailingIcon = { Icon(Icons.Default.Close, contentDescription = "検索の絞り込みを解除") },
+                label = { Text(stringResource(R.string.program_list_query_chip, query), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                trailingIcon = { Icon(Icons.Default.Close, contentDescription = stringResource(R.string.program_list_clear_query_filter)) },
                 modifier = Modifier.weight(1f, fill = false),
             )
         }
@@ -334,8 +340,8 @@ private fun FilterChipsRow(query: String, publisher: PublisherKey?, onClearQuery
             InputChip(
                 selected = true,
                 onClick = onClearPublisher,
-                label = { Text(publisher.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                trailingIcon = { Icon(Icons.Default.Close, contentDescription = "配信元の絞り込みを解除") },
+                label = { Text(publisher.label.resolve(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                trailingIcon = { Icon(Icons.Default.Close, contentDescription = stringResource(R.string.program_list_clear_publisher_filter)) },
                 modifier = Modifier.weight(1f, fill = false),
             )
         }
@@ -348,9 +354,13 @@ private fun NoMatch(query: String, publisher: PublisherKey?) {
         item {
             Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
                 // 配信元だけで 0 件にはならない（配信元の候補は手元の番組から集めるので）。検索語は必ずある
-                val prefix = publisher?.let { "${it.label}に " } ?: ""
+                val normalized = ProgramFilter.normalize(query)
                 Text(
-                    "$prefix「${ProgramFilter.normalize(query)}」に一致する番組がありません",
+                    if (publisher != null) {
+                        stringResource(R.string.program_list_no_match_in_publisher, normalized, publisher.label.resolve())
+                    } else {
+                        stringResource(R.string.program_list_no_match, normalized)
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                 )
@@ -363,16 +373,18 @@ private fun NoMatch(query: String, publisher: PublisherKey?) {
  * 未再生 0 なら「未再生 N /」を省き、手元 = 全なら「全 E 回」を「回」に畳む（「/」が 2 つ並ばないよう「全」の前は「·」）。
  * 配信元が無い・各回が無い（最新なし）ならその部分を省き、消失なら末尾に「サーバ上で見つかりません」を足す。
  */
-internal fun ProgramSummary.toSupportingText(today: LocalDate = Clock.System.todayIn(PublishedAt.ZONE)): String {
-    val unplayed = if (unplayedLocalCount > 0) "未再生 $unplayedLocalCount / " else ""
-    val count = if (localEpisodeCount == episodeCount) {
-        "${unplayed}手元 $localEpisodeCount 回"
-    } else {
-        "${unplayed}手元 $localEpisodeCount · 全 $episodeCount 回"
+internal fun ProgramSummary.toSupportingText(today: LocalDate = Clock.System.todayIn(PublishedAt.ZONE)): UiText {
+    val unplayed = unplayedLocalCount > 0
+    val all = localEpisodeCount == episodeCount
+    val count = when {
+        unplayed && all -> UiText.Res(R.string.program_list_unplayed_on_device, unplayedLocalCount, localEpisodeCount)
+        unplayed -> UiText.Res(R.string.program_list_unplayed_on_device_of_total, unplayedLocalCount, localEpisodeCount, episodeCount)
+        all -> UiText.Res(R.string.program_list_on_device, localEpisodeCount)
+        else -> UiText.Res(R.string.program_list_on_device_of_total, localEpisodeCount, episodeCount)
     }
-    val latest = latestPublishedAt?.let { "最新 ${it.toLatestDateText(today)}" }
-    val gone = if (program.isGone) "サーバ上で見つかりません" else null
-    return listOfNotNull(program.publisherName, count, latest, gone).joinToString(" · ")
+    val latest = latestPublishedAt?.let { UiText.Res(R.string.program_list_latest, it.toLatestDateText(today)) }
+    val gone = if (program.isGone) UiText.Res(R.string.common_program_gone) else null
+    return UiText.Joined(listOfNotNull(program.publisherName?.let(UiText::Plain), count, latest, gone), UiText.Plain(" · "))
 }
 @Composable
 private fun EmptyPrograms(canRefresh: Boolean) {
@@ -381,9 +393,9 @@ private fun EmptyPrograms(canRefresh: Boolean) {
         item {
             Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("番組がありません", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.program_list_empty_title), style = MaterialTheme.typography.titleMedium)
                     Text(
-                        if (canRefresh) "引っ張って更新するとサーバから取得します" else "設定からサーバに接続してください",
+                        if (canRefresh) stringResource(R.string.program_list_empty_pull) else stringResource(R.string.program_list_empty_connect),
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
                     )

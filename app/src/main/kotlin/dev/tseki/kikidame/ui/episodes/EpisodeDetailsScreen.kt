@@ -33,10 +33,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.tseki.kikidame.R
 import dev.tseki.kikidame.ui.SectionTitle
+import dev.tseki.kikidame.ui.resolve
 import dev.tseki.kikidame.ui.ValueRow
 import kotlinx.coroutines.launch
 /**
@@ -62,10 +65,10 @@ fun EpisodeDetailsScreen(onBack: () -> Unit, viewModel: EpisodeDetailsViewModel 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(item?.episode?.title ?: "各回の詳細") },
+                title = { Text(item?.episode?.title ?: stringResource(R.string.episode_details_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
             )
@@ -76,35 +79,38 @@ fun EpisodeDetailsScreen(onBack: () -> Unit, viewModel: EpisodeDetailsViewModel 
         val currentProgram = program ?: return@Scaffold
         LazyColumn(Modifier.padding(padding).fillMaxSize()) {
             for (section in EpisodeDetails.sections(current, currentProgram)) {
-                item { SectionTitle(section.title) }
-                items(section.rows) { row -> ValueRow(row.label, row.value) }
+                item { SectionTitle(section.title.resolve()) }
+                items(section.rows) { row -> ValueRow(row.label.resolve(), row.value.resolve()) }
             }
             item {
                 ListItem(
                     modifier = Modifier.clickable { showTechnical = !showTechnical },
-                    headlineContent = { Text("技術的な詳細") },
-                    supportingContent = { Text("ID・記録の生の値・保存先など。長押しでコピー") },
+                    headlineContent = { Text(stringResource(R.string.episode_details_technical)) },
+                    supportingContent = { Text(stringResource(R.string.episode_details_technical_description)) },
                     trailingContent = {
-                        Icon(if (showTechnical) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = if (showTechnical) "畳む" else "展開")
+                        Icon(if (showTechnical) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = stringResource(if (showTechnical) R.string.episode_details_collapse else R.string.episode_details_expand))
                     },
                 )
             }
             if (showTechnical) {
                 items(EpisodeDetails.technicalRows(current)) { row ->
+                    val label = row.label.resolve()
+                    val value = row.value.resolve()
+                    val copied = stringResource(R.string.episode_details_copied)
                     ListItem(
                         modifier = Modifier.combinedClickable(
                             onClick = {},
                             onLongClick = {
                                 scope.launch {
-                                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(row.label, row.value)))
+                                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(label, value)))
                                     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                                        Toast.makeText(context, "コピーしました", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, copied, Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             },
                         ),
-                        overlineContent = { Text(row.label) },
-                        headlineContent = { Text(row.value, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace) },
+                        overlineContent = { Text(label) },
+                        headlineContent = { Text(value, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace) },
                     )
                 }
             }

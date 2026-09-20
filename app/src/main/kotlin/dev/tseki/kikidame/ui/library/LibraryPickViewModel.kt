@@ -10,6 +10,7 @@ import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.sync.LibraryRefresher
 import dev.tseki.kikidame.sync.toUserMessage
+import dev.tseki.kikidame.ui.UiText
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -22,7 +23,7 @@ data class LibraryPickUiState(
     val selectedId: ServerItemId? = null,
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
-    val error: String? = null,
+    val error: UiText? = null,
 ) {
     val musicCount: Int get() = libraries.orEmpty().count { it.isMusic }
     val canConfirm: Boolean get() = !isSaving && selectedId != null

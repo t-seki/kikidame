@@ -1,5 +1,7 @@
 package dev.tseki.kikidame.ui.player
 
+import dev.tseki.kikidame.R
+import dev.tseki.kikidame.ui.UiText
 import org.junit.Test
 import kotlin.test.assertEquals
 
@@ -32,8 +34,8 @@ class SwipeSeekTest {
     }
     @Test
     fun deltaTextShowsSignAndWholeSeconds() {
-        assertEquals("+7 秒", SwipeSeek.deltaText(7_400L))
-        assertEquals("−12 秒", SwipeSeek.deltaText(-12_000L))
-        assertEquals("±0 秒", SwipeSeek.deltaText(400L))
+        assertEquals(UiText.Res(R.string.player_swipe_delta, "+7"), SwipeSeek.deltaText(7_400L))
+        assertEquals(UiText.Res(R.string.player_swipe_delta, "−12"), SwipeSeek.deltaText(-12_000L))
+        assertEquals(UiText.Res(R.string.player_swipe_delta, "±0"), SwipeSeek.deltaText(400L))
     }
 }

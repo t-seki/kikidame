@@ -64,6 +64,17 @@
 - ボトムシートは「その画面に留まったまま 1 つ選ぶ」ときに使い、スクロールする長い一覧は画面にする（#43 の判断）
 - ジャケット・波形など、データに無い視覚要素で埋めない（番組型の音声にジャケットが無いことは多い。偽の波形も置かない）
 
+### 文言の足し方（#104、ADR 0009）
+
+UI の文言は英語と日本語の 2 言語で、OS の「アプリの言語」（Android 13+）で切り替わる。既定は英語（日英以外の端末には英語が出る）。
+
+- 文言は `app/src/main/res/values/strings.xml`（英語、既定）と `values-ja/strings.xml`（日本語）の**両方**に足す。片方だけだと lint の `MissingTranslation` でビルドが落ちる。`values/` にはキーごとに翻訳者向けの短いコメント、書式引数は `%1$s` のように番号付き、数+単位（「3 回」「15 分」）は `<plurals>`
+- キーは `<area>_<what>` の snake_case。area は `common` / `connect` / `library_pick` / `program_list` / `episode_list` / `episode_details` / `player` / `settings` / `sync` / `playback` / `auto`。英語の用語は CONTEXT.md の英語名（Program / Episode / Publisher / Pinned / Starred / Played …）に揃える
+- **文字列に解決するのは Composable だけ。** Composable では `stringResource` / `pluralStringResource`。Composable の外（ViewModel・`LibraryRefresher`・`NowPlaying`・`EpisodeDetails`）は `String` ではなく `ui/UiText.kt` の `UiText`（`Res(R.string.x, args)` / `Plural(R.plurals.x, n)` / `Plain(サーバから来た名前)` / `Joined(parts, separator)`）を返し、表示側で `.resolve()`（`LaunchedEffect` の中でスナックバーに渡すときは `.resolve(LocalContext.current)`）。`Context.getString` を Composable の外に書かない。例外は `PlaybackService`（通知・Android Auto にはプロセスの外へ `String` を渡すしかない）
+- 日付（`2026-08-02`）・尺（`1:02:03`）・容量（`12.3 MB`）の書式は言語に依らず固定。言語で変わるのは区切り（`common_list_separator`「、」/ ", "）と単位だけ
+- テスト: `UiText` を返す関数は `assertEquals(UiText.Res(R.string.sync_fetched, 3, 40), actual)` の形で「どの文言がどの引数で選ばれたか」を比べる。並びや省略を見たいテスト（行の補足など）は Robolectric に `@Config(qualifiers = "ja")` を付け、`resolve(context)` した日本語で比べる
+- 3 言語目を足すときは `values-<lang>/strings.xml` を置くだけ（`generateLocaleConfig = true` が OS の言語一覧に自動で載せる）。翻訳の受け入れ体制（Weblate 等）は需要が見えてから
+
 ## 検討の記録
 
 5 つの案を、同じ 5 軸（① 行の情報密度、② 階層、③ 絞り込みの入口、④ 色、⑤ 再生画面の主役）の上に置いて比べた。画面イメージは HTML で描き（[claude.ai/artifact/DNLd8CXT26Jc5SjN86uGDP](https://claude.ai/artifact/DNLd8CXT26Jc5SjN86uGDP)、補助）、実機での `/prototype` は行っていない。

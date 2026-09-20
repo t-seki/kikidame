@@ -8,6 +8,7 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.AppSettingsRepository
 import dev.tseki.kikidame.domain.DownloadRepository
 import dev.tseki.kikidame.domain.EpisodeId
@@ -21,6 +22,7 @@ import dev.tseki.kikidame.playback.PlayerConnection
 import dev.tseki.kikidame.playback.SleepTimer
 import dev.tseki.kikidame.playback.SleepTimerSetting
 import dev.tseki.kikidame.ui.PlayerRoute
+import dev.tseki.kikidame.ui.UiText
 import dev.tseki.kikidame.ui.toClockText
 import dev.tseki.kikidame.ui.toPerformersText
 import kotlinx.coroutines.CancellationException
@@ -54,7 +56,7 @@ data class PlayerUiState(
     val durationMs: Long = 0,
     val hasPrevious: Boolean = false,
     val hasNext: Boolean = false,
-    val error: String? = null,
+    val error: UiText? = null,
 )
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -83,12 +85,12 @@ class PlayerViewModel @Inject constructor(
      * タイトルの下の `配信元 · 出演者`（#70）。配信元は番組から、出演者は各回から取り、どちらも Room を購読する
      * （この画面を開いたまま同期が出演者を書き換えても追従する）。どちらも無ければ null。番組 ID を知るために最初に 1 回だけ各回を引く。
      */
-    val subtitle: StateFlow<String?> = _uiState
+    val subtitle: StateFlow<UiText?> = _uiState
         .map { it.episodeId }
         .distinctUntilChanged()
         .flatMapLatest { id ->
             if (id == null) return@flatMapLatest flowOf(null)
-            flow<String?> {
+            flow<UiText?> {
                 val programId = library.getEpisode(id)?.episode?.programId ?: return@flow emit(null)
                 val performers = library.observeEpisodes(programId).map { list -> list.firstOrNull { it.episode.id == id }?.episode?.performers.orEmpty() }
                 emitAll(combine(library.observeProgram(programId), performers) { program, names -> playerSubtitle(program?.publisherName, names) })
@@ -106,20 +108,20 @@ class PlayerViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = "設定の保存に失敗しました: ${e::class.simpleName}") }
+                _uiState.update { it.copy(error = UiText.Res(R.string.common_error_save_settings, e::class.simpleName.orEmpty())) }
             }
         }
     }
 
     /** スリープタイマーの表示（#36）: 残り時間「24:59」（60 分直後は「1:00:00」。一時停止中は止まったまま）、「回の終わり」、未設定なら null。 */
-    val sleepTimerLabel: StateFlow<String?> = sleepTimer.setting
+    val sleepTimerLabel: StateFlow<UiText?> = sleepTimer.setting
         .flatMapLatest { setting ->
             when (setting) {
                 null -> flowOf(null)
-                SleepTimerSetting.EndOfEpisode -> flowOf("回の終わり")
+                SleepTimerSetting.EndOfEpisode -> flowOf<UiText?>(UiText.Res(R.string.player_end_of_episode))
                 is SleepTimerSetting.Countdown -> flow {
                     while (true) {
-                        emit(setting.remainingAt(clock.now()).toClockText())
+                        emit(UiText.Plain(setting.remainingAt(clock.now()).toClockText()))
                         delay(1_000)
                     }
                 }
@@ -178,13 +180,13 @@ class PlayerViewModel @Inject constructor(
         }
         val target = library.getEpisode(episodeId)
         if (target == null || !target.isPlayable) {
-            _uiState.update { it.copy(error = "この回は手元にありません") }
+            _uiState.update { it.copy(error = UiText.Res(R.string.player_error_not_on_device)) }
             return
         }
         // ファイルマネージャ等で消されていたら、ここで整合して再生しない（#5）
         val present = runCatching { downloads.ensureFilePresent(episodeId) }.getOrDefault(true)
         if (!present) {
-            _uiState.update { it.copy(error = "ファイルが見つかりません。手元の記録を整理しました") }
+            _uiState.update { it.copy(error = UiText.Res(R.string.player_error_file_missing)) }
             return
         }
         val program = library.observeProgram(target.episode.programId).first()
@@ -242,6 +244,6 @@ class PlayerViewModel @Inject constructor(
         const val POSITION_REFRESH_MS = 500L
     }
 }
-/** `配信元 · 出演者`。無い方は省き、両方無ければ null。 */
-internal fun playerSubtitle(publisherName: String?, performers: List<String>): String? =
-    listOfNotNull(publisherName, performers.toPerformersText()).takeIf { it.isNotEmpty() }?.joinToString(" · ")
+/** `配信元 · 出演者`。無い方は省き、両方無ければ null。出演者の区切りは言語で変わるので、解決は Composable に任せる。 */
+internal fun playerSubtitle(publisherName: String?, performers: List<String>): UiText? =
+    listOfNotNull(publisherName?.let(UiText::Plain), performers.toPerformersText()).takeIf { it.isNotEmpty() }?.let { UiText.Joined(it, UiText.Plain(" · ")) }

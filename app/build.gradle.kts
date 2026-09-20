@@ -42,6 +42,14 @@ android {
         compose = true
         buildConfig = true
     }
+    androidResources {
+        // OS の「アプリの言語」（Android 13+）に載せる locales_config.xml を、res/values-* と resources.properties から生成する（#104、ADR 0009）
+        generateLocaleConfig = true
+    }
+    lint {
+        // 文言は values/（英語、既定）と values-ja/ の両方に置く。片方だけの追加をビルドで落とす
+        error += "MissingTranslation"
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

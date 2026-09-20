@@ -34,14 +34,22 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import dev.tseki.kikidame.BuildConfig
+import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.ui.SectionTitle
 import dev.tseki.kikidame.ui.ValueRow
+import dev.tseki.kikidame.ui.resolve
 import dev.tseki.kikidame.ui.toDateTimeText
 import dev.tseki.kikidame.ui.toText
 
@@ -62,9 +70,10 @@ fun SettingsScreen(
     var confirmSignOut by remember { mutableStateOf(false) }
     var confirmReset by remember { mutableStateOf(false) }
 
+    val context = LocalContext.current
     LaunchedEffect(message) {
         message?.let {
-            snackbarHostState.showSnackbar(it)
+            snackbarHostState.showSnackbar(it.resolve(context))
             viewModel.consumeMessage()
         }
     }
@@ -72,9 +81,9 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("設定") },
+                title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る") }
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back)) }
                 },
             )
         },
@@ -88,31 +97,31 @@ fun SettingsScreen(
                 else -> null
             }
             // 値を見せる行はラベル上・値下（#58、各回の詳細と同じ向き）。操作の行は操作名が上で説明が下
-            SectionTitle("サーバ")
-            ValueRow("URL", current?.serverUrl ?: "未接続")
-            ValueRow("ユーザー", current?.userName ?: "-")
+            SectionTitle(stringResource(R.string.settings_section_server))
+            ValueRow("URL", current?.serverUrl ?: stringResource(R.string.settings_not_connected))
+            ValueRow(stringResource(R.string.settings_user), current?.userName ?: "-")
             ValueRow(
-                "ライブラリ",
-                (s as? SessionState.Ready)?.library?.name ?: "未選択",
+                stringResource(R.string.settings_library),
+                (s as? SessionState.Ready)?.library?.name ?: stringResource(R.string.settings_library_none),
                 modifier = Modifier.clickable(enabled = current != null, onClick = onChangeLibrary),
-                supporting = "タップで選び直す",
+                supporting = stringResource(R.string.settings_library_tap),
             )
-            ValueRow("最終同期", (s as? SessionState.Ready)?.lastFetchedAt?.toDateTimeText() ?: "-")
+            ValueRow(stringResource(R.string.settings_last_sync), (s as? SessionState.Ready)?.lastFetchedAt?.toDateTimeText() ?: "-")
             HorizontalDivider()
-            SectionTitle("ダウンロード")
+            SectionTitle(stringResource(R.string.settings_section_download))
             // 手元のファイルの合計（#42）。保持ルールや固定を調整する動機は容量なので、見えるようにする
-            ValueRow("手元のファイル", localStorage?.toText() ?: "-")
+            ValueRow(stringResource(R.string.settings_storage), localStorage?.toText()?.resolve() ?: "-")
             ListItem(
                 modifier = Modifier.clickable { viewModel.setWifiOnly(!wifiOnly) },
-                headlineContent = { Text("Wi-Fi のみ") },
-                supportingContent = { Text("オフにするとモバイル回線でもダウンロードします") },
+                headlineContent = { Text(stringResource(R.string.settings_wifi_only)) },
+                supportingContent = { Text(stringResource(R.string.settings_wifi_only_description)) },
                 trailingContent = { Switch(checked = wifiOnly, onCheckedChange = viewModel::setWifiOnly) },
             )
             HorizontalDivider()
-            SectionTitle("表示")
+            SectionTitle(stringResource(R.string.settings_section_display))
             // テーマ（#62）。ラベル上・選択肢下。選んだ瞬間に MainActivity 側で切り替わる（再起動不要）
             ListItem(
-                overlineContent = { Text("テーマ") },
+                overlineContent = { Text(stringResource(R.string.settings_theme)) },
                 headlineContent = {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
                         for (choice in ThemeMode.entries) {
@@ -120,40 +129,50 @@ fun SettingsScreen(
                                 selected = themeMode == choice,
                                 onClick = { viewModel.setThemeMode(choice) },
                                 enabled = themeMode != null,
-                                label = { Text(choice.label()) },
+                                label = { Text(stringResource(choice.label())) },
                             )
                         }
                     }
                 },
             )
+            // 言語（#104）。切替は OS のアプリ別言語設定（Android 13+）に任せ、ここはそこへのリンクだけ（ADR 0009）
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ListItem(
+                    modifier = Modifier.clickable {
+                        context.startActivity(Intent(Settings.ACTION_APP_LOCALE_SETTINGS, Uri.fromParts("package", context.packageName, null)))
+                    },
+                    headlineContent = { Text(stringResource(R.string.settings_language)) },
+                    supportingContent = { Text(stringResource(R.string.settings_language_description)) },
+                )
+            }
             HorizontalDivider()
             // 見出しが無いと「表示」の続きに見えるので群にする（#62 のレビュー指摘）
-            SectionTitle("アカウント")
+            SectionTitle(stringResource(R.string.settings_section_account))
             ListItem(
                 modifier = Modifier.clickable(enabled = current != null) { confirmSignOut = true },
-                headlineContent = { Text("ログアウト") },
-                supportingContent = { Text("認証情報だけを消します。手元の番組・各回・再生位置は残ります") },
+                headlineContent = { Text(stringResource(R.string.settings_sign_out)) },
+                supportingContent = { Text(stringResource(R.string.settings_sign_out_description)) },
             )
             ListItem(
                 modifier = Modifier.clickable { confirmReset = true },
-                headlineContent = { Text("別のサーバに接続", color = MaterialTheme.colorScheme.error) },
-                supportingContent = { Text("手元の番組・各回・再生位置・音声ファイルをすべて消してから接続画面へ") },
+                headlineContent = { Text(stringResource(R.string.settings_connect_elsewhere), color = MaterialTheme.colorScheme.error) },
+                supportingContent = { Text(stringResource(R.string.settings_connect_elsewhere_description)) },
             )
             HorizontalDivider()
             // ライセンス（#91）。MPL-2.0 で公開し、LGPL-3.0 の jellyfin-sdk-kotlin を同梱しているので、出どころと依存の一覧をここに置く
-            SectionTitle("このアプリについて")
-            ValueRow("バージョン", BuildConfig.VERSION_NAME)
+            SectionTitle(stringResource(R.string.settings_section_about))
+            ValueRow(stringResource(R.string.settings_version), BuildConfig.VERSION_NAME)
             val uriHandler = LocalUriHandler.current
             ValueRow(
-                "ライセンス",
+                stringResource(R.string.settings_license),
                 "MPL-2.0",
                 modifier = Modifier.clickable { uriHandler.openUri(SOURCE_URL) },
-                supporting = "Jellyfin プロジェクトとは無関係の非公式クライアント。タップでソースコードへ",
+                supporting = stringResource(R.string.settings_license_description),
             )
             ListItem(
                 modifier = Modifier.clickable(onClick = onOpenLicenses),
-                headlineContent = { Text("オープンソースライセンス") },
-                supportingContent = { Text("使っているライブラリとそのライセンス") },
+                headlineContent = { Text(stringResource(R.string.settings_open_source_licenses)) },
+                supportingContent = { Text(stringResource(R.string.settings_open_source_licenses_description)) },
             )
         }
     }
@@ -161,30 +180,30 @@ fun SettingsScreen(
     if (confirmSignOut) {
         AlertDialog(
             onDismissRequest = { confirmSignOut = false },
-            title = { Text("ログアウトしますか？") },
-            text = { Text("手元のデータは残ります。次回はもう一度ログインが必要です。") },
-            confirmButton = { TextButton(onClick = { confirmSignOut = false; viewModel.signOut() }) { Text("ログアウト") } },
-            dismissButton = { TextButton(onClick = { confirmSignOut = false }) { Text("キャンセル") } },
+            title = { Text(stringResource(R.string.settings_sign_out_title)) },
+            text = { Text(stringResource(R.string.settings_sign_out_text)) },
+            confirmButton = { TextButton(onClick = { confirmSignOut = false; viewModel.signOut() }) { Text(stringResource(R.string.settings_sign_out)) } },
+            dismissButton = { TextButton(onClick = { confirmSignOut = false }) { Text(stringResource(R.string.common_cancel)) } },
         )
     }
     if (confirmReset) {
         AlertDialog(
             onDismissRequest = { confirmReset = false },
-            title = { Text("手元のデータを消して別のサーバに接続しますか？") },
-            text = { Text("番組・各回・再生位置・再生済み・音声ファイルがすべて消えます。この操作は取り消せません。") },
+            title = { Text(stringResource(R.string.settings_reset_title)) },
+            text = { Text(stringResource(R.string.settings_reset_text)) },
             confirmButton = {
                 TextButton(onClick = { confirmReset = false; viewModel.resetAndConnectElsewhere() }) {
-                    Text("消して接続画面へ", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.settings_reset_confirm), color = MaterialTheme.colorScheme.error)
                 }
             },
-            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("キャンセル") } },
+            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text(stringResource(R.string.common_cancel)) } },
         )
     }
 }
-private fun ThemeMode.label(): String = when (this) {
-    ThemeMode.SYSTEM -> "システム"
-    ThemeMode.DARK -> "ダーク"
-    ThemeMode.LIGHT -> "ライト"
+private fun ThemeMode.label(): Int = when (this) {
+    ThemeMode.SYSTEM -> R.string.settings_theme_system
+    ThemeMode.DARK -> R.string.settings_theme_dark
+    ThemeMode.LIGHT -> R.string.settings_theme_light
 }
 
 private const val SOURCE_URL = "https://github.com/t-seki/kikidame"

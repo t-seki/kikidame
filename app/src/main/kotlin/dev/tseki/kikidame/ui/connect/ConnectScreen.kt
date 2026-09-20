@@ -21,12 +21,15 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.tseki.kikidame.R
+import dev.tseki.kikidame.ui.resolve
 
 /** サーバ URL・ユーザー名・パスワードでログインする。成功するとセッション状態が変わり、NavHost が次の画面へ導く。 */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -37,7 +40,7 @@ fun ConnectScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Jellyfin に接続") }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.connect_title)) }) },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -51,9 +54,9 @@ fun ConnectScreen(
             OutlinedTextField(
                 value = state.serverUrl,
                 onValueChange = viewModel::onServerUrlChange,
-                label = { Text("サーバ") },
+                label = { Text(stringResource(R.string.connect_server)) },
                 placeholder = { Text("jellyfin.example.net") },
-                supportingText = { Text("https:// のみ。スキームは省略できます") },
+                supportingText = { Text(stringResource(R.string.connect_server_hint)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
                 modifier = Modifier.fillMaxWidth(),
@@ -61,7 +64,7 @@ fun ConnectScreen(
             OutlinedTextField(
                 value = state.userName,
                 onValueChange = viewModel::onUserNameChange,
-                label = { Text("ユーザー名") },
+                label = { Text(stringResource(R.string.connect_user_name)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                 modifier = Modifier.fillMaxWidth(),
@@ -69,18 +72,18 @@ fun ConnectScreen(
             OutlinedTextField(
                 value = state.password,
                 onValueChange = viewModel::onPasswordChange,
-                label = { Text("パスワード") },
+                label = { Text(stringResource(R.string.connect_password)) },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
                 modifier = Modifier.fillMaxWidth(),
             )
-            state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            state.error?.let { Text(it.resolve(), color = MaterialTheme.colorScheme.error) }
             Button(onClick = viewModel::submit, enabled = state.canSubmit, modifier = Modifier.fillMaxWidth()) {
                 if (state.isSubmitting) {
                     CircularProgressIndicator(Modifier.height(20.dp), strokeWidth = 2.dp)
                 } else {
-                    Text("接続")
+                    Text(stringResource(R.string.connect_submit))
                 }
             }
         }
