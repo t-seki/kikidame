@@ -38,6 +38,7 @@ sdk.dir=/home/<you>/Android/Sdk
 
 ```bash
 ./gradlew test            # 全ユニットテスト（エミュレータ不要）。CI と同じ
+./gradlew :app:lintDebug  # lint。CI と同じ。MissingTranslation（values/ と values-ja/ の片方だけの追加）はエラー。抑止は app/lint.xml に理由付きで
 ./gradlew :app:assembleDebug
 ```
 

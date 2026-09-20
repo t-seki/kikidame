@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- lint の抑止は理由付きでここに集める（#111）。エラーにする検査は app/build.gradle.kts の lint {} に。 -->
+<lint>
+    <!--
+        Android Auto の音声検索（"OK Google, play …"）は #96 の非目標。
+        MEDIA_PLAY_FROM_SEARCH の intent-filter を宣言しても受ける側が無いので、宣言しない。
+    -->
+    <issue id="MissingIntentFilterForMediaSearch" severity="ignore" />
+</lint>

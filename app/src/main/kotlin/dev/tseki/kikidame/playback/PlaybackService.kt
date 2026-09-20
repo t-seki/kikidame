@@ -2,11 +2,13 @@ package dev.tseki.kikidame.playback
 import android.app.PendingIntent
 import android.content.Intent
 import android.util.Log
+import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.CommandButton
 import androidx.media3.session.LibraryResult
@@ -39,6 +41,8 @@ import kotlin.time.Clock
  * Android Auto（#96）には [MediaLibraryService] として [BrowseTree] を出す。Auto は車載機からアプリの外で bind するので、
  * 画面を開かずにこのサービスが起動する経路がある（ADR 0006 の addendum）。
  */
+// Media3 の MediaLibrarySession / LibraryResult は unstable API。クラス単位で opt-in する（#111）
+@OptIn(UnstableApi::class)
 @AndroidEntryPoint
 class PlaybackService : MediaLibraryService() {
     @Inject lateinit var libraryRepository: LibraryRepository

@@ -1,7 +1,9 @@
 package dev.tseki.kikidame.playback
+import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.PlaybackRules
 import dev.tseki.kikidame.domain.PlaybackStateRepository
@@ -24,6 +26,8 @@ import kotlin.time.Duration.Companion.seconds
  * 書き込みは [persistScope] に載せる。サービス破棄で [playerScope] が cancel されても
  * 最後の保存が失われないよう、こちらはプロセス寿命のスコープを渡す。
  */
+// Player.PositionInfo の mediaItem / mediaItemIndex が unstable API。クラス単位で opt-in する（#111）
+@OptIn(UnstableApi::class)
 class PositionPersister(
     private val player: Player,
     private val repository: PlaybackStateRepository,
