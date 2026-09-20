@@ -262,7 +262,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
     サーバ宛の TCP が黙って落ちる（DNS だけ通るので名前解決は成功し、接続がタイムアウトする）。
     `adb shell` や古い targetSdk のアプリは対象外なので、切り分けでは `run-as <pkg> nc -z <host> <port>` で
     アプリの UID から試すこと
-- **モジュール**: 上記 3 モジュールを最初から切る。`applicationId` は `dev.tseki.jellyfinradio`、`minSdk` 31
+- **モジュール**: 上記 3 モジュールを最初から切る。`applicationId` は `dev.tseki.kikidame`、`minSdk` 31
 - **Room**: `exportSchema = true` で `core/data/schemas/` を git 管理する
 - **CI**: GitHub Actions で PR ごとに `./gradlew test`
 
@@ -277,7 +277,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
     （後で「ダウンロード」節が増え、M3-a で「Wi-Fi のみ」、#42 で「手元のファイル」の合計容量が入った）
     デバッグ用シードはここに移す（接続画面にもデバッグ節として置く。M3-c で削除）
   - 401 はログアウトと同じ処理をして接続画面へ（URL とユーザー名は入力済み）
-- **認証情報**: `Client="Jellyfin Radio"`, `Version=versionName`。`Device` / `DeviceId` は jellyfin-sdk-kotlin の Android 既定
+- **認証情報**: `Client="Kikidame"`, `Version=versionName`。`Device` / `DeviceId` は jellyfin-sdk-kotlin の Android 既定
   （端末のモデル名 / `ANDROID_ID` 由来）に任せ、自前の UUID は持たない（実装時に変更。保存する値が 1 つ減る）。
   トークンは Keystore の鍵で AES-GCM 暗号化して Preferences DataStore に保存（`EncryptedSharedPreferences` は使わない）。
   パスワードは保存しない。`SessionStore`（`:core:data`）が持つ

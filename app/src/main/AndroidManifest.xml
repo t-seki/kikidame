@@ -9,10 +9,10 @@
     <!-- Android 17 (targetSdk 37): LAN 内のサーバへの接続に必要なランタイム権限 -->
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
     <application
-        android:name=".JellyfinRadioApp"
+        android:name=".KikidameApp"
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
-        android:theme="@style/Theme.JellyfinRadio">
+        android:theme="@style/Theme.Kikidame">
         <activity
             android:name=".MainActivity"
             android:exported="true"
