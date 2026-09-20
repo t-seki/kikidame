@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.ksp) apply false
     alias(libs.plugins.hilt) apply false
     alias(libs.plugins.room) apply false
+    alias(libs.plugins.aboutlibraries) apply false
 }
 // Robolectric 4.17 が SDK 37 のサンドボックスで JDK 内部 API へ反射アクセスするために必要
 // (robolectric/robolectric#11434)。Android モジュールのユニットテストにだけ効かせる。

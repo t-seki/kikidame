@@ -87,3 +87,5 @@ export JAVA_HOME=~/.local/jdk/current   # JDK 21
 - 実装引き継ぎ（設計の全体像・マイルストーン）: [docs/claude-code-handoff.md](./docs/claude-code-handoff.md)
 - 開発ガイド（ツールチェイン・テスト・実機確認・並行作業）: [docs/development.md](./docs/development.md)
 - UI の方針（大事にすること・色・画面ごとの役割）: [docs/ui.md](./docs/ui.md)
+[MPL-2.0](./LICENSE)（[ADR 0008](./docs/adr/0008-open-source-distributed-outside-play.md)）。Kikidame は Jellyfin プロジェクトとは無関係の非公式クライアントで、Jellyfin の名前とロゴは Jellyfin プロジェクトのものです。
+サーバとの通信には [jellyfin-sdk-kotlin](https://github.com/jellyfin/jellyfin-sdk-kotlin)（LGPL-3.0）を使っています。同梱している依存ライブラリとそのライセンスの一覧はアプリ内の「設定 > オープンソースライセンス」に出ます。一覧の元データは `app/src/main/res/raw/aboutlibraries.json` で、依存を変えたら `./gradlew :app:exportLibraryDefinitions` で再生成してコミットします（ビルド時には生成しないので、オフラインのビルドでも同じ一覧になります）。
