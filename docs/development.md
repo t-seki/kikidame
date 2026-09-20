@@ -72,6 +72,7 @@ release APK をビルドし、`kikidame-<version>.apk` と R8 の `mapping-<vers
   ./gradlew :app:assembleRelease         # app/build/outputs/apk/release/app-release.apk
   ```
 
+- 手元では上の `export` を `~/.android-keys/kikidame.env`（chmod 600、git 管理外）に書いて `source` する。値を表示するコマンド（`cat` / `grep`）は打たない
 - GitHub Actions 用の Secrets: `KEYSTORE_BASE64`（`base64 -w0 kikidame-upload.jks`）、`KEYSTORE_PASSWORD`、`KEY_ALIAS`、`KEY_PASSWORD`
 - 署名を確かめる: `apksigner verify --print-certs app-release.apk`（`build-tools/<ver>/apksigner`）。Releases の APK と手元のビルドで証明書の SHA-256 が一致すること
 
@@ -335,6 +336,36 @@ DHU の窓が開き、スマホ側で Android Auto が始まる。DHU のメデ�
 
 Auto はブラウズツリーを開き直すたびに `onGetChildren` を呼ぶので、ダウンロードや同期で手元の回が増減したら、タブを行き来すれば最新になる（変化の押し通知は今はしない）。
 
+### 落とし穴（2026-09-20 に #112 で踏んだもの）
+
+- DHU は `libc++1` `libc++abi1` が要る（Ubuntu: `sudo apt install -y libc++1 libc++abi1`）。`ldd ~/Android/Sdk/extras/google/auto/desktop-head-unit | grep 'not found'` が空になれば足りている
+- バックグラウンド（Claude Code 等）から起動すると stdin が EOF になって即終了する（`Version: 2.0-linux` を出して exit 0）。`sleep 1d | ~/Android/Sdk/extras/google/auto/desktop-head-unit` か、FIFO を stdin にする（作業ディレクトリはどこでもよい）:
+
+  ```bash
+  mkfifo dhu.in; exec 3<>dhu.in
+  ~/Android/Sdk/extras/google/auto/desktop-head-unit <&3 &
+  printf 'tap 350 140\n' > dhu.in     # コンソールコマンド（tap x y / dpad / keycode）を外から送れる
+  ```
+
+  コンソールの出力（`help` の一覧など）は tty でないと見えない
+- 初回はスマホに「この車で使う」許可画面（FRX）が出る。5 秒以内に進めないと `PROJECTION_NOT_STARTED` で切れる（logcat に `CarInfo authorization: UNKNOWN` → `Triggering FRX`）ので、スマホの画面を見ながら繋ぐ
+- DHU を途中で落とすとスマホのヘッドユニットサーバーが「Already connected」で固まる（`DeveloperHeadUnitNetworkService` の FATAL）。DHU 側は「Waiting for phone」のまま。Android Auto の ⋮ から「ヘッドユニット サーバーを停止」→「起動」で直る
+- WSLg では `DISPLAY=:0 xwininfo -root -tree` で "Android Auto - Desktop Head Unit" の窓 ID を取り、`DISPLAY=:0 import -window <id> shot.png`（ImageMagick）で DHU の画面が撮れる。右半分に Google マップの現在地が映るので、共有するときは注意
+- portaudio の `Device unavailable` は無視してよい（DHU 側で音は出ないが再生は進む）
+- 実機に release 署名のビルドが入っているときは `installDebug` が `INSTALL_FAILED_UPDATE_INCOMPATIBLE`（署名不一致）で失敗する。データを残したまま更新するなら release 署名で上書きする:
+
+  ```bash
+  source ~/.android-keys/kikidame.env          # export KIKIDAME_KEYSTORE=… 等を書いた chmod 600 のファイル（git 管理外）
+  ./gradlew :app:assembleRelease
+  $ADB pull "$($ADB shell pm path dev.tseki.kikidame | cut -d: -f2)" installed.apk
+  APKSIGNER=~/Android/Sdk/build-tools/36.0.0/apksigner   # 版は ls ~/Android/Sdk/build-tools/ で確かめる
+  $APKSIGNER verify --print-certs installed.apk | grep SHA-256                        # 実機の証明書
+  $APKSIGNER verify --print-certs app/build/outputs/apk/release/app-release.apk | grep SHA-256   # 一致すること
+  $ADB install -r app/build/outputs/apk/release/app-release.apk
+  ```
+
+  **`.env` を `grep` や `cat` で表示しない**（rtk は `grep -c` でも一致行を出す）。存在確認は `test -r` で
+
 ### 実機チェックリスト（#96: Android Auto）
 
 DHU での確認。subagent の作業セッションでは行わず、マージ後に main のチェックアウトから行う。
@@ -343,12 +374,14 @@ DHU での確認。subagent の作業セッションでは行わず、マージ�
 - [ ] ルートに「よく聴く」「番組」の 2 タブが出る（よく聴くの印を全部外すと「番組」だけになる）
 - [ ] 「番組」は手元に回がある番組だけで、最新回の公開日順。番組を開くと手元にある回だけが新しい順に並び、番組名・配信元・公開日が見える
 - [ ] 途中まで聴いた回に進捗の印、再生済みの回に完了の印が付く（Auto が `EXTRAS_KEY_COMPLETION_STATUS` を表示に使う。表示は Auto のバージョンに依る）
-- [ ] 回をタップすると再生が始まり、保存位置から続く（末尾 2 分以内なら先頭から。アプリと同じ規則）。「次へ」で同じ番組の次に新しい回に進む
+- [ ] 回をタップすると再生が始まり、保存位置から続く（末尾 2 分以内なら先頭から。アプリと同じ規則）。「キュー」に同じ番組の手元にある回が古い順に全部積まれていて、そこから次の回へ移れる（「次へ」ボタンは出ない: ±10 秒が back / forward のスロットを使う）
 - [ ] 車で聴いた分の再生位置・再生済みが、スマホの各回一覧と詳細に出ている
 - [ ] Auto の再生画面に「10 秒戻る」「10 秒進む」が出る（Media3 の `setMediaButtonPreferences` の `SLOT_BACK` / `SLOT_FORWARD`。出なければ `SessionCommand` のカスタムコマンドで足す）
 - [ ] DHU を閉じてもスマホの通知・ロック画面の操作（再生・一時停止・±10 秒・倍速・スリープタイマー）に退行が無い
 - [ ] アプリを開かずに DHU から再生を始めると、その後スマホでアプリを開いたときミニプレイヤーにその回が載る（ADR 0006 の addendum）
 - [ ] 「最近」（端末の再起動直後にシステムが出す再開の候補）には出ない（`isRecent` は未対応。#108）
+
+2026-09-20 に #112 で DHU で確認した。未確認のまま残っているのは「よく聴くを全部外した場合にタブが消えること」「再生済みの回の印」「ロック画面の操作」と、英語 UI の実機確認。各回の副題に公開日が出ない件は #113。
 
 ## 手元のファイルと DB の突き合わせ（#50）
 
