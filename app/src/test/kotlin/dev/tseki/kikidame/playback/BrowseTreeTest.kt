@@ -19,12 +19,12 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
-/** Android Auto のブラウズツリー（#96）: タブの出し分け、手元にある回だけ、再生済み／途中の印。 */
+/** Android Auto のブラウズツリー（#96）: タブの出し分け、手元にある回だけ、再生済み／途中の印、「続きから」と「最近」（#108）。 */
 @RunWith(AndroidJUnit4::class)
 class BrowseTreeTest {
     private val now = Instant.parse("2026-09-20T00:00:00Z")
     private val library = InMemoryLibraryRepository()
-    private val tree = BrowseTree(library, BrowseTree.Labels(starred = "Starred", programs = "Programs"))
+    private val tree = BrowseTree(library, BrowseTree.Labels(continueListening = "Continue", starred = "Starred", programs = "Programs"))
     private val harai = Program(id = ProgramId(1), serverItemId = null, name = "ハライチのターン！", publisherName = "TBSラジオ", starred = true)
     private val ann = Program(id = ProgramId(2), serverItemId = null, name = "ANN", publisherName = "ニッポン放送")
     private val onlyOnServer = Program(id = ProgramId(3), serverItemId = null, name = "手元に無い番組", publisherName = null, starred = true)
@@ -47,6 +47,55 @@ class BrowseTreeTest {
     private fun setUp(vararg episodes: EpisodeWithState, programs: List<Program> = listOf(harai, ann, onlyOnServer)) {
         library.programs.value = programs
         library.episodes.value = episodes.toList()
+    }
+    private fun started(id: Long, minutes: Int, at: Instant, played: Boolean = false) =
+        PlaybackState(EpisodeId(id), minutes.minutes, played = played, updatedAt = at)
+    /** 「続きから」は途中の回が 1 つでもあればルートの先頭に出て、無ければタブごと出さない（#108）。 */
+    @Test
+    fun rootHasContinueTabFirstOnlyWhenSomethingIsInProgress() = runTest {
+        setUp(episode(10, harai.id, "2026-09-18", playback = started(10, 20, now)), episode(20, ann.id, "2026-09-19"))
+        val tabs = tree.children(BrowseTree.ROOT_ID)!!
+        assertEquals(listOf(BrowseTree.CONTINUE_ID, BrowseTree.STARRED_ID, BrowseTree.PROGRAMS_ID), tabs.map { it.mediaId })
+        assertEquals("Continue", tabs[0].mediaMetadata.title)
+        // 再生済みだけ・聴き始めていないだけなら出ない
+        setUp(
+            episode(10, harai.id, "2026-09-18", playback = started(10, 59, now, played = true)),
+            episode(20, ann.id, "2026-09-19", playback = PlaybackState(EpisodeId(20), Duration.parse("3s"), played = false, updatedAt = now)),
+        )
+        assertEquals(listOf(BrowseTree.STARRED_ID, BrowseTree.PROGRAMS_ID), tree.children(BrowseTree.ROOT_ID)!!.map { it.mediaId })
+    }
+    /** 「続きから」の子は最近聴いた順の各回そのもので、番組をまたぎ、各回の葉は番組の一覧と同じ形（2 行目・印付き）。 */
+    @Test
+    fun continueTabListsInProgressEpisodesAcrossProgramsMostRecentFirst() = runTest {
+        setUp(
+            episode(10, harai.id, "2026-09-11", playback = started(10, 10, now)),
+            episode(20, ann.id, "2026-09-19", playback = started(20, 30, now + 1.minutes)),
+            episode(11, harai.id, "2026-09-18"),
+            episode(30, onlyOnServer.id, "2026-09-19", local = false, playback = started(30, 5, now + 2.minutes)),
+        )
+        val items = tree.children(BrowseTree.CONTINUE_ID)!!
+        assertEquals(listOf("20", "10"), items.map { it.mediaId })
+        val newest = items[0].mediaMetadata
+        assertEquals("2026-09-19", newest.title)
+        assertEquals("ANN", newest.artist)
+        assertEquals("2026-09-20 · ANN", newest.subtitle)
+        assertEquals(
+            MediaConstants.EXTRAS_VALUE_COMPLETION_STATUS_PARTIALLY_PLAYED,
+            newest.extras!!.getInt(MediaConstants.EXTRAS_KEY_COMPLETION_STATUS),
+        )
+        assertEquals("Continue", tree.item(BrowseTree.CONTINUE_ID)!!.mediaMetadata.title)
+    }
+    /** 「最近」（isRecent）のルートの子は再開候補 1 件だけ。無ければ空。 */
+    @Test
+    fun recentRootHasAtMostOneChild() = runTest {
+        setUp(
+            episode(10, harai.id, "2026-09-11", playback = started(10, 10, now)),
+            episode(20, ann.id, "2026-09-19", playback = started(20, 30, now + 1.minutes)),
+        )
+        assertEquals(BrowseTree.RECENT_ID, tree.recentRoot().mediaId)
+        assertEquals(listOf("20"), tree.children(BrowseTree.RECENT_ID)!!.map { it.mediaId })
+        setUp(episode(10, harai.id, "2026-09-11"))
+        assertEquals(emptyList(), tree.children(BrowseTree.RECENT_ID))
     }
     @Test
     fun rootHasStarredTabOnlyWhenAStarredProgramHasLocalEpisodes() = runTest {
@@ -134,6 +183,8 @@ class BrowseTreeTest {
     @Test
     fun parseRoundTrips() {
         assertEquals(BrowseTree.Node.Root, BrowseTree.parse(BrowseTree.ROOT_ID))
+        assertEquals(BrowseTree.Node.Continue, BrowseTree.parse(BrowseTree.CONTINUE_ID))
+        assertEquals(BrowseTree.Node.Recent, BrowseTree.parse(BrowseTree.RECENT_ID))
         assertEquals(BrowseTree.Node.Program(ProgramId(7)), BrowseTree.parse(BrowseTree.programId(ProgramId(7))))
         assertEquals(BrowseTree.Node.Episode(EpisodeId(42)), BrowseTree.parse(EpisodeMediaItems.mediaId(EpisodeId(42))))
         assertNull(BrowseTree.parse("program:"))

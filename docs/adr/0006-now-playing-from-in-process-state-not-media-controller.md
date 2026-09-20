@@ -11,3 +11,4 @@ date: 2026-09-18
 - `MediaController` 購読 — Media3 の想定する形で、別プロセスや他アプリのセッションにも使えるが、上記の起動副作用がある。見送り
 - Room に「聴いている回」を書く — プロセス死後も残ってしまい「サービスが止まれば消える」という意味と合わない。見送り
 - Android Auto（#96）は車載機からアプリの外で `MediaLibraryService` に bind するので、UI を開かずにサービスが起動する。プレイヤーが空のあいだ `NowPlaying` は null のままなので、一覧とミニプレイヤーの「何も載っていなければ出さない」判定は変わらない。Auto が bind している間は `onTaskRemoved` → `stopSelf()` が効かないが、これは車が操作権を持っている状態なので意図どおり
+- 再開（#108）: プレイヤーが空のとき（プロセス死後の通知の ▶、Auto の「最近」、端末の再起動後）だけ Media3 が `onPlaybackResumption` を呼び、`PlaybackService` は Room の最近聴いた回（`LibraryRepository.getRecentlyListened`）から番組のキューを復元する。「聴いている回」は復元後にプレイヤーへ載った時点で立つ（Room に「聴いている回」を書くのではなく、再生位置の記録から組み立て直す）

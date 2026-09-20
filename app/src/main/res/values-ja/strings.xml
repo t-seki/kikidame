@@ -254,6 +254,7 @@
     <string name="playback_error_failed">再生に失敗したため止めました（%1$s）</string>
 
     <!-- auto -->
+    <string name="auto_root_continue">続きから</string>
     <string name="auto_root_starred">よく聴く</string>
     <string name="auto_root_programs">番組</string>
 </resources>

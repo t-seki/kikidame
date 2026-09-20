@@ -1,15 +1,19 @@
 package dev.tseki.kikidame.data.repository
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.tseki.kikidame.data.db.EpisodeEntity
 import dev.tseki.kikidame.data.db.LocalFileEntity
 import dev.tseki.kikidame.data.db.PlaybackStateEntity
 import dev.tseki.kikidame.domain.DownloadState
 import dev.tseki.kikidame.domain.LocalStorageUsage
+import dev.tseki.kikidame.domain.Ticks
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 @RunWith(AndroidJUnit4::class)
 class RoomLibraryRepositoryTest : RoomTestBase() {
@@ -112,6 +116,39 @@ class RoomLibraryRepositoryTest : RoomTestBase() {
         assertEquals(emptyList(), reloaded.first { it.episode.title == "X 2026-06-05" }.episode.performers)
     }
 
+    /**
+     * 最近聴いた各回（#108）: 手元にあり・未再生・聴き始めている回だけを、記録の新しい順に上限まで。
+     * 手元に無い回、再生済みの回、聴き始めていない（位置が閾値未満の）回、記録の無い回は出ない。
+     */
+    @Test
+    fun recentlyListenedIsUnplayedStartedLocalEpisodesNewestRecordFirst() = runTest {
+        val programId = seedProgram()
+        val episodes = repo.observeEpisodes(programId).first()
+        val id = { title: String -> episodes.first { it.episode.title == title }.episode.id.value }
+        val minute = Ticks.fromDuration(1.minutes)
+        val at = { seconds: Long -> now + seconds.seconds }
+        // 途中まで聴いた 2 回（記録の新しい方が先に来る）
+        db.playbackStateDao().upsert(PlaybackStateEntity(id("X 2026-06-05"), positionTicks = 3 * minute, played = false, updatedAt = at(10)))
+        db.playbackStateDao().upsert(PlaybackStateEntity(id("X 2026-06-12"), positionTicks = 5 * minute, played = false, updatedAt = at(20)))
+        // 再生済みの回は出ない
+        db.playbackStateDao().upsert(PlaybackStateEntity(id("X 2026-06-19"), positionTicks = 20 * minute, played = true, updatedAt = at(30)))
+        // 聴き始めていない（位置が閾値未満）回は出ない。X 2026-06-12 (1) は記録なし
+        val notStarted = db.episodeDao().insert(
+            EpisodeEntity(
+                serverItemId = null, programId = programId.value, title = "X 2026-06-26",
+                publishedAt = Instant.parse("2026-06-25T15:00:00Z"), addedAt = null,
+                runtimeTicks = Ticks.fromDuration(30.minutes), sizeBytes = 1024, container = "m4a",
+            ),
+        )
+        db.localFileDao().upsert(LocalFileEntity(notStarted, DownloadState.DONE, "/x/2026-06-26.m4a", pinned = true, downloadedAt = now))
+        db.playbackStateDao().upsert(PlaybackStateEntity(notStarted, positionTicks = Ticks.fromDuration(2.seconds), played = false, updatedAt = at(40)))
+        assertEquals(listOf("X 2026-06-12", "X 2026-06-05"), repo.getRecentlyListened(20).map { it.episode.title })
+        // 上限
+        assertEquals(listOf("X 2026-06-12"), repo.getRecentlyListened(1).map { it.episode.title })
+        // 手元に無くなった回は出ない
+        db.localFileDao().upsert(LocalFileEntity(id("X 2026-06-12"), DownloadState.PENDING, path = null, pinned = false))
+        assertEquals(listOf("X 2026-06-05"), repo.getRecentlyListened(20).map { it.episode.title })
+    }
     @Test
     fun getEpisodeReturnsNullForUnknownId() = runTest {
         assertNull(repo.getEpisode(dev.tseki.kikidame.domain.EpisodeId(999)))

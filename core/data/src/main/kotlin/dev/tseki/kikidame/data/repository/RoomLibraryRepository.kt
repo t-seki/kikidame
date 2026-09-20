@@ -8,6 +8,7 @@ import dev.tseki.kikidame.domain.EpisodeOrder
 import dev.tseki.kikidame.domain.EpisodeWithState
 import dev.tseki.kikidame.domain.LibraryRepository
 import dev.tseki.kikidame.domain.LocalStorageUsage
+import dev.tseki.kikidame.domain.PlaybackRules
 import dev.tseki.kikidame.domain.Program
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.ProgramSummary
@@ -41,6 +42,12 @@ class RoomLibraryRepository @Inject constructor(
             .map { it.toDomain() }
             .filter { it.isPlayable }
             .sortedWith(compareBy(EpisodeOrder) { it.episode })
+    // 未再生で記録がある回のうち「聴き始めていない」（位置が数秒未満）ものは SQL で落とさず、少し多めに引いてここで絞る
+    override suspend fun getRecentlyListened(limit: Int): List<EpisodeWithState> =
+        episodeDao.listRecentlyListenedCandidates(limit * 2)
+            .map { it.toDomain() }
+            .filter { it.isPlayable && it.playback?.let { p -> !p.played && !PlaybackRules.isNotStarted(p) } == true }
+            .take(limit)
     override suspend fun updateSync(programId: ProgramId, syncEnabled: Boolean, rule: RetentionRule) =
         programDao.updateSync(programId.value, syncEnabled, rule.keepLatest, rule.deleteAfterPlayed)
     override suspend fun setStarred(programId: ProgramId, starred: Boolean) =

@@ -342,6 +342,8 @@
     <string name="playback_error_failed">Stopped because playback failed (%1$s)</string>
 
     <!-- ===== auto: Android Auto browse tree (#96) ===== -->
+    <!-- Browse tab (first): episodes the user has started but not finished, most recently listened first (#108) -->
+    <string name="auto_root_continue">Continue</string>
     <!-- Browse tab: programs the user marked as Starred (CONTEXT.md「よく聴く (Starred)」) -->
     <string name="auto_root_starred">Starred</string>
     <!-- Browse tab: all programs that have episodes on this device (CONTEXT.md「番組 (Program)」) -->
