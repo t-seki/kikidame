@@ -34,9 +34,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.tseki.kikidame.BuildConfig
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.ui.SectionTitle
 import dev.tseki.kikidame.ui.ValueRow
@@ -48,6 +50,7 @@ import dev.tseki.kikidame.ui.toText
 fun SettingsScreen(
     onBack: () -> Unit,
     onChangeLibrary: () -> Unit,
+    onOpenLicenses: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val session by viewModel.session.collectAsStateWithLifecycle()
@@ -136,6 +139,22 @@ fun SettingsScreen(
                 headlineContent = { Text("別のサーバに接続", color = MaterialTheme.colorScheme.error) },
                 supportingContent = { Text("手元の番組・各回・再生位置・音声ファイルをすべて消してから接続画面へ") },
             )
+            HorizontalDivider()
+            // ライセンス（#91）。MPL-2.0 で公開し、LGPL-3.0 の jellyfin-sdk-kotlin を同梱しているので、出どころと依存の一覧をここに置く
+            SectionTitle("このアプリについて")
+            ValueRow("バージョン", BuildConfig.VERSION_NAME)
+            val uriHandler = LocalUriHandler.current
+            ValueRow(
+                "ライセンス",
+                "MPL-2.0",
+                modifier = Modifier.clickable { uriHandler.openUri(SOURCE_URL) },
+                supporting = "Jellyfin プロジェクトとは無関係の非公式クライアント。タップでソースコードへ",
+            )
+            ListItem(
+                modifier = Modifier.clickable(onClick = onOpenLicenses),
+                headlineContent = { Text("オープンソースライセンス") },
+                supportingContent = { Text("使っているライブラリとそのライセンス") },
+            )
         }
     }
 
@@ -167,3 +186,5 @@ private fun ThemeMode.label(): String = when (this) {
     ThemeMode.DARK -> "ダーク"
     ThemeMode.LIGHT -> "ライト"
 }
+
+private const val SOURCE_URL = "https://github.com/t-seki/kikidame"
