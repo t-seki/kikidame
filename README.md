@@ -8,7 +8,7 @@ The name comes from the Japanese *kiki-dame* ("listen to what you have saved up"
 
 ## Why
 
-Existing Jellyfin clients (the official app, Findroid, Finamp) are built around video or music. Two things are weak there: "keep episodes on the device, program by program, and remove them automatically" and "keep working completely while the server is down". Kikidame is built for exactly those two, for audio where episodes pile up.
+Existing Jellyfin clients (the official app, Findroid, Finamp) are built around video or music. Two things are weak there: "keep episodes on the device, program by program, and remove them automatically" and "work fully even when the server is unreachable". Kikidame is built for exactly those two, for audio where episodes pile up.
 
 - **Offline first** — playback always uses the files on the device. Playback position and played state live on the device only and are never sent to the server
 - **Retention rules** — per program, choose "Keep latest N" and "Delete after played"; sync then downloads what is missing and removes what is no longer needed
@@ -17,9 +17,9 @@ It assumes one server, one user, one library, and that this app is the only plac
 
 ## What it does
 
-- **Program list** — sections split by the Starred mark, search by program or publisher name, filter by publisher. Each row shows whether the program is synced and whether it has gone from the server (Gone)
+- **Program list** — sections split by the Starred mark, search by program or publisher name, filter by publisher. Each row shows whether sync is enabled for the program and whether it is no longer on the server (Gone)
 - **Episode list** — download, pin, and mark played. Each row shows whether the episode is on the device, downloading, or failed
-- **Sync** — per program, choose whether it is synced and its retention rule. WorkManager syncs every 6 hours, with a "Wi-Fi only" option. Episodes you download by hand are Pinned and never removed by the rules
+- **Sync** — per program, choose whether sync is enabled for it and its retention rule. WorkManager syncs every 6 hours, with a "Wi-Fi only" option. Episodes you download by hand are Pinned and never removed by the rules
 - **Player** — background playback with notification and lock-screen controls, skip 10 seconds back and forward, speed 1.0x to 2.0x, sleep timer (by time or until the end of the episode). The playback position is saved so the next play resumes where you left off; listening near the end marks the episode Played, and finishing it advances to the next episode of the same program. After the app process has ended, the ▶ on a Bluetooth headset or Android Auto resumes the last episode from where it stopped
 - **Android Auto** — browse Continue / Starred / Programs on the car screen and play. Only episodes on the device are shown; playback position and played state follow the same rules as on the phone (Auto runs on the phone, so nothing needs syncing)
 - **Mini player** and three themes (system / dark / light)
@@ -34,9 +34,9 @@ Not distributed on Google Play ([ADR 0008](./docs/adr/0008-open-source-distribut
 1. **GitHub Releases** — download `kikidame-<version>.apk` from [Releases](https://github.com/t-seki/kikidame/releases)
 2. **Obtainium** — for automatic updates, add `https://github.com/t-seki/kikidame` to [Obtainium](https://github.com/ImranR98/Obtainium). It notifies you of new releases; the APK carries the same signature, so it installs over the existing app and keeps your episodes and playback positions
 
-**Not submitted to IzzyOnDroid or the main F-Droid repository.** Two reasons. (1) Both reject apps whose code was written with generative AI ([IzzyOnDroid App Inclusion Policy](https://izzyondroid.org/docs/general/AppInclusionPolicy/): "We are strongly opposed to apps which are fully or in part created by generative AI tools"), and most of Kikidame's code is written with Claude Code. The submission form requires a declaration of AI use; an honest answer would be rejected, and we will not file a false one. (2) The main F-Droid repository rebuilds from source and signs with its own key, so its APK cannot update to or from the Releases build (reinstalling would lose your episodes and playback positions). A self-hosted F-Droid repository, which needs no third-party review, is being considered for people who prefer the F-Droid client ([#123](https://github.com/t-seki/kikidame/issues/123)).
+**Not submitted to IzzyOnDroid or the main F-Droid repository.** Two reasons. (1) Both reject apps whose code was written with generative AI ([IzzyOnDroid App Inclusion Policy](https://izzyondroid.org/docs/general/AppInclusionPolicy/): "We are strongly opposed to apps which are fully or in part created by generative AI tools"), and most of Kikidame's code is written with Claude Code. The submission form requires a declaration of AI use; an honest answer would be rejected, and we will not make a false declaration. (2) The main F-Droid repository rebuilds from source and signs with its own key, so its APK cannot update to or from the Releases build (reinstalling would lose your episodes and playback positions). A self-hosted F-Droid repository, which needs no third-party review, is being considered for people who prefer the F-Droid client ([#123](https://github.com/t-seki/kikidame/issues/123)).
 
-Requires Android 12 (API 31) or later. Store descriptions and screenshots live in [fastlane/metadata/android/](./fastlane/metadata/android/) (Obtainium does not read them, but `fdroidserver` for the self-hosted repository (#123) reads exactly this layout, so they are kept).
+Requires Android 12 (API 31) or later. Store descriptions and screenshots live in [fastlane/metadata/android/](./fastlane/metadata/android/) (Obtainium does not read them, but `fdroidserver` for the self-hosted repository mentioned above reads exactly this layout, so they are kept).
 
 ## Server-side prerequisites
 
