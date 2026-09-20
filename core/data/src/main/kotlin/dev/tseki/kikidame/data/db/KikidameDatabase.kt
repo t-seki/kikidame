@@ -8,7 +8,7 @@ import androidx.room.TypeConverters
     version = 6,
     exportSchema = true,
     autoMigrations = [
-        // v2: programs の (stationName, name) を unique でなくした（サーバに同名の番組があり得る）
+        // v2: programs の (publisherName, name) を unique でなくした（サーバに同名の番組があり得る）
         AutoMigration(from = 1, to = 2),
         // v3: local_files.enqueuedAt（手動ダウンロードの FIFO 順）
         AutoMigration(from = 2, to = 3),

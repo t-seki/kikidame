@@ -3,7 +3,7 @@ package dev.tseki.kikidame.ui.episodes
 import dev.tseki.kikidame.domain.DownloadState
 import dev.tseki.kikidame.domain.EpisodeWithState
 import dev.tseki.kikidame.domain.Program
-import dev.tseki.kikidame.ui.toAiredDateText
+import dev.tseki.kikidame.ui.toPublishedDateText
 import dev.tseki.kikidame.ui.toPerformersText
 import dev.tseki.kikidame.ui.toClockText
 import dev.tseki.kikidame.ui.toDateTimeText
@@ -19,7 +19,7 @@ object EpisodeDetails {
 
     /**
      * 利用者向け: 各回・手元・再生の 3 群。手元に無い／再生記録が無いときはその群を 1 行に畳む。サイズが記録されていなければ「不明」。
-     * 出演者と放送局（#70）は「全部の値を並べる」画面なので無くても行を出す（出演者は「なし」、放送局が無い番組は「不明」）。
+     * 出演者と配信元（#70）は「全部の値を並べる」画面なので無くても行を出す（出演者は「なし」、配信元が無い番組は「不明」）。
      */
     fun sections(item: EpisodeWithState, program: Program): List<Section> {
         val e = item.episode
@@ -28,9 +28,9 @@ object EpisodeDetails {
         val episode = Section(
             "各回",
             listOf(
-                Row("放送日", e.airedAt.toAiredDateText()),
+                Row("公開日", e.publishedAt.toPublishedDateText()),
                 Row("出演者", e.performers.toPerformersText() ?: "なし"),
-                Row("放送局", program.stationName ?: "不明"),
+                Row("配信元", program.publisherName ?: "不明"),
                 Row("尺", e.runtime.toClockText()),
                 Row("サイズ", if (e.sizeBytes > 0) e.sizeBytes.toSizeText() else "不明"),
             ),
@@ -63,7 +63,7 @@ object EpisodeDetails {
 
     /**
      * 技術的な詳細: ID・記録の生の値・パスなど。手元のファイルが無ければ保存先・失敗回数の行を、再生記録が無ければ更新日時の行を出さない。
-     * 放送日は「サーバが返した生の値」ではなく、アプリが日付に丸めて JST の 0 時にした記録の瞬間（タグが無ければ取り込み日時で代用、CONTEXT.md）。
+     * 公開日は「サーバが返した生の値」ではなく、アプリが日付に丸めて JST の 0 時にした記録の瞬間（タグが無ければ取り込み日時で代用、CONTEXT.md）。
      * `PlaybackState.syncedAt` は出さない（ADR 0007 で再生位置はサーバへ送らない）。
      */
     fun technicalRows(item: EpisodeWithState): List<Row> {
@@ -73,7 +73,7 @@ object EpisodeDetails {
         return listOfNotNull(
             Row("サーバ ID", e.serverItemId?.value ?: "なし（手元だけの各回）"),
             Row("ID（アプリ内）", e.id.value.toString()),
-            Row("放送日（記録の瞬間、UTC）", e.airedAt.toString()),
+            Row("公開日（記録の瞬間、UTC）", e.publishedAt.toString()),
             Row("取り込み日時", e.addedAt?.toString() ?: "なし"),
             Row("コンテナ", e.container),
             local?.let { Row("保存先", it.path ?: "なし") },

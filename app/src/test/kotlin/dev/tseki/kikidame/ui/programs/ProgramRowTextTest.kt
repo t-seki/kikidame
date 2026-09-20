@@ -12,13 +12,13 @@ import kotlin.time.Instant
 /** 番組一覧の行の補足（#41）。 */
 class ProgramRowTextTest {
     private val today = LocalDate(2026, 9, 19)
-    private val aired = Instant.parse("2026-09-17T15:00:00Z") // JST 2026-09-18
+    private val published = Instant.parse("2026-09-17T15:00:00Z") // JST 2026-09-18
 
     @Test
     fun latestDateDropsTheYearOnlyForThisYear() {
-        assertEquals("09-18", aired.toLatestDateText(today))
+        assertEquals("09-18", published.toLatestDateText(today))
         assertEquals("2021-03-15", Instant.parse("2021-03-14T15:00:00Z").toLatestDateText(today))
-        assertEquals("2026-09-18", aired.toLatestDateText(LocalDate(2027, 1, 1)))
+        assertEquals("2026-09-18", published.toLatestDateText(LocalDate(2027, 1, 1)))
     }
 
     @Test
@@ -37,7 +37,7 @@ class ProgramRowTextTest {
     fun goneAndMissingPartsAreHandled() {
         assertEquals(
             "手元 0 · 全 3 回 · サーバ上で見つかりません",
-            summary(unplayed = 0, local = 0, total = 3, station = null, latest = null, gone = true).text(),
+            summary(unplayed = 0, local = 0, total = 3, publisher = null, latest = null, gone = true).text(),
         )
     }
 
@@ -47,20 +47,20 @@ class ProgramRowTextTest {
         unplayed: Int,
         local: Int,
         total: Int,
-        station: String? = "TBSラジオ",
-        latest: Instant? = aired,
+        publisher: String? = "TBSラジオ",
+        latest: Instant? = published,
         gone: Boolean = false,
     ) = ProgramSummary(
         program = Program(
             id = ProgramId(1),
             serverItemId = null,
             name = "ハライチのターン！",
-            stationName = station,
-            goneSince = if (gone) aired else null,
+            publisherName = publisher,
+            goneSince = if (gone) published else null,
         ),
         episodeCount = total,
         localEpisodeCount = local,
         unplayedLocalCount = unplayed,
-        latestAiredAt = latest,
+        latestPublishedAt = latest,
     )
 }

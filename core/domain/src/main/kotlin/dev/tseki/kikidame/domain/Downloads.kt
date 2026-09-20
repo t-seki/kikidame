@@ -14,7 +14,7 @@ enum class LocalDeletionScope {
 fun deletionScopeFor(episode: Episode): LocalDeletionScope =
     if (episode.serverItemId != null) LocalDeletionScope.FILE_ONLY else LocalDeletionScope.EPISODE
 
-/** 保存先のファイル名。フォルダ構成は radirec-tool の出力と同じ `<放送局>/<番組>/<タイトル>.<container>`。 */
+/** 保存先のファイル名。フォルダ構成は radirec-tool の出力と同じ `<配信元>/<番組>/<タイトル>.<container>`。 */
 object EpisodeFileName {
     private val FORBIDDEN = Regex("""[/\\:*?"<>|\p{Cntrl}]""")
     const val DEFAULT_CONTAINER = "m4a"
@@ -33,10 +33,10 @@ object EpisodeFileName {
         val candidates = container.lowercase().split(',').map { it.trim().trimStart('.') }.filter { it.isNotEmpty() }
         return PREFERRED_EXTENSIONS.firstOrNull { it in candidates } ?: candidates.firstOrNull() ?: DEFAULT_CONTAINER
     }
-    fun relativePath(stationName: String?, programName: String, title: String, container: String): String {
+    fun relativePath(publisherName: String?, programName: String, title: String, container: String): String {
         val ext = extensionFor(container)
         return listOf(
-            sanitize(stationName ?: UNKNOWN_STATION),
+            sanitize(publisherName ?: UNKNOWN_STATION),
             sanitize(programName),
             "${sanitize(title)}.$ext",
         ).joinToString("/")

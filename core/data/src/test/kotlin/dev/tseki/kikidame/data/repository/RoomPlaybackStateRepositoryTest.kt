@@ -19,7 +19,7 @@ class RoomPlaybackStateRepositoryTest : RoomTestBase() {
     private val library by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao(), db.localFileDao()) }
     private val repo by lazy { RoomPlaybackStateRepository(db, clock) }
     private suspend fun seedEpisode(): EpisodeId {
-        seed(listOf(scanned(title = "X 2026-06-12", airedAt = "2026-06-11T15:00:00Z")))
+        seed(listOf(scanned(title = "X 2026-06-12", publishedAt = "2026-06-11T15:00:00Z")))
         val program = library.observePrograms().first().single().program.id
         return library.observeEpisodes(program).first().single().episode.id
     }

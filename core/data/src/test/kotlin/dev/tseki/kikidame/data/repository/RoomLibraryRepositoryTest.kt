@@ -16,10 +16,10 @@ class RoomLibraryRepositoryTest : RoomTestBase() {
     private val repo by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao(), db.localFileDao()) }
     private suspend fun seedProgram() = seed(
         listOf(
-            scanned(title = "X 2026-06-12 (1)", airedAt = "2026-06-11T15:00:00Z"),
-            scanned(title = "X 2026-06-05", airedAt = "2026-06-04T15:00:00Z"),
-            scanned(title = "X 2026-06-12", airedAt = "2026-06-11T15:00:00Z"),
-            scanned(title = "X 2026-06-19", airedAt = "2026-06-18T15:00:00Z"),
+            scanned(title = "X 2026-06-12 (1)", publishedAt = "2026-06-11T15:00:00Z"),
+            scanned(title = "X 2026-06-05", publishedAt = "2026-06-04T15:00:00Z"),
+            scanned(title = "X 2026-06-12", publishedAt = "2026-06-11T15:00:00Z"),
+            scanned(title = "X 2026-06-19", publishedAt = "2026-06-18T15:00:00Z"),
         ),
     ).let { repo.observePrograms().first().single().program.id }
     @Test
@@ -40,17 +40,17 @@ class RoomLibraryRepositoryTest : RoomTestBase() {
         assertEquals(listOf("X 2026-06-05", "X 2026-06-12", "X 2026-06-19"), playable)
     }
     @Test
-    fun programsAreOrderedByLatestAiredAt() = runTest {
+    fun programsAreOrderedByLatestPublishedAt() = runTest {
         seed(
             listOf(
-                scanned(program = "Old", title = "Old 2026-01-01", airedAt = "2025-12-31T15:00:00Z"),
-                scanned(program = "New", title = "New 2026-06-01", airedAt = "2026-05-31T15:00:00Z"),
-                scanned(program = "New", title = "New 2026-01-15", airedAt = "2026-01-14T15:00:00Z"),
+                scanned(program = "Old", title = "Old 2026-01-01", publishedAt = "2025-12-31T15:00:00Z"),
+                scanned(program = "New", title = "New 2026-06-01", publishedAt = "2026-05-31T15:00:00Z"),
+                scanned(program = "New", title = "New 2026-01-15", publishedAt = "2026-01-14T15:00:00Z"),
             ),
         )
         val summaries = repo.observePrograms().first()
         assertEquals(listOf("New", "Old"), summaries.map { it.program.name })
-        assertEquals(Instant.parse("2026-05-31T15:00:00Z"), summaries[0].latestAiredAt)
+        assertEquals(Instant.parse("2026-05-31T15:00:00Z"), summaries[0].latestPublishedAt)
         assertEquals(2, summaries[0].episodeCount)
     }
     @Test

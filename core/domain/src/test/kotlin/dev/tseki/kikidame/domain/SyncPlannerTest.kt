@@ -9,7 +9,7 @@ import kotlin.time.Instant
 class SyncPlannerTest {
     private fun ep(
         id: Long,
-        aired: String,
+        published: String,
         server: String? = "s$id",
         pinned: Boolean = false,
         played: Boolean = false,
@@ -18,7 +18,7 @@ class SyncPlannerTest {
     ) = LocalEpisodeState(
         id = EpisodeId(id),
         serverItemId = server?.let(::ServerItemId),
-        airedAt = Instant.parse("${aired}T00:00:00Z"),
+        publishedAt = Instant.parse("${published}T00:00:00Z"),
         title = title,
         pinned = pinned,
         played = played,
@@ -45,7 +45,7 @@ class SyncPlannerTest {
     private fun ids(vararg v: Long) = v.map(::EpisodeId)
 
     @Test
-    fun `keeps the latest N by aired date and downloads what is missing`() {
+    fun `keeps the latest N by published date and downloads what is missing`() {
         val plan = SyncPlanner.planProgram(
             input(ep(1, "2026-09-01", local = true), ep(2, "2026-09-02"), ep(3, "2026-09-03"), ep(4, "2026-09-04")),
         )
@@ -56,7 +56,7 @@ class SyncPlannerTest {
     }
 
     @Test
-    fun `same aired date is ordered by title then id`() {
+    fun `same published date is ordered by title then id`() {
         val plan = SyncPlanner.planProgram(
             input(
                 ep(1, "2026-09-01", title = "2026-09-01"),

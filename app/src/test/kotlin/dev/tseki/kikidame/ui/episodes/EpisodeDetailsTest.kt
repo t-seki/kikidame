@@ -19,27 +19,27 @@ import kotlin.time.Instant
 
 /** 各回の詳細（#43）の値の組み立て。 */
 class EpisodeDetailsTest {
-    private val aired = Instant.parse("2026-09-17T15:00:00Z") // JST 2026-09-18
+    private val published = Instant.parse("2026-09-17T15:00:00Z") // JST 2026-09-18
     private val at = Instant.parse("2026-09-18T03:04:00Z") // JST 12:04
     private val episode = Episode(
         id = EpisodeId(42),
         serverItemId = ServerItemId("abc123"),
         programId = ProgramId(1),
         title = "2026-09-18",
-        airedAt = aired,
+        publishedAt = published,
         addedAt = at,
         runtime = 60.minutes,
         sizeBytes = 21_900_000,
         container = "m4a",
     )
-    private val program = Program(id = ProgramId(1), serverItemId = null, name = "ハライチのターン！", stationName = "TBSラジオ")
+    private val program = Program(id = ProgramId(1), serverItemId = null, name = "ハライチのターン！", publisherName = "TBSラジオ")
 
     @Test
     fun userSectionsCollapseMissingFileAndPlayback() {
         val sections = EpisodeDetails.sections(EpisodeWithState(episode, null, null), program)
         assertEquals(listOf("各回", "手元", "再生"), sections.map { it.title })
         assertEquals(
-            listOf(Row("放送日", "2026-09-18"), Row("出演者", "なし"), Row("放送局", "TBSラジオ"), Row("尺", "1:00:00"), Row("サイズ", "21.9 MB")),
+            listOf(Row("公開日", "2026-09-18"), Row("出演者", "なし"), Row("配信元", "TBSラジオ"), Row("尺", "1:00:00"), Row("サイズ", "21.9 MB")),
             sections[0].rows,
         )
         assertEquals(listOf(Row("状態", "手元に無い")), sections[1].rows)
@@ -61,12 +61,12 @@ class EpisodeDetailsTest {
         assertEquals(listOf(Row("再生位置", "12:00 / 1:00:00"), Row("再生済み", "未再生")), sections[2].rows)
     }
 
-    /** 出演者（#70）は「、」で並べ、放送局は番組から。放送局の無い番組は「不明」。 */
+    /** 出演者（#70）は「、」で並べ、配信元は番組から。配信元の無い番組は「不明」。 */
     @Test
-    fun performersAndStationRows() {
+    fun performersAndPublisherRows() {
         val item = EpisodeWithState(episode.copy(performers = listOf("岩井勇気", "澤部佑")), null, null)
         assertEquals(Row("出演者", "岩井勇気、澤部佑"), EpisodeDetails.sections(item, program)[0].rows[1])
-        assertEquals(Row("放送局", "不明"), EpisodeDetails.sections(item, program.copy(stationName = null))[0].rows[2])
+        assertEquals(Row("配信元", "不明"), EpisodeDetails.sections(item, program.copy(publisherName = null))[0].rows[2])
     }
 
     @Test
@@ -79,7 +79,7 @@ class EpisodeDetailsTest {
         val rows = EpisodeDetails.technicalRows(item)
         assertEquals(Row("サーバ ID", "abc123"), rows[0])
         assertEquals(Row("ID（アプリ内）", "42"), rows[1])
-        assertEquals(Row("放送日（記録の瞬間、UTC）", "2026-09-17T15:00:00Z"), rows[2])
+        assertEquals(Row("公開日（記録の瞬間、UTC）", "2026-09-17T15:00:00Z"), rows[2])
         assertTrue(rows.any { it == Row("保存先", "なし") })
         assertTrue(rows.any { it == Row("失敗回数", "3 回") })
         assertTrue(rows.any { it == Row("最終試行", "2026-09-18 12:04") })

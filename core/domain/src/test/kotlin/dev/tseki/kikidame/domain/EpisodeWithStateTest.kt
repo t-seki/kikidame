@@ -12,7 +12,7 @@ class EpisodeWithStateTest {
         serverItemId = null,
         programId = ProgramId(1),
         title = "X 2026-06-12",
-        airedAt = now,
+        publishedAt = now,
         addedAt = null,
         runtime = 30.minutes,
         sizeBytes = 0,

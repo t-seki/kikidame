@@ -78,7 +78,7 @@ import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.download.DownloadProgress
 import dev.tseki.kikidame.playback.NowPlayingState
 import dev.tseki.kikidame.ui.player.MiniPlayer
-import dev.tseki.kikidame.ui.toAiredDateText
+import dev.tseki.kikidame.ui.toPublishedDateText
 import dev.tseki.kikidame.ui.toPerformersText
 import dev.tseki.kikidame.ui.toText
 import dev.tseki.kikidame.ui.toClockText
@@ -120,7 +120,7 @@ fun EpisodeListScreen(
                 title = {
                     Column {
                         Text(program?.name ?: "")
-                        program?.stationName?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                        program?.publisherName?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                     }
                 },
                 navigationIcon = {
@@ -332,20 +332,20 @@ private fun EpisodeRow(
 }
 
 /**
- * 行の補足: `放送日 · 出演者 · 尺 · 状態`。出演者（#70）は無い回では省き、状態はダウンロードの待機／進行／失敗のときだけ付く。
- * 録音側が各回のタイトルを `YYYY-MM-DD` と付けるので、タイトルが放送日と同じ文字列なら同じ日付が 2 段に並んで
- * 冗長になる。そのときだけ放送日を省いて `出演者 · 尺 · 状態` にする（#66）。判定は完全一致で、表記ゆれ（`2026/08/02`）や
+ * 行の補足: `公開日 · 出演者 · 尺 · 状態`。出演者（#70）は無い回では省き、状態はダウンロードの待機／進行／失敗のときだけ付く。
+ * 録音側が各回のタイトルを `YYYY-MM-DD` と付けるので、タイトルが公開日と同じ文字列なら同じ日付が 2 段に並んで
+ * 冗長になる。そのときだけ公開日を省いて `出演者 · 尺 · 状態` にする（#66）。判定は完全一致で、表記ゆれ（`2026/08/02`）や
  * `(1)` 付きは一致とみなさない（そういう回では両方の値に意味がある）。
  */
 internal fun EpisodeWithState.toSupportingText(waitingForNetwork: Boolean): String {
-    val aired = episode.airedAt.toAiredDateText().takeIf { it != episode.title }
+    val published = episode.publishedAt.toPublishedDateText().takeIf { it != episode.title }
     val status = when (localFile?.state) {
         DownloadState.PENDING -> if (waitingForNetwork) "Wi-Fi 待ち" else "待機中"
         DownloadState.RUNNING -> "ダウンロード中"
         DownloadState.FAILED -> "失敗（タップで再試行）"
         else -> null
     }
-    return listOfNotNull(aired, episode.performers.toPerformersText(), episode.runtime.toClockText(), status).joinToString(" · ")
+    return listOfNotNull(published, episode.performers.toPerformersText(), episode.runtime.toClockText(), status).joinToString(" · ")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -412,7 +412,7 @@ private fun ProgramSyncSheet(
             supportingContent = {
                 Text(
                     when {
-                        program.isGone -> "サーバ上で見つかりません（${program.goneSince?.toAiredDateText()} から）。同期は止まっています。手元の回はそのまま聴けます"
+                        program.isGone -> "サーバ上で見つかりません（${program.goneSince?.toPublishedDateText()} から）。同期は止まっています。手元の回はそのまま聴けます"
                         !canSync -> "サーバ上で見つかっていないため同期できません"
                         else -> "保持ルールに従って自動でダウンロードし、外れた回を削除します。固定した回は残ります"
                     },

@@ -4,19 +4,19 @@ import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 class EpisodeOrderTest {
-    private fun episode(id: Long, airedAt: String, title: String) = Episode(
+    private fun episode(id: Long, publishedAt: String, title: String) = Episode(
         id = EpisodeId(id),
         serverItemId = null,
         programId = ProgramId(1),
         title = title,
-        airedAt = Instant.parse(airedAt),
+        publishedAt = Instant.parse(publishedAt),
         addedAt = null,
         runtime = 30.minutes,
         sizeBytes = 0,
         container = "m4a",
     )
     @Test
-    fun `orders by aired date, then title, then id`() {
+    fun `orders by published date, then title, then id`() {
         val part2 = episode(3, "2026-06-11T15:00:00Z", "X 2026-06-12 (1)")
         val part1 = episode(4, "2026-06-11T15:00:00Z", "X 2026-06-12")
         val older = episode(1, "2026-06-04T15:00:00Z", "X 2026-06-05")
@@ -26,7 +26,7 @@ class EpisodeOrderTest {
         assertEquals(listOf(older, part1, part2, dupA, dupB), sorted)
     }
     @Test
-    fun `newest first reverses only the aired date`() {
+    fun `newest first reverses only the published date`() {
         val part2 = episode(3, "2026-06-11T15:00:00Z", "X 2026-06-12 (1)")
         val part1 = episode(4, "2026-06-11T15:00:00Z", "X 2026-06-12")
         val older = episode(1, "2026-06-04T15:00:00Z", "X 2026-06-05")
