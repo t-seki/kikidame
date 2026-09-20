@@ -1,3 +1,17 @@
 <resources>
     <string name="app_name">Kikidame</string>
+
+    <!-- Notification / lock screen / Android Auto: skip back by 10 seconds (the app skips 10 s, not 15 or 30) -->
+    <string name="playback_skip_back">Back 10 s</string>
+    <!-- Notification / lock screen / Android Auto: skip forward by 10 seconds -->
+    <string name="playback_skip_forward">Forward 10 s</string>
+    <!-- Snackbar shown when playback stopped because the local file of the episode is gone -->
+    <string name="playback_error_file_not_found">Stopped playback because the file could not be found</string>
+    <!-- Snackbar shown when playback failed for another reason. %1$s is the Media3 error code name, e.g. ERROR_CODE_DECODING_FAILED -->
+    <string name="playback_error_failed">Stopped because playback failed (%1$s)</string>
+
+    <!-- Android Auto browse tab: programs the user marked as Starred (see CONTEXT.md「よく聴く (Starred)」) -->
+    <string name="auto_root_starred">Starred</string>
+    <!-- Android Auto browse tab: all programs that have episodes on this device (see CONTEXT.md「番組 (Program)」) -->
+    <string name="auto_root_programs">Programs</string>
 </resources>

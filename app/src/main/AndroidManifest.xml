@@ -33,12 +33,18 @@
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
+        <!-- Android Auto（#96）: 車載機にメディアアプリとして出るための宣言 -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
         <service
             android:name=".playback.PlaybackService"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
-                <action android:name="androidx.media3.session.MediaSessionService" />
+                <action android:name="androidx.media3.session.MediaLibraryService" />
+                <!-- Android Auto は MediaBrowserService の action でアプリを探す -->
+                <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
     </application>
