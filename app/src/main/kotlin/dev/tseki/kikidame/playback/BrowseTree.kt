@@ -97,13 +97,23 @@ class BrowseTree(
         )
         .build()
 
-    /** 各回の葉。[EpisodeMediaItems.toMediaItem] に、一覧向けの公開日（subtitle）と再生済み／途中の印を足す。 */
+    /**
+     * 各回の葉。[EpisodeMediaItems.toMediaItem] に、一覧向けの 2 行目（[episodeSubtitle]）と再生済み／途中の印を足す。
+     *
+     * Auto の一覧は legacy の `MediaDescriptionCompat.subtitle` を 2 行目に出す。Media3 の `LegacyConversions
+     * .convertToMediaDescriptionCompat` は `displayTitle` が無いと title → artist → album の順で title / subtitle /
+     * description を埋め、`subtitle` は無視する（#113 で番組名だけが出た理由）。`displayTitle` を置くと `subtitle` /
+     * `description` がそのまま使われるので、ここでだけ置く。再生に載る方は `onSetMediaItems` が
+     * [EpisodeMediaItems.toMediaItem] から作り直すので、通知・ロック画面の artist / album は変わらない。
+     */
     private fun episodeItem(item: EpisodeWithState, program: Program): MediaItem {
         val base = EpisodeMediaItems.toMediaItem(item, program)
         return base.buildUpon()
             .setMediaMetadata(
                 base.mediaMetadata.buildUpon()
-                    .setSubtitle(item.episode.publishedAt.toPublishedDateText())
+                    .setDisplayTitle(item.episode.title)
+                    .setSubtitle(episodeSubtitle(item.episode.title, item.episode.publishedAt.toPublishedDateText(), program.name))
+                    .setDescription(program.publisherName)
                     .setIsBrowsable(false)
                     .setIsPlayable(true)
                     .setMediaType(MediaMetadata.MEDIA_TYPE_PODCAST_EPISODE)
@@ -132,6 +142,13 @@ class BrowseTree(
         private const val PROGRAM_PREFIX = "program:"
 
         fun programId(programId: ProgramId): String = PROGRAM_PREFIX + programId.value
+
+        /**
+         * 各回の 2 行目「公開日 · 番組名」。タイトルが公開日と同じ文字列の回では公開日を省いて番組名だけ
+         * （アプリの各回一覧と同じ規則。#66）。
+         */
+        fun episodeSubtitle(title: String, publishedText: String, programName: String): String =
+            listOfNotNull(publishedText.takeIf { it != title }, programName).joinToString(" · ")
 
         fun parse(mediaId: String): Node? = when {
             mediaId == ROOT_ID -> Node.Root
