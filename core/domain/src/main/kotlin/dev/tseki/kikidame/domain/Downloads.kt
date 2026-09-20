@@ -18,7 +18,7 @@ fun deletionScopeFor(episode: Episode): LocalDeletionScope =
 object EpisodeFileName {
     private val FORBIDDEN = Regex("""[/\\:*?"<>|\p{Cntrl}]""")
     const val DEFAULT_CONTAINER = "m4a"
-    const val UNKNOWN_STATION = "_"
+    const val UNKNOWN_PUBLISHER = "_"
     private val PREFERRED_EXTENSIONS = listOf("m4a", "mp3", "aac", "ogg", "opus", "flac", "wav", "mp4")
 
     /** OS で使えない文字を `_` に。空になったら `_`。 */
@@ -36,7 +36,7 @@ object EpisodeFileName {
     fun relativePath(publisherName: String?, programName: String, title: String, container: String): String {
         val ext = extensionFor(container)
         return listOf(
-            sanitize(publisherName ?: UNKNOWN_STATION),
+            sanitize(publisherName ?: UNKNOWN_PUBLISHER),
             sanitize(programName),
             "${sanitize(title)}.$ext",
         ).joinToString("/")

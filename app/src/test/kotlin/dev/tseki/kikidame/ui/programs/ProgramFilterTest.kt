@@ -24,7 +24,7 @@ class ProgramFilterTest {
 
     @Test
     fun matchesPartOfPublisherName() {
-        // 局名の一致と、番組名に局名が含まれる場合の両方が残る
+        // 配信元名の一致と、番組名に配信元名が含まれる場合の両方が残る
         assertEquals(listOf(haraichi, noPublisher), ProgramFilter.apply(all, "TBS"))
     }
 
@@ -36,8 +36,8 @@ class ProgramFilterTest {
 
     @Test
     fun nullPublisherIsJudgedByNameOnly() {
-        // 「局なし」というラベル文字列で引っかからない。番組名では一致する
-        assertEquals(emptyList(), ProgramFilter.apply(listOf(noPublisher), "局なし"))
+        // 「配信元なし」というラベル文字列で引っかからない。番組名では一致する
+        assertEquals(emptyList(), ProgramFilter.apply(listOf(noPublisher), "配信元なし"))
         assertEquals(listOf(noPublisher), ProgramFilter.apply(listOf(noPublisher), "手元だけ"))
     }
 
@@ -68,7 +68,7 @@ class ProgramFilterTest {
     @Test
     fun filtersByPublisherExactly() {
         assertEquals(listOf(haraichi), ProgramFilter.apply(all, "", tbs))
-        // 「TBS」を番組名に含む局なしの番組は、局の絞り込みでは残らない（完全一致）
+        // 「TBS」を番組名に含む配信元なしの番組は、配信元の絞り込みでは残らない（完全一致）
         assertEquals(listOf(noPublisher), ProgramFilter.apply(all, "", none))
         assertSame(all, ProgramFilter.apply(all, "", null))
     }
@@ -89,14 +89,14 @@ class ProgramFilterTest {
             summary(1, "a", "LFR"), summary(2, "b", "LFR"),
             summary(3, "c", "TBS"), summary(4, "d", "TBS"),
             summary(5, "e", "ABC"),
-            // 局なしが一番多くても最後
+            // 配信元なしが一番多くても最後
             summary(6, "f", null), summary(7, "g", null), summary(8, "h", null),
         )
         assertEquals(
             listOf(Publisher(lfr, 2), Publisher(tbs, 2), Publisher(PublisherKey("ABC"), 1), Publisher(none, 3)),
             ProgramFilter.publishers(list),
         )
-        assertEquals("局なし", none.label)
+        assertEquals("配信元なし", none.label)
         assertEquals(emptyList(), ProgramFilter.publishers(emptyList()))
     }
     private fun summary(id: Long, name: String, publisher: String?) = ProgramSummary(
