@@ -1,0 +1,16 @@
+Kikidame ("kiki-dame", from the Japanese for "listen to what you have saved up") is for people who run their own Jellyfin server and keep radio recordings or podcasts in a music library. It downloads the episodes you want to your phone, program by program, and plays them without needing the server.
+
+What it does:
+
+- Retention rules per program: choose "Keep latest N" and "Delete after played", and sync (every 6 hours, Wi-Fi only if you like) downloads what is missing and removes what is no longer needed. Episodes you download by hand are pinned and never removed by the rules.
+- Offline first: playback always uses the files on your device. Playback position and played state are kept on the device only and are never sent to the server.
+- Player: background playback with notification and lock-screen controls, skip 10 seconds back and forward, speed 1.0x to 2.0x, sleep timer (by time or until the end of the episode), resume where you left off, and automatic advance to the next episode of the same program.
+- Android Auto: browse Continue / Starred / Programs on the car screen and play with the same rules as on the phone.
+- English and Japanese UI, switchable per app on Android 13 and later.
+- Open source under the MPL-2.0. No accounts, no ads, no tracking.
+
+Not for: music (episodes do not pile up) or audiobooks (you listen from the oldest chapter, so "keep the latest N" makes no sense).
+
+Requires: a Jellyfin server 10.10 or later with your audio in a music library (album = program, album artist = publisher), and Android 12 or later.
+
+Kikidame assumes one server, one user, one library, and that this app is the only place you listen. Source and issues: https://github.com/t-seki/kikidame

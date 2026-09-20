@@ -6,6 +6,9 @@
 #   scripts/jellyfin-testserver.sh down        # 両方止めて消す（メディアと設定のディレクトリは残る）
 #   scripts/jellyfin-testserver.sh media       # 合成ライブラリだけ作り直す
 #
+# KIKIDAME_JF_LIBRARY=showcase を付けると、統合テスト用の日本語ライブラリ（番組 2 × 各回 3）の代わりに、
+# スクリーンショット用の英語の架空ライブラリ（Example FM / Example Public Radio の 5 番組、45 回）を作る（#95）。
+#
 # up は、ffmpeg で無音の m4a を作った合成ライブラリ（番組 2 × 各回 3）をマウントし、
 # 初期セットアップ（言語・ユーザー・リモートアクセス・完了）と音楽ライブラリ「radio」の作成を REST で済ませ、
 # スキャンが終わるまで待つ。終わると統合テスト用の環境変数を表示する:
@@ -40,8 +43,51 @@ make_track() {
   fi
 }
 
+# スクリーンショット用（#95）: 英語の架空の配信元・番組。実在の局名・番組名は誤解を招くので使わない。
+# 尺は 25〜60 分の無音（12 秒だと一覧の尺が「0:12」になって不自然）。#95 の PR のスクリーンショットはこのライブラリで撮った。
+make_showcase_track() {
+  local out="$1" title="$2" album="$3" publisher="$4" date="$5" artist="$6"
+  local dur=$(( 1500 + (RANDOM % 8) * 300 ))
+  mkdir -p "$(dirname "$out")"
+  if [ -n "$artist" ]; then
+    ffmpeg -loglevel error -y -f lavfi -i anullsrc=r=8000:cl=mono -t "$dur" -c:a aac -b:a 8k \
+      -metadata "title=$title" -metadata "album=$album" -metadata "album_artist=$publisher" \
+      -metadata "date=$date" -metadata "artist=$artist" "$out"
+  else
+    ffmpeg -loglevel error -y -f lavfi -i anullsrc=r=8000:cl=mono -t "$dur" -c:a aac -b:a 8k \
+      -metadata "title=$title" -metadata "album=$album" -metadata "album_artist=$publisher" \
+      -metadata "date=$date" "$out"
+  fi
+}
+
+# 週次の番組を start から count 回。タイトルは公開日
+make_showcase_weekly() {
+  local pub="$1" prog="$2" artist="$3" start="$4" n="$5" i d
+  for i in $(seq 0 $((n - 1))); do
+    d=$(date -d "$start + $((i * 7)) days" +%F)
+    make_showcase_track "$MEDIA/$pub/$prog/$d.m4a" "$d" "$prog" "$pub" "$d" "$artist"
+  done
+}
+
+make_showcase_media() {
+  make_showcase_weekly "Example FM" "Late Night Talk" "Alex Rivera" "2026-07-06" 11
+  make_showcase_weekly "Example FM" "Morning Commute" "Sam Okafor" "2026-07-01" 12
+  make_showcase_weekly "Example Public Radio" "Weekend Science Hour" "Dr. Maya Chen" "2026-07-04" 10
+  # Book Club: タイトルが日付でない回。Episode 9 は出演者なし
+  make_showcase_track "$MEDIA/Example Public Radio/Book Club/Episode 12 - The Long Summer.m4a" "Episode 12: The Long Summer" "Book Club" "Example Public Radio" "2026-09-10" "Jordan Lee"
+  make_showcase_track "$MEDIA/Example Public Radio/Book Club/Episode 11 - Small Towns.m4a"     "Episode 11: Small Towns"     "Book Club" "Example Public Radio" "2026-08-27" "Jordan Lee"
+  make_showcase_track "$MEDIA/Example Public Radio/Book Club/Episode 10 - First Lines.m4a"     "Episode 10: First Lines"     "Book Club" "Example Public Radio" "2026-08-13" "Jordan Lee"
+  make_showcase_track "$MEDIA/Example Public Radio/Book Club/Episode 9 - Listener Picks.m4a"   "Episode 9: Listener Picks"   "Book Club" "Example Public Radio" "2026-07-30" ""
+  make_showcase_weekly "Example FM" "Local History" "Grace Whitfield" "2026-07-12" 8
+}
+
 make_media() {
   rm -rf "$MEDIA"
+  if [ "${KIKIDAME_JF_LIBRARY:-}" = "showcase" ]; then
+    make_showcase_media
+    echo "media: $MEDIA ($(find "$MEDIA" -name '*.m4a' | wc -l) tracks, showcase)"
+    return
+  fi
   # 番組 A: 同じ公開日に 2 本（"(1)" 付き）、タイトルが日付でない回、出演者が複数の回
   make_track "$MEDIA/ニッポン放送/テスト番組A/2026-09-14.m4a"     "2026-09-14"     "テスト番組A" "ニッポン放送" "2026-09-14" "出演者甲;出演者乙"
   make_track "$MEDIA/ニッポン放送/テスト番組A/2026-09-14 (1).m4a" "2026-09-14 (1)" "テスト番組A" "ニッポン放送" "2026-09-14" "出演者甲"
