@@ -16,9 +16,26 @@ android {
         versionCode = 1
         versionName = "0.1.0"
     }
+    // release の署名（#94）。鍵とパスフレーズは repo に置かず環境変数から読む。
+    // 無ければ署名設定を付けずにビルドする（CI の test と、鍵を持たない人の assembleRelease を通すため）。
+    // KIKIDAME_KEYSTORE=/path/to/kikidame-upload.jks KIKIDAME_KEYSTORE_PASSWORD=… KIKIDAME_KEY_ALIAS=kikidame KIKIDAME_KEY_PASSWORD=…
+    val keystorePath = System.getenv("KIKIDAME_KEYSTORE")
+    signingConfigs {
+        if (keystorePath != null) {
+            create("release") {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("KIKIDAME_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KIKIDAME_KEY_ALIAS") ?: "kikidame"
+                keyPassword = System.getenv("KIKIDAME_KEY_PASSWORD") ?: System.getenv("KIKIDAME_KEYSTORE_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         release {
-            isMinifyEnabled = false
+            if (keystorePath != null) signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
     buildFeatures {

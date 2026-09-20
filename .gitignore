@@ -19,3 +19,7 @@ captures/
 
 # Claude Code（並行作業用の worktree。セッションが repo 直下に作る）
 .claude/worktrees/
+
+# 署名鍵（repo の外に置く。万一のためここでも除外）
+*.jks
+*.keystore
