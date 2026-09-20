@@ -46,6 +46,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -359,7 +360,7 @@ private fun EpisodeActionsSheet(
     onDetails: () -> Unit,
 ) {
     val local = item.localFile
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Text(item.episode.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
         if (local == null && item.episode.serverItemId != null) {
             SheetAction(Icons.Filled.Download, "ダウンロード（固定）") { onDownload(); onDismiss() }
@@ -395,7 +396,7 @@ private fun ProgramSyncSheet(
     // 消失した番組（サーバの一覧に無く、突合でも結び直せなかった）とサーバ ID の無い番組は同期できない
     val canSync = program.serverItemId != null && !program.isGone
     val enabled = program.syncEnabled
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Text(program.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
         // この番組の手元のファイル（#42）。保持ルールを触る前に目に入る位置に
         localStorage?.let {
