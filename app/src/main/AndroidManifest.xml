@@ -47,5 +47,17 @@
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
+        <!--
+            再開（#119）。Media3 は再開（SystemUI の isRecent / onPlaybackResumption）をこのレシーバが宣言されているときだけ
+            有効にする（MediaSessionLegacyStub.canResumePlaybackOnStart = broadcastReceiverComponentName != null）。
+            あわせて、プロセスが死んだ後でも Bluetooth ヘッドセットの ▶ でサービスを起動できるようになる。
+        -->
+        <receiver
+            android:name="androidx.media3.session.MediaButtonReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>
