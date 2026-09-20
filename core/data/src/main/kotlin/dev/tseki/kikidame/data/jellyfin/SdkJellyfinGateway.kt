@@ -118,16 +118,20 @@ class SdkJellyfinGateway @Inject constructor(
         fetchAudio(api, UUID.fromString(programServerId.value)).filter { it.programServerId == programServerId }
     }
 
+    /**
+     * `getItem` ではなく `getItems(ids=…)` で引く。`getItem` は項目の全フィールド（`MediaSources` 含む）を返すので、
+     * 番組 ID が各回（Audio）を指していたとき 10.10 では `MediaStream.IsOriginal` 欠落でデコードに失敗する（#97）。
+     * `getItems` は [fetchAudio] と同じ基本フィールドだけを返し、無い ID・番組でない ID は空の一覧になる。
+     */
     override suspend fun fetchProgram(credentials: ServerCredentials, programServerId: ServerItemId): ServerProgram? = call {
         val api = api(credentials.serverUrl, credentials.accessToken)
-        val album = try {
-            val response by api.libraryApi.getItem(UUID.fromString(programServerId.value))
-            response
-        } catch (e: InvalidStatusException) {
-            if (e.status == 404) return@call null else throw e
-        }
-        if (album.type != BaseItemKind.MUSIC_ALBUM) return@call null
-        album.toServerProgram()
+        val result by api.libraryApi.getItems(
+            GetItemsRequest(
+                ids = listOf(UUID.fromString(programServerId.value)),
+                includeItemTypes = listOf(BaseItemKind.MUSIC_ALBUM),
+            ),
+        )
+        result.items.firstOrNull { it.type == BaseItemKind.MUSIC_ALBUM }?.toServerProgram()
     }
 
     private fun BaseItemDto.toServerProgram() = ServerProgram(
