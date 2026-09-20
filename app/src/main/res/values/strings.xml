@@ -1,17 +1,349 @@
-<resources>
-    <string name="app_name">Kikidame</string>
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Default (English) strings. Japanese lives in values-ja/. Every key must exist in both files (lint: MissingTranslation).
+  Terms follow CONTEXT.md: Program (番組), Episode (各回), Publisher (配信元), Published (公開日), Performers (出演者),
+  Pinned (固定), Starred (よく聴く), On Hold (判断保留), Gone (消失), Played (再生済み), Now Playing (聴いている回),
+  Sleep Timer (スリープタイマー), Retention Rule (保持ルール), Sync (同期).
+  Keys are <area>_<what>. Positional format arguments (%1$s) so translations can reorder them.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="app_name" translatable="false">Kikidame</string>
 
-    <!-- Notification / lock screen / Android Auto: skip back by 10 seconds (the app skips 10 s, not 15 or 30) -->
+    <!-- ===== common: shared across screens ===== -->
+    <!-- Back navigation icon -->
+    <string name="common_back">Back</string>
+    <string name="common_cancel">Cancel</string>
+    <!-- Separator between names in a list, e.g. performers "A, B". Keep the trailing space if your language uses one -->
+    <string name="common_list_separator">", "</string>
+    <!-- Value shown when a field has no value (performers, server ID) -->
+    <string name="common_none">None</string>
+    <!-- Value shown when a field is not known (publisher, file size) -->
+    <string name="common_unknown">Unknown</string>
+    <string name="common_play">Play</string>
+    <string name="common_pause">Pause</string>
+    <!-- Episode has been listened to (CONTEXT.md: Played) -->
+    <string name="common_played">Played</string>
+    <string name="common_unplayed">Unplayed</string>
+    <!-- Program is Gone: its server ID is no longer in the server listing -->
+    <string name="common_program_gone">Not found on the server</string>
+    <!-- Total size and count of files on the device: %1$s = "12.3 GB", %2$d = episode count -->
+    <plurals name="common_storage_usage">
+        <item quantity="one">%1$s (%2$d episode)</item>
+        <item quantity="other">%1$s (%2$d episodes)</item>
+    </plurals>
+    <!-- Download state of an episode file -->
+    <string name="common_download_pending">Waiting</string>
+    <string name="common_download_running">Downloading</string>
+    <string name="common_download_done">Downloaded</string>
+    <string name="common_download_failed">Failed</string>
+    <!-- Saving a setting to storage failed. %1$s = exception class name -->
+    <string name="common_error_save_settings">Could not save settings: %1$s</string>
+
+    <!-- ===== connect: sign-in screen ===== -->
+    <string name="connect_title">Connect to Jellyfin</string>
+    <!-- Label of the server URL field -->
+    <string name="connect_server">Server</string>
+    <string name="connect_server_hint">https:// only. The scheme can be omitted</string>
+    <string name="connect_user_name">Username</string>
+    <string name="connect_password">Password</string>
+    <!-- Button that starts signing in -->
+    <string name="connect_submit">Connect</string>
+    <string name="connect_error_https_only">Only https:// URLs are supported</string>
+    <!-- Saving credentials failed. %1$s = exception class name -->
+    <string name="connect_error_save_failed">Could not save: %1$s</string>
+    <!-- Appended to an "unreachable" error on Android 17+ when the local-network permission is denied. Starts with a line break -->
+    <string name="connect_hint_local_network_permission">\nThe “Local network” permission is not granted. Allow it under Settings → Apps → Kikidame → Permissions</string>
+
+    <!-- ===== library_pick: choose which Jellyfin library to use ===== -->
+    <string name="library_pick_title">Choose a library</string>
+    <string name="library_pick_no_music">There is no music library. Add your recordings to Jellyfin as a music library, then reload</string>
+    <!-- Button that confirms the selection -->
+    <string name="library_pick_confirm">Done</string>
+    <string name="library_pick_reload">Reload</string>
+    <!-- Note above the list when non-music libraries are greyed out -->
+    <string name="library_pick_music_only">Only music libraries can be selected</string>
+    <!-- Jellyfin collection types shown under each library name -->
+    <string name="library_pick_type_music">Music</string>
+    <string name="library_pick_type_movies">Movies</string>
+    <string name="library_pick_type_tvshows">TV shows</string>
+    <string name="library_pick_type_photos">Photos and home videos</string>
+    <string name="library_pick_type_books">Books</string>
+    <string name="library_pick_type_musicvideos">Music videos</string>
+    <string name="library_pick_type_boxsets">Collections</string>
+    <string name="library_pick_type_playlists">Playlists</string>
+    <string name="library_pick_type_livetv">Live TV</string>
+
+    <!-- ===== program_list: the root screen ===== -->
+    <string name="program_list_title">Programs</string>
+    <!-- Icon that opens the filter sheet (search + publisher) -->
+    <string name="program_list_filter">Filter</string>
+    <string name="program_list_settings">Settings</string>
+    <!-- Section header for programs the user marked as Starred -->
+    <string name="program_list_starred">Starred</string>
+    <!-- Section header for the remaining programs when a Starred section exists -->
+    <string name="program_list_others">Others</string>
+    <!-- Star icon on a starred program -->
+    <string name="program_list_star_remove">Starred (tap to remove)</string>
+    <!-- Star icon on a program that is not starred -->
+    <string name="program_list_star_add">Add to Starred</string>
+    <!-- Trailing icon on a program that is synced by retention rules -->
+    <string name="program_list_sync_enabled">Sync enabled</string>
+    <!-- Placeholder of the search field -->
+    <string name="program_list_filter_placeholder">Program or publisher name</string>
+    <string name="program_list_clear_query">Clear search text</string>
+    <!-- Header of the publisher list in the filter sheet -->
+    <string name="program_list_publisher">Publisher</string>
+    <!-- First publisher choice: no publisher filter -->
+    <string name="program_list_all">All</string>
+    <!-- Publisher choice for programs that have no publisher -->
+    <string name="program_list_no_publisher">No publisher</string>
+    <!-- Chip showing the active search text. %1$s = the text -->
+    <string name="program_list_query_chip">"“%1$s”"</string>
+    <string name="program_list_clear_query_filter">Clear search filter</string>
+    <string name="program_list_clear_publisher_filter">Clear publisher filter</string>
+    <!-- Empty result of a search. %1$s = search text -->
+    <string name="program_list_no_match">No programs match “%1$s”</string>
+    <!-- Empty result of a search within one publisher. %1$s = search text, %2$s = publisher name -->
+    <string name="program_list_no_match_in_publisher">No programs in %2$s match “%1$s”</string>
+    <!-- Program row: counts of episodes. "on device" = downloaded; "total" = known on the server -->
+    <string name="program_list_on_device">%1$d on device</string>
+    <string name="program_list_on_device_of_total">%1$d on device · %2$d total</string>
+    <string name="program_list_unplayed_on_device" tools:ignore="PluralsCandidate">%1$d unplayed / %2$d on device</string>
+    <string name="program_list_unplayed_on_device_of_total" tools:ignore="PluralsCandidate">%1$d unplayed / %2$d on device · %3$d total</string>
+    <!-- Program row: date of the newest episode. %1$s = "08-02" or "2025-08-02" -->
+    <string name="program_list_latest">Latest: %1$s</string>
+    <string name="program_list_empty_title">No programs</string>
+    <string name="program_list_empty_pull">Pull down to fetch from the server</string>
+    <string name="program_list_empty_connect">Connect to a server from Settings</string>
+
+    <!-- ===== episode_list: episodes of one program ===== -->
+    <!-- Sync settings icon when the program is synced / not synced -->
+    <string name="episode_list_sync_settings_on">Sync settings (sync enabled)</string>
+    <string name="episode_list_sync_settings_off">Sync settings (sync off)</string>
+    <string name="episode_list_remove_program_title">Remove this program from the device?</string>
+    <!-- %1$s = program name -->
+    <string name="episode_list_remove_program_text">All episodes, files and playback positions of “%1$s” will be deleted. This cannot be undone.</string>
+    <string name="episode_list_remove_program_confirm">Remove from device</string>
+    <string name="episode_list_disable_sync_title">Stop syncing?</string>
+    <!-- %1$d = number of unpinned files -->
+    <plurals name="episode_list_disable_sync_text">
+        <item quantity="one">%1$d unpinned file will be deleted at the next sync. Pin the episodes you want to keep first.</item>
+        <item quantity="other">%1$d unpinned files will be deleted at the next sync. Pin the episodes you want to keep first.</item>
+    </plurals>
+    <string name="episode_list_disable_sync_confirm">Stop syncing</string>
+    <!-- Pin icon before the title of a pinned episode -->
+    <string name="episode_list_pinned">Pinned</string>
+    <!-- Icon before the title of the episode that is Now Playing -->
+    <string name="episode_list_now_playing_playing">Playing now</string>
+    <string name="episode_list_now_playing_paused">Now playing (paused)</string>
+    <!-- Trailing icons of an episode row -->
+    <string name="episode_list_download">Download</string>
+    <string name="episode_list_pending_tap_cancel">Waiting (tap to cancel)</string>
+    <string name="episode_list_failed_tap_retry">Failed (tap to retry)</string>
+    <string name="episode_list_played_tap">Played (tap to mark as unplayed)</string>
+    <string name="episode_list_unplayed_tap">Unplayed (tap to mark as played)</string>
+    <!-- Status in the supporting line while the download worker waits for Wi-Fi -->
+    <string name="episode_list_status_waiting_wifi">Waiting for Wi-Fi</string>
+    <!-- Long-press actions -->
+    <string name="episode_list_action_download">Download (pin)</string>
+    <string name="episode_list_action_unpin">Unpin (apply retention rules)</string>
+    <string name="episode_list_action_delete_file">Delete file (playback position is kept)</string>
+    <string name="episode_list_action_delete_episode">Remove this episode (not on the server, cannot be restored)</string>
+    <string name="episode_list_action_details">Details</string>
+    <!-- Sync sheet: files of this program on the device. %1$s = "12.3 GB (123 episodes)" -->
+    <string name="episode_list_storage">Files on device: %1$s</string>
+    <string name="episode_list_storage_empty">No files on device</string>
+    <string name="episode_list_sync_this_program">Sync this program</string>
+    <!-- Program is Gone. %1$s = date since when -->
+    <string name="episode_list_sync_gone">Not found on the server (since %1$s). Sync is stopped. Episodes on the device can still be played</string>
+    <string name="episode_list_sync_unavailable">Cannot sync because it has not been found on the server</string>
+    <string name="episode_list_sync_description">Downloads episodes according to the retention rules and deletes ones that fall outside them. Pinned episodes are kept</string>
+    <!-- Retention rule: keep the newest N episodes -->
+    <string name="episode_list_keep_latest">Keep latest N</string>
+    <!-- Chip for a value of N -->
+    <plurals name="episode_list_keep_latest_choice">
+        <item quantity="one">%d episode</item>
+        <item quantity="other">%d episodes</item>
+    </plurals>
+    <string name="episode_list_keep_unlimited">No limit</string>
+    <!-- Retention rule: delete an episode once it is Played -->
+    <string name="episode_list_delete_after_played">Delete after played</string>
+    <string name="episode_list_delete_after_played_description">At the next sync, removes episodes you have finished</string>
+    <string name="episode_list_sync_now">Sync this program now</string>
+    <string name="episode_list_remove_program">Remove this program from the device</string>
+    <!-- Snackbar messages -->
+    <string name="episode_list_msg_unpinned">Unpinned. Retention rules now apply</string>
+    <string name="episode_list_msg_file_deleted_synced">File deleted. This program is synced, so the episode is downloaded again at the next sync if it should be kept</string>
+    <string name="episode_list_msg_file_deleted">File deleted. The playback position is kept</string>
+    <string name="episode_list_msg_episode_removed">This episode is not on the server, so it was removed from the list too</string>
+    <!-- %1$s = exception class name -->
+    <string name="episode_list_msg_action_failed">Action failed: %1$s</string>
+
+    <!-- ===== episode_details ===== -->
+    <string name="episode_details_title">Episode details</string>
+    <string name="episode_details_section_episode">Episode</string>
+    <string name="episode_details_published">Published</string>
+    <string name="episode_details_performers">Performers</string>
+    <string name="episode_details_publisher">Publisher</string>
+    <!-- Length of the audio -->
+    <string name="episode_details_runtime">Runtime</string>
+    <string name="episode_details_size">Size</string>
+    <!-- Section about the file on the device -->
+    <string name="episode_details_section_device">On device</string>
+    <string name="episode_details_state">Status</string>
+    <string name="episode_details_not_on_device">Not on device</string>
+    <!-- Label of the Pinned row -->
+    <string name="episode_details_pin">Pin</string>
+    <string name="episode_details_pinned">Pinned (exempt from retention rules)</string>
+    <string name="episode_details_not_pinned">Not pinned</string>
+    <string name="episode_details_downloaded_at">Downloaded</string>
+    <string name="episode_details_section_playback">Playback</string>
+    <string name="episode_details_position">Position</string>
+    <string name="episode_details_no_record">No record</string>
+    <!-- Technical rows -->
+    <string name="episode_details_server_id">Server ID</string>
+    <string name="episode_details_server_id_none">None (device-only episode)</string>
+    <string name="episode_details_app_id">ID (in app)</string>
+    <string name="episode_details_published_raw">Published (raw value, UTC)</string>
+    <string name="episode_details_added_at">Added</string>
+    <string name="episode_details_container">Container</string>
+    <string name="episode_details_path">Path</string>
+    <string name="episode_details_attempts">Failed attempts</string>
+    <plurals name="episode_details_attempts_value">
+        <item quantity="one">%d time</item>
+        <item quantity="other">%d times</item>
+    </plurals>
+    <string name="episode_details_last_attempt">Last attempt</string>
+    <string name="episode_details_playback_updated_at">Playback record updated</string>
+    <string name="episode_details_technical">Technical details</string>
+    <string name="episode_details_technical_description">IDs, raw values, paths. Long-press to copy</string>
+    <string name="episode_details_collapse">Collapse</string>
+    <string name="episode_details_expand">Expand</string>
+    <string name="episode_details_copied">Copied</string>
+
+    <!-- ===== player ===== -->
+    <!-- Playback speed -->
+    <string name="player_speed">Speed</string>
+    <string name="player_sleep_timer">Sleep timer</string>
+    <!-- Short label of the sleep timer button when no timer is set -->
+    <string name="player_sleep">Sleep</string>
+    <!-- Sleep timer label when set to stop at the end of the episode -->
+    <string name="player_end_of_episode">End of episode</string>
+    <string name="player_previous">Previous episode</string>
+    <string name="player_next">Next episode</string>
+    <string name="player_seek_back">Back 10 seconds</string>
+    <string name="player_seek_forward">Forward 10 seconds</string>
+    <string name="player_sleep_description">Pauses when the time is up or the current episode ends. The timer does not run while paused</string>
+    <plurals name="player_sleep_minutes">
+        <item quantity="one">%d min</item>
+        <item quantity="other">%d min</item>
+    </plurals>
+    <string name="player_sleep_until_end">Until the end of this episode</string>
+    <!-- Removes the sleep timer -->
+    <string name="player_sleep_off">Off</string>
+    <!-- Seek by swiping: %1$s = signed seconds like "+7", "−12", "±0" -->
+    <string name="player_swipe_delta">%1$s s</string>
+    <string name="player_error_not_on_device">This episode is not on the device</string>
+    <string name="player_error_file_missing">File not found. The device record has been cleaned up</string>
+
+    <!-- ===== settings ===== -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_server">Server</string>
+    <string name="settings_not_connected">Not connected</string>
+    <string name="settings_user">User</string>
+    <string name="settings_library">Library</string>
+    <string name="settings_library_none">Not selected</string>
+    <string name="settings_library_tap">Tap to change</string>
+    <string name="settings_last_sync">Last sync</string>
+    <string name="settings_section_download">Downloads</string>
+    <string name="settings_storage">Files on device</string>
+    <string name="settings_wifi_only">Wi-Fi only</string>
+    <string name="settings_wifi_only_description">Turn off to download over mobile data too</string>
+    <string name="settings_section_display">Display</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_theme_light">Light</string>
+    <!-- Opens the per-app language page of the OS settings (Android 13+) -->
+    <string name="settings_language">Language</string>
+    <string name="settings_language_description">Choose the language of this app in the system settings</string>
+    <string name="settings_section_account">Account</string>
+    <string name="settings_sign_out">Sign out</string>
+    <string name="settings_sign_out_description">Removes only the credentials. Programs, episodes and playback positions on the device are kept</string>
+    <string name="settings_connect_elsewhere">Connect to another server</string>
+    <string name="settings_connect_elsewhere_description">Deletes all programs, episodes, playback positions and audio files on the device, then returns to the connect screen</string>
+    <string name="settings_section_about">About</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_license">License</string>
+    <string name="settings_license_description">Unofficial client, not affiliated with the Jellyfin project. Tap for the source code</string>
+    <string name="settings_open_source_licenses">Open source licenses</string>
+    <string name="settings_open_source_licenses_description">Libraries in use and their licenses</string>
+    <string name="settings_sign_out_title">Sign out?</string>
+    <string name="settings_sign_out_text">Data on the device is kept. You will need to sign in again next time.</string>
+    <string name="settings_reset_title">Delete the data on the device and connect to another server?</string>
+    <string name="settings_reset_text">All programs, episodes, playback positions, played marks and audio files will be deleted. This cannot be undone.</string>
+    <string name="settings_reset_confirm">Delete and continue</string>
+
+    <!-- ===== sync: results of refresh / sync, shown in a snackbar ===== -->
+    <!-- Separates sentences in a combined message. Keep the trailing space if your language uses one -->
+    <string name="sync_sentence_separator">". "</string>
+    <!-- %1$d = programs, %2$d = episodes fetched from the server -->
+    <string name="sync_fetched" tools:ignore="PluralsCandidate">Fetched %1$d programs / %2$d episodes</string>
+    <plurals name="sync_enqueued">
+        <item quantity="one">%d episode queued for download</item>
+        <item quantity="other">%d episodes queued for download</item>
+    </plurals>
+    <plurals name="sync_deleted">
+        <item quantity="one">%d episode deleted</item>
+        <item quantity="other">%d episodes deleted</item>
+    </plurals>
+    <!-- Programs put On Hold because they were not found on the server -->
+    <plurals name="sync_on_hold">
+        <item quantity="one">%d program not found on the server, left as is</item>
+        <item quantity="other">%d programs not found on the server, left as is</item>
+    </plurals>
+    <!-- Refresh of one program (no deletions). %1$d = episodes -->
+    <plurals name="sync_program_fetched">
+        <item quantity="one">Fetched %d episode</item>
+        <item quantity="other">Fetched %d episodes</item>
+    </plurals>
+    <string name="sync_program_gone">This program is not on the server. Nothing was changed</string>
+    <!-- Sync of one program. %1$d = episodes -->
+    <plurals name="sync_program_checked">
+        <item quantity="one">Checked %d episode</item>
+        <item quantity="other">Checked %d episodes</item>
+    </plurals>
+    <string name="sync_program_up_to_date">Everything is up to date</string>
+    <!-- Files that disappeared from the device (deleted by a file manager) had their records cleaned up -->
+    <plurals name="sync_reconciled">
+        <item quantity="one">Cleaned up the record of %d episode no longer on the device</item>
+        <item quantity="other">Cleaned up the records of %d episodes no longer on the device</item>
+    </plurals>
+    <string name="sync_not_on_wifi">Not on Wi-Fi, so nothing was updated</string>
+    <string name="sync_error_session_expired">The session has expired. Sign in again</string>
+    <string name="sync_error_unreachable">Cannot reach the server. Showing what is on the device</string>
+    <!-- %1$s = server message -->
+    <string name="sync_error_fetch_failed">Fetch failed: %1$s</string>
+    <!-- %1$s = exception class name -->
+    <string name="sync_error_import_failed">Import failed: %1$s</string>
+    <!-- Sign-in errors -->
+    <string name="sync_error_unauthorized">Wrong username or password</string>
+    <string name="sync_error_unreachable_connect">Cannot reach the server. Check the URL and your network</string>
+    <!-- %1$s = server message -->
+    <string name="sync_error_server_failed">The server returned an error: %1$s</string>
+
+    <!-- ===== playback: the playback service (notification / lock screen / Android Auto). Resolved by the Service itself (ADR 0009 の例外) ===== -->
+    <!-- Skip back by 10 seconds (the app skips 10 s, not 15 or 30) -->
     <string name="playback_skip_back">Back 10 s</string>
-    <!-- Notification / lock screen / Android Auto: skip forward by 10 seconds -->
     <string name="playback_skip_forward">Forward 10 s</string>
     <!-- Snackbar shown when playback stopped because the local file of the episode is gone -->
     <string name="playback_error_file_not_found">Stopped playback because the file could not be found</string>
-    <!-- Snackbar shown when playback failed for another reason. %1$s is the Media3 error code name, e.g. ERROR_CODE_DECODING_FAILED -->
+    <!-- Snackbar shown when playback failed for another reason. %1$s = Media3 error code name, e.g. ERROR_CODE_DECODING_FAILED -->
     <string name="playback_error_failed">Stopped because playback failed (%1$s)</string>
 
-    <!-- Android Auto browse tab: programs the user marked as Starred (see CONTEXT.md「よく聴く (Starred)」) -->
+    <!-- ===== auto: Android Auto browse tree (#96) ===== -->
+    <!-- Browse tab: programs the user marked as Starred (CONTEXT.md「よく聴く (Starred)」) -->
     <string name="auto_root_starred">Starred</string>
-    <!-- Android Auto browse tab: all programs that have episodes on this device (see CONTEXT.md「番組 (Program)」) -->
+    <!-- Browse tab: all programs that have episodes on this device (CONTEXT.md「番組 (Program)」) -->
     <string name="auto_root_programs">Programs</string>
 </resources>

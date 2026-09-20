@@ -1,6 +1,7 @@
 package dev.tseki.kikidame.ui.programs
 
 import androidx.lifecycle.ViewModel
+import dev.tseki.kikidame.ui.UiText
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.tseki.kikidame.domain.LibraryRepository
@@ -73,7 +74,7 @@ class ProgramListViewModel @Inject constructor(
 
     val isRefreshing: StateFlow<Boolean> = refresher.isRefreshing
     /** 更新の結果と、ミニプレイヤーが消えた理由をスナックバーへ。 */
-    val messages: Flow<String> = merge(refresher.messages, nowPlaying.messages)
+    val messages: Flow<UiText> = merge(refresher.messages, nowPlaying.messages)
 
     /** 絞り込みシートの検索欄。空にすれば検索の絞り込みは解除される（選択中のチップの × も同じ）。 */
     fun setQuery(query: String) {

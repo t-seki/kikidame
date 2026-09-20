@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.tseki.kikidame.LocalNetworkPermission
+import dev.tseki.kikidame.R
+import dev.tseki.kikidame.ui.UiText
 import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
@@ -23,7 +25,7 @@ data class ConnectUiState(
     val userName: String = "",
     val password: String = "",
     val isSubmitting: Boolean = false,
-    val error: String? = null,
+    val error: UiText? = null,
 ) {
     val canSubmit: Boolean get() = !isSubmitting && serverUrl.isNotBlank() && userName.isNotBlank()
 }
@@ -61,18 +63,18 @@ class ConnectViewModel @Inject constructor(
                 _uiState.update { it.copy(isSubmitting = false, password = "") }
             } catch (e: ServerException) {
                 val hint = if (e is ServerException.Unreachable && LocalNetworkPermission.isRequiredAndMissing(context)) {
-                    "\n「ローカルネットワーク」の権限が許可されていません。設定 → アプリ → Kikidame → 権限 から許可してください"
+                    UiText.Res(R.string.connect_hint_local_network_permission)
                 } else {
-                    ""
+                    null
                 }
-                _uiState.update { it.copy(isSubmitting = false, error = e.toUserMessage() + hint) }
+                _uiState.update { it.copy(isSubmitting = false, error = UiText.Joined(listOfNotNull(e.toUserMessage(), hint))) }
             } catch (e: IllegalArgumentException) {
-                _uiState.update { it.copy(isSubmitting = false, error = "https:// の URL だけ使えます") }
+                _uiState.update { it.copy(isSubmitting = false, error = UiText.Res(R.string.connect_error_https_only)) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 // DataStore / Keystore の失敗。落とさずに画面へ
-                _uiState.update { it.copy(isSubmitting = false, error = "保存に失敗しました: ${e::class.simpleName}") }
+                _uiState.update { it.copy(isSubmitting = false, error = UiText.Res(R.string.connect_error_save_failed, e::class.simpleName.orEmpty())) }
             }
         }
     }

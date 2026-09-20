@@ -1,10 +1,12 @@
 package dev.tseki.kikidame.ui.programs
 
+import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.Program
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.ProgramSummary
 import dev.tseki.kikidame.ui.programs.ProgramFilter.Publisher
 import dev.tseki.kikidame.ui.programs.ProgramFilter.PublisherKey
+import dev.tseki.kikidame.ui.UiText
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -96,7 +98,7 @@ class ProgramFilterTest {
             listOf(Publisher(lfr, 2), Publisher(tbs, 2), Publisher(PublisherKey("ABC"), 1), Publisher(none, 3)),
             ProgramFilter.publishers(list),
         )
-        assertEquals("配信元なし", none.label)
+        assertEquals(UiText.Res(R.string.program_list_no_publisher), none.label)
         assertEquals(emptyList(), ProgramFilter.publishers(emptyList()))
     }
     private fun summary(id: Long, name: String, publisher: String?) = ProgramSummary(

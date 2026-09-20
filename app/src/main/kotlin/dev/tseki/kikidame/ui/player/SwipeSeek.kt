@@ -1,5 +1,7 @@
 package dev.tseki.kikidame.ui.player
 
+import dev.tseki.kikidame.R
+import dev.tseki.kikidame.ui.UiText
 import kotlin.math.roundToLong
 
 /**
@@ -28,13 +30,14 @@ object SwipeSeek {
     fun targetMs(startMs: Long, offsetDp: Float, durationMs: Long): Long =
         (startMs + deltaMs(offsetDp)).coerceIn(0L, durationMs.coerceAtLeast(0L))
 
-    /** 「+7 秒」「−12 秒」の形。0 は「±0 秒」。 */
-    fun deltaText(deltaMs: Long): String {
+    /** 「+7 秒」「−12 秒」の形。0 は「±0 秒」。符号付きの数はここで作り、単位（秒）は言語ごとの文言に任せる。 */
+    fun deltaText(deltaMs: Long): UiText {
         val seconds = deltaMs / 1000
-        return when {
-            seconds > 0 -> "+$seconds 秒"
-            seconds < 0 -> "−${-seconds} 秒"
-            else -> "±0 秒"
+        val signed = when {
+            seconds > 0 -> "+$seconds"
+            seconds < 0 -> "−${-seconds}"
+            else -> "±0"
         }
+        return UiText.Res(R.string.player_swipe_delta, signed)
     }
 }

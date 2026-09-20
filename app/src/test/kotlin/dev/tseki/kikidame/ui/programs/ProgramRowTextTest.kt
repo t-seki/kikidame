@@ -1,5 +1,12 @@
 package dev.tseki.kikidame.ui.programs
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.ui.resolve
+import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 import dev.tseki.kikidame.domain.Program
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.ProgramSummary
@@ -9,8 +16,11 @@ import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.time.Instant
 
-/** 番組一覧の行の補足（#41）。 */
+/** 番組一覧の行の補足（#41）。並び・省略を見るので、[UiText] を日本語（`values-ja/`）で解決した文字列で比較する（Robolectric）。 */
+@RunWith(AndroidJUnit4::class)
+@Config(qualifiers = "ja")
 class ProgramRowTextTest {
+    private val context: Context = ApplicationProvider.getApplicationContext()
     private val today = LocalDate(2026, 9, 19)
     private val published = Instant.parse("2026-09-17T15:00:00Z") // JST 2026-09-18
 
@@ -41,7 +51,7 @@ class ProgramRowTextTest {
         )
     }
 
-    private fun ProgramSummary.text() = toSupportingText(today)
+    private fun ProgramSummary.text() = toSupportingText(today).resolve(context)
 
     private fun summary(
         unplayed: Int,

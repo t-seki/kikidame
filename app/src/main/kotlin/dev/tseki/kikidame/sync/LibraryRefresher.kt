@@ -12,7 +12,9 @@ import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.download.DownloadKicker
+import dev.tseki.kikidame.R
 import dev.tseki.kikidame.playback.NowPlaying
+import dev.tseki.kikidame.ui.UiText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.BufferOverflow
@@ -51,8 +53,8 @@ class LibraryRefresher @Inject constructor(
     val isRefreshing: StateFlow<Boolean> = _isRefreshing
 
     // 連続した更新の結果を取りこぼさないよう少し余裕を持ち、溢れたら古い方を捨てる
-    private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 4, onBufferOverflow = BufferOverflow.DROP_OLDEST)
-    val messages: SharedFlow<String> = _messages
+    private val _messages = MutableSharedFlow<UiText>(extraBufferCapacity = 4, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    val messages: SharedFlow<UiText> = _messages
 
     /** 画面が消えても最後まで走らせたいとき（ライブラリ選択直後の初回取得）。 */
     fun launchRefresh() {
@@ -68,7 +70,7 @@ class LibraryRefresher @Inject constructor(
     suspend fun refreshProgram(programId: ProgramId): RefreshResult? = guarded(silent = false) {
         val result = refreshRepository.refreshProgram(programId)
         if (result != null) {
-            say(false, "各回 ${result.episodes} を取得しました")
+            say(false, UiText.Plural(R.plurals.sync_program_fetched, result.episodes))
             result
         } else {
             refreshRepository.refresh(excluded = excluded()).also { say(false, it.toSyncMessage()) }
@@ -83,7 +85,7 @@ class LibraryRefresher @Inject constructor(
     /** 聴いている回は削除から外す。ただし聴き終えて止まっている回は「再生済みなら削除」に任せる（#27）。 */
     private fun excluded(): Set<EpisodeId> = setOfNotNull(nowPlaying.excludedFromSync)
 
-    private fun say(silent: Boolean, message: String) {
+    private fun say(silent: Boolean, message: UiText) {
         if (!silent) _messages.tryEmit(message)
     }
 
@@ -94,9 +96,9 @@ class LibraryRefresher @Inject constructor(
             if (sessionRepository.state.first() !is SessionState.Ready) return null
             // 手元のファイルが消えていないか先に整合する（#5）。ローカル I/O なのでネットワークの条件は見ない
             val reconciled = downloads.reconcileMissingFiles()
-            if (reconciled > 0) say(silent, "手元に無くなっていた $reconciled 回の記録を整理しました")
+            if (reconciled > 0) say(silent, UiText.Plural(R.plurals.sync_reconciled, reconciled))
             if (settings.wifiOnly.first() && network.isMetered()) {
-                say(silent, "Wi-Fi に接続していないため更新しません")
+                say(silent, UiText.Res(R.string.sync_not_on_wifi))
                 return null
             }
             val result = block() ?: return null
@@ -112,21 +114,21 @@ class LibraryRefresher @Inject constructor(
             }
             return result
         } catch (e: ServerException.Unauthorized) {
-            say(silent, "サーバの認証が切れました。もう一度ログインしてください")
+            say(silent, UiText.Res(R.string.sync_error_session_expired))
             sessionRepository.signOut()
             return null
         } catch (e: ServerException.Unreachable) {
-            say(silent, "サーバに接続できません。手元の一覧を表示しています")
+            say(silent, UiText.Res(R.string.sync_error_unreachable))
             return null
         } catch (e: ServerException.Failed) {
-            say(silent, "取得に失敗しました: ${e.message}")
+            say(silent, UiText.Res(R.string.sync_error_fetch_failed, e.message.orEmpty()))
             return null
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             // Room / DataStore / Keystore の失敗。落とさずに文言にする
             Log.e(TAG, "refresh failed", e)
-            say(silent, "取り込みに失敗しました: ${e::class.simpleName}")
+            say(silent, UiText.Res(R.string.sync_error_import_failed, e::class.simpleName.orEmpty()))
             return null
         } finally {
             _isRefreshing.value = false
@@ -139,30 +141,38 @@ class LibraryRefresher @Inject constructor(
     }
 }
 
-/** 同期の結果の文言。0 のものは省く。 */
-fun RefreshResult.toSyncMessage(): String = buildString {
-    append("番組 $programs / 各回 $episodes を取得")
+/** 「N 回をダウンロード予約、M 回を削除」。0 のものは省く。何も無ければ null。区切りは [R.string.common_list_separator]。 */
+private fun RefreshResult.actionsText(): UiText? {
     val actions = listOfNotNull(
-        enqueued.takeIf { it > 0 }?.let { "$it 回をダウンロード予約" },
-        (deleted + removed).takeIf { it > 0 }?.let { "$it 回を削除" },
+        enqueued.takeIf { it > 0 }?.let { UiText.Plural(R.plurals.sync_enqueued, it) },
+        (deleted + removed).takeIf { it > 0 }?.let { UiText.Plural(R.plurals.sync_deleted, it) },
     )
-    if (actions.isNotEmpty()) append("。").append(actions.joinToString("、"))
-    if (onHold > 0) append("。$onHold 番組はサーバ上で見つからず、そのままにしました")
+    return actions.takeIf { it.isNotEmpty() }?.let { UiText.Joined(it, UiText.Res(R.string.common_list_separator)) }
 }
 
+/** 文を「。」（言語ごとの [R.string.sync_sentence_separator]）でつなぐ。 */
+private fun sentences(vararg parts: UiText?): UiText =
+    UiText.Joined(parts.filterNotNull(), UiText.Res(R.string.sync_sentence_separator))
+
+/** 同期の結果の文言。0 のものは省く。 */
+fun RefreshResult.toSyncMessage(): UiText = sentences(
+    UiText.Res(R.string.sync_fetched, programs, episodes),
+    actionsText(),
+    onHold.takeIf { it > 0 }?.let { UiText.Plural(R.plurals.sync_on_hold, it) },
+)
+
 /** 1 番組の同期の文言。 */
-fun RefreshResult.toProgramSyncMessage(): String {
-    if (onHold > 0) return "この番組はサーバ上で見つかりません。何も変えていません"
-    val actions = listOfNotNull(
-        enqueued.takeIf { it > 0 }?.let { "$it 回をダウンロード予約" },
-        (deleted + removed).takeIf { it > 0 }?.let { "$it 回を削除" },
+fun RefreshResult.toProgramSyncMessage(): UiText {
+    if (onHold > 0) return UiText.Res(R.string.sync_program_gone)
+    return sentences(
+        UiText.Plural(R.plurals.sync_program_checked, episodes),
+        actionsText() ?: UiText.Res(R.string.sync_program_up_to_date),
     )
-    return if (actions.isEmpty()) "各回 $episodes を確認。手元は最新です" else "各回 $episodes を確認。" + actions.joinToString("、")
 }
 
 /** 接続画面の文言。 */
-fun ServerException.toUserMessage(): String = when (this) {
-    is ServerException.Unauthorized -> "ユーザー名またはパスワードが違います"
-    is ServerException.Unreachable -> "サーバに接続できません。URL とネットワークを確認してください"
-    is ServerException.Failed -> "サーバがエラーを返しました: $message"
+fun ServerException.toUserMessage(): UiText = when (this) {
+    is ServerException.Unauthorized -> UiText.Res(R.string.sync_error_unauthorized)
+    is ServerException.Unreachable -> UiText.Res(R.string.sync_error_unreachable_connect)
+    is ServerException.Failed -> UiText.Res(R.string.sync_error_server_failed, message.orEmpty())
 }

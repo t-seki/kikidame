@@ -1,5 +1,12 @@
 package dev.tseki.kikidame.ui.episodes
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.ui.resolve
+import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 import dev.tseki.kikidame.domain.DownloadState
 import dev.tseki.kikidame.domain.Episode
 import dev.tseki.kikidame.domain.EpisodeId
@@ -12,8 +19,14 @@ import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
-/** 各回一覧の行の補足（#66）: タイトルが公開日と同じ文字列のときだけ公開日を省く。 */
+/**
+ * 各回一覧の行の補足（#66）: タイトルが公開日と同じ文字列のときだけ公開日を省く。
+ * 並び・省略・区切りを見るテストなので、[UiText] を日本語（`values-ja/`）で解決した文字列で比較する（Robolectric）。
+ */
+@RunWith(AndroidJUnit4::class)
+@Config(qualifiers = "ja")
 class EpisodeRowTextTest {
+    private val context: Context = ApplicationProvider.getApplicationContext()
     private val published = Instant.parse("2026-08-01T15:00:00Z") // JST 2026-08-02
 
     @Test
@@ -63,7 +76,7 @@ class EpisodeRowTextTest {
         assertEquals("2:00:00", item(title = "2026-08-02", performers = emptyList()).text())
     }
 
-    private fun EpisodeWithState.text(waitingForNetwork: Boolean = false) = toSupportingText(waitingForNetwork)
+    private fun EpisodeWithState.text(waitingForNetwork: Boolean = false) = toSupportingText(waitingForNetwork).resolve(context)
 
     private fun item(title: String, publishedAt: Instant = published, state: DownloadState? = null, performers: List<String> = emptyList()): EpisodeWithState {
         val episode = Episode(

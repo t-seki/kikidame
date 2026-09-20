@@ -12,6 +12,7 @@ import kotlin.time.Duration.Companion.seconds
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import dev.tseki.kikidame.domain.EpisodeId
+import dev.tseki.kikidame.ui.UiText
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -56,12 +57,12 @@ class NowPlaying @Inject constructor() {
     }
 
     // 出した時点で誰も見ていなくても（再生画面・バックグラウンド）、次に見た画面へ 1 回だけ届くように Channel で持つ
-    private val _messages = Channel<String>(Channel.CONFLATED)
+    private val _messages = Channel<UiText>(Channel.CONFLATED)
 
     /** 聴いている回が利用者の操作なしに消えた理由（再生の失敗など）。今見えている画面（再生画面か一覧）が 1 回だけ受け取って出す。 */
-    val messages: Flow<String> = _messages.receiveAsFlow()
+    val messages: Flow<UiText> = _messages.receiveAsFlow()
 
-    fun say(message: String) {
+    fun say(message: UiText) {
         _messages.trySend(message)
     }
 

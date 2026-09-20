@@ -18,6 +18,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import dagger.hilt.android.AndroidEntryPoint
 import dev.tseki.kikidame.MainActivity
 import dev.tseki.kikidame.R
+import dev.tseki.kikidame.ui.UiText
 import dev.tseki.kikidame.di.ApplicationScope
 import dev.tseki.kikidame.domain.AppSettingsRepository
 import dev.tseki.kikidame.domain.LibraryRepository
@@ -65,8 +66,8 @@ class PlaybackService : MediaLibraryService() {
             session?.player?.clearMediaItems()
             nowPlaying.say(
                 when (error.errorCode) {
-                    PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND -> getString(R.string.playback_error_file_not_found)
-                    else -> getString(R.string.playback_error_failed, error.errorCodeName)
+                    PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND -> UiText.Res(R.string.playback_error_file_not_found)
+                    else -> UiText.Res(R.string.playback_error_failed, error.errorCodeName)
                 },
             )
         }

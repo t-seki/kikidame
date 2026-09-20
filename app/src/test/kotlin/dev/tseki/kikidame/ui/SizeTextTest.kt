@@ -1,4 +1,5 @@
 package dev.tseki.kikidame.ui
+import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.LocalStorageUsage
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -18,6 +19,7 @@ class SizeTextTest {
     }
     @Test
     fun usageTextIncludesCount() {
-        assertEquals("12.3 GB（123 回）", LocalStorageUsage(12_345_678_901L, 123).toText())
+        // 「12.3 GB（123 回）」。括弧と「回」は文言側（plurals）で、数値の書式はここで決める
+        assertEquals(UiText.Plural(R.plurals.common_storage_usage, 123, "12.3 GB", 123), LocalStorageUsage(12_345_678_901L, 123).toText())
     }
 }

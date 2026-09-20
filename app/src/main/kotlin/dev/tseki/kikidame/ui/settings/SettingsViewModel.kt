@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.AppSettingsRepository
 import dev.tseki.kikidame.domain.ThemeMode
 import dev.tseki.kikidame.domain.LocalDataReset
@@ -14,6 +15,7 @@ import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.download.DownloadScheduler
 import dev.tseki.kikidame.playback.PlayerConnection
 import dev.tseki.kikidame.sync.SyncScheduler
+import dev.tseki.kikidame.ui.UiText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -47,7 +49,7 @@ class SettingsViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _message.value = "設定の保存に失敗しました: ${e::class.simpleName}"
+                _message.value = UiText.Res(R.string.common_error_save_settings, e::class.simpleName.orEmpty())
             }
         }
     }
@@ -62,15 +64,15 @@ class SettingsViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _message.value = "設定の保存に失敗しました: ${e::class.simpleName}"
+                _message.value = UiText.Res(R.string.common_error_save_settings, e::class.simpleName.orEmpty())
             }
         }
     }
     val session: StateFlow<SessionState?> = sessionRepository.state
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    private val _message = MutableStateFlow<String?>(null)
-    val message: StateFlow<String?> = _message
+    private val _message = MutableStateFlow<UiText?>(null)
+    val message: StateFlow<UiText?> = _message
 
     /** 認証情報だけ消す。手元の番組・各回・再生位置は残る。 */
     fun signOut() {

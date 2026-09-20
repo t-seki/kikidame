@@ -27,10 +27,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.LibraryView
+import dev.tseki.kikidame.ui.resolve
 
 /**
  * ライブラリ選択。全ライブラリを列挙し、音楽ライブラリだけ選べる（他はグレーアウトし、理由は一覧の上に 1 回）。
@@ -48,10 +51,10 @@ fun LibraryPickScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("ライブラリを選ぶ") },
+                title = { Text(stringResource(R.string.library_pick_title)) },
                 navigationIcon = {
                     if (onBack != null) {
-                        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る") }
+                        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back)) }
                     }
                 },
             )
@@ -60,7 +63,7 @@ fun LibraryPickScreen(
             Column(Modifier.padding(16.dp)) {
                 if (state.libraries != null && state.musicCount == 0) {
                     Text(
-                        "音楽ライブラリがありません。Jellyfin 側でラジオ録音を音楽ライブラリとして追加してから再読み込みしてください",
+                        stringResource(R.string.library_pick_no_music),
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(bottom = 8.dp),
@@ -70,7 +73,7 @@ fun LibraryPickScreen(
                     onClick = { viewModel.confirm(onDone) },
                     enabled = state.canConfirm,
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("決定") }
+                ) { Text(stringResource(R.string.library_pick_confirm)) }
             }
         },
     ) { padding ->
@@ -82,15 +85,15 @@ fun LibraryPickScreen(
                 Modifier.fillMaxSize().padding(padding).padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text(state.error!!, color = MaterialTheme.colorScheme.error)
-                TextButton(onClick = viewModel::load) { Text("再読み込み") }
+                Text(state.error!!.resolve(), color = MaterialTheme.colorScheme.error)
+                TextButton(onClick = viewModel::load) { Text(stringResource(R.string.library_pick_reload)) }
             }
             else -> LazyColumn(Modifier.padding(padding)) {
                 // 選べない理由は行ごとに繰り返さず、一覧の上に 1 回だけ（#71）。音楽以外が無ければ出さない
                 if (state.libraries.orEmpty().any { !it.isMusic }) {
                     item(key = "note") {
                         Text(
-                            "音楽ライブラリのみ選べます",
+                            stringResource(R.string.library_pick_music_only),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -117,21 +120,22 @@ private fun LibraryRow(library: LibraryView, selected: Boolean, onClick: () -> U
         },
         supportingContent = {
             // 補足は種類だけ（種類が取れない音楽ライブラリは「音楽」、それ以外で取れなければ何も出さない）
-            val type = library.collectionType?.let { collectionTypeLabel(it) } ?: if (library.isMusic) "音楽" else null
+            val type = library.collectionType?.let { collectionTypeLabel(it) } ?: if (library.isMusic) stringResource(R.string.library_pick_type_music) else null
             if (type != null) Text(type, color = if (library.isMusic) MaterialTheme.colorScheme.onSurfaceVariant else disabledColor)
         },
     )
 }
 
+@Composable
 private fun collectionTypeLabel(type: String): String = when (type) {
-    "music" -> "音楽"
-    "movies" -> "映画"
-    "tvshows" -> "番組（TV）"
-    "photos", "homevideos" -> "写真・ホームビデオ"
-    "books" -> "本"
-    "musicvideos" -> "ミュージックビデオ"
-    "boxsets" -> "コレクション"
-    "playlists" -> "プレイリスト"
-    "livetv" -> "ライブ TV"
+    "music" -> stringResource(R.string.library_pick_type_music)
+    "movies" -> stringResource(R.string.library_pick_type_movies)
+    "tvshows" -> stringResource(R.string.library_pick_type_tvshows)
+    "photos", "homevideos" -> stringResource(R.string.library_pick_type_photos)
+    "books" -> stringResource(R.string.library_pick_type_books)
+    "musicvideos" -> stringResource(R.string.library_pick_type_musicvideos)
+    "boxsets" -> stringResource(R.string.library_pick_type_boxsets)
+    "playlists" -> stringResource(R.string.library_pick_type_playlists)
+    "livetv" -> stringResource(R.string.library_pick_type_livetv)
     else -> type
 }
