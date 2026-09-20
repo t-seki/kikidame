@@ -55,6 +55,39 @@ Robolectric が SDK 37 で JDK 内部 API へアクセスするための `--add-
 Room のスキーマは `core/data/schemas/` に書き出す（`room { schemaDirectory(...) }`）。
 Entity を変えたら version を上げ、書き出された JSON もコミットする。
 
+### テスト用 Jellyfin サーバ（#97）
+
+対応範囲は Jellyfin **10.10 以上**。版ごとの差（10.10 は `MediaStream.IsOriginal` を返さず、SDK 1.9 は必須と見なす、等）は
+本物のサーバに当てないと分からないので、コンテナで立てて `SdkJellyfinGateway` の統合テストを回す。docker と ffmpeg と curl と python3 が要る。
+
+```bash
+scripts/jellyfin-testserver.sh up 1010   # Jellyfin 10.10.x → http://localhost:8097
+scripts/jellyfin-testserver.sh up 12     # Jellyfin 12.x    → http://localhost:8098
+scripts/jellyfin-testserver.sh down      # 両方止めて消す
+
+KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTest \
+  --tests dev.tseki.kikidame.data.jellyfin.SdkJellyfinGatewayIntegrationTest
+```
+
+- `up` は ffmpeg で無音の m4a を作った合成ライブラリ（番組 2 × 各回 3。同じ公開日の 2 本、タイトルが日付でない回、出演者の無い回を含む）を
+  `/media` にマウントし、初期セットアップと音楽ライブラリ `radio` の作成を REST で済ませ、スキャンが終わるまで待つ。
+  置き場は `$KIKIDAME_JF_DIR`（既定 `/tmp/kikidame-jf`）。ユーザーは `kikidame` / `kikidame-test`
+- 統合テストは `KIKIDAME_JELLYFIN_URL` が無ければ `Assume` でスキップするので、CI と普段の `./gradlew test` には出てこない。
+  付いているときはキャッシュを使わず毎回走る（`core/data/build.gradle.kts`）
+- `JellyfinGateway` の全メソッド（ログイン・ライブラリ一覧・番組と各回の取得・1 番組の各回・番組の存在確認・ダウンロードと `Range`・
+  認証切れ・到達不能）を 1 回ずつ呼ぶ。新しい版が出たら `resolve()` にタグを足して同じテストを当てる
+- 認証は SDK が付ける `Authorization: MediaBrowser Client="Kikidame", Version="…", DeviceId="…", Device="…"` の 1 形式だけ
+  （レガシーの `X-Emby-Authorization` は送らない。2026-09-21 に記録用サーバで確認）
+- 実機からコンテナに繋ぐには `adb reverse tcp:8096 tcp:8097` で、アプリの URL は `http://localhost:8096`。
+  ただし「別のサーバに接続」は手元のデータを消すので、本番サーバに繋いだ実機では試さない
+
+確認した版（統合テスト 5 件、番組 2 / 各回 6）:
+
+| 版 | 日付 | 結果 |
+| --- | --- | --- |
+| 10.10.7 | 2026-09-21 | 通る（`fetchProgram` を `getItems(ids=…)` に変えて通した。#97） |
+| 12.0.0 | 2026-09-21 | 通る |
+
 ## リリース（#94）
 
 配布は GitHub Releases の署名済み APK（ADR 0008）。`v*` のタグを push すると `.github/workflows/release.yml` が
@@ -170,6 +203,8 @@ M1 ではサーバ無しで試すため、`getExternalFilesDir("episodes")/<配�
 手元のファイルを直接入れたい場合は、番組・各回の行に結び付ける仕組みが無いので別途設計が要る（#21 の非目標）。
 
 ### 実機チェックリスト（M1）
+
+以下のチェックリストを通したときは、**確認したサーバの版**（Jellyfin の設定 → ダッシュボード、または `/System/Info/Public` の `Version`）を結果と一緒に issue に書く（#97）。これまでの実機確認は 10.11.x の本番サーバに対するもの。10.10 / 12.0 はコンテナと統合テストで確認している（上の「テスト用 Jellyfin サーバ」）。
 
 2026-09-17 に Pixel 7a（Android 17）で確認済み。`©day` の項目のみ未確認。
 

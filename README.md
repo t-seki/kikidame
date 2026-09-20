@@ -36,7 +36,7 @@ Google Play では配布しない（[ADR 0008](./docs/adr/0008-open-source-distr
 
 ## サーバ側の前提
 
-- Jellyfin **10.10 以上**を対象（10.11 で動作を確認。10.10 と 12.0 は [#97](https://github.com/t-seki/kikidame/issues/97) で確認する。レガシー認証は使わない）
+- Jellyfin **10.10 以上**を対象（10.10.7 / 12.0.0 はコンテナと統合テスト、10.11 は実機で確認。`scripts/jellyfin-testserver.sh` と `docs/development.md` の「テスト用 Jellyfin サーバ」を参照。レガシー認証は使わない）
 - 音声は**音楽ライブラリ**として取り込まれていること。アプリはこう読み替える:
 
   | Jellyfin | アプリ内 |
