@@ -1,7 +1,9 @@
 package dev.tseki.kikidame.playback
 import android.os.Bundle
+import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaConstants
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.EpisodeWithState
@@ -23,6 +25,8 @@ import kotlin.time.Duration
  * ID の形は [Node]。各回の ID は [EpisodeMediaItems.mediaId] と同じなので、ツリーから選ばれた回は
  * 既存の `onAddMediaItems` / `onSetMediaItems` がそのまま解決できる。
  */
+// Media3 の MediaConstants（完了状態の extras）は unstable API。クラス単位で opt-in する（#111）
+@OptIn(UnstableApi::class)
 class BrowseTree(
     private val library: LibraryRepository,
     private val labels: Labels,

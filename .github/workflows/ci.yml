@@ -18,8 +18,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Unit tests (JVM + Robolectric, no emulator)
         run: ./gradlew test --no-daemon
+      # lint（#111）: MissingTranslation（values/ と values-ja/ の片方だけの追加）と UnsafeOptInUsageError を落とす
+      - name: Lint
+        run: ./gradlew :app:lintDebug --no-daemon
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: test-reports
-          path: '**/build/reports/tests/'
+          path: |
+            **/build/reports/tests/
+            app/build/reports/lint-results-debug.*
