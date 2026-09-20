@@ -4,6 +4,15 @@
 
 An Android app for **episodic audio** (radio recordings and podcasts) kept in a Jellyfin music library. It downloads and deletes episodes automatically by per-program rules, and keeps playing when the server is unreachable. Kikidame is an unofficial client with no affiliation to the Jellyfin project.
 
+<p>
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" width="180" alt="Programs"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" width="180" alt="Episodes"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" width="180" alt="Player"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/4.png" width="180" alt="Sync settings">
+</p>
+<p>
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/5.png" width="480" alt="Android Auto">
+</p>
+
+Screenshots: programs, episodes, player, sync settings, and Android Auto (English UI).
+
 The name comes from the Japanese *kiki-dame* ("listen to what you have saved up"): record the episodes as they air, then listen to them on your phone when you have time.
 
 ## Why
