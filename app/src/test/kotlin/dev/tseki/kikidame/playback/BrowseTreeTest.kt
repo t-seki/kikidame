@@ -86,7 +86,9 @@ class BrowseTreeTest {
         assertEquals("2026-09-18", newest.title)
         assertEquals("ハライチのターン！", newest.artist)
         assertEquals("TBSラジオ", newest.albumTitle)
-        assertEquals("2026-09-19", newest.subtitle) // JST の公開日
+        assertEquals("2026-09-18", newest.displayTitle) // 置かないと legacy 変換で subtitle が捨てられる（#113）
+        assertEquals("2026-09-19 · ハライチのターン！", newest.subtitle) // JST の公開日 · 番組名
+        assertEquals("TBSラジオ", newest.description)
         assertTrue(newest.isPlayable == true && newest.isBrowsable == false)
         assertEquals(MediaMetadata.MEDIA_TYPE_PODCAST_EPISODE, newest.mediaType)
     }
@@ -105,6 +107,13 @@ class BrowseTreeTest {
         assertEquals(MediaConstants.EXTRAS_VALUE_COMPLETION_STATUS_FULLY_PLAYED, played.getInt(MediaConstants.EXTRAS_KEY_COMPLETION_STATUS))
         val fresh = byId.getValue("12").mediaMetadata.extras!!
         assertEquals(MediaConstants.EXTRAS_VALUE_COMPLETION_STATUS_NOT_PLAYED, fresh.getInt(MediaConstants.EXTRAS_KEY_COMPLETION_STATUS))
+    }
+    /** タイトルが公開日と同じ文字列の回では公開日を省き、2 行目は番組名だけ（アプリの各回一覧と同じ規則。#66）。 */
+    @Test
+    fun subtitleOmitsPublishedDateWhenTitleEqualsIt() {
+        assertEquals("ANN", BrowseTree.episodeSubtitle("2026-09-19", "2026-09-19", "ANN"))
+        assertEquals("2026-09-19 · ANN", BrowseTree.episodeSubtitle("第 12 回", "2026-09-19", "ANN"))
+        assertEquals("2026-09-19 · ANN", BrowseTree.episodeSubtitle("2026-09-19 (1)", "2026-09-19", "ANN"))
     }
     /** 聴き始めていない（数秒だけ）回は「途中」にしない — アプリの各回一覧と同じ規則。 */
     @Test
