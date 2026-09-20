@@ -1,0 +1,9 @@
+<resources>
+    <string name="playback_skip_back">10 秒戻る</string>
+    <string name="playback_skip_forward">10 秒進む</string>
+    <string name="playback_error_file_not_found">ファイルが見つからないため再生を止めました</string>
+    <string name="playback_error_failed">再生に失敗したため止めました（%1$s）</string>
+
+    <string name="auto_root_starred">よく聴く</string>
+    <string name="auto_root_programs">番組</string>
+</resources>

@@ -314,6 +314,42 @@ $ADB push dev.db /data/local/tmp/ && $ADB shell "run-as dev.tseki.kikidame sh -c
 - [ ] 元のライブラリに戻して同期すると印が消える（`goneSince` が null に戻る）（実機では未実施。`RoomSyncTest` で全体同期・1 番組の同期・番組単位の更新の 3 経路を担保）
 - [x] 設定画面・接続画面にデバッグ節（シード）が出ない（#21）
 
+## Android Auto を DHU で確認する（#96）
+
+車が無くても、Desktop Head Unit（DHU）が車載機の代わりになる。Android Auto はアプリを**スマホ側で**動かし、車載機には画面と操作だけを投影する。つまり DHU に出るブラウズツリーも、そこから鳴る音も `PlaybackService`（`MediaLibraryService`）と Room の中身であり、再生位置と再生済みは車で聴いてもアプリの各回一覧にそのまま反映される（別デバイスではないので同期は要らない）。
+
+### 準備（1 回だけ）
+
+1. SDK Manager（`sdkmanager --install "extras;google;auto"`、または Android Studio の SDK Tools → "Android Auto Desktop Head Unit Emulator"）で DHU を入れる。`~/Android/Sdk/extras/google/auto/desktop-head-unit` に置かれる。WSL2 では WSLg があれば GUI がそのまま出る（Linux 版のバイナリなので `chmod +x` が要ることがある）
+2. スマホに Play から Android Auto アプリを入れ、開発者モードにする: Android Auto の設定 → 「バージョン」を 10 回タップ → 右上メニュー「開発者向け設定」→ **「提供元不明のアプリ」を ON**（デバッグビルドの Kikidame は Play を通っていないので、これが無いと一覧に出ない）→ 同じメニューの「ヘッドユニット サーバーを起動」
+3. アプリを実機に入れる（`./gradlew :app:installDebug`。main のチェックアウトから）
+
+### つなぐ
+
+```bash
+$ADB forward tcp:5277 tcp:5277
+~/Android/Sdk/extras/google/auto/desktop-head-unit
+```
+
+DHU の窓が開き、スマホ側で Android Auto が始まる。DHU のメディアタブ（音符のアイコン）に Kikidame が出る。出ないときは「提供元不明のアプリ」と、`AndroidManifest.xml` の `<meta-data android:name="com.google.android.gms.car.application">` と `android.media.browse.MediaBrowserService` の action を疑う。DHU 側で `Ctrl+M` の後に `d` でデイ／ナイトが切り替わり、コンソールには `help` でコマンド一覧が出る（`mic play <file>` は使わない: 音声アシスタントは非目標）。
+
+Auto はブラウズツリーを開き直すたびに `onGetChildren` を呼ぶので、ダウンロードや同期で手元の回が増減したら、タブを行き来すれば最新になる（変化の押し通知は今はしない）。
+
+### 実機チェックリスト（#96: Android Auto）
+
+DHU での確認。subagent の作業セッションでは行わず、マージ後に main のチェックアウトから行う。
+
+- [ ] DHU のメディア一覧に Kikidame が出る
+- [ ] ルートに「よく聴く」「番組」の 2 タブが出る（よく聴くの印を全部外すと「番組」だけになる）
+- [ ] 「番組」は手元に回がある番組だけで、最新回の公開日順。番組を開くと手元にある回だけが新しい順に並び、番組名・配信元・公開日が見える
+- [ ] 途中まで聴いた回に進捗の印、再生済みの回に完了の印が付く（Auto が `EXTRAS_KEY_COMPLETION_STATUS` を表示に使う。表示は Auto のバージョンに依る）
+- [ ] 回をタップすると再生が始まり、保存位置から続く（末尾 2 分以内なら先頭から。アプリと同じ規則）。「次へ」で同じ番組の次に新しい回に進む
+- [ ] 車で聴いた分の再生位置・再生済みが、スマホの各回一覧と詳細に出ている
+- [ ] Auto の再生画面に「10 秒戻る」「10 秒進む」が出る（Media3 の `setMediaButtonPreferences` の `SLOT_BACK` / `SLOT_FORWARD`。出なければ `SessionCommand` のカスタムコマンドで足す）
+- [ ] DHU を閉じてもスマホの通知・ロック画面の操作（再生・一時停止・±10 秒・倍速・スリープタイマー）に退行が無い
+- [ ] アプリを開かずに DHU から再生を始めると、その後スマホでアプリを開いたときミニプレイヤーにその回が載る（ADR 0006 の addendum）
+- [ ] 「最近」（端末の再起動直後にシステムが出す再開の候補）には出ない（`isRecent` は未対応。#108）
+
 ## 手元のファイルと DB の突き合わせ（#50）
 
 `files/episodes/` にあるのに `local_files` のどの行の `path` でもないファイル（行の無いファイル）は、アプリからは二度と到達できず、容量の表示（#42）にも数えられない。
