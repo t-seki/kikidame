@@ -28,11 +28,12 @@ Jellyfin サーバに音楽ライブラリとして取り込まれた**番組型
 
 Google Play では配布しない（[ADR 0008](./docs/adr/0008-open-source-distributed-outside-play.md)）。配布経路はこの順で用意する:
 
-1. **GitHub Releases** の APK — [Obtainium](https://github.com/ImranR98/Obtainium) にこのリポジトリを登録すると更新も追える
-2. **IzzyOnDroid** — F-Droid クライアントにリポジトリを追加して検索
-3. **F-Droid** 本体
+1. **GitHub Releases** の APK — [Releases](https://github.com/t-seki/kikidame/releases) から `kikidame-<版>.apk` を入れる。[Obtainium](https://github.com/ImranR98/Obtainium) にこのリポジトリを登録すると更新も追える
+2. **IzzyOnDroid** — F-Droid クライアントに [IzzyOnDroid のリポジトリ](https://apt.izzysoft.de/fdroid/)を追加して「Kikidame」で検索。Releases と同じ APK（同じ署名）を配るので、どちらから入れても互いに更新できる（[#95](https://github.com/t-seki/kikidame/issues/95) で申請中）
 
-初回リリースの準備中（[#94](https://github.com/t-seki/kikidame/issues/94)）。それまでは「ビルドと実行」の手順で自分でビルドする。端末は Android 12（API 31）以上。
+**F-Droid 本家には載せていない。** F-Droid はソースからビルドし直して F-Droid の鍵で署名するため、Releases / IzzyOnDroid 版とは署名が違い、片方から片方へ更新できない（入れ直すと手元の各回と再生位置が消える）。それを避ける reproducible builds を通す手間に今は見合わないと判断した。要望があれば reproducible builds と合わせて検討する。
+
+端末は Android 12（API 31）以上。ストア向けの説明文とスクリーンショットは [fastlane/metadata/android/](./fastlane/metadata/android/) にある（IzzyOnDroid が読む）。
 
 ## サーバ側の前提
 
