@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    alias(libs.plugins.aboutlibraries)
 }
 android {
     namespace = "dev.tseki.kikidame"
@@ -66,6 +67,8 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.hilt.work)
+    implementation(libs.aboutlibraries.core)
+    implementation(libs.aboutlibraries.compose.m3)
     ksp(libs.androidx.hilt.compiler)
 
     // jellyfin-sdk-kotlin は kotlin-logging 経由で slf4j を要求する。バインディングが無いと実行時に落ちる
@@ -79,4 +82,23 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)
     testImplementation(libs.androidx.work.testing)
+}
+
+// 依存ライブラリのライセンス一覧（設定 > オープンソースライセンス）。ビルド時には生成せず、
+// `./gradlew :app:exportLibraryDefinitions` で src/main/res/raw/aboutlibraries.json を書き出してコミットする。
+// F-Droid や CI のオフラインビルドでも同じ一覧になり、依存を変えたときは再生成して差分を見る
+aboutLibraries {
+    // jellyfin-sdk-kotlin の POM は LGPL-3.0 を名前と URL でしか宣言しておらず本文が取れないので、config/licenses で本文を補う
+    collect {
+        configPath = file("config")
+    }
+    export {
+        outputFile = file("src/main/res/raw/aboutlibraries.json")
+        variant = "release"
+        prettyPrint = true
+    }
+    license {
+        // LGPL-3.0 §4(b) は GPL 本文も添えることを求めるので、直接使う依存が無くても GPL-3.0 を同梱する
+        additionalLicenses.add("GPL-3.0-only")
+    }
 }

@@ -24,6 +24,7 @@ import dev.tseki.kikidame.ui.episodes.EpisodeListScreen
 import dev.tseki.kikidame.ui.library.LibraryPickScreen
 import dev.tseki.kikidame.ui.player.PlayerScreen
 import dev.tseki.kikidame.ui.programs.ProgramListScreen
+import dev.tseki.kikidame.ui.settings.LicensesScreen
 import dev.tseki.kikidame.ui.settings.SettingsScreen
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -40,6 +41,8 @@ object LibraryPickRoute
 
 @Serializable
 object SettingsRoute
+@Serializable
+object LicensesRoute
 
 @Serializable
 object ProgramListRoute
@@ -100,7 +103,11 @@ fun KikidameNavHost(sessionViewModel: SessionViewModel = hiltViewModel()) {
             SettingsScreen(
                 onBack = navController::popIfNotRoot,
                 onChangeLibrary = { navController.navigate(LibraryPickRoute) },
+                onOpenLicenses = { navController.navigate(LicensesRoute) },
             )
+        }
+        composable<LicensesRoute> {
+            LicensesScreen(onBack = navController::popIfNotRoot)
         }
         composable<ProgramListRoute> {
             ProgramListScreen(
