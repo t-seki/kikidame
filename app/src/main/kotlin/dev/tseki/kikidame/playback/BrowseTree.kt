@@ -15,8 +15,9 @@ import dev.tseki.kikidame.ui.toPublishedDateText
 import kotlinx.coroutines.flow.first
 import kotlin.time.Duration
 /**
- * Android Auto のブラウズツリー（#96）。深さ 2: ルート → 「よく聴く」「番組」（タブ）→ 番組 → 手元にある各回。
- * 手元に無い回は出さない（運転中に落とさせない）。「よく聴く」は印の付いた番組が 1 つも無ければタブごと出さない。
+ * Android Auto のブラウズツリー（#96）。ルートの下は「よく聴く」「番組」のタブ → 番組 → 手元にある各回の 3 階層
+ * （Auto が推奨する上限内）。手元に無い回は出さない（運転中に落とさせない）。
+ * 「よく聴く」は、印が付いていて手元に回がある番組が 1 つも無ければタブごと出さない。
  * 「続きから」と再開（`onPlaybackResumption`）は #108。
  *
  * ID の形は [Node]。各回の ID は [EpisodeMediaItems.mediaId] と同じなので、ツリーから選ばれた回は
