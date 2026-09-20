@@ -127,7 +127,7 @@ WSL2 は USB を見られないが、LAN 上の端末には TCP で届く。Wind
 ### 代替: Windows 側の adb に USB 接続
 
 ```powershell
-adb install -r \\wsl.localhost\Ubuntu\home\<you>\dev\kikidame\app\build\outputs\apk\debug\app-debug.apk
+adb install -r \\wsl.localhost\Ubuntu\home\<you>\dev\<repo>\app\build\outputs\apk\debug\app-debug.apk
 ```
 
 ### 音声ファイルを入れる（M1 当時の手順。シードは M3-c で削除）
