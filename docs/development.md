@@ -73,7 +73,7 @@ KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTe
   `/media` にマウントし、初期セットアップと音楽ライブラリ `radio` の作成を REST で済ませ、スキャンが終わるまで待つ。
   置き場は `$KIKIDAME_JF_DIR`（既定 `/tmp/kikidame-jf`）。ユーザーは `kikidame` / `kikidame-test`
 - `KIKIDAME_JF_LIBRARY=showcase` を付けて `media` / `up` すると、ストア向けスクリーンショット用の英語の架空ライブラリ
-  （Example FM / Example Public Radio の 5 番組、各 6〜10 回。#95）になる。統合テストの期待値は日本語ライブラリ前提なので、
+  （Example FM / Example Public Radio の 5 番組、45 回。#95）になる。実機のスクリーンショットは #95 の PR のときにこのライブラリで撮った。統合テストの期待値は日本語ライブラリ前提なので、
   そのときは統合テストを回さない
 - 統合テストは `KIKIDAME_JELLYFIN_URL` が無ければ `Assume` でスキップするので、CI と普段の `./gradlew test` には出てこない。
   付いているときはキャッシュを使わず毎回走る（`core/data/build.gradle.kts`）

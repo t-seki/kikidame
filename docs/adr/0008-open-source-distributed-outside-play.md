@@ -6,7 +6,7 @@ date: 2026-09-20
 
 - 2027 年から Android の開発者認証が全世界で施行され、Play を使わなくても公に配布するなら Android Developer Console への登録（$25、身分証）が要る。Play の住所公開はストア掲載に紐づく要件なので Console 単独では公開されないと見込むが、FAQ に公開項目の記載が無く未確認（#98 で確かめる）。それまでは登録せず配布してよい
 - 名前とアプリ ID は Jellyfin のブランディング方針（第三者アプリは名前に Jellyfin を使えず、Jelly〜 / 〜fin も非推奨、ロゴ不可）に従って公開前に変える。これは配布経路に関わらず必要
-- 有料化の選択肢は残す。需要が見えたら、F-Droid は無料のまま Play に有料版（開発支援）を追加する「併売」に進み、そのときに Play の要件を満たしに行く。クローズド化には戻らない
+- 有料化の選択肢は残す。需要が見えたら、Releases / IzzyOnDroid は無料のまま Play に有料版（開発支援）を追加する「併売」に進み、そのときに Play の要件を満たしに行く。クローズド化には戻らない
 - ライセンスは GPL-3.0 ではなく MPL-2.0。GPL-3.0 は App Store の規約と相容れないとされ（VLC の前例）、外部のコントリビューションを受けた後は iOS 版を出せなくなる。MPL-2.0 はファイル単位のコピーレフトでアプリはオープンのまま、LGPL-3.0 の SDK・App Store・有料 Play 版のどれとも支障がない。Jellyfin クライアントでは Findroid が GPL-3.0 で Android のみ、Finamp が MPL-2.0 で iOS にも出ている
 - 2026-09-21 #95: F-Droid 本家は当面載せない。F-Droid の鍵で署名し直されるため Releases / IzzyOnDroid 版と相互に更新できず、reproducible builds を通す手間に見合わない。配布経路は GitHub Releases と IzzyOnDroid の 2 つ
 - iOS 版を作るときは `jellyfin-sdk-kotlin` が JVM/Android 専用なので、そこで初めて KMP 対応の HTTP クライアントに置き換える。Android 単独のうちは置き換えない
