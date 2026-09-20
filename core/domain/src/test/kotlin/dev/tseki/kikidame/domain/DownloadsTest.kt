@@ -11,7 +11,7 @@ class DownloadsTest {
         serverItemId = server?.let(::ServerItemId),
         programId = ProgramId(1),
         title = "x",
-        airedAt = Instant.parse("2026-09-16T15:00:00Z"),
+        publishedAt = Instant.parse("2026-09-16T15:00:00Z"),
         addedAt = null,
         runtime = 30.minutes,
         sizeBytes = 0,

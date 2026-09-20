@@ -27,7 +27,7 @@ class EpisodeDetailsViewModel @Inject constructor(
     val item: StateFlow<EpisodeWithState?> = library.observeEpisodes(ProgramId(route.programId))
         .map { list -> list.firstOrNull { it.episode.id == episodeId } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-    /** 番組（放送局の行に使う、#70）。 */
+    /** 番組（配信元の行に使う、#70）。 */
     val program: StateFlow<Program?> = library.observeProgram(ProgramId(route.programId))
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 }

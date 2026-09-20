@@ -21,7 +21,7 @@ object EpisodeMediaItems {
                 MediaMetadata.Builder()
                     .setTitle(item.episode.title)
                     .setArtist(program?.name)
-                    .setAlbumTitle(program?.stationName)
+                    .setAlbumTitle(program?.publisherName)
                     .setDurationMs(item.episode.runtime.inWholeMilliseconds)
                     .build(),
             )

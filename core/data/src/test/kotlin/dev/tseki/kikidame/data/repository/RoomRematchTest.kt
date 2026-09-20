@@ -34,7 +34,7 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
-/** 再取り込み（サーバ ID の変更）後の結び直し（ADR 0005）と、タイトルが違う未結合の各回の第二段突合（放送日 + 尺）。 */
+/** 再取り込み（サーバ ID の変更）後の結び直し（ADR 0005）と、タイトルが違う未結合の各回の第二段突合（公開日 + 尺）。 */
 @RunWith(AndroidJUnit4::class)
 class RoomRematchTest : RoomTestBase() {
     @get:Rule
@@ -50,14 +50,14 @@ class RoomRematchTest : RoomTestBase() {
     private val downloads by lazy { RoomDownloadRepository(db, directory, clock) }
     private val repo by lazy { RoomLibraryRefreshRepository(db, store, gateway, downloads, clock) }
 
-    private val station = "TBSラジオ"
+    private val publisher = "TBSラジオ"
     private val programName = "パンサー向井のふらっと"
 
-    private fun se(id: String, program: String, title: String, aired: String, runtime: Duration = 90.minutes) = ServerEpisode(
+    private fun se(id: String, program: String, title: String, published: String, runtime: Duration = 90.minutes) = ServerEpisode(
         serverId = ServerItemId(id),
         programServerId = ServerItemId(program),
         title = title,
-        airedAt = Instant.parse(if ('T' in aired) aired else "${aired}T00:00:00Z"),
+        publishedAt = Instant.parse(if ('T' in published) published else "${published}T00:00:00Z"),
         addedAt = Instant.parse("2026-09-16T02:00:00Z"),
         runtime = runtime,
         sizeBytes = null,
@@ -65,7 +65,7 @@ class RoomRematchTest : RoomTestBase() {
     )
 
     private fun snapshot(program: String, vararg episodes: ServerEpisode) =
-        ServerSnapshot(listOf(ServerProgram(ServerItemId(program), programName, station)), episodes.toList())
+        ServerSnapshot(listOf(ServerProgram(ServerItemId(program), programName, publisher)), episodes.toList())
 
     private val original = snapshot("P1", se("E1", "P1", "2026-09-01", "2026-09-01"), se("E2", "P1", "2026-09-02", "2026-09-02"), se("E3", "P1", "2026-09-03", "2026-09-03"))
 
@@ -177,11 +177,11 @@ class RoomRematchTest : RoomTestBase() {
     }
 
     @Test
-    fun unlinkedEpisodesLinkByAiredDayAndRuntimeWhenTitlesDiffer() = runTest {
+    fun unlinkedEpisodesLinkByPublishedDayAndRuntimeWhenTitlesDiffer() = runTest {
         seed(
             listOf(
-                scanned(station = station, program = programName, title = "$programName 2026-09-16-1", airedAt = "2026-09-15T15:00:00Z", runtime = 89.minutes + 59.seconds),
-                scanned(station = station, program = programName, title = "$programName 2026-09-16-2", airedAt = "2026-09-15T15:00:00Z", runtime = 60.minutes + 5.seconds),
+                scanned(publisher = publisher, program = programName, title = "$programName 2026-09-16-1", publishedAt = "2026-09-15T15:00:00Z", runtime = 89.minutes + 59.seconds),
+                scanned(publisher = publisher, program = programName, title = "$programName 2026-09-16-2", publishedAt = "2026-09-15T15:00:00Z", runtime = 60.minutes + 5.seconds),
             ),
         )
         val seeded = programs().single()
@@ -190,7 +190,7 @@ class RoomRematchTest : RoomTestBase() {
         signInAndSelect()
         gateway.snapshot = snapshot(
             "P1",
-            // 手元の行の放送日（JST 0 時 = 前日 15:00Z）と同じ日
+            // 手元の行の公開日（JST 0 時 = 前日 15:00Z）と同じ日
             se("E1", "P1", "2026-09-16 (1)", "2026-09-15T15:00:00Z", runtime = 90.minutes),
             se("E2", "P1", "2026-09-16 (2)", "2026-09-15T15:00:00Z", runtime = 60.minutes + 4.seconds),
         )

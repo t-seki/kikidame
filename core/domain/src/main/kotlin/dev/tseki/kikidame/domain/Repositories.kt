@@ -2,7 +2,7 @@ package dev.tseki.kikidame.domain
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Duration
 import kotlin.time.Instant
-/** 番組一覧の 1 行。[LibraryRepository.observePrograms] は最新の各回の放送日順で返し、画面はよく聴く番組を先に分けて出す。 */
+/** 番組一覧の 1 行。[LibraryRepository.observePrograms] は最新の各回の公開日順で返し、画面はよく聴く番組を先に分けて出す。 */
 data class ProgramSummary(
     val program: Program,
     /** サーバ上の分も含めた各回の数。 */
@@ -11,7 +11,7 @@ data class ProgramSummary(
     val localEpisodeCount: Int,
     /** 手元にファイルがあって再生済みでない各回の数（#41）。聴きかけ・聴いている回も再生済みでなければ数える。サーバ上にしか無い回は数えない。 */
     val unplayedLocalCount: Int,
-    val latestAiredAt: Instant?,
+    val latestPublishedAt: Instant?,
 )
 /** 各回一覧・再生画面が使う、各回とその手元の状態。 */
 data class EpisodeWithState(
@@ -39,12 +39,12 @@ data class LocalStorageUsage(val totalBytes: Long, val episodeCount: Int) {
     }
 }
 interface LibraryRepository {
-    /** 最新の各回の放送日が新しい順。 */
+    /** 最新の各回の公開日が新しい順。 */
     fun observePrograms(): Flow<List<ProgramSummary>>
     /** 手元のファイルの合計。ダウンロード・削除で追従する。 */
     fun observeLocalStorage(): Flow<LocalStorageUsage>
     fun observeProgram(programId: ProgramId): Flow<Program?>
-    /** [EpisodeOrder.newestFirst]（放送日の新しい順、同着はタイトルの辞書順）。 */
+    /** [EpisodeOrder.newestFirst]（公開日の新しい順、同着はタイトルの辞書順）。 */
     fun observeEpisodes(programId: ProgramId): Flow<List<EpisodeWithState>>
     suspend fun getEpisode(episodeId: EpisodeId): EpisodeWithState?
     /** 連続再生用。[EpisodeOrder] の順（古い順）で、手元にあるものだけ。 */

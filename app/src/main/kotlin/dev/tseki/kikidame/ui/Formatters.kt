@@ -1,5 +1,5 @@
 package dev.tseki.kikidame.ui
-import dev.tseki.kikidame.domain.AiredAt
+import dev.tseki.kikidame.domain.PublishedAt
 import dev.tseki.kikidame.domain.LocalStorageUsage
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.todayIn
@@ -8,17 +8,17 @@ import java.util.Locale
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
-fun Instant.toAiredDateText(): String = toLocalDateTime(AiredAt.ZONE).date.toString()
+fun Instant.toPublishedDateText(): String = toLocalDateTime(PublishedAt.ZONE).date.toString()
 /**
  * 番組一覧の「最新」用の短い日付（#41）。今年なら MM-DD、それ以外は YYYY-MM-DD（古い番組は年が要る）。
- * 各回一覧の放送日は [toAiredDateText] のまま年を落とさない（一覧内で年をまたぐ）。出すかどうかは各回一覧側で決める
- * （タイトルが放送日と同じ回では丸ごと省く。#66）。
+ * 各回一覧の公開日は [toPublishedDateText] のまま年を落とさない（一覧内で年をまたぐ）。出すかどうかは各回一覧側で決める
+ * （タイトルが公開日と同じ回では丸ごと省く。#66）。
  */
-fun Instant.toLatestDateText(today: LocalDate = Clock.System.todayIn(AiredAt.ZONE)): String {
-    val date = toLocalDateTime(AiredAt.ZONE).date
+fun Instant.toLatestDateText(today: LocalDate = Clock.System.todayIn(PublishedAt.ZONE)): String {
+    val date = toLocalDateTime(PublishedAt.ZONE).date
     return if (date.year == today.year) "%02d-%02d".format(date.monthNumber, date.dayOfMonth) else date.toString()
 }
-fun Instant.toDateTimeText(): String = toLocalDateTime(AiredAt.ZONE).let { dt ->
+fun Instant.toDateTimeText(): String = toLocalDateTime(PublishedAt.ZONE).let { dt ->
     "%s %02d:%02d".format(dt.date, dt.hour, dt.minute)
 }
 /**

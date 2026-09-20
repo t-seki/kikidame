@@ -68,9 +68,9 @@ import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.ProgramSummary
 import dev.tseki.kikidame.ui.SectionTitle
 import dev.tseki.kikidame.ui.player.MiniPlayer
-import dev.tseki.kikidame.ui.programs.ProgramFilter.Station
-import dev.tseki.kikidame.ui.programs.ProgramFilter.StationKey
-import dev.tseki.kikidame.domain.AiredAt
+import dev.tseki.kikidame.ui.programs.ProgramFilter.Publisher
+import dev.tseki.kikidame.ui.programs.ProgramFilter.PublisherKey
+import dev.tseki.kikidame.domain.PublishedAt
 import dev.tseki.kikidame.ui.toLatestDateText
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.todayIn
@@ -94,15 +94,15 @@ fun ProgramListScreen(
     LaunchedEffect(Unit) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
     }
-    // 絞り込みの入口（#55）は番組が 1 つでもあれば出す。局の段は 2 種類以上のときだけ（1 種類なら絞る意味が無い）
-    val stations = filtered?.stations.orEmpty()
-    if (showFilterSheet && stations.isNotEmpty()) {
+    // 絞り込みの入口（#55）は番組が 1 つでもあれば出す。配信元の段は 2 種類以上のときだけ（1 種類なら絞る意味が無い）
+    val publishers = filtered?.publishers.orEmpty()
+    if (showFilterSheet && publishers.isNotEmpty()) {
         FilterSheet(
             query = query,
             onQueryChange = viewModel::setQuery,
-            stations = stations.takeIf { it.size >= 2 }.orEmpty(),
-            selected = filtered?.station,
-            onSelectStation = viewModel::selectStation,
+            publishers = publishers.takeIf { it.size >= 2 }.orEmpty(),
+            selected = filtered?.publisher,
+            onSelectPublisher = viewModel::selectPublisher,
             onDismiss = { showFilterSheet = false },
         )
     }
@@ -111,13 +111,13 @@ fun ProgramListScreen(
     BackHandler(enabled = filtered?.isFiltering == true && !showFilterSheet, onBack = viewModel::clearFilters)
     Scaffold(
         topBar = {
-            // 検索（#44）と局（#45）の入口を 1 つの「絞り込み」に統合（#55）。効いている間は点を付け、
+            // 検索（#44）と配信元（#45）の入口を 1 つの「絞り込み」に統合（#55）。効いている間は点を付け、
             // 何で絞っているかは TopAppBar 下のチップで示す
             Column {
                 TopAppBar(
                     title = { Text("番組") },
                     actions = {
-                        if (stations.isNotEmpty()) {
+                        if (publishers.isNotEmpty()) {
                             IconButton(onClick = { showFilterSheet = true }) {
                                 BadgedBox(badge = { if (filtered?.isFiltering == true) Badge() }) {
                                     Icon(Icons.Default.Tune, contentDescription = "絞り込み")
@@ -131,9 +131,9 @@ fun ProgramListScreen(
                 )
                 FilterChipsRow(
                     query = ProgramFilter.normalize(query),
-                    station = filtered?.station,
+                    publisher = filtered?.publisher,
                     onClearQuery = { viewModel.setQuery("") },
-                    onClearStation = { viewModel.selectStation(null) },
+                    onClearPublisher = { viewModel.selectPublisher(null) },
                 )
             }
         },
@@ -149,14 +149,14 @@ fun ProgramListScreen(
             val list = state?.programs
             when {
                 state == null || list == null -> Box(Modifier.fillMaxSize())
-                // 番組自体が無い（局も集まらない）なら、検索中でも「一致なし」ではなく空の案内
-                state.stations.isEmpty() -> EmptyPrograms(canRefresh)
-                list.isEmpty() -> NoMatch(query, state.station)
+                // 番組自体が無い（配信元も集まらない）なら、検索中でも「一致なし」ではなく空の案内
+                state.publishers.isEmpty() -> EmptyPrograms(canRefresh)
+                list.isEmpty() -> NoMatch(query, state.publisher)
                 else -> {
                     val listState = rememberLazyListState()
-                    // 検索語か局が変わるたびに先頭へ（絞った結果は先頭から見たい。解除したときも先頭に戻す）。
+                    // 検索語か配信元が変わるたびに先頭へ（絞った結果は先頭から見たい。解除したときも先頭に戻す）。
                     // 末尾の空白など絞り込みに効かない変化では動かさず、初回も動かさない（番組から戻ったときに復元された位置を潰さない）
-                    val filterKey = ProgramFilter.normalize(query) to state.station
+                    val filterKey = ProgramFilter.normalize(query) to state.publisher
                     var seenKey by remember { mutableStateOf(filterKey) }
                     LaunchedEffect(filterKey) {
                         if (filterKey != seenKey) {
@@ -165,12 +165,12 @@ fun ProgramListScreen(
                         }
                     }
                     if (state.isFiltering) {
-                        // 何らかの絞り込みが効いていれば節に分けずフラットに出す（#44・#45 共通の規則。検索は該当が少なく節が邪魔、局はそれに揃えた）
+                        // 何らかの絞り込みが効いていれば節に分けずフラットに出す（#44・#45 共通の規則。検索は該当が少なく節が邪魔、配信元はそれに揃えた）
                         LazyColumn(Modifier.fillMaxSize(), state = listState) {
                             programItems(list, onProgramClick, viewModel::setStarred)
                         }
                     } else {
-                        // よく聴く番組は上の節にまとめる（重複させない）。無ければ節ごと出さない。節内は従来どおり最新の放送日順
+                        // よく聴く番組は上の節にまとめる（重複させない）。無ければ節ごと出さない。節内は従来どおり最新の公開日順
                         val (starred, others) = list.partition { it.program.starred }
                         // 最初の ★ で見出しが先頭行の上に挿入されると、キー基準のスクロール位置維持で見出しが画面外に出る。
                         // 先頭付近にいるときだけ先頭に戻す（下の方を見ているときは動かさない）
@@ -233,9 +233,9 @@ private fun ProgramRow(summary: ProgramSummary, onClick: () -> Unit, onToggleSta
 }
 
 /**
- * 絞り込みのシート（#55）。上段が検索欄（#44）、下段が「すべて」＋ 手元の番組から集めた局（#45、番組数付き）。
- * 検索語はその場で背後の一覧に効き、キーボードの検索（決定）か局の選択で閉じる。局が 2 種類未満なら [stations] は空で、下段を出さない。
- * 縦に並べるので局が増えても横にはみ出さず、半開きで下の局が隠れないよう最初から全開。ドラッグでは閉じない。
+ * 絞り込みのシート（#55）。上段が検索欄（#44）、下段が「すべて」＋ 手元の番組から集めた配信元（#45、番組数付き）。
+ * 検索語はその場で背後の一覧に効き、キーボードの検索（決定）か配信元の選択で閉じる。配信元が 2 種類未満なら [publishers] は空で、下段を出さない。
+ * 縦に並べるので配信元が増えても横にはみ出さず、半開きで下の配信元が隠れないよう最初から全開。ドラッグでは閉じない。
  * M3 の SearchBar は全画面のサジェスト領域を持つ部品なので、その場で一覧を絞る用途には使わない。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -243,13 +243,13 @@ private fun ProgramRow(summary: ProgramSummary, onClick: () -> Unit, onToggleSta
 private fun FilterSheet(
     query: String,
     onQueryChange: (String) -> Unit,
-    stations: List<Station>,
-    selected: StationKey?,
-    onSelectStation: (StationKey?) -> Unit,
+    publishers: List<Publisher>,
+    selected: PublisherKey?,
+    onSelectPublisher: (PublisherKey?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    // 局の一覧を先頭を越えて引っ張ると、余ったドラッグがシートに渡って閉じてしまう。最初から全開でドラッグで閉じる意味は薄いので
-    // シートのドラッグ操作ごと無効にする（閉じるのは外側タップ・戻る・検索キー・局の選択）。取っ手も引けないので出さない
+    // 配信元の一覧を先頭を越えて引っ張ると、余ったドラッグがシートに渡って閉じてしまう。最初から全開でドラッグで閉じる意味は薄いので
+    // シートのドラッグ操作ごと無効にする（閉じるのは外側タップ・戻る・検索キー・配信元の選択）。取っ手も引けないので出さない
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -271,7 +271,7 @@ private fun FilterSheet(
             onValueChange = onQueryChange,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).focusRequester(focusRequester),
             textStyle = MaterialTheme.typography.bodyLarge,
-            placeholder = { Text("番組名・放送局名") },
+            placeholder = { Text("番組名・配信元名") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             trailingIcon = {
                 if (query.isNotEmpty()) {
@@ -284,19 +284,19 @@ private fun FilterSheet(
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { keyboard?.hide(); onDismiss() }),
         )
-        if (stations.isNotEmpty()) {
-            Text("放送局", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 4.dp))
+        if (publishers.isNotEmpty()) {
+            Text("配信元", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 4.dp))
             // キーボードの上に収める（imePadding）。シートの高さいっぱいで測ると「全部収まっている」扱いになって
             // 一覧がスクロールせず、ドラッグがシートに渡って閉じてしまう
             LazyColumn(Modifier.weight(1f, fill = false).imePadding()) {
                 item(key = "all") {
-                    StationChoice("すべて", stations.sumOf { it.programCount }, selected == null) { onSelectStation(null); onDismiss() }
+                    PublisherChoice("すべて", publishers.sumOf { it.programCount }, selected == null) { onSelectPublisher(null); onDismiss() }
                 }
-                // 「すべて」「局なし」と局名が衝突しないよう接頭辞を付ける
-                items(stations, key = { it.key.name?.let { n -> "station:$n" } ?: "none" }) { station ->
-                    StationChoice(station.key.label, station.programCount, station.key == selected) { onSelectStation(station.key); onDismiss() }
+                // 「すべて」「配信元なし」と配信元名が衝突しないよう接頭辞を付ける
+                items(publishers, key = { it.key.name?.let { n -> "publisher:$n" } ?: "none" }) { publisher ->
+                    PublisherChoice(publisher.key.label, publisher.programCount, publisher.key == selected) { onSelectPublisher(publisher.key); onDismiss() }
                 }
-                // 末尾の余白は一覧の中に置く（外に置くと、局が多くて一覧が高さを使い切ったとき 0 になる）
+                // 末尾の余白は一覧の中に置く（外に置くと、配信元が多くて一覧が高さを使い切ったとき 0 になる）
                 item { Spacer(Modifier.padding(bottom = 32.dp)) }
             }
         } else {
@@ -305,7 +305,7 @@ private fun FilterSheet(
     }
 }
 @Composable
-private fun StationChoice(label: String, programCount: Int, selected: Boolean, onClick: () -> Unit) {
+private fun PublisherChoice(label: String, programCount: Int, selected: Boolean, onClick: () -> Unit) {
     ListItem(
         modifier = Modifier.clickable(onClick = onClick),
         leadingContent = { RadioButton(selected = selected, onClick = null) },
@@ -314,12 +314,12 @@ private fun StationChoice(label: String, programCount: Int, selected: Boolean, o
     )
 }
 /**
- * 効いている絞り込みを 1 つずつチップで示す（検索語は「」で囲み、局は局名）。チップのタップ（× を含む）でその絞り込みだけ解除する。
+ * 効いている絞り込みを 1 つずつチップで示す（検索語は「」で囲み、配信元は配信元名）。チップのタップ（× を含む）でその絞り込みだけ解除する。
  * × だけを別の clickable にすると当たり判定が小さくなるので、チップ全体を解除にする。変えるのは TopAppBar の絞り込みから。
  */
 @Composable
-private fun FilterChipsRow(query: String, station: StationKey?, onClearQuery: () -> Unit, onClearStation: () -> Unit) {
-    if (query.isEmpty() && station == null) return
+private fun FilterChipsRow(query: String, publisher: PublisherKey?, onClearQuery: () -> Unit, onClearPublisher: () -> Unit) {
+    if (query.isEmpty() && publisher == null) return
     Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         if (query.isNotEmpty()) {
             InputChip(
@@ -330,12 +330,12 @@ private fun FilterChipsRow(query: String, station: StationKey?, onClearQuery: ()
                 modifier = Modifier.weight(1f, fill = false),
             )
         }
-        if (station != null) {
+        if (publisher != null) {
             InputChip(
                 selected = true,
-                onClick = onClearStation,
-                label = { Text(station.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                trailingIcon = { Icon(Icons.Default.Close, contentDescription = "局の絞り込みを解除") },
+                onClick = onClearPublisher,
+                label = { Text(publisher.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                trailingIcon = { Icon(Icons.Default.Close, contentDescription = "配信元の絞り込みを解除") },
                 modifier = Modifier.weight(1f, fill = false),
             )
         }
@@ -343,12 +343,12 @@ private fun FilterChipsRow(query: String, station: StationKey?, onClearQuery: ()
 }
 /** 絞り込みが効いていて該当が無いとき。番組自体が無いのとは別物なので、更新の案内は出さない。 */
 @Composable
-private fun NoMatch(query: String, station: StationKey?) {
+private fun NoMatch(query: String, publisher: PublisherKey?) {
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-                // 局だけで 0 件にはならない（局の候補は手元の番組から集めるので）。検索語は必ずある
-                val prefix = station?.let { "${it.label}に " } ?: ""
+                // 配信元だけで 0 件にはならない（配信元の候補は手元の番組から集めるので）。検索語は必ずある
+                val prefix = publisher?.let { "${it.label}に " } ?: ""
                 Text(
                     "$prefix「${ProgramFilter.normalize(query)}」に一致する番組がありません",
                     style = MaterialTheme.typography.bodyMedium,
@@ -359,20 +359,20 @@ private fun NoMatch(query: String, station: StationKey?) {
     }
 }
 /**
- * 行の補足（#41）: `局 · 未再生 N / 手元 L · 全 E 回 · 最新 MM-DD`。
+ * 行の補足（#41）: `配信元 · 未再生 N / 手元 L · 全 E 回 · 最新 MM-DD`。
  * 未再生 0 なら「未再生 N /」を省き、手元 = 全なら「全 E 回」を「回」に畳む（「/」が 2 つ並ばないよう「全」の前は「·」）。
- * 局が無い・各回が無い（最新なし）ならその部分を省き、消失なら末尾に「サーバ上で見つかりません」を足す。
+ * 配信元が無い・各回が無い（最新なし）ならその部分を省き、消失なら末尾に「サーバ上で見つかりません」を足す。
  */
-internal fun ProgramSummary.toSupportingText(today: LocalDate = Clock.System.todayIn(AiredAt.ZONE)): String {
+internal fun ProgramSummary.toSupportingText(today: LocalDate = Clock.System.todayIn(PublishedAt.ZONE)): String {
     val unplayed = if (unplayedLocalCount > 0) "未再生 $unplayedLocalCount / " else ""
     val count = if (localEpisodeCount == episodeCount) {
         "${unplayed}手元 $localEpisodeCount 回"
     } else {
         "${unplayed}手元 $localEpisodeCount · 全 $episodeCount 回"
     }
-    val latest = latestAiredAt?.let { "最新 ${it.toLatestDateText(today)}" }
+    val latest = latestPublishedAt?.let { "最新 ${it.toLatestDateText(today)}" }
     val gone = if (program.isGone) "サーバ上で見つかりません" else null
-    return listOfNotNull(program.stationName, count, latest, gone).joinToString(" · ")
+    return listOfNotNull(program.publisherName, count, latest, gone).joinToString(" · ")
 }
 @Composable
 private fun EmptyPrograms(canRefresh: Boolean) {

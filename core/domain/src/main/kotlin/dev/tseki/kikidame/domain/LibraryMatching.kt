@@ -8,17 +8,17 @@ import kotlin.time.Instant
 data class LocalProgramKey(
     val id: ProgramId,
     val serverItemId: ServerItemId?,
-    val stationName: String?,
+    val publisherName: String?,
     val name: String,
 )
 
-/** 突合に必要な列だけの手元の各回。放送日と尺は第二段（タイトルで結べなかったとき）に使う。 */
+/** 突合に必要な列だけの手元の各回。公開日と尺は第二段（タイトルで結べなかったとき）に使う。 */
 data class LocalEpisodeKey(
     val id: EpisodeId,
     val serverItemId: ServerItemId?,
     val programId: ProgramId,
     val title: String,
-    val airedAt: Instant,
+    val publishedAt: Instant,
     /** 不明なら [Duration.ZERO]（第二段の対象外）。 */
     val runtime: Duration = Duration.ZERO,
 )
@@ -44,8 +44,8 @@ data class LibraryMatch(
  * - 対象は**未結合**の手元の行: サーバ ID を持たない行と、持っているサーバ ID がスナップショットに無い行（再取り込み後）。
  *   ただしスナップショットが 1 番組分（[ServerSnapshot.scope]）のときは、番組の一覧が無いので番組の結び直しはせず、
  *   各回の結び直しもその番組のものに限る
- * - 番組は（放送局, 番組名）、各回は同じ番組内のタイトルの完全一致。タイトルで結べなかった各回は
- *   同じ番組内で放送日が同じ ＋ 尺の差が [RUNTIME_TOLERANCE] 以内（尺 0 は対象外）
+ * - 番組は（配信元, 番組名）、各回は同じ番組内のタイトルの完全一致。タイトルで結べなかった各回は
+ *   同じ番組内で公開日が同じ ＋ 尺の差が [RUNTIME_TOLERANCE] 以内（尺 0 は対象外）
  * - どちらの段でも、手元側・サーバ側のどちらかに候補が複数あれば結ばない（サーバ側は新規行になる）
  * - 表記ゆれは吸収しない
  */
@@ -68,9 +68,9 @@ object LibraryMatching {
 
         val linkedPrograms = localPrograms.filter { it.isLinked() }
         val linkedProgramIds = linkedPrograms.mapNotNull { it.serverItemId }.toSet()
-        val unlinkedProgramsByKey = localPrograms.filter { !it.isLinked() }.groupBy { it.stationName to it.name }
+        val unlinkedProgramsByKey = localPrograms.filter { !it.isLinked() }.groupBy { it.publisherName to it.name }
         // 既に結び付いているサーバの番組は突合の相手にも曖昧判定の分母にも入れない
-        val freeServerProgramsByKey = server.programs.filter { it.serverId !in linkedProgramIds }.groupBy { it.stationName to it.name }
+        val freeServerProgramsByKey = server.programs.filter { it.serverId !in linkedProgramIds }.groupBy { it.publisherName to it.name }
 
         val programLinks = HashMap<ProgramId, ServerItemId>()
         val newPrograms = ArrayList<ServerProgram>()
@@ -84,7 +84,7 @@ object LibraryMatching {
                 localProgramOf[sp.serverId] = linked.id
                 continue
             }
-            val key = sp.stationName to sp.name
+            val key = sp.publisherName to sp.name
             val localCandidates = unlinkedProgramsByKey[key].orEmpty()
             val serverCandidates = freeServerProgramsByKey.getValue(key)
             if (localCandidates.size == 1 && serverCandidates.size == 1) {
@@ -134,17 +134,17 @@ object LibraryMatching {
             }
         }
 
-        // 第二段: 同じ番組内で放送日が同じ ＋ 尺がほぼ同じ。尺 0 の手元行は対象外
+        // 第二段: 同じ番組内で公開日が同じ ＋ 尺がほぼ同じ。尺 0 の手元行は対象外
         val remainingLocal = unlinkedEpisodes.filter { it.id !in episodeLinks && it.runtime > Duration.ZERO }
-        val remainingLocalByDay = remainingLocal.groupBy { it.programId to it.airedAt }
-        val unmatchedServerByDay = unmatchedServer.groupBy { it.programServerId to it.airedAt }
+        val remainingLocalByDay = remainingLocal.groupBy { it.programId to it.publishedAt }
+        val unmatchedServerByDay = unmatchedServer.groupBy { it.programServerId to it.publishedAt }
         for (se in unmatchedServer) {
             val programId = localProgramOf[se.programServerId]
-            val localCandidates = programId?.let { remainingLocalByDay[it to se.airedAt] }.orEmpty()
+            val localCandidates = programId?.let { remainingLocalByDay[it to se.publishedAt] }.orEmpty()
                 .filter { it.id !in episodeLinks && it.closeTo(se.runtime) }
             val local = localCandidates.singleOrNull()
             // その手元行から見てもサーバ側の候補が 1 つだけのとき結ぶ（同日パート違いを尺で区別できないなら結ばない）
-            val serverCandidates = local?.let { l -> unmatchedServerByDay.getValue(se.programServerId to se.airedAt).filter { l.closeTo(it.runtime) } }
+            val serverCandidates = local?.let { l -> unmatchedServerByDay.getValue(se.programServerId to se.publishedAt).filter { l.closeTo(it.runtime) } }
             if (local != null && serverCandidates?.size == 1) {
                 episodeLinks[local.id] = se.serverId
             } else {

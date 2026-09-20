@@ -10,8 +10,8 @@ import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.playback.NowPlaying
 import dev.tseki.kikidame.sync.LibraryRefresher
-import dev.tseki.kikidame.ui.programs.ProgramFilter.Station
-import dev.tseki.kikidame.ui.programs.ProgramFilter.StationKey
+import dev.tseki.kikidame.ui.programs.ProgramFilter.Publisher
+import dev.tseki.kikidame.ui.programs.ProgramFilter.PublisherKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -38,32 +38,32 @@ class ProgramListViewModel @Inject constructor(
      */
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
-    /** 放送局の絞り込み（#45）の選択。null は「すべて」。検索とは独立で、検索を閉じても残る。 */
-    private val _station = MutableStateFlow<StationKey?>(null)
+    /** 配信元の絞り込み（#45）の選択。null は「すべて」。検索とは独立で、検索を閉じても残る。 */
+    private val _publisher = MutableStateFlow<PublisherKey?>(null)
     /**
-     * 絞り込みの入力（検索語・局）と手元の番組から導いた、画面が出すもの一式。
-     * 一覧・局の候補・絞り込み中かどうかを別々の Flow にすると一瞬食い違うことがあるので 1 つにまとめる。
+     * 絞り込みの入力（検索語・配信元）と手元の番組から導いた、画面が出すもの一式。
+     * 一覧・配信元の候補・絞り込み中かどうかを別々の Flow にすると一瞬食い違うことがあるので 1 つにまとめる。
      */
     data class Filtered(
         /** 絞った後の一覧。 */
         val programs: List<ProgramSummary>,
-        /** 局を選ぶシートに出す候補（手元の番組から集めたもの。番組数は検索語で絞らない）。空なら番組が 1 つも無い。 */
-        val stations: List<Station>,
-        /** 選択中の局。候補に無い局、絞り込み自体を出さない（局が 2 種類未満）ときは選ばれていない扱い。 */
-        val station: StationKey?,
+        /** 配信元を選ぶシートに出す候補（手元の番組から集めたもの。番組数は検索語で絞らない）。空なら番組が 1 つも無い。 */
+        val publishers: List<Publisher>,
+        /** 選択中の配信元。候補に無い配信元、絞り込み自体を出さない（配信元が 2 種類未満）ときは選ばれていない扱い。 */
+        val publisher: PublisherKey?,
         /** 絞り込みが効いているか。効いていれば画面は「よく聴く」「その他」の節を解除する。 */
         val isFiltering: Boolean,
     )
     /** null は読み込み前。 */
-    val filtered: StateFlow<Filtered?> = combine(library.observePrograms(), _query, _station) { list, q, selected ->
-        val stations = ProgramFilter.stations(list)
-        val station = selected?.takeIf { key -> stations.size >= 2 && stations.any { it.key == key } }
-        if (selected != null && station == null) {
-            // 同期で選択中の局の番組が消えた（か、他の局が消えて絞り込み自体を出さなくなった）ら「すべて」に戻す。
+    val filtered: StateFlow<Filtered?> = combine(library.observePrograms(), _query, _publisher) { list, q, selected ->
+        val publishers = ProgramFilter.publishers(list)
+        val publisher = selected?.takeIf { key -> publishers.size >= 2 && publishers.any { it.key == key } }
+        if (selected != null && publisher == null) {
+            // 同期で選択中の配信元の番組が消えた（か、他の配信元が消えて絞り込み自体を出さなくなった）ら「すべて」に戻す。
             // 絞り込みだけ残って解除できない状態にしない。この計算の元になった選択と同じときだけ戻す（その間の操作は潰さない）
-            _station.compareAndSet(selected, null)
+            _publisher.compareAndSet(selected, null)
         }
-        Filtered(ProgramFilter.apply(list, q, station), stations, station, ProgramFilter.isActive(q, station))
+        Filtered(ProgramFilter.apply(list, q, publisher), publishers, publisher, ProgramFilter.isActive(q, publisher))
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** サーバに接続済み（ライブラリ選択済み）なら「引っ張って更新」ができる。 */
@@ -79,14 +79,14 @@ class ProgramListViewModel @Inject constructor(
     fun setQuery(query: String) {
         _query.value = query
     }
-    /** 絞り込みシートで局を選ぶ。null は「すべて」（選択中のチップの × も同じ）。 */
-    fun selectStation(station: StationKey?) {
-        _station.value = station
+    /** 絞り込みシートで配信元を選ぶ。null は「すべて」（選択中のチップの × も同じ）。 */
+    fun selectPublisher(publisher: PublisherKey?) {
+        _publisher.value = publisher
     }
-    /** 戻るボタンで絞り込みをまとめて解除する（検索語と局の両方）。 */
+    /** 戻るボタンで絞り込みをまとめて解除する（検索語と配信元の両方）。 */
     fun clearFilters() {
         _query.value = ""
-        _station.value = null
+        _publisher.value = null
     }
     fun refresh() {
         viewModelScope.launch { refresher.refresh() }

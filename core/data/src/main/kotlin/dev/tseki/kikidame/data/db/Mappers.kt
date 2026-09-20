@@ -19,7 +19,7 @@ fun ProgramEntity.toDomain(): Program = Program(
     id = ProgramId(id),
     serverItemId = serverItemId?.let(::ServerItemId),
     name = name,
-    stationName = stationName,
+    publisherName = publisherName,
     syncEnabled = syncEnabled,
     retentionRule = RetentionRule(keepLatest = keepLatest, deleteAfterPlayed = deleteAfterPlayed),
     goneSince = goneSince,
@@ -30,16 +30,16 @@ fun ProgramSummaryRow.toDomain(): ProgramSummary = ProgramSummary(
     episodeCount = episodeCount,
     localEpisodeCount = localEpisodeCount,
     unplayedLocalCount = unplayedLocalCount,
-    latestAiredAt = latestAiredAt?.let(Instant::fromEpochMilliseconds),
+    latestPublishedAt = latestPublishedAt?.let(Instant::fromEpochMilliseconds),
 )
 fun ProgramKeyRow.toDomain(): LocalProgramKey =
-    LocalProgramKey(ProgramId(id), serverItemId?.let(::ServerItemId), stationName, name)
+    LocalProgramKey(ProgramId(id), serverItemId?.let(::ServerItemId), publisherName, name)
 fun EpisodeKeyRow.toDomain(): LocalEpisodeKey =
-    LocalEpisodeKey(EpisodeId(id), serverItemId?.let(::ServerItemId), ProgramId(programId), title, airedAt, Ticks.toDuration(runtimeTicks))
+    LocalEpisodeKey(EpisodeId(id), serverItemId?.let(::ServerItemId), ProgramId(programId), title, publishedAt, Ticks.toDuration(runtimeTicks))
 fun EpisodeSyncRow.toDomain(): LocalEpisodeState = LocalEpisodeState(
     id = EpisodeId(id),
     serverItemId = serverItemId?.let(::ServerItemId),
-    airedAt = airedAt,
+    publishedAt = publishedAt,
     title = title,
     pinned = pinned == true,
     played = played == true,
@@ -50,7 +50,7 @@ fun EpisodeEntity.toDomain(): Episode = Episode(
     serverItemId = serverItemId?.let(::ServerItemId),
     programId = ProgramId(programId),
     title = title,
-    airedAt = airedAt,
+    publishedAt = publishedAt,
     addedAt = addedAt,
     runtime = Ticks.toDuration(runtimeTicks),
     sizeBytes = sizeBytes,

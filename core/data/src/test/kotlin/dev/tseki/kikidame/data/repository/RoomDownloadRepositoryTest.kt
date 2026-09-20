@@ -157,7 +157,7 @@ class RoomDownloadRepositoryTest : RoomTestBase() {
 
     @Test
     fun deleteSeededEpisodeRemovesEpisodeAndEmptyLocalProgram() = runTest {
-        seed(listOf(scanned(station = "J-WAVE", program = "Solo", title = "Solo 2026-06-12", airedAt = "2026-06-11T15:00:00Z")))
+        seed(listOf(scanned(publisher = "J-WAVE", program = "Solo", title = "Solo 2026-06-12", publishedAt = "2026-06-11T15:00:00Z")))
         val solo = library.observePrograms().first().first { it.program.name == "Solo" }
         val ep = library.observeEpisodes(solo.program.id).first().single()
         playback.update(ep.episode.id) { PlaybackRules.setPlayed(it, true, now) }

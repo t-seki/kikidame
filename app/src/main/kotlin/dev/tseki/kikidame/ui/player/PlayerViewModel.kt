@@ -80,7 +80,7 @@ class PlayerViewModel @Inject constructor(
         .flatMapLatest { id -> if (id == null) flowOf(false) else playbackStates.observe(id).map { it?.played == true } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
     /**
-     * タイトルの下の `放送局 · 出演者`（#70）。放送局は番組から、出演者は各回から取り、どちらも Room を購読する
+     * タイトルの下の `配信元 · 出演者`（#70）。配信元は番組から、出演者は各回から取り、どちらも Room を購読する
      * （この画面を開いたまま同期が出演者を書き換えても追従する）。どちらも無ければ null。番組 ID を知るために最初に 1 回だけ各回を引く。
      */
     val subtitle: StateFlow<String?> = _uiState
@@ -91,7 +91,7 @@ class PlayerViewModel @Inject constructor(
             flow<String?> {
                 val programId = library.getEpisode(id)?.episode?.programId ?: return@flow emit(null)
                 val performers = library.observeEpisodes(programId).map { list -> list.firstOrNull { it.episode.id == id }?.episode?.performers.orEmpty() }
-                emitAll(combine(library.observeProgram(programId), performers) { program, names -> playerSubtitle(program?.stationName, names) })
+                emitAll(combine(library.observeProgram(programId), performers) { program, names -> playerSubtitle(program?.publisherName, names) })
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -242,6 +242,6 @@ class PlayerViewModel @Inject constructor(
         const val POSITION_REFRESH_MS = 500L
     }
 }
-/** `放送局 · 出演者`。無い方は省き、両方無ければ null。 */
-internal fun playerSubtitle(stationName: String?, performers: List<String>): String? =
-    listOfNotNull(stationName, performers.toPerformersText()).takeIf { it.isNotEmpty() }?.joinToString(" · ")
+/** `配信元 · 出演者`。無い方は省き、両方無ければ null。 */
+internal fun playerSubtitle(publisherName: String?, performers: List<String>): String? =
+    listOfNotNull(publisherName, performers.toPerformersText()).takeIf { it.isNotEmpty() }?.joinToString(" · ")
