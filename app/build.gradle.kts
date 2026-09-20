@@ -6,10 +6,10 @@ plugins {
     alias(libs.plugins.hilt)
 }
 android {
-    namespace = "dev.tseki.jellyfinradio"
+    namespace = "dev.tseki.kikidame"
     compileSdk = 37
     defaultConfig {
-        applicationId = "dev.tseki.jellyfinradio"
+        applicationId = "dev.tseki.kikidame"
         minSdk = 31
         targetSdk = 37
         versionCode = 1
