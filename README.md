@@ -26,14 +26,14 @@ Jellyfin サーバに音楽ライブラリとして取り込まれた**番組型
 
 ## 入れ方
 
-Google Play では配布しない（[ADR 0008](./docs/adr/0008-open-source-distributed-outside-play.md)）。配布経路はこの順で用意する:
+Google Play では配布しない（[ADR 0008](./docs/adr/0008-open-source-distributed-outside-play.md)）。配布経路は 2 つ:
 
-1. **GitHub Releases** の APK — [Releases](https://github.com/t-seki/kikidame/releases) から `kikidame-<版>.apk` を入れる。[Obtainium](https://github.com/ImranR98/Obtainium) にこのリポジトリを登録すると更新も追える
-2. **IzzyOnDroid** — F-Droid クライアントに [IzzyOnDroid のリポジトリ](https://apt.izzysoft.de/fdroid/)を追加して「Kikidame」で検索。Releases と同じ APK（同じ署名）を配るので、どちらから入れても互いに更新できる（[#95](https://github.com/t-seki/kikidame/issues/95) で申請予定。載ったらここを更新）
+1. **GitHub Releases** の APK — [Releases](https://github.com/t-seki/kikidame/releases) から `kikidame-<版>.apk` を入れる
+2. **Obtainium** — 自動更新したい人は [Obtainium](https://github.com/ImranR98/Obtainium) に `https://github.com/t-seki/kikidame` を登録する。新しい Release が出ると通知され、同じ署名の APK なので上書きで更新できる（手元の各回と再生位置は残る）
 
-**F-Droid 本家には載せていない。** F-Droid はソースからビルドし直して F-Droid の鍵で署名するため、Releases / IzzyOnDroid 版とは署名が違い、片方から片方へ更新できない（入れ直すと手元の各回と再生位置が消える）。それを避ける reproducible builds を通す手間に今は見合わないと判断した。要望があれば reproducible builds と合わせて検討する。
+**IzzyOnDroid と F-Droid 本家には申請しない。** 理由は 2 つ。(1) どちらも生成 AI で書かれたコードを含むアプリを受け付けない方針で（[IzzyOnDroid の App Inclusion Policy](https://izzyondroid.org/docs/general/AppInclusionPolicy/): "We are strongly opposed to apps which are fully or in part created by generative AI tools"）、Kikidame のコードは大半を Claude Code で書いている。申請テンプレには AI 使用の申告が必須なので、正直に申告すれば却下対象になる。虚偽の申告はしない。(2) F-Droid 本家はソースからビルドし直して F-Droid の鍵で署名するため、Releases 版とは署名が違い、片方から片方へ更新できない（入れ直すと手元の各回と再生位置が消える）。F-Droid クライアントから入れたい人向けには、審査を通さない自前のリポジトリを検討している（[#123](https://github.com/t-seki/kikidame/issues/123)）。
 
-端末は Android 12（API 31）以上。ストア向けの説明文とスクリーンショットは [fastlane/metadata/android/](./fastlane/metadata/android/) にある（IzzyOnDroid が読む）。
+端末は Android 12（API 31）以上。ストア向けの説明文とスクリーンショットは [fastlane/metadata/android/](./fastlane/metadata/android/) にある（Obtainium は読まないが、自前の F-Droid リポジトリ（#123）の `fdroidserver` がそのまま読む形式なので残している）。
 
 ## サーバ側の前提
 
@@ -93,7 +93,7 @@ export JAVA_HOME=~/.local/jdk/current   # JDK 21
 - 再生位置や再生済みのサーバ同期、他端末との共有
 - サーバ管理
 - オーディオブック（古い章から順に聴くので「最新 N 回まで保持」が合わない。対応するなら番組に「向き」を足す設計が要る）
-- Google Play での配布と課金（需要が見えたら Releases / IzzyOnDroid は無料のまま Play に有料版を併売する選択肢は残している。[ADR 0008](./docs/adr/0008-open-source-distributed-outside-play.md)）
+- Google Play での配布と課金（需要が見えたら Releases は無料のまま Play に有料版を併売する選択肢は残している。[ADR 0008](./docs/adr/0008-open-source-distributed-outside-play.md)）
 
 全体は [docs/claude-code-handoff.md](./docs/claude-code-handoff.md) の「やらないこと」。
 
