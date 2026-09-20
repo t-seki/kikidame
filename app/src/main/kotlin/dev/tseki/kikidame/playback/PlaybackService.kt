@@ -162,6 +162,31 @@ class PlaybackService : MediaLibraryService() {
      * URI とメタデータはこちらで引き直す。ブラウズ（Auto）は [BrowseTree] に委ねる。
      */
     private inner class LibrarySessionCallback : MediaLibrarySession.Callback {
+        /**
+         * メディア通知コントローラ（と Auto）にはライブラリコマンド込みで接続を受ける（#119）。
+         * Media3 1.11.1 の `MediaSessionImpl.onConnectOnHandler` は、通知コントローラが接続済みで相手が SystemUI のとき
+         * この `onConnect` を呼ばず、通知コントローラのコマンド集合（`getPlatformConnectionResult`）を流用する。
+         * そして `MediaLibraryServiceLegacyStub.getRootOnHandler` は `COMMAND_CODE_LIBRARY_GET_LIBRARY_ROOT` の無い
+         * コントローラに root を返さない（`No root for client com.android.systemui`）。既定の接続結果は
+         * ライブラリコマンドを含まないので、SystemUI の再開ブラウザ（`MediaResumeListener`）が [onGetLibraryRoot] の
+         * `isRecent` にも [onPlaybackResumption] にも辿り着けなかった。ここで明示的に付ける。
+         * メディアボタン（±10 秒）は `MediaSession.Builder.setMediaButtonPreferences` のものがそのまま使われる
+         * （接続結果側は指定しない）。
+         */
+        override fun onConnect(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+        ): MediaSession.ConnectionResult =
+            if (session.isMediaNotificationController(controller) ||
+                session.isAutomotiveController(controller) ||
+                session.isAutoCompanionController(controller)
+            ) {
+                MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                    .setAvailableSessionCommands(MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS)
+                    .build()
+            } else {
+                super.onConnect(session, controller)
+            }
         override fun onAddMediaItems(
             mediaSession: MediaSession,
             controller: MediaSession.ControllerInfo,
