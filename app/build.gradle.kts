@@ -83,6 +83,7 @@ dependencies {
     testImplementation(libs.turbine)
     testImplementation(libs.androidx.work.testing)
 }
+
 // 依存ライブラリのライセンス一覧（設定 > オープンソースライセンス）。ビルド時には生成せず、
 // `./gradlew :app:exportLibraryDefinitions` で src/main/res/raw/aboutlibraries.json を書き出してコミットする。
 // F-Droid や CI のオフラインビルドでも同じ一覧になり、依存を変えたときは再生成して差分を見る
@@ -95,5 +96,9 @@ aboutLibraries {
         outputFile = file("src/main/res/raw/aboutlibraries.json")
         variant = "release"
         prettyPrint = true
+    }
+    license {
+        // LGPL-3.0 §4(b) は GPL 本文も添えることを求めるので、直接使う依存が無くても GPL-3.0 を同梱する
+        additionalLicenses.add("GPL-3.0-only")
     }
 }
