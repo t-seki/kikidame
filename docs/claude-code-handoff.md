@@ -446,6 +446,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 - `docs/adr/0006-now-playing-from-in-process-state-not-media-controller.md` — 聴いている回はプロセス内の状態から取る
 - `docs/adr/0007-playback-state-stays-local.md` — 再生位置と再生済みはサーバへ送らない
 - `docs/adr/0008-open-source-distributed-outside-play.md` — MPL-2.0 の OSS として Play を通さず配布する
+- `docs/adr/0009-ui-text-resolved-only-in-compose.md` — UI の文言は strings.xml、文字列に解決するのは Compose だけ（`UiText`）。既定は英語
 - Jellyfin 12 認証仕様: https://gist.github.com/nielsvanvelzen/ea047d9028f676185832e51ffaf12a6f
 - jellyfin-sdk-kotlin Releases: https://github.com/jellyfin/jellyfin-sdk-kotlin/releases
 - Jellyfin OpenAPI (stable): https://api.jellyfin.org/openapi/jellyfin-openapi-stable.json

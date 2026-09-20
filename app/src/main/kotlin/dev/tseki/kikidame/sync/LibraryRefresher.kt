@@ -70,7 +70,7 @@ class LibraryRefresher @Inject constructor(
     suspend fun refreshProgram(programId: ProgramId): RefreshResult? = guarded(silent = false) {
         val result = refreshRepository.refreshProgram(programId)
         if (result != null) {
-            say(false, UiText.Res(R.string.sync_program_fetched, result.episodes))
+            say(false, UiText.Plural(R.plurals.sync_program_fetched, result.episodes))
             result
         } else {
             refreshRepository.refresh(excluded = excluded()).also { say(false, it.toSyncMessage()) }
@@ -165,7 +165,7 @@ fun RefreshResult.toSyncMessage(): UiText = sentences(
 fun RefreshResult.toProgramSyncMessage(): UiText {
     if (onHold > 0) return UiText.Res(R.string.sync_program_gone)
     return sentences(
-        UiText.Res(R.string.sync_program_checked, episodes),
+        UiText.Plural(R.plurals.sync_program_checked, episodes),
         actionsText() ?: UiText.Res(R.string.sync_program_up_to_date),
     )
 }

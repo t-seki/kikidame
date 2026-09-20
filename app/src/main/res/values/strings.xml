@@ -52,7 +52,7 @@
     <!-- Saving credentials failed. %1$s = exception class name -->
     <string name="connect_error_save_failed">Could not save: %1$s</string>
     <!-- Appended to an "unreachable" error on Android 17+ when the local-network permission is denied. Starts with a line break -->
-    <string name="connect_hint_local_network_permission">\nThe "Local network" permission is not granted. Allow it under Settings → Apps → Kikidame → Permissions</string>
+    <string name="connect_hint_local_network_permission">\nThe “Local network” permission is not granted. Allow it under Settings → Apps → Kikidame → Permissions</string>
 
     <!-- ===== library_pick: choose which Jellyfin library to use ===== -->
     <string name="library_pick_title">Choose a library</string>
@@ -105,13 +105,13 @@
     <string name="program_list_no_match">No programs match “%1$s”</string>
     <!-- Empty result of a search within one publisher. %1$s = search text, %2$s = publisher name -->
     <string name="program_list_no_match_in_publisher">No programs in %2$s match “%1$s”</string>
-    <!-- Program row: counts of episodes. "on device" = downloaded; "in all" = known on the server -->
+    <!-- Program row: counts of episodes. "on device" = downloaded; "total" = known on the server -->
     <string name="program_list_on_device">%1$d on device</string>
-    <string name="program_list_on_device_of_total">%1$d on device · %2$d in all</string>
+    <string name="program_list_on_device_of_total">%1$d on device · %2$d total</string>
     <string name="program_list_unplayed_on_device" tools:ignore="PluralsCandidate">%1$d unplayed / %2$d on device</string>
-    <string name="program_list_unplayed_on_device_of_total" tools:ignore="PluralsCandidate">%1$d unplayed / %2$d on device · %3$d in all</string>
+    <string name="program_list_unplayed_on_device_of_total" tools:ignore="PluralsCandidate">%1$d unplayed / %2$d on device · %3$d total</string>
     <!-- Program row: date of the newest episode. %1$s = "08-02" or "2025-08-02" -->
-    <string name="program_list_latest">Latest %1$s</string>
+    <string name="program_list_latest">Latest: %1$s</string>
     <string name="program_list_empty_title">No programs</string>
     <string name="program_list_empty_pull">Pull down to fetch from the server</string>
     <string name="program_list_empty_connect">Connect to a server from Settings</string>
@@ -119,7 +119,7 @@
     <!-- ===== episode_list: episodes of one program ===== -->
     <!-- Sync settings icon when the program is synced / not synced -->
     <string name="episode_list_sync_settings_on">Sync settings (sync enabled)</string>
-    <string name="episode_list_sync_settings_off">Sync settings (not syncing)</string>
+    <string name="episode_list_sync_settings_off">Sync settings (sync off)</string>
     <string name="episode_list_remove_program_title">Remove this program from the device?</string>
     <!-- %1$s = program name -->
     <string name="episode_list_remove_program_text">All episodes, files and playback positions of “%1$s” will be deleted. This cannot be undone.</string>
@@ -134,7 +134,7 @@
     <!-- Pin icon before the title of a pinned episode -->
     <string name="episode_list_pinned">Pinned</string>
     <!-- Icon before the title of the episode that is Now Playing -->
-    <string name="episode_list_now_playing_playing">Now playing (playing)</string>
+    <string name="episode_list_now_playing_playing">Playing now</string>
     <string name="episode_list_now_playing_paused">Now playing (paused)</string>
     <!-- Trailing icons of an episode row -->
     <string name="episode_list_download">Download</string>
@@ -157,7 +157,7 @@
     <!-- Program is Gone. %1$s = date since when -->
     <string name="episode_list_sync_gone">Not found on the server (since %1$s). Sync is stopped. Episodes on the device can still be played</string>
     <string name="episode_list_sync_unavailable">Cannot sync because it has not been found on the server</string>
-    <string name="episode_list_sync_description">Downloads by the retention rules and deletes episodes that fall out of them. Pinned episodes are kept</string>
+    <string name="episode_list_sync_description">Downloads episodes according to the retention rules and deletes ones that fall outside them. Pinned episodes are kept</string>
     <!-- Retention rule: keep the newest N episodes -->
     <string name="episode_list_keep_latest">Keep latest N</string>
     <!-- Chip for a value of N -->
@@ -168,7 +168,7 @@
     <string name="episode_list_keep_unlimited">No limit</string>
     <!-- Retention rule: delete an episode once it is Played -->
     <string name="episode_list_delete_after_played">Delete after played</string>
-    <string name="episode_list_delete_after_played_description">Removes episodes you have finished at the next sync</string>
+    <string name="episode_list_delete_after_played_description">At the next sync, removes episodes you have finished</string>
     <string name="episode_list_sync_now">Sync this program now</string>
     <string name="episode_list_remove_program">Remove this program from the device</string>
     <!-- Snackbar messages -->
@@ -204,7 +204,7 @@
     <string name="episode_details_server_id">Server ID</string>
     <string name="episode_details_server_id_none">None (device-only episode)</string>
     <string name="episode_details_app_id">ID (in app)</string>
-    <string name="episode_details_published_raw">Published (recorded instant, UTC)</string>
+    <string name="episode_details_published_raw">Published (raw value, UTC)</string>
     <string name="episode_details_added_at">Added</string>
     <string name="episode_details_container">Container</string>
     <string name="episode_details_path">Path</string>
@@ -282,7 +282,7 @@
     <string name="settings_sign_out_text">Data on the device is kept. You will need to sign in again next time.</string>
     <string name="settings_reset_title">Delete the data on the device and connect to another server?</string>
     <string name="settings_reset_text">All programs, episodes, playback positions, played marks and audio files will be deleted. This cannot be undone.</string>
-    <string name="settings_reset_confirm">Delete and connect</string>
+    <string name="settings_reset_confirm">Delete and continue</string>
 
     <!-- ===== sync: results of refresh / sync, shown in a snackbar ===== -->
     <!-- Separates sentences in a combined message. Keep the trailing space if your language uses one -->
@@ -303,10 +303,16 @@
         <item quantity="other">%d programs not found on the server, left as is</item>
     </plurals>
     <!-- Refresh of one program (no deletions). %1$d = episodes -->
-    <string name="sync_program_fetched" tools:ignore="PluralsCandidate">Fetched %1$d episodes</string>
+    <plurals name="sync_program_fetched">
+        <item quantity="one">Fetched %d episode</item>
+        <item quantity="other">Fetched %d episodes</item>
+    </plurals>
     <string name="sync_program_gone">This program is not on the server. Nothing was changed</string>
     <!-- Sync of one program. %1$d = episodes -->
-    <string name="sync_program_checked" tools:ignore="PluralsCandidate">Checked %1$d episodes</string>
+    <plurals name="sync_program_checked">
+        <item quantity="one">Checked %d episode</item>
+        <item quantity="other">Checked %d episodes</item>
+    </plurals>
     <string name="sync_program_up_to_date">Everything is up to date</string>
     <!-- Files that disappeared from the device (deleted by a file manager) had their records cleaned up -->
     <plurals name="sync_reconciled">

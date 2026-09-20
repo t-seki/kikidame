@@ -66,7 +66,7 @@
     <string name="program_list_clear_query_filter">検索の絞り込みを解除</string>
     <string name="program_list_clear_publisher_filter">配信元の絞り込みを解除</string>
     <string name="program_list_no_match">「%1$s」に一致する番組がありません</string>
-    <string name="program_list_no_match_in_publisher">%2$sに 「%1$s」に一致する番組がありません</string>
+    <string name="program_list_no_match_in_publisher">%2$sに「%1$s」に一致する番組がありません</string>
     <string name="program_list_on_device">手元 %1$d 回</string>
     <string name="program_list_on_device_of_total">手元 %1$d · 全 %2$d 回</string>
     <string name="program_list_unplayed_on_device">未再生 %1$d / 手元 %2$d 回</string>
@@ -227,9 +227,13 @@
     <plurals name="sync_on_hold">
         <item quantity="other">%d 番組はサーバ上で見つからず、そのままにしました</item>
     </plurals>
-    <string name="sync_program_fetched">各回 %1$d を取得しました</string>
+    <plurals name="sync_program_fetched">
+        <item quantity="other">各回 %d を取得しました</item>
+    </plurals>
     <string name="sync_program_gone">この番組はサーバ上で見つかりません。何も変えていません</string>
-    <string name="sync_program_checked">各回 %1$d を確認</string>
+    <plurals name="sync_program_checked">
+        <item quantity="other">各回 %d を確認</item>
+    </plurals>
     <string name="sync_program_up_to_date">手元は最新です</string>
     <plurals name="sync_reconciled">
         <item quantity="other">手元に無くなっていた %d 回の記録を整理しました</item>

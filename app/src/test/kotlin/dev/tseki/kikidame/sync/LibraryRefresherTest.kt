@@ -251,7 +251,7 @@ class LibraryRefresherTest {
         refresher.messages.test {
             assertEquals(2, refresher.syncProgram(ProgramId(1))?.enqueued)
             assertEquals(
-                sentences(UiText.Res(R.string.sync_program_checked, 6), actions(UiText.Plural(R.plurals.sync_enqueued, 2), UiText.Plural(R.plurals.sync_deleted, 1))),
+                sentences(UiText.Plural(R.plurals.sync_program_checked, 6), actions(UiText.Plural(R.plurals.sync_enqueued, 2), UiText.Plural(R.plurals.sync_deleted, 1))),
                 awaitItem(),
             )
         }
@@ -263,7 +263,7 @@ class LibraryRefresherTest {
     @Test
     fun programSyncMessages() {
         assertEquals(
-            sentences(UiText.Res(R.string.sync_program_checked, 6), UiText.Res(R.string.sync_program_up_to_date)),
+            sentences(UiText.Plural(R.plurals.sync_program_checked, 6), UiText.Res(R.string.sync_program_up_to_date)),
             RefreshResult(1, 6, 0, 0, now).toProgramSyncMessage(),
         )
         assertEquals(UiText.Res(R.string.sync_program_gone), RefreshResult(0, 0, 0, 0, now, onHold = 1).toProgramSyncMessage())
@@ -275,7 +275,7 @@ class LibraryRefresherTest {
         val refresher = refresher(repo)
         refresher.messages.test {
             assertEquals(7, refresher.refreshProgram(ProgramId(1))?.episodes)
-            assertEquals(UiText.Res(R.string.sync_program_fetched, 7), awaitItem())
+            assertEquals(UiText.Plural(R.plurals.sync_program_fetched, 7), awaitItem())
         }
         assertEquals(1, repo.programCalls)
         assertEquals(0, repo.calls)
