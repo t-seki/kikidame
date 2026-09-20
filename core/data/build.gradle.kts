@@ -5,7 +5,7 @@ plugins {
     alias(libs.plugins.room)
 }
 android {
-    namespace = "dev.tseki.jellyfinradio.data"
+    namespace = "dev.tseki.kikidame.data"
     compileSdk = 37
     defaultConfig {
         minSdk = 31

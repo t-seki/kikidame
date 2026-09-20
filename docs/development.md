@@ -127,7 +127,7 @@ WSL2 は USB を見られないが、LAN 上の端末には TCP で届く。Wind
 ### 代替: Windows 側の adb に USB 接続
 
 ```powershell
-adb install -r \\wsl.localhost\Ubuntu\home\<you>\dev\jellyfin-radio\app\build\outputs\apk\debug\app-debug.apk
+adb install -r \\wsl.localhost\Ubuntu\home\<you>\dev\<repo>\app\build\outputs\apk\debug\app-debug.apk
 ```
 
 ### 音声ファイルを入れる（M1 当時の手順。シードは M3-c で削除）
@@ -163,7 +163,7 @@ M1 ではサーバ無しで試すため、`getExternalFilesDir("episodes")/<放�
   DNS だけ通る（名前解決は成功し、接続が 6 秒でタイムアウトする）。初回起動の権限ダイアログで許可する。
   `adb shell` の `nc` は対象外なので疎通確認に使えない。アプリの UID で試す:
   ```bash
-  $ADB shell "run-as dev.tseki.jellyfinradio sh -c 'timeout 6 nc -z <host> 443; echo rc=\$?'"   # rc=124 なら落ちている
+  $ADB shell "run-as dev.tseki.kikidame sh -c 'timeout 6 nc -z <host> 443; echo rc=\$?'"   # rc=124 なら落ちている
   ```
 - ゲートウェイの失敗は `JellyfinGateway` タグに原因の連鎖を出す:
   ```bash
@@ -195,7 +195,7 @@ M1 ではサーバ無しで試すため、`getExternalFilesDir("episodes")/<放�
 LAN では 10 MB が 0.5 秒で落ちるので、ダウンロード中に kill しても再開の経路を踏めない。代わりに「途中まで落ちた状態」を作る:
 
 ```bash
-$ADB shell am force-stop dev.tseki.jellyfinradio
+$ADB shell am force-stop dev.tseki.kikidame
 # DB を引き出し、対象の local_files.state を 'DONE' → 'PENDING' に書き換えて戻す（development.md 上の「DB だけ消す」と同じ run-as 手順）
 $ADB shell "head -c 5000000 '<path>' > '<path>.part' && rm '<path>'"
 $ADB logcat -c && <アプリを起動>
@@ -224,12 +224,12 @@ $ADB logcat -d | grep JellyfinGateway   # download <id> from 5000000 -> HTTP 206
 定期同期は WorkManager の `sync-periodic`（6 時間）、起動時同期は `sync-once`。状態は次で見える:
 
 ```bash
-$ADB shell dumpsys jobscheduler | grep -A3 "dev.tseki.jellyfinradio" | head -40
+$ADB shell dumpsys jobscheduler | grep -A3 "dev.tseki.kikidame" | head -40
 $ADB logcat -d | grep -E "SyncWorker|LibraryRefresher"   # "sync: 番組 N / 各回 M を取得。…"
 ```
 
 起動時同期は前回同期から 1 時間以上あけないと積まれない（ログイン直後の初回取得も同期なので、ログインし直しでは試せない）。
-待たずに Worker を走らせるなら、`dumpsys jobscheduler` で WorkManager のジョブ ID を見て `adb shell cmd jobscheduler run -f dev.tseki.jellyfinradio <jobId>`。
+待たずに Worker を走らせるなら、`dumpsys jobscheduler` で WorkManager のジョブ ID を見て `adb shell cmd jobscheduler run -f dev.tseki.kikidame <jobId>`。
 
 ### 実機チェックリスト（M3-b）
 
@@ -263,10 +263,10 @@ $ADB logcat -d | grep -E "SyncWorker|LibraryRefresher"   # "sync: 番組 N / 各
 (b) サーバ側で 1 番組のフォルダを外してスキャン、(c) デバッグビルドなら端末の DB を書き換える（2026-09-18 に採用）:
 
 ```bash
-$ADB shell am force-stop dev.tseki.jellyfinradio
-$ADB shell "run-as dev.tseki.jellyfinradio sh -c 'cat databases/jellyfin-radio.db'" > dev.db   # -wal も取り、python の sqlite3 で checkpoint
+$ADB shell am force-stop dev.tseki.kikidame
+$ADB shell "run-as dev.tseki.kikidame sh -c 'cat databases/kikidame.db'" > dev.db   # -wal も取り、python の sqlite3 で checkpoint
 # programs の 1 行を UPDATE: serverItemId を偽の UUID に、name に「（旧）」を付ける（同名だと突合で結び直される）
-$ADB push dev.db /data/local/tmp/ && $ADB shell "run-as dev.tseki.jellyfinradio sh -c 'rm -f databases/jellyfin-radio.db-wal databases/jellyfin-radio.db-shm; cat /data/local/tmp/dev.db > databases/jellyfin-radio.db'"
+$ADB push dev.db /data/local/tmp/ && $ADB shell "run-as dev.tseki.kikidame sh -c 'rm -f databases/kikidame.db-wal databases/kikidame.db-shm; cat /data/local/tmp/dev.db > databases/kikidame.db'"
 ```
 
 番組一覧を引っ張ると「1 番組はサーバ上で見つからず、そのままにしました」と出る。(c) では各回の ID が本物のままなので、各回はサーバの言うとおり
@@ -291,21 +291,21 @@ $ADB push dev.db /data/local/tmp/ && $ADB shell "run-as dev.tseki.jellyfinradio 
 DB を消すときは `files/episodes/` も一緒に消すこと:
 
 ```bash
-D=/storage/emulated/0/Android/data/dev.tseki.jellyfinradio/files/episodes
+D=/storage/emulated/0/Android/data/dev.tseki.kikidame/files/episodes
 $ADB shell "rm -rf '$D'"
 ```
 
 突き合わせ（行の無いファイルと、行はあるのにファイルが無い回を列挙し、前者を `stray.txt` に書く）:
 
 ```bash
-D=/storage/emulated/0/Android/data/dev.tseki.jellyfinradio/files/episodes
-for f in jellyfin-radio.db jellyfin-radio.db-wal; do
-  $ADB shell "run-as dev.tseki.jellyfinradio sh -c 'cat databases/$f'" > dev-$f < /dev/null
+D=/storage/emulated/0/Android/data/dev.tseki.kikidame/files/episodes
+for f in kikidame.db kikidame.db-wal; do
+  $ADB shell "run-as dev.tseki.kikidame sh -c 'cat databases/$f'" > dev-$f < /dev/null
 done
 $ADB shell "find '$D' -type f ! -name '*.part'" | sort > disk.txt
 python3 - <<'PY'
 import sqlite3
-db = {r[0] for r in sqlite3.connect('dev-jellyfin-radio.db').execute("SELECT path FROM local_files WHERE path IS NOT NULL")}
+db = {r[0] for r in sqlite3.connect('dev-kikidame.db').execute("SELECT path FROM local_files WHERE path IS NOT NULL")}
 disk = {l.strip() for l in open('disk.txt')}
 stray = sorted(disk - db)
 print('行の無いファイル:', *stray, sep='\n  ')

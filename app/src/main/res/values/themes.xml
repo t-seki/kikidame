@@ -1,5 +1,5 @@
 <resources>
-    <style name="Theme.JellyfinRadio" parent="android:Theme.Material.NoActionBar">
+    <style name="Theme.Kikidame" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowLightStatusBar">false</item>
     </style>
 </resources>

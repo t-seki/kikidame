@@ -12,7 +12,7 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "jellyfin-radio"
+rootProject.name = "kikidame"
 include(":app")
 include(":core:domain")
 include(":core:data")
