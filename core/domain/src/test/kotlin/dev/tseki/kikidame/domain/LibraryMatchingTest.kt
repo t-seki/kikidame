@@ -12,14 +12,14 @@ import kotlin.time.Instant
 class LibraryMatchingTest {
     private val now = Instant.parse("2026-09-17T00:00:00Z")
 
-    private fun sp(id: String, name: String, station: String? = "TBSラジオ") =
-        ServerProgram(ServerItemId(id), name, station)
+    private fun sp(id: String, name: String, publisher: String? = "TBSラジオ") =
+        ServerProgram(ServerItemId(id), name, publisher)
 
-    private fun se(id: String, program: String, title: String, aired: Instant = now, runtime: Duration = 30.minutes) = ServerEpisode(
+    private fun se(id: String, program: String, title: String, published: Instant = now, runtime: Duration = 30.minutes) = ServerEpisode(
         serverId = ServerItemId(id),
         programServerId = ServerItemId(program),
         title = title,
-        airedAt = aired,
+        publishedAt = published,
         addedAt = now,
         runtime = runtime,
         sizeBytes = 1,
@@ -43,11 +43,11 @@ class LibraryMatchingTest {
         assertTrue(match.newPrograms.isEmpty() && match.newEpisodes.isEmpty())
     }
 
-    private fun lp(id: Long, name: String, station: String? = "TBSラジオ", server: String? = null) =
-        LocalProgramKey(ProgramId(id), server?.let(::ServerItemId), station, name)
+    private fun lp(id: Long, name: String, publisher: String? = "TBSラジオ", server: String? = null) =
+        LocalProgramKey(ProgramId(id), server?.let(::ServerItemId), publisher, name)
 
-    private fun le(id: Long, program: Long, title: String, server: String? = null, aired: Instant = now, runtime: Duration = Duration.ZERO) =
-        LocalEpisodeKey(EpisodeId(id), server?.let(::ServerItemId), ProgramId(program), title, aired, runtime)
+    private fun le(id: Long, program: Long, title: String, server: String? = null, published: Instant = now, runtime: Duration = Duration.ZERO) =
+        LocalEpisodeKey(EpisodeId(id), server?.let(::ServerItemId), ProgramId(program), title, published, runtime)
 
     @Test
     fun `links seeded program and episodes by name`() {
@@ -67,11 +67,11 @@ class LibraryMatchingTest {
     }
 
     @Test
-    fun `station must match too`() {
+    fun `publisher must match too`() {
         val match = LibraryMatching.match(
-            localPrograms = listOf(lp(1, "ふらっと", station = "J-WAVE")),
+            localPrograms = listOf(lp(1, "ふらっと", publisher = "J-WAVE")),
             localEpisodes = emptyList(),
-            server = ServerSnapshot(listOf(sp("P", "ふらっと", station = "TBSラジオ")), emptyList()),
+            server = ServerSnapshot(listOf(sp("P", "ふらっと", publisher = "TBSラジオ")), emptyList()),
         )
         assertTrue(match.programLinks.isEmpty())
         assertEquals(listOf("P"), match.newPrograms.map { it.serverId.value })
@@ -194,22 +194,22 @@ class LibraryMatchingTest {
         assertTrue(match.programLinks.isEmpty())
         assertEquals(listOf("NEW-P"), match.newPrograms.map { it.serverId.value })
     }
-    // --- 第二段: 放送日 ＋ 尺（#9） ---
+    // --- 第二段: 公開日 ＋ 尺（#9） ---
     @Test
-    fun `seeded episodes with different titles link by aired day and runtime`() {
+    fun `seeded episodes with different titles link by published day and runtime`() {
         val match = LibraryMatching.match(
             localPrograms = listOf(lp(1, "ふらっと", server = "P")),
             localEpisodes = listOf(
-                le(10, 1, "ふらっと 2026-09-16-1", aired = day2, runtime = 89.minutes + 59.seconds),
-                le(11, 1, "ふらっと 2026-09-16-2", aired = day2, runtime = 60.minutes + 5.seconds),
-                le(12, 1, "ふらっと 2026-09-15-1", aired = day1, runtime = 90.minutes),
+                le(10, 1, "ふらっと 2026-09-16-1", published = day2, runtime = 89.minutes + 59.seconds),
+                le(11, 1, "ふらっと 2026-09-16-2", published = day2, runtime = 60.minutes + 5.seconds),
+                le(12, 1, "ふらっと 2026-09-15-1", published = day1, runtime = 90.minutes),
             ),
             server = ServerSnapshot(
                 listOf(sp("P", "ふらっと")),
                 listOf(
-                    se("E1", "P", "2026-09-16 (1)", aired = day2, runtime = 90.minutes),
-                    se("E2", "P", "2026-09-16 (2)", aired = day2, runtime = 60.minutes + 4.seconds),
-                    se("E3", "P", "2026-09-15 (1)", aired = day1, runtime = 90.minutes + 2.seconds),
+                    se("E1", "P", "2026-09-16 (1)", published = day2, runtime = 90.minutes),
+                    se("E2", "P", "2026-09-16 (2)", published = day2, runtime = 60.minutes + 4.seconds),
+                    se("E3", "P", "2026-09-15 (1)", published = day1, runtime = 90.minutes + 2.seconds),
                 ),
             ),
         )
@@ -223,10 +223,10 @@ class LibraryMatchingTest {
     fun `same day with indistinguishable runtimes is not linked`() {
         val match = LibraryMatching.match(
             localPrograms = listOf(lp(1, "ふらっと", server = "P")),
-            localEpisodes = listOf(le(10, 1, "x-1", aired = day2, runtime = 60.minutes), le(11, 1, "x-2", aired = day2, runtime = 60.minutes + 2.seconds)),
+            localEpisodes = listOf(le(10, 1, "x-1", published = day2, runtime = 60.minutes), le(11, 1, "x-2", published = day2, runtime = 60.minutes + 2.seconds)),
             server = ServerSnapshot(
                 listOf(sp("P", "ふらっと")),
-                listOf(se("E1", "P", "(1)", aired = day2, runtime = 60.minutes), se("E2", "P", "(2)", aired = day2, runtime = 60.minutes + 1.seconds)),
+                listOf(se("E1", "P", "(1)", published = day2, runtime = 60.minutes), se("E2", "P", "(2)", published = day2, runtime = 60.minutes + 1.seconds)),
             ),
         )
         assertTrue(match.episodeLinks.isEmpty())
@@ -236,23 +236,23 @@ class LibraryMatchingTest {
     fun `runtime beyond the tolerance or unknown runtime is not linked`() {
         val match = LibraryMatching.match(
             localPrograms = listOf(lp(1, "ふらっと", server = "P")),
-            localEpisodes = listOf(le(10, 1, "far", aired = day1, runtime = 60.minutes), le(11, 1, "unknown", aired = day2)),
+            localEpisodes = listOf(le(10, 1, "far", published = day1, runtime = 60.minutes), le(11, 1, "unknown", published = day2)),
             server = ServerSnapshot(
                 listOf(sp("P", "ふらっと")),
-                listOf(se("E1", "P", "(1)", aired = day1, runtime = 60.minutes + 6.seconds), se("E2", "P", "(2)", aired = day2, runtime = 30.minutes)),
+                listOf(se("E1", "P", "(1)", published = day1, runtime = 60.minutes + 6.seconds), se("E2", "P", "(2)", published = day2, runtime = 30.minutes)),
             ),
         )
         assertTrue(match.episodeLinks.isEmpty())
         assertFalse(match.newEpisodes.isEmpty())
     }
     @Test
-    fun `title match wins over aired-day match`() {
+    fun `title match wins over published-day match`() {
         val match = LibraryMatching.match(
             localPrograms = listOf(lp(1, "ふらっと", server = "P")),
-            localEpisodes = listOf(le(10, 1, "(1)", aired = day2, runtime = 60.minutes)),
+            localEpisodes = listOf(le(10, 1, "(1)", published = day2, runtime = 60.minutes)),
             server = ServerSnapshot(
                 listOf(sp("P", "ふらっと")),
-                listOf(se("E1", "P", "(1)", aired = day1, runtime = 60.minutes), se("E2", "P", "(2)", aired = day2, runtime = 60.minutes)),
+                listOf(se("E1", "P", "(1)", published = day1, runtime = 60.minutes), se("E2", "P", "(2)", published = day2, runtime = 60.minutes)),
             ),
         )
         assertEquals(mapOf(EpisodeId(10) to ServerItemId("E1")), match.episodeLinks)

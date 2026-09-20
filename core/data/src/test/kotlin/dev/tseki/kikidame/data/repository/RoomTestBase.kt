@@ -33,40 +33,40 @@ abstract class RoomTestBase {
     }
     /** サーバ ID を持たない手元の行（ADR 0001。かつてのシードが作っていた形）をテスト用に組み立てる。 */
     data class LocalRow(
-        val station: String,
+        val publisher: String,
         val program: String,
         val title: String,
-        val airedAt: Instant,
+        val publishedAt: Instant,
         val runtime: Duration,
         val path: String,
     )
 
     protected fun scanned(
-        station: String = "J-WAVE",
+        publisher: String = "J-WAVE",
         program: String = "LOGISTEED RADIONOMICS",
         title: String,
-        airedAt: String,
+        publishedAt: String,
         runtime: Duration = 30.minutes,
     ) = LocalRow(
-        station = station,
+        publisher = publisher,
         program = program,
         title = title,
-        airedAt = Instant.parse(airedAt),
+        publishedAt = Instant.parse(publishedAt),
         runtime = runtime,
-        path = "/sdcard/Android/data/dev.tseki.kikidame/files/episodes/$station/$program/$title.m4a",
+        path = "/sdcard/Android/data/dev.tseki.kikidame/files/episodes/$publisher/$program/$title.m4a",
     )
 
-    /** 番組は (放送局, 番組名) で探して無ければ作り、各回は固定された DONE のファイル付きで入れる。 */
+    /** 番組は (配信元, 番組名) で探して無ければ作り、各回は固定された DONE のファイル付きで入れる。 */
     protected suspend fun seed(rows: List<LocalRow>) {
         for (r in rows) {
-            val programId = db.programDao().findByStationAndName(r.station, r.program)?.id
-                ?: db.programDao().insert(ProgramEntity(serverItemId = null, name = r.program, stationName = r.station))
+            val programId = db.programDao().findByPublisherAndName(r.publisher, r.program)?.id
+                ?: db.programDao().insert(ProgramEntity(serverItemId = null, name = r.program, publisherName = r.publisher))
             val episodeId = db.episodeDao().insert(
                 EpisodeEntity(
                     serverItemId = null,
                     programId = programId,
                     title = r.title,
-                    airedAt = r.airedAt,
+                    publishedAt = r.publishedAt,
                     addedAt = null,
                     runtimeTicks = Ticks.fromDuration(r.runtime),
                     sizeBytes = 1024,

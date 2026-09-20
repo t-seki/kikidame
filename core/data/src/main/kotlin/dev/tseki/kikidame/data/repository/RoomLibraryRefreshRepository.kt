@@ -119,15 +119,15 @@ class RoomLibraryRefreshRepository @Inject constructor(
             programDao.setServerItemId(programId.value, serverId.value)
         }
         for (sp in match.newPrograms) {
-            programDao.insert(ProgramEntity(serverItemId = sp.serverId.value, name = sp.name, stationName = sp.stationName))
+            programDao.insert(ProgramEntity(serverItemId = sp.serverId.value, name = sp.name, publisherName = sp.publisherName))
         }
-        // サーバの番組名・放送局はサーバが正
+        // サーバの番組名・配信元はサーバが正
         val programIdByServerId = HashMap<ServerItemId, Long>()
         for (sp in snapshot.programs) {
             val row = programDao.findByServerItemId(sp.serverId.value) ?: continue
             programIdByServerId[sp.serverId] = row.id
-            if (row.name != sp.name || row.stationName != sp.stationName) {
-                programDao.updateNames(row.id, sp.name, sp.stationName)
+            if (row.name != sp.name || row.publisherName != sp.publisherName) {
+                programDao.updateNames(row.id, sp.name, sp.publisherName)
             }
         }
 
@@ -228,7 +228,7 @@ class RoomLibraryRefreshRepository @Inject constructor(
         serverItemId = serverId.value,
         programId = programId,
         title = title,
-        airedAt = airedAt,
+        publishedAt = publishedAt,
         addedAt = addedAt,
         runtimeTicks = Ticks.fromDuration(runtime),
         sizeBytes = sizeBytes ?: existingSize ?: 0L,

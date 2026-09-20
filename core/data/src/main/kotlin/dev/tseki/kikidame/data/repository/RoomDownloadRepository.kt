@@ -60,7 +60,7 @@ class RoomDownloadRepository @Inject constructor(
         val episode = row.episode
         if (episode.serverItemId == null) return false
         val program = db.programDao().findById(episode.programId) ?: return false
-        val path = uniqueTarget(EpisodeFileName.relativePath(program.stationName, program.name, episode.title, episode.container))
+        val path = uniqueTarget(EpisodeFileName.relativePath(program.publisherName, program.name, episode.title, episode.container))
         db.localFileDao().upsert(
             LocalFileEntity(
                 episodeId = episodeId.value,

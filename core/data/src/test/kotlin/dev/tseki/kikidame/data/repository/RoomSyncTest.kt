@@ -52,11 +52,11 @@ class RoomSyncTest : RoomTestBase() {
     private val downloads by lazy { RoomDownloadRepository(db, directory, clock) }
     private val repo by lazy { RoomLibraryRefreshRepository(db, store, gateway, downloads, clock) }
 
-    private fun se(id: String, aired: String, program: String = "album-1") = ServerEpisode(
+    private fun se(id: String, published: String, program: String = "album-1") = ServerEpisode(
         serverId = ServerItemId(id),
         programServerId = ServerItemId(program),
-        title = aired,
-        airedAt = Instant.parse("${aired}T00:00:00Z"),
+        title = published,
+        publishedAt = Instant.parse("${published}T00:00:00Z"),
         addedAt = Instant.parse("2026-09-16T02:00:00Z"),
         runtime = 60.minutes,
         sizeBytes = null,
@@ -464,7 +464,7 @@ class RoomSyncTest : RoomTestBase() {
     @Test
     fun refreshProgramReturnsNullForAProgramWithoutServerId() = runTest {
         signInAndSelect()
-        val id = ProgramId(db.programDao().insert(dev.tseki.kikidame.data.db.ProgramEntity(serverItemId = null, name = "seed", stationName = null)))
+        val id = ProgramId(db.programDao().insert(dev.tseki.kikidame.data.db.ProgramEntity(serverItemId = null, name = "seed", publisherName = null)))
 
         assertNull(repo.refreshProgram(id))
         assertTrue(gateway.fetchedPrograms.isEmpty())

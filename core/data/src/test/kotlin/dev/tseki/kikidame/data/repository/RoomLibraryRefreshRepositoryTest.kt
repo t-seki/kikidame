@@ -48,13 +48,13 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
     private val repo by lazy { RoomLibraryRefreshRepository(db, store, gateway, downloads, clock) }
 
     private val program = "パンサー向井のふらっと"
-    private val station = "TBSラジオ"
+    private val publisher = "TBSラジオ"
 
-    private fun serverEpisode(id: String, title: String, aired: String, runtime: Int = 90) = ServerEpisode(
+    private fun serverEpisode(id: String, title: String, published: String, runtime: Int = 90) = ServerEpisode(
         serverId = ServerItemId(id),
         programServerId = ServerItemId("album-1"),
         title = title,
-        airedAt = Instant.parse(aired),
+        publishedAt = Instant.parse(published),
         addedAt = Instant.parse("2026-09-16T02:00:00Z"),
         runtime = runtime.minutes,
         sizeBytes = null,
@@ -62,7 +62,7 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
     )
 
     private val snapshot = ServerSnapshot(
-        programs = listOf(ServerProgram(ServerItemId("album-1"), program, station)),
+        programs = listOf(ServerProgram(ServerItemId("album-1"), program, publisher)),
         episodes = listOf(
             serverEpisode("audio-1", "$program 2026-09-14-1", "2026-09-13T15:00:00Z"),
             serverEpisode("audio-2", "$program 2026-09-14-2", "2026-09-13T15:00:00Z", runtime = 60),
@@ -89,8 +89,8 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
     fun linksSeededRowsAndAddsServerOnlyEpisodes() = runTest {
         seed(
             listOf(
-                scanned(station = station, program = program, title = "$program 2026-09-14-1", airedAt = "2026-09-13T15:00:00Z"),
-                scanned(station = station, program = program, title = "$program 2026-09-14-2", airedAt = "2026-09-13T15:00:00Z"),
+                scanned(publisher = publisher, program = program, title = "$program 2026-09-14-1", publishedAt = "2026-09-13T15:00:00Z"),
+                scanned(publisher = publisher, program = program, title = "$program 2026-09-14-2", publishedAt = "2026-09-13T15:00:00Z"),
             ),
         )
         val seeded = library.observePrograms().first().single()
@@ -137,7 +137,7 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
         repo.refresh()
 
         gateway.snapshot = snapshot.copy(
-            programs = listOf(ServerProgram(ServerItemId("album-1"), "$program（改）", station)),
+            programs = listOf(ServerProgram(ServerItemId("album-1"), "$program（改）", publisher)),
             episodes = snapshot.episodes.map { if (it.serverId.value == "audio-3") it.copy(title = "renamed") else it },
         )
         val result = repo.refresh()

@@ -5,8 +5,8 @@ data class Program(
     val id: ProgramId,
     val serverItemId: ServerItemId?,
     val name: String,
-    /** 放送局。MusicAlbum の AlbumArtist、手元では番組フォルダの親フォルダ名。 */
-    val stationName: String?,
+    /** 配信元。MusicAlbum の AlbumArtist、手元では番組フォルダの親フォルダ名。 */
+    val publisherName: String?,
     val syncEnabled: Boolean = false,
     val retentionRule: RetentionRule = RetentionRule(),
     /** 消失（CONTEXT.md）: サーバの番組一覧に無く突合でも結び直せなかったと最初に分かった日時。null ならサーバに在る。 */

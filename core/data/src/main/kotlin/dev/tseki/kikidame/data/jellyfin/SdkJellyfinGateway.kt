@@ -10,9 +10,9 @@ import dev.tseki.kikidame.domain.ServerItemId
 import dev.tseki.kikidame.domain.ServerProgram
 import dev.tseki.kikidame.domain.ServerSnapshot
 import dev.tseki.kikidame.domain.Session
-import dev.tseki.kikidame.domain.AiredAt
+import dev.tseki.kikidame.domain.PublishedAt
 import dev.tseki.kikidame.domain.Ticks
-import dev.tseki.kikidame.domain.serverAiredAt
+import dev.tseki.kikidame.domain.serverPublishedAt
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.toLocalDateTime
 import org.jellyfin.sdk.Jellyfin
@@ -133,7 +133,7 @@ class SdkJellyfinGateway @Inject constructor(
     private fun BaseItemDto.toServerProgram() = ServerProgram(
         serverId = ServerItemId(id.toString()),
         name = name.orEmpty(),
-        stationName = albumArtist ?: albumArtists?.firstOrNull()?.name,
+        publisherName = albumArtist ?: albumArtists?.firstOrNull()?.name,
     )
 
     /** `parent` 配下の Audio を 500 件ずつ全部。ライブラリでも番組（MusicAlbum）でも同じ形。 */
@@ -229,7 +229,7 @@ class SdkJellyfinGateway @Inject constructor(
             serverId = ServerItemId(id.toString()),
             programServerId = ServerItemId(albumId.toString()),
             title = name.orEmpty(),
-            airedAt = serverAiredAt(premiereDate?.toKotlinLocalDate(), created.toKotlinLocalDate()),
+            publishedAt = serverPublishedAt(premiereDate?.toKotlinLocalDate(), created.toKotlinLocalDate()),
             addedAt = created.toInstantUtc(),
             runtime = runTimeTicks?.let(Ticks::toDuration) ?: Duration.ZERO,
             // ファイルサイズは基本フィールドに無い（MediaSources を避けるため）。M3 のダウンロードで確定する
@@ -282,7 +282,7 @@ class SdkJellyfinGateway @Inject constructor(
  * （`DateCreated` が JST 9:00 前だと UTC では前日になる。`PremiereDate` は UTC 0 時で来るので同じ日付のまま）。
  */
 internal fun java.time.LocalDateTime.toKotlinLocalDate(): LocalDate =
-    toInstantUtc().toLocalDateTime(AiredAt.ZONE).date
+    toInstantUtc().toLocalDateTime(PublishedAt.ZONE).date
 
 internal fun java.time.LocalDateTime.toInstantUtc(): Instant =
     toInstant(java.time.ZoneOffset.UTC).toKotlinInstant()

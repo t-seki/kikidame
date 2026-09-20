@@ -127,7 +127,7 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
             verticalArrangement = Arrangement.Center,
         ) {
             Text(state.title, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
-            // `放送局 · 出演者`（#70）。無い回や読み込み前も 1 行分の場所は確保して、回が進んだときにタイトルが跳ねないようにする
+            // `配信元 · 出演者`（#70）。無い回や読み込み前も 1 行分の場所は確保して、回が進んだときにタイトルが跳ねないようにする
             Spacer(Modifier.height(4.dp))
             Text(
                 subtitle ?: " ",
