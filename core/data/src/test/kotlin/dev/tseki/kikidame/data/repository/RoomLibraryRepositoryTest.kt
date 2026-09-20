@@ -145,6 +145,10 @@ class RoomLibraryRepositoryTest : RoomTestBase() {
         assertEquals(listOf("X 2026-06-12", "X 2026-06-05"), repo.getRecentlyListened(20).map { it.episode.title })
         // 上限
         assertEquals(listOf("X 2026-06-12"), repo.getRecentlyListened(1).map { it.episode.title })
+        // 記録の上位が聴き始めていない回で埋まっていても、上限 1 で途中の回が返る（絞り込みが LIMIT の前に効く。
+        // ⏭ 連打で通り過ぎた回の記録は普通にできる）
+        db.playbackStateDao().upsert(PlaybackStateEntity(id("X 2026-06-12 (1)"), positionTicks = Ticks.fromDuration(1.seconds), played = false, updatedAt = at(50)))
+        assertEquals(listOf("X 2026-06-12"), repo.getRecentlyListened(1).map { it.episode.title })
         // 手元に無くなった回は出ない
         db.localFileDao().upsert(LocalFileEntity(id("X 2026-06-12"), DownloadState.PENDING, path = null, pinned = false))
         assertEquals(listOf("X 2026-06-05"), repo.getRecentlyListened(20).map { it.episode.title })

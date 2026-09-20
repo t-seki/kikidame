@@ -97,9 +97,9 @@ interface EpisodeDao {
     @Query("SELECT * FROM episodes WHERE id = :id")
     suspend fun findById(id: Long): EpisodeRow?
     /**
-     * 最近聴いた各回の候補（#108）: 手元にあり、再生済みでなく、再生記録がある各回を記録の新しい順に。
-     * 「聴き始めている」（[dev.tseki.kikidame.domain.PlaybackRules.isNotStarted]）の閾値は SQL に埋めず、
-     * 呼び出し側が少し多めに引いて Kotlin で絞る（規則を 1 箇所に残す）。
+     * 最近聴いた各回（#108）: 手元にあり、再生済みでなく、聴き始めている（位置が [notStartedTicks] 以上）各回を
+     * 記録の新しい順に。閾値の値は [dev.tseki.kikidame.domain.PlaybackRules.NOT_STARTED_THRESHOLD] から呼び出し側が渡す
+     * （規則の由来は 1 箇所のまま、絞り込みは SQL で。LIMIT の前に絞らないと上位が未開始の回で埋まったとき空になる）。
      */
     @Transaction
     @Query(
@@ -107,12 +107,12 @@ interface EpisodeDao {
         SELECT e.* FROM episodes e
           JOIN local_files lf ON lf.episodeId = e.id
           JOIN playback_states ps ON ps.episodeId = e.id
-        WHERE lf.state = 'DONE' AND lf.path IS NOT NULL AND ps.played = 0
+        WHERE lf.state = 'DONE' AND lf.path IS NOT NULL AND ps.played = 0 AND ps.positionTicks >= :notStartedTicks
         ORDER BY ps.updatedAt DESC, e.id DESC
         LIMIT :limit
         """,
     )
-    suspend fun listRecentlyListenedCandidates(limit: Int): List<EpisodeRow>
+    suspend fun listRecentlyListened(limit: Int, notStartedTicks: Long): List<EpisodeRow>
     @Query("SELECT * FROM episodes WHERE serverItemId = :serverItemId")
     suspend fun findByServerItemId(serverItemId: String): EpisodeEntity?
     @Query("SELECT id, serverItemId, programId, title, airedAt AS publishedAt, runtimeTicks FROM episodes")
