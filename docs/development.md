@@ -54,6 +54,37 @@ Robolectric が SDK 37 で JDK 内部 API へアクセスするための `--add-
 Room のスキーマは `core/data/schemas/` に書き出す（`room { schemaDirectory(...) }`）。
 Entity を変えたら version を上げ、書き出された JSON もコミットする。
 
+## リリース（#94）
+
+配布は GitHub Releases の署名済み APK（ADR 0008）。`v*` のタグを push すると `.github/workflows/release.yml` が
+release APK をビルドし、`kikidame-<version>.apk` と R8 の `mapping-<version>.txt` を Release に添付する。
+
+### 署名鍵
+
+- upload 鍵は repo の外（例: `~/.android-keys/kikidame-upload.jks`、alias `kikidame`）。**失うと以後の更新を配れない**ので、
+  keystore ファイルとパスフレーズをパスワードマネージャとオフラインの 2 箇所に控える
+- ビルドは環境変数から読む。無ければ署名無しでビルドする（CI の `test` と、鍵を持たない人の `assembleRelease` を通すため）
+
+  ```bash
+  export KIKIDAME_KEYSTORE=~/.android-keys/kikidame-upload.jks
+  export KIKIDAME_KEYSTORE_PASSWORD=…   # 鍵のパスワードが別なら KIKIDAME_KEY_PASSWORD も
+  export KIKIDAME_KEY_ALIAS=kikidame
+  ./gradlew :app:assembleRelease         # app/build/outputs/apk/release/app-release.apk
+  ```
+
+- GitHub Actions 用の Secrets: `KEYSTORE_BASE64`（`base64 -w0 kikidame-upload.jks`）、`KEYSTORE_PASSWORD`、`KEY_ALIAS`、`KEY_PASSWORD`
+- 署名を確かめる: `apksigner verify --print-certs app-release.apk`（`build-tools/<ver>/apksigner`）。Releases の APK と手元のビルドで証明書の SHA-256 が一致すること
+
+### 版を上げて出す
+
+1. `app/build.gradle.kts` の `versionCode`（単調増加の整数。F-Droid はこれを見る）と `versionName`（`X.Y.Z`）を上げる PR をマージする
+2. `git tag vX.Y.Z && git push origin vX.Y.Z`。タグと `versionName` が食い違うと workflow が止まる
+3. Release が作られたら、Obtainium で更新が見えることと、実機で `adb install -r` して既存データが残ることを確認する
+
+release ビルドは R8 と resource shrinking を有効にしている（APK は約 8 MB、debug は約 85 MB）。
+ライブラリの consumer rules で足りていて `app/proguard-rules.pro` は最小限。縮小で壊れたら、`mapping-<version>.txt` でスタックトレースを戻せる。
+`res/raw/aboutlibraries.json` はコードから参照しているので shrinker に消されない（消えたら設定のライセンス一覧が空になる）。
+
 ## 並行作業（複数の Claude Code セッション）
 方針は `~/.claude/CLAUDE.md` の「Parallel Work」（作業セッションは全部 worktree、main のチェックアウトは統合専用）。この repo 固有の手順:
 - worktree は repo 直下の `.claude/worktrees/`（`.gitignore` 済み）。`local.properties` は git 管理外なので、新しい worktree に `cp local.properties <worktree>/` する

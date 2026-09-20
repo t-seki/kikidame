@@ -1,0 +1,70 @@
+name: Release
+# v1.2.3 のタグを push すると release APK をビルドして GitHub Release に添付する（#94）。
+# 署名鍵は Secrets: KEYSTORE_BASE64（.jks を base64 にしたもの）、KEYSTORE_PASSWORD、KEY_ALIAS、KEY_PASSWORD。
+# APK の名前は kikidame-<version>.apk に固定する（Obtainium が追いやすい）。
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # 直前のタグの versionCode と比べるため
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platforms;android-37.0 build-tools;36.0.0 platform-tools
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Check that the tag matches versionName
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          name="$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' app/build.gradle.kts)"
+          if [ "$tag" != "$name" ]; then
+            echo "tag v$tag does not match versionName $name in app/build.gradle.kts" >&2
+            exit 1
+          fi
+      - name: Check that versionCode increased since the previous tag
+        # versionCode を上げ忘れると Release はできるのに利用者は更新できない（インストーラも Obtainium も新版と見なさない）
+        run: |
+          code="$(sed -n 's/.*versionCode = \([0-9]*\).*/\1/p' app/build.gradle.kts)"
+          prev="$(git describe --tags --abbrev=0 --match 'v*' "${GITHUB_REF_NAME}^" 2>/dev/null || true)"
+          if [ -z "$prev" ]; then
+            echo "no previous tag; versionCode=$code"
+            exit 0
+          fi
+          prev_code="$(git show "$prev:app/build.gradle.kts" | sed -n 's/.*versionCode = \([0-9]*\).*/\1/p')"
+          echo "previous $prev versionCode=$prev_code, this versionCode=$code"
+          if [ -z "$code" ] || [ -z "$prev_code" ] || [ "$code" -le "$prev_code" ]; then
+            echo "versionCode must increase (previous $prev_code, now $code)" >&2
+            exit 1
+          fi
+      - name: Decode keystore
+        run: echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      - name: Build signed release APK
+        run: ./gradlew :app:assembleRelease --no-daemon
+        env:
+          KIKIDAME_KEYSTORE: ${{ runner.temp }}/upload.jks
+          KIKIDAME_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KIKIDAME_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KIKIDAME_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      - name: Rename APK and keep the R8 mapping
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          mv app/build/outputs/apk/release/app-release.apk "kikidame-$version.apk"
+          cp app/build/outputs/mapping/release/mapping.txt "mapping-$version.txt"
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            kikidame-*.apk
+            mapping-*.txt
+          generate_release_notes: true
