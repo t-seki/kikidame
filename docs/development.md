@@ -154,7 +154,10 @@ debug 版は初回（とアンインストールの後）にサーバへのロ�
 
 ### マージの承認
 
-承認制。PR のビルドを実機の debug 版に入れ、人が見てからマージしたい（docs だけの PR でも自動にはしない）。
+承認制。
+
+- アプリに変更がある PR: ビルドを実機の debug 版に入れ、人が見てからマージする
+- docs だけの PR: これも承認制。実機の確認は無く、人が差分を見て決める
 
 ### マージ後の確認（デプロイ）
 
@@ -170,15 +173,16 @@ WSL2 は USB を見られないが、LAN 上の端末には TCP で届く。Wind
 ファイアウォール設定は不要。PC が有線でも、端末と同じルータの下にいればよい。
 
 1. 端末: 開発者向けオプション → ワイヤレスデバッグ ON → 「ペア設定コードによるデバイスのペア設定」
-2. WSL2（初回のみ。ダイアログを開いたまま）:
+2. WSL2（初回と、鍵が合わなくなったとき。ダイアログを開いたまま）:
    ```bash
    ADB=~/Android/Sdk/platform-tools/adb
    PKG=dev.tseki.kikidame.debug
+   $ADB mdns services                   # _adb-tls-pairing._tcp の行がペア設定の IP:ポート（ダイアログを開いている間だけ出る）
    $ADB pair <ペア設定の IP:ポート> <6 桁コード>
    ```
    `PKG` は debug 版の applicationId で、以下の手順の `$PKG` はこれを指す。release 版（`dev.tseki.kikidame`、Releases の APK）は
    debuggable でないので `run-as` が効かない。開発中の確認は debug 版で行う（#128）
-   ペア設定の IP:ポートは、ダイアログを開いている間だけ `$ADB mdns services` の `_adb-tls-pairing._tcp` に出る。
+
    人に聞くのは 6 桁コードだけでよい
 3. 接続（端末の再起動後はポートが変わるので都度）:
    ```bash
@@ -190,7 +194,7 @@ WSL2 は USB を見られないが、LAN 上の端末には TCP で届く。Wind
    ```bash
    tail -n 20 /tmp/adb.$(id -u).log
    ```
-   `SSLV3_ALERT_CERTIFICATE_UNKNOWN` なら、端末がこの PC の鍵（`~/.android/adbkey`）を知らない。2 からペアリングし直す
+   `SSLV3_ALERT_CERTIFICATE_UNKNOWN` なら、端末がこの PC の鍵（`~/.android/adbkey`）を知らない。1 からペアリングし直す
    （2026-09-23 は、adb デーモンの起動時に鍵が新しく作られていてこうなった）。端末の開発者向けオプションの
    「ADB 認証のタイムアウトを無効にする」が OFF だと、7 日使わなかった PC の承認も切れる
 4. インストールは Gradle から。複数に見えるときは `ANDROID_SERIAL` で接続用の名前を指定する:
