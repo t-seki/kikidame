@@ -169,9 +169,10 @@ WSL2 は USB を見られないが、LAN 上の端末には TCP で届く。Wind
 2. WSL2（初回のみ。ダイアログを開いたまま）:
    ```bash
    ADB=~/Android/Sdk/platform-tools/adb
+   PKG=dev.tseki.kikidame.debug
    $ADB pair <ペア設定の IP:ポート> <6 桁コード>
    ```
-   以下の手順の `$PKG` は debug 版の applicationId（`PKG=dev.tseki.kikidame.debug`）。release 版（`dev.tseki.kikidame`、Releases の APK）は
+   `PKG` は debug 版の applicationId で、以下の手順の `$PKG` はこれを指す。release 版（`dev.tseki.kikidame`、Releases の APK）は
    debuggable でないので `run-as` が効かない。開発中の確認は debug 版で行う（#128）
 3. 接続（端末の再起動後はポートが変わるので都度）:
    ```bash
@@ -398,9 +399,9 @@ Auto はブラウズツリーを開き直すたびに `onGetChildren` を呼ぶ�
 
 ### 実機チェックリスト（#96: Android Auto）
 
-DHU での確認。subagent の作業セッションでは行わず、マージ後に main のチェックアウトから行う。
+DHU での確認。fork の作業セッションでは行わない。マージ前に fork が作った debug APK を Supervisor が実機の debug 版に入れて行う（「Supervisor」節の「マージ前の検証」）。
 
-- [ ] DHU のメディア一覧に Kikidame が出る
+- [ ] DHU のメディア一覧に Kikidame (debug) が出る
 - [ ] ルートに「続きから」「よく聴く」「番組」のタブが出る（よく聴くの印を全部外すと「よく聴く」が消え、途中の回が無ければ「続きから」が消える）
 - [ ] 「続きから」（#108）は途中まで聴いた回が番組をまたいで最近聴いた順に並び、再生済みの回・手元に無い回・数秒しか聴いていない回は出ない
 - [ ] 「番組」は手元に回がある番組だけで、最新回の公開日順。番組を開くと手元にある回だけが新しい順に並び、番組名・配信元・公開日が見える
