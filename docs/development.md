@@ -163,6 +163,8 @@ debug 版は初回（とアンインストールの後）にサーバへのロ�
 
 ### マージ後の確認（デプロイ）
 
+docs だけの PR は `git pull --ff-only` までで、以下は行わない。以下はアプリに変更がある PR をマージしたとき。
+
 - main で `git pull --ff-only` した後、`./gradlew :app:installDebug` で debug 版を main のビルドに入れ直す（接続は下の「実機で試す（M1）」）
 - Room のスキーマを上げた PR をマージした後は、それより古い debug ビルドを入れない（入れるなら先にアンインストールする）
 - release 版は、Supervisor がマージのたびに触るものではない。更新は「リリース」節の手順（タグ → Releases → Obtainium / `adb install -r`）で行う
