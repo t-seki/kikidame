@@ -31,6 +31,11 @@ android {
         }
     }
     buildTypes {
+        // 実機では Releases の release 版（普段使い）と並べて入れる。PR の検証ビルドやスキーマを上げたビルドを
+        // 入れても release 版のデータに触れない（#128）。アプリ名は src/debug/res で「Kikidame (debug)」
+        debug {
+            applicationIdSuffix = ".debug"
+        }
         release {
             if (keystorePath != null) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
