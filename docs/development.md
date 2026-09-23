@@ -144,6 +144,8 @@ main のチェックアウトから fork subagent に並列で実装させて回
 
 ### マージ前の検証
 
+docs だけの PR は 1（CI）だけ。2〜5 はアプリに変更がある PR で行う。
+
 1. CI（`./gradlew test` と `./gradlew :app:lintDebug`）が通っている
 2. 担当の fork に `./gradlew :app:assembleDebug` を頼み、APK のフルパス（`<worktree>/app/build/outputs/apk/debug/app-debug.apk`）を報告させる
 3. Supervisor が `$ADB install -r <APK>` で実機の **debug 版**に入れる。debug 版は applicationId が `dev.tseki.kikidame.debug`、アプリ名が「Kikidame (debug)」で、普段使いの **release 版**（`dev.tseki.kikidame`、Releases の APK）とは別アプリとして並ぶ。release 版には触らない
