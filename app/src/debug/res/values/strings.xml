@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug build only: tells it apart from the release app installed side by side (applicationIdSuffix ".debug", #128). -->
+<resources>
+    <string name="app_name" translatable="false">Kikidame (debug)</string>
+</resources>

@@ -124,50 +124,39 @@ release ビルドは R8 と resource shrinking を有効にしている（APK �
 `res/raw/aboutlibraries.json` はコードから参照しているので shrinker に消されない（消えたら設定のライセンス一覧が空になる）。
 
 ## 並行作業（複数の Claude Code セッション）
-方針は `~/.claude/CLAUDE.md` の「Parallel Work」（作業セッションは全部 worktree、main のチェックアウトは統合専用）。この repo 固有の手順:
-- worktree は repo 直下の `.claude/worktrees/`（`.gitignore` 済み）。`local.properties` は git 管理外なので、新しい worktree に `cp local.properties <worktree>/` する
-- Gradle の成果物（`build/`）は worktree ごとに別なので初回ビルドが重い。`~/.gradle` のキャッシュは共有されるので依存の再ダウンロードは無い
-- 実機は 1 台。`adb install` は main のチェックアウトからだけ行い、作業セッションは実機を触らない（触るならひと言告げる）。再生画面を開く確認は音が出るので避ける
-- Room のスキーマを上げる PR がマージされたら、それより古いビルドを実機に入れない（DB のダウングレードで落ちる）
+
+方針は `~/.claude/CLAUDE.md` の「Parallel Work」（作業セッションは全部 worktree、main のチェックアウトは統合専用、作業セッションの閉じ方もそこ）。
+main のチェックアウトから fork subagent に並列で実装させて回す手順は、共通 skill `/supervise`（dotfiles）にある。skill はこの repo 固有の手順として下の「Supervisor」節を読む。人が立ち上げる別セッションで作業するときも、worktree の準備は同じ節に従う。
+
+- 実機は 1 台。触るのは Supervisor（main のチェックアウトにいるセッション）だけで、作業セッションは実機を触らない（触るならひと言告げる）
+- 閉じ方と掃除の手順は、2026-09-20 に main のローカルにマージ済みブランチ 8 本と用済みの worktree 1 つが残っていたのが由来（#84）。今は CLAUDE.md と `/supervise` にある
+
+## Supervisor
+
+`/supervise`（dotfiles の共通 skill）が読む repo 固有の手順。2026-09-20 からこの docs に書いて回していた手順のうち、どの repo でも同じ部分を #128 で skill に移した。
+
+### worktree の準備
+
+- fork の worktree は repo 直下の `.claude/worktrees/`（`.gitignore` 済み）に切られる
+- `local.properties` は git 管理外なので、main のチェックアウトから worktree 直下にコピーする（`cp local.properties <worktree>/`）
+- Gradle は `JAVA_HOME=~/.local/jdk/current` を付けて回す。`build/` は worktree ごとに別なので初回ビルドが重い。`~/.gradle` のキャッシュは共有されるので依存の再ダウンロードは無い
 - 担当は「同じファイルを触らない」単位で分ける（例: 2026-09-20 は `EpisodeListScreen.kt` 周りの #66→#68→#70 と、テーマ・設定・ミニプレイヤーの #59→#62 に分けて衝突なし）
 
-### 作業セッションの閉じ方（#84）
+### マージ前の検証
 
-2026-09-20 に main のローカルにマージ済みブランチ 8 本と用済みの worktree 1 つが残っていた。原因は、1 つの worktree で #66→#68→#70→#82 と 4 本の PR を回して worktree とブランチが 1:1 でなかったこと、`gh pr merge --delete-branch` がチェックアウト中のブランチをローカルでは消せないこと、レビュー用に `gh pr checkout` した `pr-N` ブランチを消していなかったこと。
+1. CI（`./gradlew test` と `./gradlew :app:lintDebug`）が通っている
+2. 担当の fork に `./gradlew :app:assembleDebug` を頼み、APK のフルパス（`<worktree>/app/build/outputs/apk/debug/app-debug.apk`）を報告させる
+3. Supervisor が `$ADB install -r <APK>` で実機の **debug 版**に入れる。debug 版は applicationId が `dev.tseki.kikidame.debug`、アプリ名が「Kikidame (debug)」で、普段使いの **release 版**（`dev.tseki.kikidame`、Releases の APK）とは別アプリとして並ぶ。release 版には触らない
+4. Room のスキーマを上げる PR も入れてよい（影響は debug 版に閉じる）。その後にスキーマの古いビルドを入れてダウングレードで落ちたら、`$ADB uninstall dev.tseki.kikidame.debug` してから入れ直す（debug 版のログイン・DB・手元のファイルが消える）
+5. 人に実機で見てほしい点を PR ごとに示す。再生画面を開く確認は音が出るので避ける（出すなら実機の音量をハードキーで 0 にしてから）
 
-- worktree の寿命は 1 セッション = 1 issue（密結合した issue の連鎖 1 本まで）。マージしたら別の仕事に流用せず閉じる。次の仕事は EnterWorktree で入り直す（既定で `origin/main` から切るので「main の HEAD から切る」も満たす）
-- 閉じる手順（worktree の中で）:
-  ```bash
-  /usr/bin/git checkout --detach origin/main     # 掴んでいるブランチを離す
-  /usr/bin/git branch -D feat/<自分で切ったブランチ>
-  ```
-  そのあと ExitWorktree(remove)。ExitWorktree はユーザーが言ったときだけ動くので、マージ後に「worktree を消して抜けて」と一言（セッション終了時の keep/remove で remove でもよい）。ExitWorktree が消すのは EnterWorktree が作った `worktree-<name>` ブランチだけなので、自分で切ったブランチは先に消しておく
-- レビューは `gh pr diff` / `gh pr view` で読む。テストを走らせて確かめるときだけ worktree に入って checkout し、終わったら同じ手順で消す。実機に入れるのは上の通り main からだけ。main 側に `pr-N` ブランチを作らない
+debug 版は初回（とアンインストールの後）にサーバへのログインと同期が要る。以後は `install -r` でデータが残る。
 
-### 調整役セッション（main のチェックアウト）の責務
+### マージ後の確認（デプロイ）
 
-作業セッションは自分の issue しか見ていないので、横断する仕事は main のチェックアウトにいるセッションが持つ。
-
-- 入口: epic を sub-issue に割り、各 issue に「触るファイル」を書く。作業セッションは issue を読んで自分で EnterWorktree する
-- 出口: PR が来たら `/code-review:code-review` を回す（レビュー用の subagent は `pr-reviewer`（read-only）。general-purpose に振ると `gh pr checkout` して main 側に `pr-N` を作ることがある）。マージ順を決め、`gh pr merge --squash --delete-branch` → `git pull --ff-only` → `installDebug`。Room のスキーマ版数を上げる PR の後に古いビルドを入れないチェックもここ
-- 掃除（マージのたび、セッション終了時に必ず）:
-  ```bash
-  git fetch --prune
-  git worktree prune
-  git worktree list      # 残っていれば git worktree remove <path>
-  git for-each-ref refs/heads --format='%(refname:short) %(upstream:track)' | awk '$2=="[gone]" || $1 ~ /^pr-?[0-9]/{print $1}' | xargs -r git branch -D
-  for b in $(git for-each-ref refs/heads --format='%(refname:short)' | grep '^worktree-'); do [ -d ".claude/worktrees/${b#worktree-}" ] || git branch -D "$b"; done
-  ```
-  1 行目は `gone`（`--delete-branch` でマージ済みのもの）と、general-purpose のレビュー subagent が `gh pr checkout` で作る `pr-N` を消す。チェックアウト中のブランチは `-D` が失敗して次に進むだけ。
-  2 行目は EnterWorktree / `Agent` が作る `worktree-<name>` を、対応する `.claude/worktrees/<name>` が無いときだけ消す（作業中のセッションは `feat/…` に乗り換えた後も `worktree-<name>` を持っているので、ディレクトリの有無で見る）。
-  `git branch` ではなく `for-each-ref` なのは、rtk が `git branch` の出力を整形して `* ` の行を足すため。upstream 無しのブランチを全部消す条件にはしない: worktree で切って push 前に worktree だけ消した `feat/…` まで消える（2026-09-20 に #85 のマージ後、`worktree-agent-<id>` と `pr85-view` が残ったのがこの手順の由来）
-- 横串: 先にマージされた PR が後の PR に影響するとき、該当 issue にコメントを書く（「#N がマージされたので rebase して」）。同じマシンのセッションには `SendMessage` で通知してもよいが、正とするのは issue コメント（メッセージは揮発する）
-- やらないこと: 実装（小物でも worktree に振る）、会話を状態の置き場にすること（cold start しても GitHub だけで復帰できる状態を保つ）、`/loop` での PR 監視（人が「PR 出た」と一言投げる）
-- 対話が要らない issue（docs、issue を読めば完結する小さな実装）は、調整役から `Agent` を `isolation: "worktree"` で起動して任せてもよい。subagent は人に質問できないので、grill は起動前に調整役で済ませて issue / ADR に落としておく。subagent の worktree は変更があれば残るので、マージ後に上の掃除で消す
-
-### `~/.claude/CLAUDE.md` の「Parallel Work」との関係
-
-方針（全部 worktree・main は統合専用・共有は GitHub と docs と実機だけ）はそのまま。上の 2 節は repo 固有の手順で、CLAUDE.md は変えない。閉じ方と調整役の責務が他の repo でも使えると分かったら、その時点で CLAUDE.md（dotfiles）に格上げする。
+- main で `git pull --ff-only` した後、`./gradlew :app:installDebug` で debug 版を main のビルドに入れ直す（接続は下の「実機で試す（M1）」）
+- Room のスキーマを上げた PR をマージした後は、それより古い debug ビルドを入れない（入れるなら先にアンインストールする）
+- release 版は、Supervisor がマージのたびに触るものではない。更新は「リリース」節の手順（タグ → Releases → Obtainium / `adb install -r`）で行う
 
 ## 実機で試す（M1）
 
@@ -182,6 +171,8 @@ WSL2 は USB を見られないが、LAN 上の端末には TCP で届く。Wind
    ADB=~/Android/Sdk/platform-tools/adb
    $ADB pair <ペア設定の IP:ポート> <6 桁コード>
    ```
+   以下の手順の `$PKG` は debug 版の applicationId（`PKG=dev.tseki.kikidame.debug`）。release 版（`dev.tseki.kikidame`、Releases の APK）は
+   debuggable でないので `run-as` が効かない。開発中の確認は debug 版で行う（#128）
 3. 接続（端末の再起動後はポートが変わるので都度）:
    ```bash
    $ADB connect <接続用の IP:ポート>     # ワイヤレスデバッグ画面の上部に出ている方
@@ -234,7 +225,7 @@ M1 ではサーバ無しで試すため、`getExternalFilesDir("episodes")/<配�
   DNS だけ通る（名前解決は成功し、接続が 6 秒でタイムアウトする）。初回起動の権限ダイアログで許可する。
   `adb shell` の `nc` は対象外なので疎通確認に使えない。アプリの UID で試す:
   ```bash
-  $ADB shell "run-as dev.tseki.kikidame sh -c 'timeout 6 nc -z <host> 443; echo rc=\$?'"   # rc=124 なら落ちている
+  $ADB shell "run-as $PKG sh -c 'timeout 6 nc -z <host> 443; echo rc=\$?'"   # rc=124 なら落ちている
   ```
 - ゲートウェイの失敗は `JellyfinGateway` タグに原因の連鎖を出す:
   ```bash
@@ -266,7 +257,7 @@ M1 ではサーバ無しで試すため、`getExternalFilesDir("episodes")/<配�
 LAN では 10 MB が 0.5 秒で落ちるので、ダウンロード中に kill しても再開の経路を踏めない。代わりに「途中まで落ちた状態」を作る:
 
 ```bash
-$ADB shell am force-stop dev.tseki.kikidame
+$ADB shell am force-stop $PKG
 # DB を引き出し、対象の local_files.state を 'DONE' → 'PENDING' に書き換えて戻す（development.md 上の「DB だけ消す」と同じ run-as 手順）
 $ADB shell "head -c 5000000 '<path>' > '<path>.part' && rm '<path>'"
 $ADB logcat -c && <アプリを起動>
@@ -295,12 +286,12 @@ $ADB logcat -d | grep JellyfinGateway   # download <id> from 5000000 -> HTTP 206
 定期同期は WorkManager の `sync-periodic`（6 時間）、起動時同期は `sync-once`。状態は次で見える:
 
 ```bash
-$ADB shell dumpsys jobscheduler | grep -A3 "dev.tseki.kikidame" | head -40
+$ADB shell dumpsys jobscheduler | grep -A3 "$PKG" | head -40
 $ADB logcat -d | grep -E "SyncWorker|LibraryRefresher"   # "sync: 番組 N / 各回 M を取得。…"
 ```
 
 起動時同期は前回同期から 1 時間以上あけないと積まれない（ログイン直後の初回取得も同期なので、ログインし直しでは試せない）。
-待たずに Worker を走らせるなら、`dumpsys jobscheduler` で WorkManager のジョブ ID を見て `adb shell cmd jobscheduler run -f dev.tseki.kikidame <jobId>`。
+待たずに Worker を走らせるなら、`dumpsys jobscheduler` で WorkManager のジョブ ID を見て `adb shell cmd jobscheduler run -f $PKG <jobId>`。
 
 ### 実機チェックリスト（M3-b）
 
@@ -334,10 +325,10 @@ $ADB logcat -d | grep -E "SyncWorker|LibraryRefresher"   # "sync: 番組 N / 各
 (b) サーバ側で 1 番組のフォルダを外してスキャン、(c) デバッグビルドなら端末の DB を書き換える（2026-09-18 に採用）:
 
 ```bash
-$ADB shell am force-stop dev.tseki.kikidame
-$ADB shell "run-as dev.tseki.kikidame sh -c 'cat databases/kikidame.db'" > dev.db   # -wal も取り、python の sqlite3 で checkpoint
+$ADB shell am force-stop $PKG
+$ADB shell "run-as $PKG sh -c 'cat databases/kikidame.db'" > dev.db   # -wal も取り、python の sqlite3 で checkpoint
 # programs の 1 行を UPDATE: serverItemId を偽の UUID に、name に「（旧）」を付ける（同名だと突合で結び直される）
-$ADB push dev.db /data/local/tmp/ && $ADB shell "run-as dev.tseki.kikidame sh -c 'rm -f databases/kikidame.db-wal databases/kikidame.db-shm; cat /data/local/tmp/dev.db > databases/kikidame.db'"
+$ADB push dev.db /data/local/tmp/ && $ADB shell "run-as $PKG sh -c 'rm -f databases/kikidame.db-wal databases/kikidame.db-shm; cat /data/local/tmp/dev.db > databases/kikidame.db'"
 ```
 
 番組一覧を引っ張ると「1 番組はサーバ上で見つからず、そのままにしました」と出る。(c) では各回の ID が本物のままなので、各回はサーバの言うとおり
@@ -361,7 +352,7 @@ $ADB push dev.db /data/local/tmp/ && $ADB shell "run-as dev.tseki.kikidame sh -c
 ### 準備（1 回だけ）
 
 1. SDK Manager（`sdkmanager --install "extras;google;auto"`、または Android Studio の SDK Tools → "Android Auto Desktop Head Unit Emulator"）で DHU を入れる。`~/Android/Sdk/extras/google/auto/desktop-head-unit` に置かれる。WSL2 では WSLg があれば GUI がそのまま出る（Linux 版のバイナリなので `chmod +x` が要ることがある）
-2. スマホに Play から Android Auto アプリを入れ、開発者モードにする: Android Auto の設定 → 「バージョン」を 10 回タップ → 右上メニュー「開発者向け設定」→ **「提供元不明のアプリ」を ON**（デバッグビルドの Kikidame は Play を通っていないので、これが無いと一覧に出ない）→ 同じメニューの「ヘッドユニット サーバーを起動」
+2. スマホに Play から Android Auto アプリを入れ、開発者モードにする: Android Auto の設定 → 「バージョン」を 10 回タップ → 右上メニュー「開発者向け設定」→ **「提供元不明のアプリ」を ON**（debug 版の「Kikidame (debug)」も release 版も Play を通っていないので、これが無いと一覧に出ない）→ 同じメニューの「ヘッドユニット サーバーを起動」
 3. アプリを実機に入れる（`./gradlew :app:installDebug`。main のチェックアウトから）
 
 ### つなぐ
@@ -371,7 +362,7 @@ $ADB forward tcp:5277 tcp:5277
 ~/Android/Sdk/extras/google/auto/desktop-head-unit
 ```
 
-DHU の窓が開き、スマホ側で Android Auto が始まる。DHU のメディアタブ（音符のアイコン）に Kikidame が出る。出ないときは「提供元不明のアプリ」と、`AndroidManifest.xml` の `<meta-data android:name="com.google.android.gms.car.application">` と `android.media.browse.MediaBrowserService` の action を疑う。DHU 側で `Ctrl+M` の後に `d` でデイ／ナイトが切り替わり、コンソールには `help` でコマンド一覧が出る（`mic play <file>` は使わない: 音声アシスタントは非目標）。
+DHU の窓が開き、スマホ側で Android Auto が始まる。DHU のメディアタブ（音符のアイコン）に Kikidame が出る（debug 版と release 版の両方が入っていれば 2 つ並ぶ。確認するのは「Kikidame (debug)」）。出ないときは「提供元不明のアプリ」と、`AndroidManifest.xml` の `<meta-data android:name="com.google.android.gms.car.application">` と `android.media.browse.MediaBrowserService` の action を疑う。DHU 側で `Ctrl+M` の後に `d` でデイ／ナイトが切り替わり、コンソールには `help` でコマンド一覧が出る（`mic play <file>` は使わない: 音声アシスタントは非目標）。
 
 Auto はブラウズツリーを開き直すたびに `onGetChildren` を呼ぶので、ダウンロードや同期で手元の回が増減したら、タブを行き来すれば最新になる（変化の押し通知は今はしない）。
 
@@ -391,7 +382,7 @@ Auto はブラウズツリーを開き直すたびに `onGetChildren` を呼ぶ�
 - DHU を途中で落とすとスマホのヘッドユニットサーバーが「Already connected」で固まる（`DeveloperHeadUnitNetworkService` の FATAL）。DHU 側は「Waiting for phone」のまま。Android Auto の ⋮ から「ヘッドユニット サーバーを停止」→「起動」で直る
 - WSLg では `DISPLAY=:0 xwininfo -root -tree` で "Android Auto - Desktop Head Unit" の窓 ID を取り、`DISPLAY=:0 import -window <id> shot.png`（ImageMagick）で DHU の画面が撮れる。右半分に Google マップの現在地が映るので、共有するときは注意
 - portaudio の `Device unavailable` は無視してよい（DHU 側で音は出ないが再生は進む）
-- 実機に release 署名のビルドが入っているときは `installDebug` が `INSTALL_FAILED_UPDATE_INCOMPATIBLE`（署名不一致）で失敗する。データを残したまま更新するなら release 署名で上書きする:
+- debug 版は applicationId が別（`dev.tseki.kikidame.debug`、#128）なので、`installDebug` は release 版に触らない（#128 より前は同じ ID だったので、release 版の入った実機では `INSTALL_FAILED_UPDATE_INCOMPATIBLE`（署名不一致）で失敗していた）。release 版そのものをデータを残したまま手元のビルドで更新するなら、release 署名で上書きする:
 
   ```bash
   source ~/.android-keys/kikidame.env          # export KIKIDAME_KEYSTORE=… 等を書いた chmod 600 のファイル（git 管理外）
@@ -419,7 +410,7 @@ DHU での確認。subagent の作業セッションでは行わず、マージ�
 - [ ] Auto の再生画面に「10 秒戻る」「10 秒進む」が出る（Media3 の `setMediaButtonPreferences` の `SLOT_BACK` / `SLOT_FORWARD`。出なければ `SessionCommand` のカスタムコマンドで足す）
 - [ ] DHU を閉じてもスマホの通知・ロック画面の操作（再生・一時停止・±10 秒・倍速・スリープタイマー）に退行が無い
 - [ ] アプリを開かずに DHU から再生を始めると、その後スマホでアプリを開いたときミニプレイヤーにその回が載る（ADR 0006 の addendum）
-- [ ] 再開（#108）: 再生を止めてアプリのプロセスを殺し（`adb shell am force-stop dev.tseki.kikidame`）、DHU の Kikidame の ▶ か「最近」（端末の再起動直後にシステムが出す再開の候補）から、最後に聴いていた回がその番組のキューごと保存位置から始まる（`onPlaybackResumption`）。スマホ側では、プロセスを殺した後に通知シェードに Kikidame の再開カードが出て、▶ で同じく続きから始まる（`MediaButtonReceiver` の宣言が要る。#119）
+- [ ] 再開（#108）: 再生を止めてアプリのプロセスを殺し（`adb shell am force-stop $PKG`）、DHU の Kikidame の ▶ か「最近」（端末の再起動直後にシステムが出す再開の候補）から、最後に聴いていた回がその番組のキューごと保存位置から始まる（`onPlaybackResumption`）。スマホ側では、プロセスを殺した後に通知シェードに Kikidame の再開カードが出て、▶ で同じく続きから始まる（`MediaButtonReceiver` の宣言が要る。#119）
 
 2026-09-20 に #112 で DHU で確認した。未確認のまま残っているのは「よく聴くを全部外した場合にタブが消えること」「再生済みの回の印」「ロック画面の操作」と、英語 UI の実機確認、#108 で足した「続きから」タブと「再開」の 2 項目。各回の副題に公開日が出ない件は #113。
 
@@ -431,16 +422,16 @@ DHU での確認。subagent の作業セッションでは行わず、マージ�
 DB を消すときは `files/episodes/` も一緒に消すこと:
 
 ```bash
-D=/storage/emulated/0/Android/data/dev.tseki.kikidame/files/episodes
+D=/storage/emulated/0/Android/data/$PKG/files/episodes
 $ADB shell "rm -rf '$D'"
 ```
 
 突き合わせ（行の無いファイルと、行はあるのにファイルが無い回を列挙し、前者を `stray.txt` に書く）:
 
 ```bash
-D=/storage/emulated/0/Android/data/dev.tseki.kikidame/files/episodes
+D=/storage/emulated/0/Android/data/$PKG/files/episodes
 for f in kikidame.db kikidame.db-wal; do
-  $ADB shell "run-as dev.tseki.kikidame sh -c 'cat databases/$f'" > dev-$f < /dev/null
+  $ADB shell "run-as $PKG sh -c 'cat databases/$f'" > dev-$f < /dev/null
 done
 $ADB shell "find '$D' -type f ! -name '*.part'" | sort > disk.txt
 python3 - <<'PY'
