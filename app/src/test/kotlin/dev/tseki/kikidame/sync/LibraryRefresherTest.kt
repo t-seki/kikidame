@@ -145,34 +145,54 @@ class LibraryRefresherTest {
     private fun nowPlaying(episodeId: Long, ended: Boolean = false) =
         NowPlayingState(EpisodeId(episodeId), "title", "program", isPlaying = !ended, isEnded = ended)
 
+    /** 手動で変化が無ければ「最新の状態です」。取得した件数は出さない（#142）。 */
     @Test
-    fun successEmitsCountsMessage() = runTest(StandardTestDispatcher()) {
+    fun manualRefreshWithoutChangesSaysUpToDate() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { result = RefreshResult(3, 40, 1, 6, now) }
         val refresher = refresher(repo)
 
         refresher.messages.test {
             assertEquals(3, refresher.refresh()?.programs)
-            assertEquals(sentences(UiText.Res(R.string.sync_fetched, 3, 40)), awaitItem())
+            assertEquals(upToDate, awaitItem())
         }
         assertFalse(refresher.isRefreshing.value)
     }
 
     @Test
-    fun syncMessageListsWhatHappened() {
-        // 「番組 3 / 各回 40 を取得。5 回をダウンロード予約、3 回を削除。1 番組はサーバ上で見つからず、そのままにしました」
+    fun syncMessageListsOnlyTheChanges() {
+        // 「新しい回 4 件。5 回をダウンロード予約、3 回を削除。1 番組はサーバ上で見つからず、そのままにしました」
         assertEquals(
             sentences(
-                UiText.Res(R.string.sync_fetched, 3, 40),
+                UiText.Plural(R.plurals.sync_new_episodes, 4),
                 actions(UiText.Plural(R.plurals.sync_enqueued, 5), UiText.Plural(R.plurals.sync_deleted, 3)),
                 UiText.Plural(R.plurals.sync_on_hold, 1),
             ),
-            RefreshResult(3, 40, 0, 0, now, enqueued = 5, deleted = 2, removed = 1, onHold = 1).toSyncMessage(),
+            RefreshResult(3, 40, 0, 0, now, enqueued = 5, deleted = 2, removed = 1, onHold = 1, newEpisodes = 4).toSyncMessage(),
         )
-        // 「番組 3 / 各回 40 を取得。2 回を削除」
+        // 「2 回を削除」
         assertEquals(
-            sentences(UiText.Res(R.string.sync_fetched, 3, 40), actions(UiText.Plural(R.plurals.sync_deleted, 2))),
+            sentences(actions(UiText.Plural(R.plurals.sync_deleted, 2))),
             RefreshResult(3, 40, 0, 0, now, deleted = 2).toSyncMessage(),
         )
+        // 「新しい回 5 件」
+        assertEquals(
+            sentences(UiText.Plural(R.plurals.sync_new_episodes, 5)),
+            RefreshResult(3, 40, 0, 0, now, newEpisodes = 5).toSyncMessage(),
+        )
+        // 判断保留は変化ではない: 「最新の状態です。1 番組はサーバ上で見つからず、そのままにしました」
+        assertEquals(
+            sentences(UiText.Res(R.string.sync_up_to_date), UiText.Plural(R.plurals.sync_on_hold, 1)),
+            RefreshResult(3, 40, 0, 0, now, onHold = 1).toSyncMessage(),
+        )
+    }
+
+    @Test
+    fun changesAreNewEpisodesEnqueuedAndDeleted() {
+        assertFalse(RefreshResult(3, 40, 2, 5, now, onHold = 1).hasChanges, "linked episodes and On Hold are not changes")
+        assertTrue(RefreshResult(3, 40, 0, 0, now, newEpisodes = 1).hasChanges)
+        assertTrue(RefreshResult(3, 40, 0, 0, now, enqueued = 1).hasChanges)
+        assertTrue(RefreshResult(3, 40, 0, 0, now, deleted = 1).hasChanges)
+        assertTrue(RefreshResult(3, 40, 0, 0, now, removed = 1).hasChanges)
     }
 
     @Test
@@ -226,13 +246,40 @@ class LibraryRefresherTest {
     }
 
     @Test
-    fun silentRefreshEmitsNoMessages() = runTest(StandardTestDispatcher()) {
+    fun silentRefreshWithoutChangesEmitsNoMessages() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now) }
         val refresher = refresher(repo)
         refresher.messages.test {
             assertEquals(1, refresher.refresh(silent = true)?.programs)
             expectNoEvents()
         }
+    }
+
+    /** 判断保留だけでは裏の同期は何も出さない（変化ではない）。 */
+    @Test
+    fun silentRefreshWithOnlyOnHoldEmitsNoMessages() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now, onHold = 1) }
+        val refresher = refresher(repo)
+        refresher.messages.test {
+            assertEquals(1, refresher.refresh(silent = true)?.onHold)
+            expectNoEvents()
+        }
+    }
+
+    /** 裏の同期でも手元に変化があれば、手動と同じ文言を出す（#142）。 */
+    @Test
+    fun silentRefreshWithChangesReportsThem() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 9, 0, 0, now, enqueued = 2, newEpisodes = 3) }
+        val refresher = refresher(repo)
+        refresher.messages.test {
+            assertEquals(3, refresher.refresh(silent = true)?.newEpisodes)
+            assertEquals(
+                sentences(UiText.Plural(R.plurals.sync_new_episodes, 3), actions(UiText.Plural(R.plurals.sync_enqueued, 2))),
+                awaitItem(),
+            )
+            expectNoEvents()
+        }
+        assertFalse(refresher.isRefreshing.value, "still no spinner")
     }
 
     @Test
@@ -253,7 +300,7 @@ class LibraryRefresherTest {
         refresher.messages.test {
             assertEquals(2, refresher.syncProgram(ProgramId(1))?.enqueued)
             assertEquals(
-                sentences(UiText.Plural(R.plurals.sync_program_checked, 6), actions(UiText.Plural(R.plurals.sync_enqueued, 2), UiText.Plural(R.plurals.sync_deleted, 1))),
+                sentences(actions(UiText.Plural(R.plurals.sync_enqueued, 2), UiText.Plural(R.plurals.sync_deleted, 1))),
                 awaitItem(),
             )
         }
@@ -264,23 +311,35 @@ class LibraryRefresherTest {
 
     @Test
     fun programSyncMessages() {
+        assertEquals(upToDate, RefreshResult(1, 6, 0, 0, now).toProgramSyncMessage())
         assertEquals(
-            sentences(UiText.Plural(R.plurals.sync_program_checked, 6), UiText.Res(R.string.sync_program_up_to_date)),
-            RefreshResult(1, 6, 0, 0, now).toProgramSyncMessage(),
+            sentences(UiText.Plural(R.plurals.sync_new_episodes, 2), actions(UiText.Plural(R.plurals.sync_enqueued, 2))),
+            RefreshResult(1, 6, 0, 0, now, enqueued = 2, newEpisodes = 2).toProgramSyncMessage(),
         )
         assertEquals(UiText.Res(R.string.sync_program_gone), RefreshResult(0, 0, 0, 0, now, onHold = 1).toProgramSyncMessage())
     }
 
     @Test
     fun refreshProgramUsesTheProgramPathAndItsOwnMessage() = runTest(StandardTestDispatcher()) {
-        val repo = FakeRefreshRepository().apply { programResult = RefreshResult(1, 7, 0, 0, now) }
+        val repo = FakeRefreshRepository().apply { programResult = RefreshResult(1, 7, 0, 0, now, newEpisodes = 2) }
         val refresher = refresher(repo)
         refresher.messages.test {
             assertEquals(7, refresher.refreshProgram(ProgramId(1))?.episodes)
-            assertEquals(UiText.Plural(R.plurals.sync_program_fetched, 7), awaitItem())
+            assertEquals(sentences(UiText.Plural(R.plurals.sync_new_episodes, 2)), awaitItem())
         }
         assertEquals(1, repo.programCalls)
         assertEquals(0, repo.calls)
+    }
+
+    /** 番組単位の取り込みでも、番組がサーバ上で見つからなければ「最新の状態です」ではなくそう出す。 */
+    @Test
+    fun refreshProgramOfAGoneProgramSaysSo() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { programResult = RefreshResult(0, 0, 0, 0, now, onHold = 1) }
+        val refresher = refresher(repo)
+        refresher.messages.test {
+            refresher.refreshProgram(ProgramId(1))
+            assertEquals(UiText.Res(R.string.sync_program_gone), awaitItem())
+        }
     }
 
     @Test
@@ -289,7 +348,7 @@ class LibraryRefresherTest {
         val refresher = refresher(repo)
         refresher.messages.test {
             assertEquals(9, refresher.refreshProgram(ProgramId(1))?.episodes)
-            assertEquals(sentences(UiText.Res(R.string.sync_fetched, 2, 9)), awaitItem())
+            assertEquals(upToDate, awaitItem())
         }
         assertEquals(1, repo.calls)
     }
@@ -301,7 +360,7 @@ class LibraryRefresherTest {
         refresher.messages.test {
             refresher.refresh()
             assertEquals(UiText.Plural(R.plurals.sync_reconciled, 2), awaitItem())
-            assertEquals(sentences(UiText.Res(R.string.sync_fetched, 1, 2)), awaitItem())
+            assertEquals(upToDate, awaitItem())
         }
     }
 
@@ -411,7 +470,7 @@ class LibraryRefresherTest {
 
     /**
      * silent な全走査の最中に [manual] を呼ぶと、裏の同期の表示が消えてクルクルに切り替わり（#138）、
-     * 走っている全走査の結果が 1 回だけ出て返る。
+     * 走っている全走査の結果が 1 回だけ出て返る。変化が無くても手動なので「最新の状態です」が出る（#142）。
      */
     private fun joinsASilentRefresh(manual: suspend LibraryRefresher.() -> RefreshResult?) = runTest(StandardTestDispatcher()) {
         val gate = CompletableDeferred<Unit>()
@@ -438,7 +497,7 @@ class LibraryRefresherTest {
             gate.complete(Unit)
             assertEquals(40, joined.await()?.episodes)
             assertEquals(40, silent.await()?.episodes)
-            assertEquals(sentences(UiText.Res(R.string.sync_fetched, 3, 40)), awaitItem())
+            assertEquals(upToDate, awaitItem())
             expectNoEvents()
         }
         assertFalse(refresher.isRefreshing.value)
@@ -448,9 +507,9 @@ class LibraryRefresherTest {
         assertEquals(0, repo.syncProgramCalls)
     }
 
-    /** 結果の文言を出した後（Worker を起こしている間）に合流しても、その文言は 1 回だけ出る。 */
+    /** silent なうちに変化を出した後（Worker を起こしている間）に合流しても、その文言は二度は出ない（#142）。 */
     @Test
-    fun joiningAfterTheResultStillReportsItOnce() = runTest(StandardTestDispatcher()) {
+    fun joiningAfterASilentReportDoesNotRepeatIt() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { result = RefreshResult(3, 40, 0, 0, now, enqueued = 2) }
         val kickGate = CompletableDeferred<Unit>()
         val kicker = FakeKicker().apply { gate = kickGate }
@@ -460,11 +519,11 @@ class LibraryRefresherTest {
             val silent = async { refresher.refresh(silent = true) }
             runCurrent()
             assertEquals(1, kicker.kicks)
+            assertEquals(sentences(actions(UiText.Plural(R.plurals.sync_enqueued, 2))), awaitItem())
 
             val joined = async { refresher.refresh() }
             runCurrent()
-            val message = sentences(UiText.Res(R.string.sync_fetched, 3, 40), actions(UiText.Plural(R.plurals.sync_enqueued, 2)))
-            assertEquals(message, awaitItem())
+            expectNoEvents()
             assertTrue(refresher.isRefreshing.value)
 
             kickGate.complete(Unit)
@@ -520,13 +579,16 @@ class LibraryRefresherTest {
             assertTrue(refresher.isRefreshing.value)
             gate.complete(Unit)
             assertEquals(1, manual.await()?.programs)
-            assertEquals(sentences(UiText.Res(R.string.sync_fetched, 1, 1)), awaitItem())
+            assertEquals(upToDate, awaitItem())
             expectNoEvents()
         }
         assertEquals(1, repo.calls)
         assertFalse(refresher.isRefreshing.value)
     }
 }
+
+/** 「最新の状態です」だけの文言。 */
+private val upToDate: UiText = sentences(UiText.Res(R.string.sync_up_to_date))
 
 /** 文を「。」でつないだ形（[LibraryRefresher] が作る [UiText.Joined] と同じ構造）。 */
 private fun sentences(vararg parts: UiText): UiText = UiText.Joined(parts.toList(), UiText.Res(R.string.sync_sentence_separator))

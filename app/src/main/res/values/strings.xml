@@ -291,8 +291,11 @@
     <!-- ===== sync: results of refresh / sync, shown in a snackbar ===== -->
     <!-- Separates sentences in a combined message. Keep the trailing space if your language uses one -->
     <string name="sync_sentence_separator">". "</string>
-    <!-- %1$d = programs, %2$d = episodes fetched from the server -->
-    <string name="sync_fetched" tools:ignore="PluralsCandidate">Fetched %1$d programs / %2$d episodes</string>
+    <!-- New episodes added to the device's list by this refresh or sync (not downloaded yet). Only changes are shown, not how many were fetched -->
+    <plurals name="sync_new_episodes">
+        <item quantity="one">%d new episode</item>
+        <item quantity="other">%d new episodes</item>
+    </plurals>
     <plurals name="sync_enqueued">
         <item quantity="one">%d episode queued for download</item>
         <item quantity="other">%d episodes queued for download</item>
@@ -306,18 +309,9 @@
         <item quantity="one">%d program not found on the server, left as is</item>
         <item quantity="other">%d programs not found on the server, left as is</item>
     </plurals>
-    <!-- Refresh of one program (no deletions). %1$d = episodes -->
-    <plurals name="sync_program_fetched">
-        <item quantity="one">Fetched %d episode</item>
-        <item quantity="other">Fetched %d episodes</item>
-    </plurals>
     <string name="sync_program_gone">This program is not on the server. Nothing was changed</string>
-    <!-- Sync of one program. %1$d = episodes -->
-    <plurals name="sync_program_checked">
-        <item quantity="one">Checked %d episode</item>
-        <item quantity="other">Checked %d episodes</item>
-    </plurals>
-    <string name="sync_program_up_to_date">Everything is up to date</string>
+    <!-- A refresh or sync found no new episodes, queued nothing, and deleted nothing -->
+    <string name="sync_up_to_date">Everything is up to date</string>
     <!-- Files that disappeared from the device (deleted by a file manager) had their records cleaned up -->
     <plurals name="sync_reconciled">
         <item quantity="one">Cleaned up the record of %d episode no longer on the device</item>

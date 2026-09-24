@@ -103,6 +103,7 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
 
         assertEquals(1, result.linkedPrograms)
         assertEquals(2, result.linkedEpisodes)
+        assertEquals(1, result.newEpisodes, "relinked episodes are not new (#142)")
         assertEquals(listOf(ServerItemId("lib-1")), gateway.fetchedLibraries)
 
         val programs = library.observePrograms().first()
@@ -182,6 +183,36 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
         episodes = library.observeEpisodes(programId).first()
         assertEquals(emptyList(), episodes.performersOf("audio-1"))
         assertEquals(listOf("向井慧"), episodes.performersOf("audio-2"))
+    }
+
+    /** 新しい回（#142）: 取り込みで手元に増えた回だけを数える。2 回目以降は、サーバに回が増えた分だけ。 */
+    @Test
+    fun newEpisodesCountOnlyWhatTheDeviceDidNotHave() = runTest {
+        signInAndSelect()
+        gateway.snapshot = snapshot
+        assertEquals(3, repo.refresh().newEpisodes)
+        assertEquals(0, repo.refresh().newEpisodes)
+
+        gateway.snapshot = snapshot.copy(episodes = snapshot.episodes + serverEpisode("audio-4", "$program 2026-09-21-1", "2026-09-20T15:00:00Z"))
+        val result = repo.refresh()
+        assertEquals(1, result.newEpisodes)
+        assertTrue(result.hasChanges)
+    }
+
+    /** 番組単位の取り込み・1 番組の同期も新しい回を数える（#142）。 */
+    @Test
+    fun perProgramPathsCountNewEpisodes() = runTest {
+        signInAndSelect()
+        gateway.snapshot = snapshot
+        repo.refresh()
+        val programId = library.observePrograms().first().single().program.id
+
+        gateway.snapshot = snapshot.copy(episodes = snapshot.episodes + serverEpisode("audio-4", "$program 2026-09-21-1", "2026-09-20T15:00:00Z"))
+        assertEquals(1, repo.refreshProgram(programId)?.newEpisodes)
+        assertEquals(0, repo.syncProgram(programId)?.newEpisodes)
+
+        gateway.snapshot = snapshot.copy(episodes = snapshot.episodes + serverEpisode("audio-5", "$program 2026-09-24-1", "2026-09-23T15:00:00Z"))
+        assertEquals(1, repo.syncProgram(programId)?.newEpisodes)
     }
 
     /** 番組ごとサーバの一覧から消えたら消失 = 判断保留（各回が消えた場合は RoomSyncTest）。 */

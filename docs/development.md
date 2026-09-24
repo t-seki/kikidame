@@ -310,7 +310,7 @@ $ADB logcat -d | grep JellyfinGateway   # download <id> from 5000000 -> HTTP 206
 
 ```bash
 $ADB shell dumpsys jobscheduler | grep -A3 "$PKG" | head -40
-$ADB logcat -d | grep -E "SyncWorker|LibraryRefresher"   # "sync: 番組 N / 各回 M を取得。…"
+$ADB logcat -d | grep -E "SyncWorker|LibraryRefresher"   # "sync: programs=N episodes=M new=… enqueued=… deleted=… onHold=…"
 ```
 
 起動時同期は前回の全走査から 1 時間以上あけないと積まれない。前回の全走査は成功（`lastFetchedAt`）と試み（`lastAttemptedAt`。

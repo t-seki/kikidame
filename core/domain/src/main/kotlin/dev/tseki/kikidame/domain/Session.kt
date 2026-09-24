@@ -109,7 +109,12 @@ data class RefreshResult(
     val removed: Int = 0,
     /** 判断保留になった番組の数。 */
     val onHold: Int = 0,
-)
+    /** 取り込みで新しく手元に増えた各回の数（同期対象でない番組の回も数える）。突合で結び直した既存の回は数えない（#142）。 */
+    val newEpisodes: Int = 0,
+) {
+    /** 手元に変化（新しい回・ダウンロード予約・削除）があったか。判断保留は変化に数えない（#142）。 */
+    val hasChanges: Boolean get() = newEpisodes > 0 || enqueued > 0 || deleted + removed > 0
+}
 
 /** 「別のサーバに接続」。手元の番組・各回・再生位置・セッションを全部消し、音声ファイルも消す（#50）。 */
 interface LocalDataReset {
