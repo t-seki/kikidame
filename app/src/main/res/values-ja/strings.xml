@@ -220,7 +220,9 @@
 
     <!-- sync: 結果（スナックバー） -->
     <string name="sync_sentence_separator">。</string>
-    <string name="sync_fetched">番組 %1$d / 各回 %2$d を取得</string>
+    <plurals name="sync_new_episodes">
+        <item quantity="other">新しい回 %d 件</item>
+    </plurals>
     <plurals name="sync_enqueued">
         <item quantity="other">%d 回をダウンロード予約</item>
     </plurals>
@@ -230,14 +232,8 @@
     <plurals name="sync_on_hold">
         <item quantity="other">%d 番組はサーバ上で見つからず、そのままにしました</item>
     </plurals>
-    <plurals name="sync_program_fetched">
-        <item quantity="other">各回 %d を取得しました</item>
-    </plurals>
     <string name="sync_program_gone">この番組はサーバ上で見つかりません。何も変えていません</string>
-    <plurals name="sync_program_checked">
-        <item quantity="other">各回 %d を確認</item>
-    </plurals>
-    <string name="sync_program_up_to_date">手元は最新です</string>
+    <string name="sync_up_to_date">最新の状態です</string>
     <plurals name="sync_reconciled">
         <item quantity="other">手元に無くなっていた %d 回の記録を整理しました</item>
     </plurals>

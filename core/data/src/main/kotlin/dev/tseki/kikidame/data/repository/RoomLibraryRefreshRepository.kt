@@ -136,11 +136,14 @@ class RoomLibraryRefreshRepository @Inject constructor(
         for ((episodeId, serverId) in match.episodeLinks) {
             episodeDao.setServerItemId(episodeId.value, serverId.value)
         }
+        // 結び直した回は上でサーバ ID を得ているので、ここで挿入されるのは手元に無かった回だけ（#142 の「新しい回」）
+        var newEpisodes = 0
         for (se in snapshot.episodes) {
             val programId = programIdByServerId[se.programServerId] ?: continue
             val existing = episodeDao.findByServerItemId(se.serverId.value)
             if (existing == null) {
                 episodeDao.insert(se.toEntity(programId, existingSize = null))
+                newEpisodes++
             } else {
                 val updated = se.toEntity(programId, existingSize = existing.sizeBytes).copy(id = existing.id)
                 if (updated != existing) episodeDao.update(updated)
@@ -153,6 +156,7 @@ class RoomLibraryRefreshRepository @Inject constructor(
             linkedPrograms = match.programLinks.size,
             linkedEpisodes = match.episodeLinks.size,
             fetchedAt = clock.now(),
+            newEpisodes = newEpisodes,
         )
     }
 

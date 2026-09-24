@@ -37,6 +37,7 @@ import javax.inject.Singleton
  * - 「Wi-Fi のみ」は手動を含めて効く。従量制ならサーバに触らず理由を出して終える。手元のファイルの整合（#5）はその前に走る
  * - 401 はログアウトと同じ処理をする（セッション状態が変わり、画面側が接続画面へ導く）
  * - 定期・起動時の silent な同期ではクルクルを出さない。その最中に手動の操作が来たら、走っている同期に合流する（#134）
+ * - 結果の文言は手元の変化（新しい回・予約・削除）だけを並べる。手動は変化が無ければ「最新の状態です」、silent は変化があったときだけ出す（#142）
  * - silent な同期の間は [isSyncingInBackground] を立てる（画面は細いバーを出す。#138）。合流したらクルクルに切り替える
  */
 @Singleton
@@ -75,22 +76,15 @@ class LibraryRefresher @Inject constructor(
     }
 
     /**
-     * 全走査して同期する。[silent] ならクルクルも文言も出さず（定期・起動時）、代わりに [isSyncingInBackground] を立てて細いバーを出す（#138）。
-     * ただし手動の操作が合流したら、そこからバーを消してクルクルを出し、結果の文言を出す。
+     * 全走査して同期する。[silent] ならクルクルを出さず（定期・起動時）、代わりに [isSyncingInBackground] を立てて細いバーを出す（#138）。
+     * silent でも手元に変化があれば結果の文言を出す（#142）。変化が無い結果と失敗は出さない。
+     * ただし手動の操作が合流したら、そこからバーを消してクルクルを出し、結果の文言（変化が無ければ「最新の状態です」）を出す。
      */
-    suspend fun refresh(silent: Boolean = false): RefreshResult? = guarded(silent) {
-        refreshRepository.refresh(excluded = excluded()).also { report(it.toSyncMessage()) }
-    }
+    suspend fun refresh(silent: Boolean = false): RefreshResult? = guarded(silent) { sync() }
 
     /** 1 番組だけ取り込む。サーバ ID の無い番組は全走査（同期）にフォールバックする。 */
     suspend fun refreshProgram(programId: ProgramId): RefreshResult? = guarded(silent = false) {
-        val result = refreshRepository.refreshProgram(programId)
-        if (result != null) {
-            report(UiText.Plural(R.plurals.sync_program_fetched, result.episodes))
-            result
-        } else {
-            refreshRepository.refresh(excluded = excluded()).also { report(it.toSyncMessage()) }
-        }
+        refreshRepository.refreshProgram(programId)?.also { report(it.toProgramSyncMessage()) } ?: sync()
     }
 
     /** 1 番組だけ同期する。サーバ ID の無い番組は何もしない（シート側でスイッチを無効にしている）。 */
@@ -98,10 +92,17 @@ class LibraryRefresher @Inject constructor(
         refreshRepository.syncProgram(programId, excluded = excluded())?.also { report(it.toProgramSyncMessage()) }
     }
 
+    /** 全走査して結果の文言を出す。手元に変化があれば silent でも出す（#142）。 */
+    private suspend fun Run.sync(): RefreshResult =
+        refreshRepository.refresh(excluded = excluded()).also { report(it.toSyncMessage(), evenIfSilent = it.hasChanges) }
+
     /** 聴いている回は削除から外す。ただし聴き終えて止まっている回は「再生済みなら削除」に任せる（#27）。 */
     private fun excluded(): Set<EpisodeId> = setOfNotNull(nowPlaying.excludedFromSync)
 
-    /** 1 回の実行。手動の操作が合流すると [silent] が外れ、結果の文言が出る。 */
+    /**
+     * 1 回の実行。手動の操作が合流すると [silent] が外れ、まだ出していない結果の文言があればそこで出る。
+     * 手元に変化があった結果は silent でも合流を待たずに出しているので、合流しても二度は出ない（#142）。
+     */
     private inner class Run(silent: Boolean) {
         /** [silent] と [unreported] は [lock] の中で読み書きする。 */
         var silent: Boolean = silent
@@ -122,17 +123,19 @@ class LibraryRefresher @Inject constructor(
         /**
          * 結果の文言（成功・エラー・Wi-Fi のみ）。1 回の実行で 1 回だけ呼ぶ。
          * silent なら取っておき、この後の片付けまでに手動が合流したらそこで出す。
+         * [evenIfSilent]（手元に変化があった結果。#142）なら silent でもすぐ出し、取っておかない（合流しても二度は出ない）。
          */
-        fun report(message: UiText) {
+        fun report(message: UiText, evenIfSilent: Boolean = false) {
             synchronized(lock) {
-                if (silent) unreported = message else _messages.tryEmit(message)
+                if (silent && !evenIfSilent) unreported = message else _messages.tryEmit(message)
             }
         }
     }
 
     /**
      * 同時に 1 つしか走らせない。走っている間に来た呼び出しは:
-     * - silent な実行の最中の手動 → 合流する。クルクルを出し、結果の文言を出させ、その実行の結果を待って返す（全走査をやり直さない）
+     * - silent な実行の最中の手動 → 合流する。クルクルを出し、まだ出していない結果の文言があれば出させ（変化があって既に出した文言は出し直さない。#142）、
+     *   その実行の結果を待って返す（全走査をやり直さない）
      * - それ以外 → 何もせず null
      */
     private suspend fun guarded(silent: Boolean, block: suspend Run.() -> RefreshResult?): RefreshResult? {
@@ -230,23 +233,29 @@ private fun RefreshResult.actionsText(): UiText? {
 }
 
 /** 文を「。」（言語ごとの [R.string.sync_sentence_separator]）でつなぐ。 */
-private fun sentences(vararg parts: UiText?): UiText =
-    UiText.Joined(parts.filterNotNull(), UiText.Res(R.string.sync_sentence_separator))
+private fun sentences(parts: List<UiText>): UiText =
+    UiText.Joined(parts, UiText.Res(R.string.sync_sentence_separator))
 
-/** 同期の結果の文言。0 のものは省く。 */
-fun RefreshResult.toSyncMessage(): UiText = sentences(
-    UiText.Res(R.string.sync_fetched, programs, episodes),
-    actionsText(),
-    onHold.takeIf { it > 0 }?.let { UiText.Plural(R.plurals.sync_on_hold, it) },
-)
+/**
+ * 手元の変化の文（#142）: 「新しい回 N 件」「M 回をダウンロード予約、L 回を削除」。0 のものは省き、何も無ければ「最新の状態です」。
+ * 取得した番組数・各回数は出さない（毎回ほぼ同じで、変化が埋もれる）。
+ */
+private fun RefreshResult.changes(): List<UiText> {
+    if (!hasChanges) return listOf(UiText.Res(R.string.sync_up_to_date))
+    return listOfNotNull(
+        newEpisodes.takeIf { it > 0 }?.let { UiText.Plural(R.plurals.sync_new_episodes, it) },
+        actionsText(),
+    )
+}
 
-/** 1 番組の同期の文言。 */
+/** 全走査（同期）の結果の文言。変化に続けて、判断保留があればそれも出す。 */
+fun RefreshResult.toSyncMessage(): UiText =
+    sentences(changes() + listOfNotNull(onHold.takeIf { it > 0 }?.let { UiText.Plural(R.plurals.sync_on_hold, it) }))
+
+/** 1 番組の同期・取り込みの文言。番組がサーバ上で見つからなければそれだけを出す。 */
 fun RefreshResult.toProgramSyncMessage(): UiText {
     if (onHold > 0) return UiText.Res(R.string.sync_program_gone)
-    return sentences(
-        UiText.Plural(R.plurals.sync_program_checked, episodes),
-        actionsText() ?: UiText.Res(R.string.sync_program_up_to_date),
-    )
+    return sentences(changes())
 }
 
 /** 接続画面の文言。 */
