@@ -353,12 +353,50 @@ class LibraryRefresherTest {
         val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now); this.gate = gate }
         val refresher = refresher(repo)
 
+        assertFalse(refresher.isSyncingInBackground.value)
         val silent = async { refresher.refresh(silent = true) }
         runCurrent()
         assertFalse(refresher.isRefreshing.value)
+        assertTrue(refresher.isSyncingInBackground.value, "shows the background bar instead")
         assertNull(refresher.refresh(silent = true), "another silent call returns immediately")
+        assertTrue(refresher.isSyncingInBackground.value)
         gate.complete(Unit)
         assertEquals(1, silent.await()?.programs)
+        assertFalse(refresher.isRefreshing.value)
+        assertFalse(refresher.isSyncingInBackground.value)
+    }
+
+    /** 手動だけの実行では裏の同期の表示を出さない（#138）。 */
+    @Test
+    fun manualRefreshDoesNotShowTheBackgroundBar() = runTest(StandardTestDispatcher()) {
+        val gate = CompletableDeferred<Unit>()
+        val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now); this.gate = gate }
+        val refresher = refresher(repo)
+
+        refresher.isSyncingInBackground.test {
+            assertFalse(awaitItem())
+            val manual = async { refresher.refresh() }
+            runCurrent()
+            assertTrue(refresher.isRefreshing.value)
+            gate.complete(Unit)
+            assertEquals(1, manual.await()?.programs)
+            expectNoEvents()
+        }
+    }
+
+    /** 失敗しても裏の同期の表示は消える（文言は出さない）。 */
+    @Test
+    fun silentRefreshErrorClearsTheBackgroundBar() = runTest(StandardTestDispatcher()) {
+        val gate = CompletableDeferred<Unit>()
+        val repo = FakeRefreshRepository().apply { error = ServerException.Unreachable(); this.gate = gate }
+        val refresher = refresher(repo)
+
+        val silent = async { refresher.refresh(silent = true) }
+        runCurrent()
+        assertTrue(refresher.isSyncingInBackground.value)
+        gate.complete(Unit)
+        assertNull(silent.await())
+        assertFalse(refresher.isSyncingInBackground.value)
         assertFalse(refresher.isRefreshing.value)
     }
 
@@ -371,7 +409,10 @@ class LibraryRefresherTest {
     @Test
     fun syncProgramJoinsASilentRefresh() = joinsASilentRefresh { syncProgram(ProgramId(1)) }
 
-    /** silent な全走査の最中に [manual] を呼ぶと、そこからクルクルが出て、走っている全走査の結果が 1 回だけ出て返る。 */
+    /**
+     * silent な全走査の最中に [manual] を呼ぶと、裏の同期の表示が消えてクルクルに切り替わり（#138）、
+     * 走っている全走査の結果が 1 回だけ出て返る。
+     */
     private fun joinsASilentRefresh(manual: suspend LibraryRefresher.() -> RefreshResult?) = runTest(StandardTestDispatcher()) {
         val gate = CompletableDeferred<Unit>()
         val repo = FakeRefreshRepository().apply {
@@ -386,10 +427,12 @@ class LibraryRefresherTest {
             val silent = async { refresher.refresh(silent = true) }
             runCurrent()
             assertFalse(refresher.isRefreshing.value)
+            assertTrue(refresher.isSyncingInBackground.value)
 
             val joined = async { refresher.manual() }
             runCurrent()
             assertTrue(refresher.isRefreshing.value)
+            assertFalse(refresher.isSyncingInBackground.value, "the spinner replaces the background bar")
             assertFalse(joined.isCompleted, "waits for the running sync")
 
             gate.complete(Unit)
@@ -399,6 +442,7 @@ class LibraryRefresherTest {
             expectNoEvents()
         }
         assertFalse(refresher.isRefreshing.value)
+        assertFalse(refresher.isSyncingInBackground.value)
         assertEquals(1, repo.calls)
         assertEquals(0, repo.programCalls)
         assertEquals(0, repo.syncProgramCalls)

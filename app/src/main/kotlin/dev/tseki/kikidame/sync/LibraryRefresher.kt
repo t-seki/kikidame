@@ -37,6 +37,7 @@ import javax.inject.Singleton
  * - 「Wi-Fi のみ」は手動を含めて効く。従量制ならサーバに触らず理由を出して終える。手元のファイルの整合（#5）はその前に走る
  * - 401 はログアウトと同じ処理をする（セッション状態が変わり、画面側が接続画面へ導く）
  * - 定期・起動時の silent な同期ではクルクルを出さない。その最中に手動の操作が来たら、走っている同期に合流する（#134）
+ * - silent な同期の間は [isSyncingInBackground] を立てる（画面は細いバーを出す。#138）。合流したらクルクルに切り替える
  */
 @Singleton
 class LibraryRefresher @Inject constructor(
@@ -59,6 +60,11 @@ class LibraryRefresher @Inject constructor(
     /** 手動の実行と、手動が合流した silent な実行の間だけ true。silent なだけの実行では立てない（#134）。 */
     val isRefreshing: StateFlow<Boolean> = _isRefreshing
 
+    private val _isSyncingInBackground = MutableStateFlow(false)
+
+    /** silent な実行の間だけ true。手動が合流したら false に戻し、[isRefreshing] に譲る（両方は立てない。#138）。 */
+    val isSyncingInBackground: StateFlow<Boolean> = _isSyncingInBackground
+
     // 連続した更新の結果を取りこぼさないよう少し余裕を持ち、溢れたら古い方を捨てる
     private val _messages = MutableSharedFlow<UiText>(extraBufferCapacity = 4, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val messages: SharedFlow<UiText> = _messages
@@ -68,7 +74,10 @@ class LibraryRefresher @Inject constructor(
         applicationScope.launch { refresh() }
     }
 
-    /** 全走査して同期する。[silent] ならクルクルも文言も出さない（定期・起動時）。ただし手動の操作が合流したら、そこからクルクルを出し、結果の文言を出す。 */
+    /**
+     * 全走査して同期する。[silent] ならクルクルも文言も出さず（定期・起動時）、代わりに [isSyncingInBackground] を立てて細いバーを出す（#138）。
+     * ただし手動の操作が合流したら、そこからバーを消してクルクルを出し、結果の文言を出す。
+     */
     suspend fun refresh(silent: Boolean = false): RefreshResult? = guarded(silent) {
         refreshRepository.refresh(excluded = excluded()).also { report(it.toSyncMessage()) }
     }
@@ -133,12 +142,13 @@ class LibraryRefresher @Inject constructor(
             when {
                 current == null -> Run(silent).also {
                     running = it
-                    if (!silent) _isRefreshing.value = true
+                    if (silent) _isSyncingInBackground.value = true else _isRefreshing.value = true
                 }
                 !silent && current.silent -> {
                     current.silent = false
                     current.unreported?.let { _messages.tryEmit(it) }
                     current.unreported = null
+                    _isSyncingInBackground.value = false
                     _isRefreshing.value = true
                     joined = current
                     null
@@ -156,6 +166,7 @@ class LibraryRefresher @Inject constructor(
             synchronized(lock) {
                 running = null
                 _isRefreshing.value = false
+                _isSyncingInBackground.value = false
             }
             run.result.complete(result)
         }

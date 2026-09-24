@@ -348,7 +348,8 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   **ゲートはサーバへの取得だけを包む**: 先頭の `reconcileMissingFiles()`（#5、ローカル I/O のみ）は従量制でも走らせる
 - **起点**: 定期は `PeriodicWorkRequest` 6 時間（`UPDATE` で起動時に登録し直す）。起動時は `ProcessLifecycleOwner` の `ON_START` で
   前回同期から 1 時間以上（#135 で `lastFetchedAt` と `lastAttemptedAt` の新しい方から 1 時間に。`lastAttemptedAt` は全走査がサーバに問い合わせる直前に成功・失敗を問わず記録）なら `OneTimeWorkRequest`（ユニーク `sync-once`、`KEEP`）。定期・起動時の失敗は `Result.success()` で終え次回を待つ
-  （スナックバー無し、Log のみ）。401 は `DownloadWorker` と同じくログアウト
+  （スナックバー無し、Log のみ）。走っている間は番組一覧・各回一覧のトップバーの下に細いバーと「バックグラウンドで同期中…」を出し、
+  手動の操作が合流したらクルクルに切り替える（#134・#138。`LibraryRefresher.isSyncingInBackground`）。401 は `DownloadWorker` と同じくログアウト
 - **`planSync`**（`:core:domain`、純粋、JUnit 5）: 入力は番組ごとの `{ syncEnabled, retentionRule, server: Known(list) | Unavailable | Gone,
   local: List<LocalEpisodeState(episodeId, serverItemId?, airedAt, title, pinned, played, hasLocalFile)> }`。`hasLocalFile` は
   PENDING / RUNNING / DONE / FAILED のいずれかの行があること（**FAILED も「手元にある」**。再試行は M3-a の規則のまま Worker 起動時に

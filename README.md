@@ -28,7 +28,7 @@ It assumes one server, one user, one library, and that this app is the only plac
 
 - **Program list** — sections split by the Starred mark, search by program or publisher name, filter by publisher. Each row shows whether sync is enabled for the program and whether it is no longer on the server (Gone)
 - **Episode list** — download, pin, and mark played. Each row shows whether the episode is on the device, downloading, or failed
-- **Sync** — per program, choose whether sync is enabled for it and its retention rule. WorkManager syncs every 6 hours, with a "Wi-Fi only" option. Episodes you download by hand are Pinned and never removed by the rules
+- **Sync** — per program, choose whether sync is enabled for it and its retention rule. WorkManager syncs every 6 hours, with a "Wi-Fi only" option. While a background sync runs, a thin bar under the top bar says so. Episodes you download by hand are Pinned and never removed by the rules
 - **Player** — background playback with notification and lock-screen controls, skip 10 seconds back and forward, speed 1.0x to 2.0x, sleep timer (by time or until the end of the episode). The playback position is saved so the next play resumes where you left off; listening near the end marks the episode Played, and finishing it advances to the next episode of the same program. After the app process has ended, the ▶ on a Bluetooth headset or Android Auto resumes the last episode from where it stopped
 - **Android Auto** — browse Continue / Starred / Programs on the car screen and play. Only episodes on the device are shown; playback position and played state follow the same rules as on the phone (Auto runs on the phone, so nothing needs syncing)
 - **Mini player** and three themes (system / dark / light)

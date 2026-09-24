@@ -69,6 +69,7 @@ import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.ProgramSummary
+import dev.tseki.kikidame.ui.BackgroundSyncBar
 import dev.tseki.kikidame.ui.SectionTitle
 import dev.tseki.kikidame.ui.UiText
 import dev.tseki.kikidame.ui.resolve
@@ -92,6 +93,7 @@ fun ProgramListScreen(
     val filtered by viewModel.filtered.collectAsStateWithLifecycle()
     val canRefresh by viewModel.canRefresh.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val isSyncingInBackground by viewModel.isSyncingInBackground.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     // 他のシートと同じく remember（プロセス死で開き直さない。絞り込みの状態も復元しないので）
@@ -135,6 +137,7 @@ fun ProgramListScreen(
                         }
                     },
                 )
+                BackgroundSyncBar(isSyncingInBackground)
                 FilterChipsRow(
                     query = ProgramFilter.normalize(query),
                     publisher = filtered?.publisher,
