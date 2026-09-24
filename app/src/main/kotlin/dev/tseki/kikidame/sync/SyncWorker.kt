@@ -9,7 +9,7 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 
 /**
- * 定期・起動時の同期。中身は [LibraryRefresher.refresh] そのもの（手動と同じ入口、文言だけ出さない）。
+ * 定期・起動時の同期。中身は [LibraryRefresher.refresh] そのもの（手動と同じ入口。silent なのでクルクルも文言も出さないが、手動の操作が合流したら結果を出す（#134））。
  * 失敗しても `retry` にはせず次の周期を待つ。401 は Refresher がログアウトする。
  */
 @HiltWorker
