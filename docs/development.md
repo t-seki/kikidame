@@ -317,7 +317,39 @@ $ADB logcat -d | grep -E "SyncWorker|LibraryRefresher"   # "sync: 番組 N / 各
 サーバに届かず失敗した回も含む）の新しい方で見る（#135。外出中に前面に出すたびサーバへ接続し直さないため）。
 手動・定期の全走査も試みとして数える。「Wi-Fi のみ」で打ち切った回と番組単位の同期・取り込みは数えない。
 ログイン直後の初回取得も同期なので、ログインし直しでは試せない。
-待たずに Worker を走らせるなら、`dumpsys jobscheduler` で WorkManager のジョブ ID を見て `adb shell cmd jobscheduler run -f $PKG <jobId>`。
+
+### 裏の同期をすぐ起こす（#140）
+
+確実なのは、セッションの Preferences DataStore から前回の全走査の時刻（`last_fetched_at` / `last_attempted_at`）を消してから開く方法。
+次に開いたとき起動時同期が必ず積まれ、何度でも繰り返せる。`run-as` を使うので debug 版だけ。
+ファイルにはトークンの暗号文が入るので、中身を表示しない・コミットしない。キーを消すのは `scripts/datastore-drop-keys.py`（キー名だけ出す）:
+
+```bash
+$ADB shell am force-stop $PKG      # 動いている DataStore に上書きされないよう先に止める
+F=/tmp/kikidame-session.pb       # repo の外に置く（うっかりコミットしないため）
+$ADB exec-out run-as $PKG cat files/datastore/session.preferences_pb > $F
+chmod 600 $F
+scripts/datastore-drop-keys.py $F $F last_fetched_at last_attempted_at   # dropped: … / kept: …
+$ADB exec-in run-as $PKG sh -c 'cat > files/datastore/session.preferences_pb' < $F
+rm $F
+$ADB logcat -c && <アプリを開く>
+$ADB logcat -d | grep -E "SyncWorker|LibraryRefresher"
+```
+
+`kept:` にログイン（サーバ・トークン等）とライブラリのキーが残っていればよい。`not found:` は、そのキーがまだ書かれていない
+（全走査を一度もしていない）ということで、そのまま進めてよい。
+
+`jobscheduler` から直接走らせる手もあるが、当てにならない:
+
+- WorkManager のジョブは namespace `androidx.work.systemjobscheduler` に入るので、`-n` を付けないと `Could not find job N` になる。
+  `$ADB shell cmd jobscheduler run -f -n androidx.work.systemjobscheduler $PKG <jobId>`（ジョブ ID は `dumpsys jobscheduler` で見る）
+- ジョブ ID はアプリを前面に出すたびに（WorkManager が登録を `UPDATE` し直すので）変わる。打つ直前に見直す
+- 定期同期（`sync-periodic`）は次の時刻より前だと、走っても WorkManager が
+  `Delaying execution for SyncWorker because it is being executed before schedule.` で見送る
+- 起動時同期（`sync-once`）は上の 1 時間の条件を満たさないとそもそも積まれない
+
+ワイヤレス ADB のまま Wi-Fi を切って外出中を再現すると ADB も切れる。ログは Wi-Fi を戻して接続し直してから
+`logcat -d` で後から読む。繋ぎ直すときはポートが変わっていることがあるので `$ADB mdns services` で見直す。
 
 ### 実機チェックリスト（M3-b）
 
