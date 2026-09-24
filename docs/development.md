@@ -327,8 +327,7 @@ $ADB logcat -d | grep -E "SyncWorker|LibraryRefresher"   # "sync: 番組 N / 各
 ```bash
 $ADB shell am force-stop $PKG      # 動いている DataStore に上書きされないよう先に止める
 F=/tmp/kikidame-session.pb       # repo の外に置く（うっかりコミットしないため）
-$ADB exec-out run-as $PKG cat files/datastore/session.preferences_pb > $F
-chmod 600 $F
+(umask 077; $ADB exec-out run-as $PKG cat files/datastore/session.preferences_pb > $F)   # 最初から 0600 で作る
 scripts/datastore-drop-keys.py $F $F last_fetched_at last_attempted_at   # dropped: … / kept: …
 $ADB exec-in run-as $PKG sh -c 'cat > files/datastore/session.preferences_pb' < $F
 rm $F
@@ -342,7 +341,10 @@ $ADB logcat -d | grep -E "SyncWorker|LibraryRefresher"
 `jobscheduler` から直接走らせる手もあるが、当てにならない:
 
 - WorkManager のジョブは namespace `androidx.work.systemjobscheduler` に入るので、`-n` を付けないと `Could not find job N` になる。
-  `$ADB shell cmd jobscheduler run -f -n androidx.work.systemjobscheduler $PKG <jobId>`（ジョブ ID は `dumpsys jobscheduler` で見る）
+  ジョブ ID は `dumpsys jobscheduler` で見る:
+  ```bash
+  $ADB shell cmd jobscheduler run -f -n androidx.work.systemjobscheduler $PKG <jobId>
+  ```
 - ジョブ ID はアプリを前面に出すたびに（WorkManager が登録を `UPDATE` し直すので）変わる。打つ直前に見直す
 - 定期同期（`sync-periodic`）は次の時刻より前だと、走っても WorkManager が
   `Delaying execution for SyncWorker because it is being executed before schedule.` で見送る
