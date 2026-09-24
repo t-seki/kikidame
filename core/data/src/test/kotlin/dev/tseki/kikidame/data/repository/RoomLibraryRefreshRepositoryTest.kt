@@ -208,6 +208,39 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
         assertEquals(1, library.observePrograms().first().size)
     }
 
+    /** 全走査を試みた時刻は、サーバに届かず失敗しても記録される。最終同期の時刻は成功したときだけ（#135）。 */
+    @Test
+    fun anUnreachableRefreshStillRecordsTheAttempt() = runTest {
+        signInAndSelect()
+        gateway.snapshot = snapshot
+        repo.refresh()
+        val fetchedAt = now
+        now += 90.minutes
+        gateway.failWith = ServerException.Unreachable()
+
+        assertFailsWith<ServerException.Unreachable> { repo.refresh() }
+
+        val ready = assertIs<SessionState.Ready>(session.state.first())
+        assertEquals(now, ready.lastAttemptedAt)
+        assertEquals(fetchedAt, ready.lastFetchedAt)
+    }
+
+    /** 番組単位の取り込み・同期は試みとして記録しない（最終同期の時刻と同じ扱い）。 */
+    @Test
+    fun perProgramRefreshDoesNotRecordAnAttempt() = runTest {
+        signInAndSelect()
+        gateway.snapshot = snapshot
+        repo.refresh()
+        val attemptedAt = now
+        now += 90.minutes
+        val programId = library.observePrograms().first().single().program.id
+
+        repo.refreshProgram(programId)
+        repo.syncProgram(programId)
+
+        assertEquals(attemptedAt, assertIs<SessionState.Ready>(session.state.first()).lastAttemptedAt)
+    }
+
     /** 「別のサーバに接続」は行・セッションに加えて音声ファイルも消す（#50。残しても到達する手段が無い）。 */
     @Test
     fun resetAllClearsRowsSessionAndFiles() = runTest {

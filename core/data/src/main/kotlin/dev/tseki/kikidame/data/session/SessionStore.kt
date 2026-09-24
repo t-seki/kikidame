@@ -36,6 +36,7 @@ class SessionStore(
             it.remove(LIBRARY_ID)
             it.remove(LIBRARY_NAME)
             it.remove(LAST_FETCHED_AT)
+            it.remove(LAST_ATTEMPTED_AT)
         }
     }
 
@@ -50,6 +51,11 @@ class SessionStore(
         dataStore.edit { it[LAST_FETCHED_AT] = at.toEpochMilliseconds() }
     }
 
+    /** 全走査を試みた時刻。サーバに問い合わせる直前に、成功・失敗を問わず記録する（#135）。 */
+    suspend fun saveLastAttemptedAt(at: Instant) {
+        dataStore.edit { it[LAST_ATTEMPTED_AT] = at.toEpochMilliseconds() }
+    }
+
     /** ログアウト。サーバ URL とユーザー名は次回の入力補助として残す。 */
     suspend fun clearCredentials() {
         dataStore.edit {
@@ -58,6 +64,7 @@ class SessionStore(
             it.remove(LIBRARY_ID)
             it.remove(LIBRARY_NAME)
             it.remove(LAST_FETCHED_AT)
+            it.remove(LAST_ATTEMPTED_AT)
         }
     }
 
@@ -81,6 +88,7 @@ class SessionStore(
             session = session,
             library = SelectedLibrary(ServerItemId(libraryId), libraryName),
             lastFetchedAt = this[LAST_FETCHED_AT]?.let(Instant::fromEpochMilliseconds),
+            lastAttemptedAt = this[LAST_ATTEMPTED_AT]?.let(Instant::fromEpochMilliseconds),
         )
     }
 
@@ -92,5 +100,6 @@ class SessionStore(
         val LIBRARY_ID = stringPreferencesKey("library_id")
         val LIBRARY_NAME = stringPreferencesKey("library_name")
         val LAST_FETCHED_AT = longPreferencesKey("last_fetched_at")
+        val LAST_ATTEMPTED_AT = longPreferencesKey("last_attempted_at")
     }
 }

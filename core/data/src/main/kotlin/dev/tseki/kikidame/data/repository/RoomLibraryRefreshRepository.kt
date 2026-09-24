@@ -48,6 +48,8 @@ class RoomLibraryRefreshRepository @Inject constructor(
 
     override suspend fun refresh(excluded: Set<EpisodeId>): RefreshResult {
         val ready = requireReady()
+        // 失敗しても記録する。到達できない間、起動時同期が前面に出るたびに積まれないように（#135）
+        store.saveLastAttemptedAt(clock.now())
         val snapshot = gateway.fetchLibrary(ready.session.credentials(), ready.library.id)
         val result = apply(snapshot)
         val outcome = synchronize(snapshot, excluded)

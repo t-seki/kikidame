@@ -1,6 +1,7 @@
 package dev.tseki.kikidame.data.repository
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.tseki.kikidame.data.session.SessionStore
 import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.ServerItemId
@@ -18,7 +19,10 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
+import kotlin.time.Instant
 
 @RunWith(AndroidJUnit4::class)
 class DataStoreSessionRepositoryTest {
@@ -27,7 +31,8 @@ class DataStoreSessionRepositoryTest {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val gateway = FakeJellyfinGateway()
-    private val store by lazy { testSessionStore(tmp.root, scope) }
+    private val dataStore by lazy { testDataStore(tmp.root, scope) }
+    private val store by lazy { SessionStore(dataStore, FakeTokenCipher()) }
     private val repo by lazy { DataStoreSessionRepository(store, gateway) }
     private val music = LibraryView(ServerItemId("lib-music"), "Radio", "music", isMusic = true)
     private val movies = LibraryView(ServerItemId("lib-movies"), "Movies", "movies", isMusic = false)
@@ -72,6 +77,30 @@ class DataStoreSessionRepositoryTest {
         val signedOut = assertIs<SessionState.SignedOut>(repo.state.first())
         assertEquals("https://jellyfin.lab.example/", signedOut.lastServerUrl)
         assertEquals("alice", signedOut.lastUserName)
+    }
+
+    /** 全走査を試みた時刻（#135）は最終同期の時刻と一緒に、ログアウト・再ログインで消える。 */
+    @Test
+    fun signOutAndSignInClearTheSyncTimes() = runTest {
+        val at = Instant.parse("2026-09-24T00:00:00Z")
+        repo.signIn("jellyfin.lab.example", "alice", "secret")
+        repo.selectLibrary(music)
+        store.saveLastFetchedAt(at)
+        store.saveLastAttemptedAt(at)
+        assertEquals(at, assertIs<SessionState.Ready>(repo.state.first()).lastAttemptedAt)
+
+        repo.signIn("jellyfin.lab.example", "alice", "secret")
+        repo.selectLibrary(music)
+        val relogged = assertIs<SessionState.Ready>(repo.state.first())
+        assertNull(relogged.lastFetchedAt)
+        assertNull(relogged.lastAttemptedAt)
+
+        store.saveLastFetchedAt(at)
+        store.saveLastAttemptedAt(at)
+        repo.signOut()
+        val keys = dataStore.data.first().asMap().keys.map { it.name }
+        assertFalse("last_fetched_at" in keys)
+        assertFalse("last_attempted_at" in keys)
     }
 
     @Test

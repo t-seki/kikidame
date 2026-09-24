@@ -18,12 +18,13 @@ import javax.inject.Singleton
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 import kotlin.time.toJavaDuration
 
 /**
  * 同期の起点を WorkManager に登録する。
  * - 定期: 6 時間ごと。起動のたびに `UPDATE` で登録し直し、「Wi-Fi のみ」の変更を拾う
- * - 起動時: 前回同期から 1 時間以上なら一度だけ（`KEEP`）。制約を満たすまで待つ
+ * - 起動時: 前回同期（または前回の試み。失敗を含む）から 1 時間以上なら一度だけ（`KEEP`）。制約を満たすまで待つ
  * 制約は `DownloadWorker` と同じ（Wi-Fi のみなら UNMETERED、そうでなければ CONNECTED）。充電中は課さない。
  */
 @Singleton
@@ -61,8 +62,7 @@ class SyncScheduler @Inject constructor(
 
     private suspend fun syncOnceIfStale() {
         val ready = sessionRepository.state.first() as? SessionState.Ready ?: return
-        val last = ready.lastFetchedAt
-        if (last != null && clock.now() - last < STALE_AFTER) return
+        if (!isStale(ready, clock.now())) return
         val request = OneTimeWorkRequestBuilder<SyncWorker>().setConstraints(constraints()).build()
         workManager.enqueueUniqueWork(SyncWorker.ONCE_NAME, ExistingWorkPolicy.KEEP, request)
     }
@@ -77,5 +77,14 @@ class SyncScheduler @Inject constructor(
     companion object {
         val PERIOD: Duration = 6.hours
         val STALE_AFTER: Duration = 1.hours
+
+        /**
+         * 起動時同期を積むか。前回同期（成功）と前回の試み（失敗を含む）の新しい方から [STALE_AFTER] たっていれば積む。
+         * どちらも無ければ積む。失敗した直後に前面に出ても、到達できないサーバに接続し直さない（#135）。
+         */
+        internal fun isStale(ready: SessionState.Ready, now: Instant): Boolean {
+            val last = listOfNotNull(ready.lastFetchedAt, ready.lastAttemptedAt).maxOrNull() ?: return true
+            return now - last >= STALE_AFTER
+        }
     }
 }
