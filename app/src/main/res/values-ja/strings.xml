@@ -215,8 +215,10 @@
     <string name="settings_reset_text">番組・各回・再生位置・再生済み・音声ファイルがすべて消えます。この操作は取り消せません。</string>
     <string name="settings_reset_confirm">消して接続画面へ</string>
 
-    <!-- sync -->
+    <!-- sync: 同期中の表示（トップバーの下） -->
     <string name="sync_in_background">バックグラウンドで同期中…</string>
+
+    <!-- sync: 結果（スナックバー） -->
     <string name="sync_sentence_separator">。</string>
     <string name="sync_fetched">番組 %1$d / 各回 %2$d を取得</string>
     <plurals name="sync_enqueued">

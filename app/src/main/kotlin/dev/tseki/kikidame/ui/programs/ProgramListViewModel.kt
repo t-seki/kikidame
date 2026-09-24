@@ -73,7 +73,7 @@ class ProgramListViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     val isRefreshing: StateFlow<Boolean> = refresher.isRefreshing
-    /** 裏の同期（定期・起動時）の間だけ true。トップバーの下に細いバーを出す（#138）。 */
+    /** 裏の同期（定期・起動時）のうち、手動が合流していない間だけ true。トップバーの下に細いバーを出す（#138）。 */
     val isSyncingInBackground: StateFlow<Boolean> = refresher.isSyncingInBackground
     /** 更新の結果と、ミニプレイヤーが消えた理由をスナックバーへ。 */
     val messages: Flow<UiText> = merge(refresher.messages, nowPlaying.messages)

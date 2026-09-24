@@ -74,7 +74,10 @@ class LibraryRefresher @Inject constructor(
         applicationScope.launch { refresh() }
     }
 
-    /** 全走査して同期する。[silent] ならクルクルも文言も出さない（定期・起動時）。ただし手動の操作が合流したら、そこからクルクルを出し、結果の文言を出す。 */
+    /**
+     * 全走査して同期する。[silent] ならクルクルも文言も出さず（定期・起動時）、代わりに [isSyncingInBackground] を立てて細いバーを出す（#138）。
+     * ただし手動の操作が合流したら、そこからバーを消してクルクルを出し、結果の文言を出す。
+     */
     suspend fun refresh(silent: Boolean = false): RefreshResult? = guarded(silent) {
         refreshRepository.refresh(excluded = excluded()).also { report(it.toSyncMessage()) }
     }

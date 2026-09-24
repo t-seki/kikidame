@@ -284,9 +284,11 @@
     <string name="settings_reset_text">All programs, episodes, playback positions, played marks and audio files will be deleted. This cannot be undone.</string>
     <string name="settings_reset_confirm">Delete and continue</string>
 
-    <!-- ===== sync: results of refresh / sync, shown in a snackbar ===== -->
+    <!-- ===== sync: shown under the top bar while syncing ===== -->
     <!-- Small text under the top bar while a scheduled or on-start sync runs, next to a thin progress bar -->
     <string name="sync_in_background">Syncing in background…</string>
+
+    <!-- ===== sync: results of refresh / sync, shown in a snackbar ===== -->
     <!-- Separates sentences in a combined message. Keep the trailing space if your language uses one -->
     <string name="sync_sentence_separator">". "</string>
     <!-- %1$d = programs, %2$d = episodes fetched from the server -->
