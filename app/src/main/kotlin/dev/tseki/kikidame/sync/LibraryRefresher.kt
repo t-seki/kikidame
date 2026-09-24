@@ -99,7 +99,10 @@ class LibraryRefresher @Inject constructor(
     /** 聴いている回は削除から外す。ただし聴き終えて止まっている回は「再生済みなら削除」に任せる（#27）。 */
     private fun excluded(): Set<EpisodeId> = setOfNotNull(nowPlaying.excludedFromSync)
 
-    /** 1 回の実行。手動の操作が合流すると [silent] が外れ、結果の文言が出る。 */
+    /**
+     * 1 回の実行。手動の操作が合流すると [silent] が外れ、まだ出していない結果の文言があればそこで出る。
+     * 手元に変化があった結果は silent でも合流を待たずに出しているので、合流しても二度は出ない（#142）。
+     */
     private inner class Run(silent: Boolean) {
         /** [silent] と [unreported] は [lock] の中で読み書きする。 */
         var silent: Boolean = silent
@@ -131,7 +134,8 @@ class LibraryRefresher @Inject constructor(
 
     /**
      * 同時に 1 つしか走らせない。走っている間に来た呼び出しは:
-     * - silent な実行の最中の手動 → 合流する。クルクルを出し、結果の文言を出させ、その実行の結果を待って返す（全走査をやり直さない）
+     * - silent な実行の最中の手動 → 合流する。クルクルを出し、まだ出していない結果の文言があれば出させ（変化があって既に出した文言は出し直さない。#142）、
+     *   その実行の結果を待って返す（全走査をやり直さない）
      * - それ以外 → 何もせず null
      */
     private suspend fun guarded(silent: Boolean, block: suspend Run.() -> RefreshResult?): RefreshResult? {

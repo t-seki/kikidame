@@ -348,7 +348,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   **ゲートはサーバへの取得だけを包む**: 先頭の `reconcileMissingFiles()`（#5、ローカル I/O のみ）は従量制でも走らせる
 - **起点**: 定期は `PeriodicWorkRequest` 6 時間（`UPDATE` で起動時に登録し直す）。起動時は `ProcessLifecycleOwner` の `ON_START` で
   前回同期から 1 時間以上（#135 で `lastFetchedAt` と `lastAttemptedAt` の新しい方から 1 時間に。`lastAttemptedAt` は全走査がサーバに問い合わせる直前に成功・失敗を問わず記録）なら `OneTimeWorkRequest`（ユニーク `sync-once`、`KEEP`）。定期・起動時の失敗は `Result.success()` で終え次回を待つ
-  （スナックバー無し、Log のみ。成功しても変化が無ければ出さず、変化があったときだけ手動と同じ文言をスナックバーに出す — #142）。走っている間は番組一覧・各回一覧のトップバーの下に細いバーと「バックグラウンドで同期中…」を出し、
+  （スナックバー無し、Log のみ）。成功したときは、手元に変化があったときだけ手動と同じ文言をスナックバーに出し、変化が無ければ出さない（#142）。走っている間は番組一覧・各回一覧のトップバーの下に細いバーと「バックグラウンドで同期中…」を出し、
   手動の操作が合流したらクルクルに切り替える（#134・#138。`LibraryRefresher.isSyncingInBackground`）。401 は `DownloadWorker` と同じくログアウト
 - **`planSync`**（`:core:domain`、純粋、JUnit 5）: 入力は番組ごとの `{ syncEnabled, retentionRule, server: Known(list) | Unavailable | Gone,
   local: List<LocalEpisodeState(episodeId, serverItemId?, airedAt, title, pinned, played, hasLocalFile)> }`。`hasLocalFile` は
@@ -383,7 +383,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   「N 番組はサーバ上で見つからず、そのままにしました」。`RefreshResult` に `enqueued` / `deleted` / `onHold` を足す。通知は出さない。
   #142（2026-09-24）で取得件数をやめ、変化だけを出すようにした:「新しい回 N 件。Z 回をダウンロード予約、W 回を削除」（新しい回 = 取り込みで
   手元に新しく増えた各回。突合で結び直した回は数えない。`RefreshResult.newEpisodes`）。手動は変化が無ければ「最新の状態です」、
-  裏の同期（定期・起動時）は変化があったときだけ同じ文言を出す（画面を開いているときだけ。閉じている間の結果は後から出さない）
+  裏の同期（定期・起動時）は変化があったときだけ同じ文言を出す（`messages` を collect している番組一覧・各回一覧を開いているときだけ。それ以外の画面にいる間や、閉じている間の結果は後から出さない）
 - **#12 番組単位の更新**: `JellyfinGateway.fetchProgramEpisodes(credentials, programServerId)`、
   `LibraryRefreshRepository.refreshProgram(programId)`（突合は「番組 1 つ + その各回」のスナップショットで `LibraryMatching.match`、削除なし）。
   `serverItemId` の無い番組は手動同期にフォールバック
