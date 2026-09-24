@@ -313,7 +313,10 @@ $ADB shell dumpsys jobscheduler | grep -A3 "$PKG" | head -40
 $ADB logcat -d | grep -E "SyncWorker|LibraryRefresher"   # "sync: 番組 N / 各回 M を取得。…"
 ```
 
-起動時同期は前回同期から 1 時間以上あけないと積まれない（ログイン直後の初回取得も同期なので、ログインし直しでは試せない）。
+起動時同期は前回の全走査から 1 時間以上あけないと積まれない。前回の全走査は成功（`lastFetchedAt`）と試み（`lastAttemptedAt`。
+サーバに届かず失敗した回も含む）の新しい方で見る（#135。外出中に前面に出すたびサーバへ接続し直さないため）。
+手動・定期の全走査も試みとして数える。「Wi-Fi のみ」で打ち切った回と番組単位の同期・取り込みは数えない。
+ログイン直後の初回取得も同期なので、ログインし直しでは試せない。
 待たずに Worker を走らせるなら、`dumpsys jobscheduler` で WorkManager のジョブ ID を見て `adb shell cmd jobscheduler run -f $PKG <jobId>`。
 
 ### 実機チェックリスト（M3-b）
