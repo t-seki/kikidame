@@ -204,7 +204,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 
 - 定期同期: `PeriodicWorkRequest` 6 時間ごと、`Constraints` は `DownloadWorker` と同じ（Wi-Fi のみなら UNMETERED、
   そうでなければ CONNECTED）。充電中の条件は課さない（同期自体の通信は一覧の JSON だけで軽く、転送は `DownloadWorker` の制約で守られる）
-- アプリ起動時: 前回同期から 1 時間以上経っていれば実行（同じ制約で待つ）。番組一覧の手動プルは同期そのもの（M3-b の範囲を参照）
+- アプリ起動時: 前回同期から 1 時間以上経っていれば実行（同じ制約で待つ。#135 で「前回同期（`lastFetchedAt`）と前回の試み（`lastAttemptedAt`。失敗した全走査も数える）の新しい方から 1 時間」に）。番組一覧の手動プルは同期そのもの（M3-b の範囲を参照）
 - ダウンロード: Worker 内で HTTP ストリームを `.part` ファイルへ書き、完了後にリネーム。
   再開は `Range` ヘッダ。進捗は `setProgress` で UI へ
 - 置き場所: `getExternalFilesDir("episodes")/<配信元>/<番組>/<ファイル>`（radirec-tool の出力と同じ階層）
@@ -347,7 +347,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   「Wi-Fi に接続していないため更新しません」で終える（裏で待たせない）。判定は全走査・番組単位・起動時・定期のすべてが通るが、
   **ゲートはサーバへの取得だけを包む**: 先頭の `reconcileMissingFiles()`（#5、ローカル I/O のみ）は従量制でも走らせる
 - **起点**: 定期は `PeriodicWorkRequest` 6 時間（`UPDATE` で起動時に登録し直す）。起動時は `ProcessLifecycleOwner` の `ON_START` で
-  前回同期から 1 時間以上なら `OneTimeWorkRequest`（ユニーク `sync-once`、`KEEP`）。定期・起動時の失敗は `Result.success()` で終え次回を待つ
+  前回同期から 1 時間以上（#135 で `lastFetchedAt` と `lastAttemptedAt` の新しい方から 1 時間に。`lastAttemptedAt` は全走査がサーバに問い合わせる直前に成功・失敗を問わず記録）なら `OneTimeWorkRequest`（ユニーク `sync-once`、`KEEP`）。定期・起動時の失敗は `Result.success()` で終え次回を待つ
   （スナックバー無し、Log のみ）。401 は `DownloadWorker` と同じくログアウト
 - **`planSync`**（`:core:domain`、純粋、JUnit 5）: 入力は番組ごとの `{ syncEnabled, retentionRule, server: Known(list) | Unavailable | Gone,
   local: List<LocalEpisodeState(episodeId, serverItemId?, airedAt, title, pinned, played, hasLocalFile)> }`。`hasLocalFile` は
