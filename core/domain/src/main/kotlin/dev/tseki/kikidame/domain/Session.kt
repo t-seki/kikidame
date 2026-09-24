@@ -11,7 +11,16 @@ sealed interface SessionState {
     /** ログイン済みだがライブラリ未選択。 */
     data class NeedsLibrary(val session: Session) : SessionState
 
-    data class Ready(val session: Session, val library: SelectedLibrary, val lastFetchedAt: Instant?) : SessionState
+    /**
+     * [lastFetchedAt] は最後に全走査が成功した時刻、[lastAttemptedAt] は最後に全走査を試みた時刻（成功・失敗を問わない。#135）。
+     * 起動時同期は両方の新しい方から間をあける。
+     */
+    data class Ready(
+        val session: Session,
+        val library: SelectedLibrary,
+        val lastFetchedAt: Instant?,
+        val lastAttemptedAt: Instant? = null,
+    ) : SessionState
 }
 
 data class Session(
@@ -68,6 +77,7 @@ interface LibraryRefreshRepository {
      * （保持ルールによる削除、サーバから消えた各回の除去、ダウンロードの予約）。
      * [excluded] の各回（再生中の回）は今回は削除しない。
      * 401 は [ServerException.Unauthorized] を投げる（呼び出し側がログアウトへ導く）。
+     * サーバに問い合わせる前に試みた時刻（[SessionState.Ready.lastAttemptedAt]）を記録する。失敗しても残る。
      */
     suspend fun refresh(excluded: Set<EpisodeId> = emptySet()): RefreshResult
 

@@ -25,7 +25,7 @@ class KikidameApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
-        // アプリが前面に出るたび: 定期同期の登録（制約の変更を拾う）と、前回から 1 時間以上なら起動時同期
+        // アプリが前面に出るたび: 定期同期の登録（制約の変更を拾う）と、前回の同期（または失敗した試み）から 1 時間以上なら起動時同期
         ProcessLifecycleOwner.get().lifecycle.addObserver(
             object : DefaultLifecycleObserver {
                 override fun onStart(owner: LifecycleOwner) {
