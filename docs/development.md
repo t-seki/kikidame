@@ -34,6 +34,16 @@ sdk.dir=/home/<you>/Android/Sdk
 
 `org.gradle.java.home` はコミットしない（CI と食い違う）。JDK は `JAVA_HOME` で渡す。
 
+エディタで Kotlin LSP（Zed の Kotlin 拡張など）を使うなら、repo の `gradle.properties` ではなく、ユーザー単位の `~/.gradle/gradle.properties` に JDK 21 を書く（こちらはコミットされないので書いてよい）:
+
+```
+org.gradle.java.home=/home/<you>/.local/jdk/current
+```
+
+この設定はそのユーザーの全 Gradle プロジェクトに効き、`JAVA_HOME` より優先される（コマンドラインで `JAVA_HOME` を付けても、Gradle のデーモンはこの JDK で動く）。kikidame のコマンドラインのビルドも同じ JDK 21 なので影響は無いが、別の JDK を使うプロジェクトがあるなら注意する。
+
+JetBrains の kotlin-lsp は同梱の JBR で Gradle を動かすが、JBR には `jlink` が無い。Android の JDK イメージ変換（`JdkImageTransform`）が `jlink executable .../jbr/bin/jlink does not exist` で落ち、Android のクラスが解決できず Project Diagnostics がエラーだらけになる。書いたら言語サーバーを再起動する。Zed なら取り込みのログは `~/.local/share/zed/logs/server-workspace-*.log` の `intellij/importLog` に出る。同じログの `Failed to call 'onVariants' in 'androidComponents' extension` は kotlin-lsp の Android 対応の限界で、診断には影響しない。
+
 ## ビルド・テスト
 
 ```bash
