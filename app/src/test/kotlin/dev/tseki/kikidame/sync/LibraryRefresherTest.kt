@@ -125,8 +125,10 @@ class LibraryRefresherTest {
 
     private class FakeKicker : DownloadKicker {
         var kicks = 0
+        var gate: CompletableDeferred<Unit>? = null
         override suspend fun kick() {
             kicks++
+            gate?.await()
         }
     }
 
@@ -341,6 +343,142 @@ class LibraryRefresherTest {
         assertNull(refresher.refresh(), "second call returns immediately")
         gate.complete(Unit)
         assertEquals(1, first.await()?.programs)
+        assertEquals(1, repo.calls)
+        assertFalse(refresher.isRefreshing.value)
+    }
+
+    @Test
+    fun silentRefreshDoesNotShowTheSpinner() = runTest(StandardTestDispatcher()) {
+        val gate = CompletableDeferred<Unit>()
+        val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now); this.gate = gate }
+        val refresher = refresher(repo)
+
+        val silent = async { refresher.refresh(silent = true) }
+        runCurrent()
+        assertFalse(refresher.isRefreshing.value)
+        assertNull(refresher.refresh(silent = true), "another silent call returns immediately")
+        gate.complete(Unit)
+        assertEquals(1, silent.await()?.programs)
+        assertFalse(refresher.isRefreshing.value)
+    }
+
+    @Test
+    fun manualRefreshJoinsASilentOne() = joinsASilentRefresh { refresh() }
+
+    @Test
+    fun refreshProgramJoinsASilentRefresh() = joinsASilentRefresh { refreshProgram(ProgramId(1)) }
+
+    @Test
+    fun syncProgramJoinsASilentRefresh() = joinsASilentRefresh { syncProgram(ProgramId(1)) }
+
+    /** silent な全走査の最中に [manual] を呼ぶと、そこからクルクルが出て、走っている全走査の結果が 1 回だけ出て返る。 */
+    private fun joinsASilentRefresh(manual: suspend LibraryRefresher.() -> RefreshResult?) = runTest(StandardTestDispatcher()) {
+        val gate = CompletableDeferred<Unit>()
+        val repo = FakeRefreshRepository().apply {
+            result = RefreshResult(3, 40, 0, 0, now)
+            programResult = RefreshResult(1, 7, 0, 0, now)
+            syncProgramResult = RefreshResult(1, 6, 0, 0, now)
+            this.gate = gate
+        }
+        val refresher = refresher(repo)
+
+        refresher.messages.test {
+            val silent = async { refresher.refresh(silent = true) }
+            runCurrent()
+            assertFalse(refresher.isRefreshing.value)
+
+            val joined = async { refresher.manual() }
+            runCurrent()
+            assertTrue(refresher.isRefreshing.value)
+            assertFalse(joined.isCompleted, "waits for the running sync")
+
+            gate.complete(Unit)
+            assertEquals(40, joined.await()?.episodes)
+            assertEquals(40, silent.await()?.episodes)
+            assertEquals(sentences(UiText.Res(R.string.sync_fetched, 3, 40)), awaitItem())
+            expectNoEvents()
+        }
+        assertFalse(refresher.isRefreshing.value)
+        assertEquals(1, repo.calls)
+        assertEquals(0, repo.programCalls)
+        assertEquals(0, repo.syncProgramCalls)
+    }
+
+    /** 結果の文言を出した後（Worker を起こしている間）に合流しても、その文言は 1 回だけ出る。 */
+    @Test
+    fun joiningAfterTheResultStillReportsItOnce() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { result = RefreshResult(3, 40, 0, 0, now, enqueued = 2) }
+        val kickGate = CompletableDeferred<Unit>()
+        val kicker = FakeKicker().apply { gate = kickGate }
+        val refresher = refresher(repo, kicker = kicker)
+
+        refresher.messages.test {
+            val silent = async { refresher.refresh(silent = true) }
+            runCurrent()
+            assertEquals(1, kicker.kicks)
+
+            val joined = async { refresher.refresh() }
+            runCurrent()
+            val message = sentences(UiText.Res(R.string.sync_fetched, 3, 40), actions(UiText.Plural(R.plurals.sync_enqueued, 2)))
+            assertEquals(message, awaitItem())
+            assertTrue(refresher.isRefreshing.value)
+
+            kickGate.complete(Unit)
+            assertEquals(40, joined.await()?.episodes)
+            assertEquals(40, silent.await()?.episodes)
+            expectNoEvents()
+        }
+        assertFalse(refresher.isRefreshing.value)
+        assertEquals(1, repo.calls)
+    }
+
+    @Test
+    fun joiningASilentRefreshReportsItsError() = runTest(StandardTestDispatcher()) {
+        val gate = CompletableDeferred<Unit>()
+        val repo = FakeRefreshRepository().apply { error = ServerException.Unreachable(); this.gate = gate }
+        val refresher = refresher(repo)
+
+        refresher.messages.test {
+            val silent = async { refresher.refresh(silent = true) }
+            runCurrent()
+            val joined = async { refresher.refresh() }
+            runCurrent()
+            gate.complete(Unit)
+            assertNull(joined.await())
+            assertNull(silent.await())
+            assertEquals(UiText.Res(R.string.sync_error_unreachable), awaitItem())
+            expectNoEvents()
+        }
+        assertFalse(refresher.isRefreshing.value)
+        assertEquals(1, repo.calls)
+    }
+
+    @Test
+    fun silentRefreshErrorStaysQuietWithoutAJoin() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { error = ServerException.Unreachable() }
+        val refresher = refresher(repo)
+        refresher.messages.test {
+            assertNull(refresher.refresh(silent = true))
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun silentCallDuringAManualRefreshIsIgnored() = runTest(StandardTestDispatcher()) {
+        val gate = CompletableDeferred<Unit>()
+        val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now); this.gate = gate }
+        val refresher = refresher(repo)
+
+        refresher.messages.test {
+            val manual = async { refresher.refresh() }
+            runCurrent()
+            assertNull(refresher.refresh(silent = true))
+            assertTrue(refresher.isRefreshing.value)
+            gate.complete(Unit)
+            assertEquals(1, manual.await()?.programs)
+            assertEquals(sentences(UiText.Res(R.string.sync_fetched, 1, 1)), awaitItem())
+            expectNoEvents()
+        }
         assertEquals(1, repo.calls)
         assertFalse(refresher.isRefreshing.value)
     }
