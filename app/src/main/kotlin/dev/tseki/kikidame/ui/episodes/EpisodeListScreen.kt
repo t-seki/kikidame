@@ -81,6 +81,7 @@ import dev.tseki.kikidame.domain.Program
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.download.DownloadProgress
 import dev.tseki.kikidame.playback.NowPlayingState
+import dev.tseki.kikidame.ui.BackgroundSyncBar
 import dev.tseki.kikidame.ui.UiText
 import dev.tseki.kikidame.ui.player.MiniPlayer
 import dev.tseki.kikidame.ui.resolve
@@ -104,6 +105,7 @@ fun EpisodeListScreen(
     val localStorage by viewModel.localStorage.collectAsStateWithLifecycle()
     val canRefresh by viewModel.canRefresh.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val isSyncingInBackground by viewModel.isSyncingInBackground.collectAsStateWithLifecycle()
     val progress by viewModel.progress.collectAsStateWithLifecycle()
     val waitingForNetwork by viewModel.waitingForNetwork.collectAsStateWithLifecycle()
     val nowPlaying by viewModel.nowPlaying.collectAsStateWithLifecycle()
@@ -123,36 +125,39 @@ fun EpisodeListScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(program?.name ?: "")
-                        program?.publisherName?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.setStarred(program?.starred != true) }, enabled = program != null) {
-                        if (program?.starred == true) {
-                            Icon(Icons.Filled.Star, contentDescription = stringResource(R.string.program_list_star_remove), tint = MaterialTheme.colorScheme.primary)
-                        } else {
-                            Icon(Icons.Outlined.StarOutline, contentDescription = stringResource(R.string.program_list_star_add))
+            Column {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text(program?.name ?: "")
+                            program?.publisherName?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                         }
-                    }
-                    IconButton(onClick = { showSyncSheet = true }, enabled = program != null) {
-                        // filled と outlined の Sync は形がほぼ同じなので、OFF は斜線入りで区別する
-                        if (program?.syncEnabled == true) {
-                            Icon(Icons.Filled.Sync, contentDescription = stringResource(R.string.episode_list_sync_settings_on), tint = MaterialTheme.colorScheme.primary)
-                        } else {
-                            Icon(Icons.Filled.SyncDisabled, contentDescription = stringResource(R.string.episode_list_sync_settings_off))
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                         }
-                    }
-                },
-            )
+                    },
+                    actions = {
+                        IconButton(onClick = { viewModel.setStarred(program?.starred != true) }, enabled = program != null) {
+                            if (program?.starred == true) {
+                                Icon(Icons.Filled.Star, contentDescription = stringResource(R.string.program_list_star_remove), tint = MaterialTheme.colorScheme.primary)
+                            } else {
+                                Icon(Icons.Outlined.StarOutline, contentDescription = stringResource(R.string.program_list_star_add))
+                            }
+                        }
+                        IconButton(onClick = { showSyncSheet = true }, enabled = program != null) {
+                            // filled と outlined の Sync は形がほぼ同じなので、OFF は斜線入りで区別する
+                            if (program?.syncEnabled == true) {
+                                Icon(Icons.Filled.Sync, contentDescription = stringResource(R.string.episode_list_sync_settings_on), tint = MaterialTheme.colorScheme.primary)
+                            } else {
+                                Icon(Icons.Filled.SyncDisabled, contentDescription = stringResource(R.string.episode_list_sync_settings_off))
+                            }
+                        }
+                    },
+                )
+                BackgroundSyncBar(isSyncingInBackground)
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = { MiniPlayer(onClick = onNowPlayingClick) },

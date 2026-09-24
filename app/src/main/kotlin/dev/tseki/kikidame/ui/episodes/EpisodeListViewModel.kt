@@ -72,6 +72,9 @@ class EpisodeListViewModel @Inject constructor(
 
     val isRefreshing: StateFlow<Boolean> = refresher.isRefreshing
 
+    /** 裏の同期（定期・起動時）の間だけ true。トップバーの下に細いバーを出す（#138）。 */
+    val isSyncingInBackground: StateFlow<Boolean> = refresher.isSyncingInBackground
+
     /**
      * 聴いている回（別の番組の回のこともある）。この番組の回なら行にマークを出す。
      * 再生位置（ミニプレイヤー用、1 秒ごとに変わる）は行に要らないので落とし、行を毎秒作り直さない。

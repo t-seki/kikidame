@@ -216,6 +216,7 @@
     <string name="settings_reset_confirm">消して接続画面へ</string>
 
     <!-- sync -->
+    <string name="sync_in_background">バックグラウンドで同期中…</string>
     <string name="sync_sentence_separator">。</string>
     <string name="sync_fetched">番組 %1$d / 各回 %2$d を取得</string>
     <plurals name="sync_enqueued">
