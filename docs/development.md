@@ -154,7 +154,7 @@ main のチェックアウトから fork subagent に並列で実装させて回
 
 ### マージ前の検証
 
-docs だけの PR は 1（CI）だけ。2〜5 はアプリに変更がある PR で行う。
+docs だけの PR は 1（CI）だけ。2〜5 はアプリに変更がある PR で行う。Renovate の PR は、APK に入る Gradle の依存・プラグインの更新なら 2〜5 も行い、GitHub Actions・Gradle wrapper・統合テスト用のコンテナだけの更新なら 1（CI）だけ（「マージの承認」）。Renovate の PR には担当の worker がいないので、2 のビルドは Supervisor が検証用の worktree で行う（`/supervise` の手順 7）。
 
 1. CI（`./gradlew test` と `./gradlew :app:lintDebug`）が通っている
 2. 担当の fork に `./gradlew :app:assembleDebug` を頼み、APK のフルパス（`<worktree>/app/build/outputs/apk/debug/app-debug.apk`）を報告させる
@@ -170,7 +170,10 @@ debug 版は初回（とアンインストールの後）にサーバへのロ�
 
 - アプリに変更がある PR: ビルドを実機の debug 版に入れ、人が見てからマージする
 - docs だけの PR: これも承認制。実機の確認は無く、人が差分を見て決める
-- Renovate の PR（依存の更新）: 依存の更新もアプリの変更なので、アプリに変更がある PR と同じく実機の debug 版で見てから承認する。repo の auto-merge は無効（`allow_auto_merge: false`）で、Renovate は platform の auto-merge が使えないと自分でマージするため、共通の preset（`local>t-seki/renovate-config`）の minor / patch / digest の自動マージを `renovate.json` の `packageRules` で切っている
+- Renovate の PR（依存の更新）は、APK に入るかどうかで分ける。どちらも承認制で、自動マージはしない
+  - 承認の仕方: APK に入る Gradle の依存・プラグイン（`gradle/libs.versions.toml`、`build.gradle.kts` 系。AGP、Kotlin、Media3、Room など）の更新は、アプリに変更がある PR と同じく実機の debug 版で見てから承認する。GitHub Actions・Gradle wrapper・統合テスト用のコンテナだけの更新は、docs だけの PR と同じく CI と差分を見て承認する
+  - 自動マージを切っている理由: 共通の preset（`local>t-seki/renovate-config`）は minor / patch と pin / pinDigest / digest の更新を自動マージする。この repo の auto-merge は無効（`allow_auto_merge: false`）で、Renovate は「platform の auto-merge が使えないときは Renovate 自身の自動マージに切り替える」（Renovate の docs、configuration-options の `platformAutomerge`）ため、CI が通っただけで実機の確認なしにマージされうる
+  - 切っている場所: `renovate.json` の `packageRules`（`matchPackageNames: ["*"]` で `automerge` / `platformAutomerge` を false にして、preset の設定を上書きしている）
 
 ### マージ後の確認（デプロイ）
 
