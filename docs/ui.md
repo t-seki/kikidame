@@ -15,11 +15,11 @@
 
 固定パレット。ダークが主（寝る前の利用）で、ライトも同じ構成。既定は端末の設定に追従し、設定の「テーマ」で システム／ダーク／ライト を選べる（#62。「端末はライトのままアプリだけ常にダーク」のため）。
 
-温かい黒（赤みのある黒）にアンバーのアクセント。状態を表す色は **`primary`（アンバー）と `error`（赤）の 2 系統だけ** にし、それ以外の意味を色に持たせない（聴いている回の行の背景だけ `secondaryContainer` で示す）。
+温かい黒（赤みのある黒）にアンバーのアクセント。状態を表す色は **`primary`（アンバー）と `error`（赤）の 2 系統だけ** にし、それ以外の意味を色に持たせない（聴いている回の行の背景だけ `secondaryContainer` で示す。タブの選択の表示は下の「共通の規則」）。
 
 | スロット | ダーク | ライト | 使いどころ |
 | --- | --- | --- | --- |
-| `primary` | `#F5A623` | `#9A5B00` | よく聴く ★・同期対象・聴いている回の印・節の見出し・進捗 |
+| `primary` | `#F5A623` | `#9A5B00` | よく聴く ★・同期対象・聴いている回の印・節の見出し・進捗・選んでいるタブの文字と下線 |
 | `onPrimary` | `#3D2600` | `#FFFFFF` | 再生ボタンのアイコン |
 | `primaryContainer` | `#5A3A00` | `#FFDDB3` | 選択中のチップ |
 | `onPrimaryContainer` | `#FFE2B8` | `#2E1B00` | |
@@ -28,7 +28,7 @@
 | `surface` | `#141210` | `#FBF7F1` | 画面の地 |
 | `onSurface` | `#EDE5DA` | `#1F1A14` | 本文 |
 | `background` / `onBackground` | surface / onSurface と同じ | 同左 | Scaffold の地。既定のままだと Material3 の素の色が透ける |
-| `onSurfaceVariant` | `#B3A58F` | `#5E5347` | 補足行・ラベル |
+| `onSurfaceVariant` | `#B3A58F` | `#5E5347` | 補足行・ラベル・選んでいないタブの文字 |
 | `surfaceContainerLow` | `#1B1815` | `#F5F0E8` | |
 | `surfaceContainer` | `#211D18` | `#EFE9DF` | TopAppBar の地。ミニプレイヤーはこれに `primary` を 18% 混ぜた面（#59） |
 | `surfaceContainerHigh` | `#2B261F` | `#E8E1D5` | ボトムシート |
