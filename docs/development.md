@@ -244,10 +244,10 @@ scp ~/.android/debug.keystore <host>:~/.android/debug.keystore
 chmod 600 ~/.android/debug.keystore
 ```
 
-指紋は、コピー後の鍵でビルドした APK の証明書の SHA-256 を、端末に入っている debug 版の署名と比べる。端末の署名の取り方は記録が無く、**未確認**（案: `$ADB shell pm path dev.tseki.kikidame.debug` で APK のパスを見て `$ADB pull` し、同じ `apksigner` にかける）。`apksigner` は build-tools の中にあり、版は `ls ~/Android/Sdk/build-tools/` で確かめる（この PC は 36.0.0）。
+指紋は、コピー後の鍵でビルドした APK の証明書の SHA-256 を、端末に入っている debug 版の署名と比べる。端末の署名の取り方は記録が無く、**未確認**（案: `$ADB shell pm path dev.tseki.kikidame.debug` で APK のパスを見て `$ADB pull` し、同じ `apksigner` にかける）。`apksigner` は build-tools の中にあり、版は `ls ~/Android/Sdk/build-tools/` で確かめる。
 
 ```bash
-APKSIGNER=~/Android/Sdk/build-tools/<ver>/apksigner
+APKSIGNER=~/Android/Sdk/build-tools/36.0.0/apksigner   # 版は ls ~/Android/Sdk/build-tools/ で確かめる
 $APKSIGNER verify --print-certs app/build/outputs/apk/debug/app-debug.apk | grep SHA-256
 ```
 
