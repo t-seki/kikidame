@@ -154,7 +154,7 @@ main のチェックアウトから fork subagent に並列で実装させて回
 
 ### マージ前の検証
 
-docs だけの PR は 1（CI）だけ。2〜5 はアプリに変更がある PR で行う。
+docs だけの PR は 1（CI）だけ。2〜5 はアプリに変更がある PR で行う。Renovate の PR は、APK に入る Gradle の依存・プラグインの更新なら 2〜5 も行い、GitHub Actions・Gradle wrapper・統合テスト用のコンテナだけの更新なら 1（CI）だけ（「マージの承認」）。両方が 1 つの PR に混ざるとき（preset は minor / patch を 1 つの PR にまとめる）は、実機で見る側に倒す。Renovate の PR には担当の worker がいないので、2 のビルドは Supervisor が検証用の worktree で行う（`/supervise` の手順 7）。
 
 1. CI（`./gradlew test` と `./gradlew :app:lintDebug`）が通っている
 2. 担当の fork に `./gradlew :app:assembleDebug` を頼み、APK のフルパス（`<worktree>/app/build/outputs/apk/debug/app-debug.apk`）を報告させる
@@ -170,10 +170,15 @@ debug 版は初回（とアンインストールの後）にサーバへのロ�
 
 - アプリに変更がある PR: ビルドを実機の debug 版に入れ、人が見てからマージする
 - docs だけの PR: これも承認制。実機の確認は無く、人が差分を見て決める
+- Renovate の PR（依存の更新）は、APK に入るかどうかで分ける。どちらも承認制で、自動マージはしない
+  - 承認の仕方: APK に入る Gradle の依存・プラグイン（`gradle/libs.versions.toml`、`build.gradle.kts` 系。AGP、Kotlin、Media3、Room など）の更新は、アプリに変更がある PR と同じく実機の debug 版で見てから承認する。GitHub Actions・Gradle wrapper・統合テスト用のコンテナだけの更新は、docs だけの PR と同じく CI と差分を見て承認する。両方が 1 つの PR に混ざるとき（preset は minor / patch を 1 つの PR にまとめる）は、実機で見る側に倒す
+  - 自動マージを切っている理由: 共通の preset（`local>t-seki/renovate-config`）は minor / patch と pin / pinDigest / digest の更新を自動マージする。この repo の auto-merge は無効（`allow_auto_merge: false`）で、Renovate は「platform の auto-merge が使えないときは Renovate 自身の自動マージに切り替える」（Renovate の docs、configuration-options の `platformAutomerge`）ため、CI が通っただけで実機の確認なしにマージされうる
+  - 切っている場所: `renovate.json` の `packageRules`（`matchPackageNames: ["*"]` で `automerge` / `platformAutomerge` を false にして、preset の設定を上書きしている）
 
 ### マージ後の確認（デプロイ）
 
 docs だけの PR は `git pull --ff-only` までで、以下は行わない。以下はアプリに変更がある PR をマージしたとき。
+Renovate の PR は、Gradle の依存・プラグインの更新ならアプリに変更がある PR 側（`installDebug` で入れ直す）、GitHub Actions・Gradle wrapper・統合テスト用のコンテナだけの更新なら docs だけの PR 側（`git pull --ff-only` まで）。両方が混ざるときはアプリに変更がある PR 側（「マージの承認」）。
 
 - main で `git pull --ff-only` した後、`./gradlew :app:installDebug` で debug 版を main のビルドに入れ直す（接続は下の「実機で試す（M1）」）
 - Room のスキーマを上げた PR をマージした後は、それより古い debug ビルドを入れない（入れるなら先にアンインストールする）
