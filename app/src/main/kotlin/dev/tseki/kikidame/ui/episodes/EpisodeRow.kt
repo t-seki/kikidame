@@ -121,7 +121,7 @@ internal fun EpisodeRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     if (playable && resume != null && runtime > Duration.ZERO) {
-                        // 再生済みと未再生の間の隙間（gapSize の既定）は無くす。ミニプレイヤーの線（#59）と同じ
+                        // 再生済みと未再生の間の隙間（gapSize の既定）は無くす。隙間を無くす点だけミニプレイヤーの線（#59）と同じで、色・端の形・端の点は既定のまま
                         LinearProgressIndicator(
                             progress = { (resume / runtime).toFloat().coerceIn(0f, 1f) },
                             modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
