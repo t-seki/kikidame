@@ -322,7 +322,9 @@ private fun LazyListScope.programItems(
  *
  * M3 の `ListItem` は補足が 2 行に折り返して 3 行になると左右の要素を上に寄せる（`ListItem.kt` の `place()`、#157）。
  * 番組の行は行の高さに関わらず左右を真ん中に置く方針なので、`ListItem` は使わず [Row] で組む。
+ * 左右は本文の高さが決まる前に測られるので、中身を `fillMaxHeight` で中央寄せにしても `ListItem` では真ん中に置けない。
  * 余白・最小の高さ・文字のスタイルと色は、`ListItem`（material3 1.4.0）の 1〜2 行のときの値に合わせてある。
+ * 3 行になっても上下 8dp・最小 72dp のままにする（`ListItem` の 3 行の既定は上下 12dp・最小 88dp。#157 で決めた）。
  */
 @Composable
 private fun ProgramRow(summary: ProgramSummary, onClick: () -> Unit, onToggleStarred: () -> Unit) {
