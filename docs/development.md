@@ -152,8 +152,8 @@ main のチェックアウトから fork subagent に並列で実装させて回
 ### worktree の準備
 
 - fork の worktree は repo 直下の `.claude/worktrees/`（`.gitignore` 済み）に切られる
-- `local.properties` は git 管理外なので、main のチェックアウトから worktree 直下にコピーする（`cp local.properties <worktree>/`）
-- Gradle は `JAVA_HOME=~/.local/jdk/current` を付けて回す。`build/` は worktree ごとに別なので初回ビルドが重い。`~/.gradle` のキャッシュは共有されるので依存の再ダウンロードは無い
+- worktree には `local.properties`（git 管理外）を置かない。コピーしない（`cp local.properties <worktree>/` は、2026-10-07 に #157 の worker で auto mode の分類器に止められた。分類器が毎回止めるのか、場面によるのかは未確認（1 回止められただけ））。`local.properties` の中身は `sdk.dir` の 1 行だけなので、代わりに環境変数 `ANDROID_HOME` で SDK を渡す
+- Gradle は `ANDROID_HOME=~/Android/Sdk JAVA_HOME=~/.local/jdk/current ./gradlew <タスク>` の形で回す（例: `./gradlew :app:assembleDebug`。#161 の head `59784fc` でこの形のビルドが通ることを確かめた）。`build/` は worktree ごとに別なので初回ビルドが重い。`~/.gradle` のキャッシュは共有されるので依存の再ダウンロードは無い
 - 画面（UI）を変える issue は、「触るファイル」と完了条件に `docs/ui.md` と `docs/claude-code-handoff.md` の該当箇所を入れる。入れ忘れると PR のレビューで「docs が古い」と指摘されて直すことになる（過去に #79・#139・#143・#152 で起きた）
 - 担当は「同じファイルを触らない」単位で分ける（例: 2026-09-20 は `EpisodeListScreen.kt` 周りの #66→#68→#70 と、テーマ・設定・ミニプレイヤーの #59→#62 に分けて衝突なし）
 
@@ -162,7 +162,7 @@ main のチェックアウトから fork subagent に並列で実装させて回
 docs だけの PR は 1（CI）だけ。2〜5 はアプリに変更がある PR で行う。Renovate の PR は、APK に入る Gradle の依存・プラグインの更新なら 2〜5 も行い、GitHub Actions・Gradle wrapper・統合テスト用のコンテナだけの更新なら 1（CI）だけ（「マージの承認」）。両方が 1 つの PR に混ざるとき（preset は minor / patch を 1 つの PR にまとめる）は、実機で見る側に倒す。Renovate の PR には担当の worker がいないので、2 のビルドは Supervisor が検証用の worktree で行う（`/supervise` の手順 7）。
 
 1. CI（`./gradlew test` と `./gradlew :app:lintDebug`）が通っている
-2. 担当の fork に `./gradlew :app:assembleDebug` を頼み、APK のフルパス（`<worktree>/app/build/outputs/apk/debug/app-debug.apk`）を報告させる
+2. 担当の fork に `./gradlew :app:assembleDebug` を頼み（「worktree の準備」の形で、`ANDROID_HOME` と `JAVA_HOME` を付けて回す）、APK のフルパス（`<worktree>/app/build/outputs/apk/debug/app-debug.apk`）を報告させる
 3. Supervisor が `$ADB install -r <APK>` で実機の **debug 版**に入れる。debug 版は applicationId が `dev.tseki.kikidame.debug`、アプリ名が「Kikidame (debug)」で、普段使いの **release 版**（`dev.tseki.kikidame`、Releases の APK）とは別アプリとして並ぶ。release 版には触らない
 4. Room のスキーマを上げる PR も入れてよい（影響は debug 版に閉じる）。その後にスキーマの古いビルドを入れてダウングレードで落ちたら、`$ADB uninstall dev.tseki.kikidame.debug` してから入れ直す（debug 版のログイン・DB・手元のファイルが消える）
 5. 人に実機で見てほしい点を PR ごとに示す。再生画面を開く確認は音が出るので避ける（出すなら実機の音量をハードキーで 0 にしてから）
