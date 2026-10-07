@@ -2,7 +2,7 @@ package dev.tseki.kikidame.domain
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Duration
 import kotlin.time.Instant
-/** 番組一覧の 1 行。[LibraryRepository.observePrograms] は最新の各回の公開日順で返し、画面はよく聴く番組を先に分けて出す。 */
+/** 番組一覧の 1 行。[LibraryRepository.observePrograms] は最新の各回の公開日順で返す（「よく聴く」タブはそのうちよく聴く番組だけを同じ順で出す。#151）。 */
 data class ProgramSummary(
     val program: Program,
     /** サーバ上の分も含めた各回の数。 */
@@ -55,6 +55,11 @@ interface LibraryRepository {
      * Android Auto の「続きから」と、プレイヤーが空のときの再開（`onPlaybackResumption`）が使う。
      */
     suspend fun getRecentlyListened(limit: Int): List<EpisodeWithState>
+    /**
+     * [getRecentlyListened] と同じ条件・順で件数の上限なし。再生位置の保存・再生済みの切り替え・ファイルの削除や同期に追従する。
+     * 番組一覧の「続きから」タブ（#151）が使う。
+     */
+    fun observeRecentlyListened(): Flow<List<EpisodeWithState>>
 
     /** 同期対象と保持ルールを保存する。適用は次の同期（保存した瞬間には何も消えない）。 */
     suspend fun updateSync(programId: ProgramId, syncEnabled: Boolean, rule: RetentionRule)

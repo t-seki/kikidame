@@ -74,14 +74,27 @@
     <string name="library_pick_type_livetv">Live TV</string>
 
     <!-- ===== program_list: the root screen ===== -->
-    <string name="program_list_title">Programs</string>
+    <!-- Title of the root screen: the app name -->
+    <string name="program_list_title">Kikidame</string>
+    <!-- Tabs of the root screen. "Continue" = Continue Listening: partly listened episodes across programs -->
+    <string name="program_list_tab_continue">Continue</string>
+    <string name="program_list_tab_starred">Starred</string>
+    <string name="program_list_tab_all">All programs</string>
+    <!-- Empty Continue tab -->
+    <string name="program_list_continue_empty">Episodes you have partly listened to show up here</string>
+    <!-- Empty Starred tab -->
+    <string name="program_list_starred_empty">Tap ☆ on a program in All programs to add it here</string>
+    <!-- Continue row: time left until the end of the episode. %1$d = minutes, rounded up -->
+    <plurals name="program_list_continue_remaining">
+        <item quantity="one">%1$d min left</item>
+        <item quantity="other">%1$d min left</item>
+    </plurals>
+    <!-- Snackbar after marking an episode played on the Continue tab, with an Undo action -->
+    <string name="program_list_marked_played">Marked as played</string>
+    <string name="program_list_undo">Undo</string>
     <!-- Icon that opens the filter sheet (search + publisher) -->
     <string name="program_list_filter">Filter</string>
     <string name="program_list_settings">Settings</string>
-    <!-- Section header for programs the user marked as Starred -->
-    <string name="program_list_starred">Starred</string>
-    <!-- Section header for the remaining programs when a Starred section exists -->
-    <string name="program_list_others">Others</string>
     <!-- Star icon on a starred program -->
     <string name="program_list_star_remove">Starred (tap to remove)</string>
     <!-- Star icon on a program that is not starred -->
@@ -105,6 +118,8 @@
     <string name="program_list_no_match">No programs match “%1$s”</string>
     <!-- Empty result of a search within one publisher. %1$s = search text, %2$s = publisher name -->
     <string name="program_list_no_match_in_publisher">No programs in %2$s match “%1$s”</string>
+    <!-- Empty Starred tab when only a publisher filter is active. %1$s = publisher name -->
+    <string name="program_list_no_starred_in_publisher">No starred programs in %1$s</string>
     <!-- Program row: counts of episodes. "on device" = downloaded; "total" = known on the server -->
     <string name="program_list_on_device">%1$d on device</string>
     <string name="program_list_on_device_of_total">%1$d on device · %2$d total</string>

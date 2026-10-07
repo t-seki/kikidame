@@ -8,13 +8,15 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dev.tseki.kikidame.domain.AppSettingsRepository
 import dev.tseki.kikidame.domain.PlaybackSpeed
+import dev.tseki.kikidame.domain.ProgramListTab
 import dev.tseki.kikidame.domain.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
 /**
- * アプリ全体の設定（セッションとは別の DataStore `settings`）。「Wi-Fi のみ」（handoff）・倍速（#35）・テーマ（#62）。
+ * アプリ全体の設定（セッションとは別の DataStore `settings`）。「Wi-Fi のみ」（handoff）・倍速（#35）・テーマ（#62）・
+ * 番組の画面で最後に開いていたタブ（#151）。
  * 1 つの DataStore なので、どれかを書くと全部の Flow が再度流れる。値が変わったときだけ下流に伝える。
  */
 class DataStoreAppSettings(private val dataStore: DataStore<Preferences>) : AppSettingsRepository {
@@ -33,11 +35,17 @@ class DataStoreAppSettings(private val dataStore: DataStore<Preferences>) : AppS
     override suspend fun setThemeMode(value: ThemeMode) {
         dataStore.edit { it[THEME_MODE] = value.name }
     }
+    override val programListTab: Flow<ProgramListTab> =
+        dataStore.data.map { ProgramListTab.fromStorageName(it[PROGRAM_LIST_TAB]) }.distinctUntilChanged()
+    override suspend fun setProgramListTab(value: ProgramListTab) {
+        dataStore.edit { it[PROGRAM_LIST_TAB] = value.name }
+    }
 
     companion object {
         const val DEFAULT_WIFI_ONLY = true
         private val WIFI_ONLY = booleanPreferencesKey("wifi_only")
         private val PLAYBACK_SPEED = floatPreferencesKey("playback_speed")
         private val THEME_MODE = stringPreferencesKey("theme_mode")
+        private val PROGRAM_LIST_TAB = stringPreferencesKey("program_list_tab")
     }
 }

@@ -3,6 +3,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.tseki.kikidame.domain.ProgramListTab
 import dev.tseki.kikidame.domain.ThemeMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -46,5 +47,16 @@ class DataStoreAppSettingsTest {
     fun unknownStoredValueFallsBackToSystem() = runTest {
         dataStore.value.edit { it[stringPreferencesKey("theme_mode")] = "AMOLED" }
         assertEquals(ThemeMode.SYSTEM, settings.themeMode.first())
+    }
+    /** 番組の画面のタブ（#151）: 初回は「続きから」、選んだタブは再起動後も残る。読めない値は「続きから」に戻る。 */
+    @Test
+    fun programListTabDefaultsToContinueListeningAndPersists() = runTest {
+        assertEquals(ProgramListTab.CONTINUE_LISTENING, settings.programListTab.first())
+        settings.setProgramListTab(ProgramListTab.ALL_PROGRAMS)
+        assertEquals(ProgramListTab.ALL_PROGRAMS, settings.programListTab.first())
+        restart()
+        assertEquals(ProgramListTab.ALL_PROGRAMS, settings.programListTab.first())
+        dataStore.value.edit { it[stringPreferencesKey("program_list_tab")] = "HISTORY" }
+        assertEquals(ProgramListTab.CONTINUE_LISTENING, settings.programListTab.first())
     }
 }

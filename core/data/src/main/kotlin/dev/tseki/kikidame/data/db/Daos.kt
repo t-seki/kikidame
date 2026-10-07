@@ -85,6 +85,14 @@ data class EpisodeRow(
     @Relation(parentColumn = "id", entityColumn = "episodeId") val localFile: LocalFileEntity?,
     @Relation(parentColumn = "id", entityColumn = "episodeId") val playback: PlaybackStateEntity?,
 )
+/** 「続きから」（#108）の条件と順。Auto・再開の上限付きの読み出しと、アプリの「続きから」タブ（#151）の追従する読み出しで共有する。 */
+private const val RECENTLY_LISTENED = """
+    SELECT e.* FROM episodes e
+      JOIN local_files lf ON lf.episodeId = e.id
+      JOIN playback_states ps ON ps.episodeId = e.id
+    WHERE lf.state = 'DONE' AND lf.path IS NOT NULL AND ps.played = 0 AND ps.positionTicks >= :notStartedTicks
+    ORDER BY ps.updatedAt DESC, e.id DESC
+    """
 @Dao
 interface EpisodeDao {
     @Transaction
@@ -102,17 +110,12 @@ interface EpisodeDao {
      * （規則の由来は 1 箇所のまま、絞り込みは SQL で。LIMIT の前に絞らないと上位が未開始の回で埋まったとき空になる）。
      */
     @Transaction
-    @Query(
-        """
-        SELECT e.* FROM episodes e
-          JOIN local_files lf ON lf.episodeId = e.id
-          JOIN playback_states ps ON ps.episodeId = e.id
-        WHERE lf.state = 'DONE' AND lf.path IS NOT NULL AND ps.played = 0 AND ps.positionTicks >= :notStartedTicks
-        ORDER BY ps.updatedAt DESC, e.id DESC
-        LIMIT :limit
-        """,
-    )
+    @Query("$RECENTLY_LISTENED LIMIT :limit")
     suspend fun listRecentlyListened(limit: Int, notStartedTicks: Long): List<EpisodeRow>
+    /** [listRecentlyListened] と同じ条件・順で、件数の上限なし。変化（再生位置の保存・再生済み・ファイルの削除）に追従する（#151 の「続きから」タブ）。 */
+    @Transaction
+    @Query(RECENTLY_LISTENED)
+    fun observeRecentlyListened(notStartedTicks: Long): Flow<List<EpisodeRow>>
     @Query("SELECT * FROM episodes WHERE serverItemId = :serverItemId")
     suspend fun findByServerItemId(serverItemId: String): EpisodeEntity?
     @Query("SELECT id, serverItemId, programId, title, airedAt AS publishedAt, runtimeTicks FROM episodes")
