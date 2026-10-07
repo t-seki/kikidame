@@ -87,7 +87,7 @@ KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTe
   `/media` にマウントし、初期セットアップと音楽ライブラリ `radio` の作成を REST で済ませ、スキャンが終わるまで待つ。
   置き場は `$KIKIDAME_JF_DIR`（既定 `/tmp/kikidame-jf`）。ユーザーは `kikidame` / `kikidame-test`
 - `KIKIDAME_JF_LIBRARY=showcase` を付けて `media` / `up` すると、ストア向けスクリーンショット用の英語の架空ライブラリ
-  （Example FM / Example Public Radio の 5 番組、45 回。#95）になる。実機のスクリーンショットは #95 の PR のときにこのライブラリで撮った。統合テストの期待値は日本語ライブラリ前提なので、
+  （Example FM / Example Public Radio の 5 番組、45 回。#95）になる。実機のスクリーンショットは #95 の PR のときにこのライブラリで撮った（実機からは下の HTTPS の手順でつなぐ）。統合テストの期待値は日本語ライブラリ前提なので、
   そのときは統合テストを回さない
 - 統合テストは `KIKIDAME_JELLYFIN_URL` が無ければ `Assume` でスキップするので、CI と普段の `./gradlew test` には出てこない。
   付いているときはキャッシュを使わず毎回走る（`core/data/build.gradle.kts`）
@@ -95,7 +95,27 @@ KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTe
   認証切れ・到達不能）を 1 回ずつ呼ぶ。新しい版が出たら `resolve()` にタグを足して同じテストを当てる
 - 認証は SDK が付ける `Authorization: MediaBrowser Client="Kikidame", Version="…", DeviceId="…", Device="…"` の 1 形式だけ
   （レガシーの `X-Emby-Authorization` は送らない。2026-09-21 に記録用サーバで確認）
-- 実機からコンテナに繋ぐには `adb reverse tcp:8096 tcp:8097` で、アプリの URL は `http://localhost:8096`。
+- 実機（Android）からコンテナに繋ぐには、Tailscale の HTTPS（`tailscale serve`）で出す。`adb reverse` は要らない（実機は tailnet 経由でつなぐ）。
+  下の例は Jellyfin 12（`up 12`、`http://localhost:8098`）に向けたもので、撮影（#154）で通った。`<host>.<tailnet>.ts.net` は自分のマシンと tailnet の名前に読み替える
+  1. tailnet で HTTPS 証明書を有効にする（1 回だけ）。管理画面の [DNS ページ](https://login.tailscale.com/admin/dns)で MagicDNS を有効にし、
+     HTTPS Certificates の Enable HTTPS を押す（[Tailscale の docs「Enabling HTTPS」](https://tailscale.com/docs/how-to/set-up-https-certificates)）。
+     有効にする前に `tailscale serve` を打つと「Serve is not enabled on your tailnet」と出て止まり、有効にするための URL が出る
+  2. 実機の Tailscale アプリをオンにして、tailnet に入れる
+  3. 開発機で、コンテナのポートを HTTPS で出す。sudo なしだと「Access denied: serve config denied」で止まる
+
+     ```bash
+     sudo tailscale serve --bg --https=443 http://localhost:8098
+     ```
+
+  4. `tailscale serve status` が `https://<host>.<tailnet>.ts.net (tailnet only)` / `|-- / proxy http://localhost:8098` を出し、
+     `curl https://<host>.<tailnet>.ts.net/System/Info/Public` が 200 を返すことを確かめる
+  5. アプリの接続画面で URL `https://<host>.<tailnet>.ts.net`、ユーザー `kikidame` / パスワード `kikidame-test` で入る
+  6. 済んだら止める（止めるのにも sudo が要る）
+
+     ```bash
+     sudo tailscale serve reset
+     ```
+
   ただし「別のサーバに接続」は手元のデータを消すので、本番サーバに繋いだ実機では試さない
 
 確認した版（統合テスト 5 件、番組 2 / 各回 6）:
