@@ -59,6 +59,7 @@
 
 ### 共通の規則
 
+- 番組の行（`ProgramRow`）は、左の ★ と右の同期対象・消失のアイコンを、行が何行になっても上下の真ん中に置く（#157）。Material 3 の `ListItem` は、補足が折り返して 3 行になると左右の要素を上に寄せる（material3 1.4.0 の `ListItem.kt` の `place()`）。左右は本文の高さが決まる前に測られるので、中身を `fillMaxHeight` で中央寄せにしても直せない。そのため `ListItem` は使わず `Row(verticalAlignment = CenterVertically)` で組み、余白・最小の高さ（72dp）・文字のスタイルと色は `ListItem` の 1〜2 行のときに合わせている。Material 3 の 3 行の既定から外すのは人の判断。各回の行・「続きから」の行は対象外
 - 値を見せる行は `overlineContent` = ラベル、`headlineContent` = 値。操作の行は `headlineContent` = 操作名、`supportingContent` = 説明。少数の選択肢から 1 つ選ぶ行は `overlineContent` = ラベル、`headlineContent` = `FilterChip` の並び（保持ルールの「最新 N 回」、設定の「テーマ」）
 - 状態の色は `primary`（よく聴く・同期対象・再生中）と `error`（消失・失敗・破壊的操作）だけ。聴いている回の行の背景は `secondaryContainer`。ただしタブは例外で、選んでいるタブの文字と下線に `primary`、選んでいないタブの文字に `onSurfaceVariant` を使う（#155。`Tab` の既定は選んでいないタブも `primary` になる）
 - 同期中の表示は 2 種類で、両方は出さない。利用者の操作（引っ張って更新・「この番組を今すぐ同期」）はクルクル（`PullToRefreshBox`）、裏の同期（定期・起動時）は番組の画面（タブの下）・各回一覧のトップバーの下に細い不確定のバーと「バックグラウンドで同期中…」（`ui/BackgroundSyncBar.kt`、#138）。裏の同期の最中に操作が来たらクルクルに切り替える（#134）

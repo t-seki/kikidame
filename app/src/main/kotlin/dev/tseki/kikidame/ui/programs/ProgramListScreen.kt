@@ -3,6 +3,11 @@ package dev.tseki.kikidame.ui.programs
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -312,29 +317,51 @@ private fun LazyListScope.programItems(
         HorizontalDivider()
     }
 }
-/** 左端の ★ でよく聴くを切り替える。右端は同期対象／消失の状態表示。 */
+/**
+ * 左端の ★ でよく聴くを切り替える。右端は同期対象／消失の状態表示。
+ *
+ * M3 の `ListItem` は補足が 2 行に折り返して 3 行になると左右の要素を上に寄せる（`ListItem.kt` の `place()`、#157）。
+ * 番組の行は行の高さに関わらず左右を真ん中に置く方針なので、`ListItem` は使わず [Row] で組む。
+ * 余白・最小の高さ・文字のスタイルと色は、`ListItem`（material3 1.4.0）の 1〜2 行のときの値に合わせてある。
+ */
 @Composable
 private fun ProgramRow(summary: ProgramSummary, onClick: () -> Unit, onToggleStarred: () -> Unit) {
-    ListItem(
-        modifier = Modifier.clickable(onClick = onClick),
-        leadingContent = {
-            IconButton(onClick = onToggleStarred) {
-                if (summary.program.starred) {
-                    Icon(Icons.Filled.Star, contentDescription = stringResource(R.string.program_list_star_remove), tint = MaterialTheme.colorScheme.primary)
-                } else {
-                    Icon(Icons.Outlined.StarOutline, contentDescription = stringResource(R.string.program_list_star_add))
+    Surface(
+        modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}.clickable(onClick = onClick),
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
+        Row(
+            modifier = Modifier.heightIn(min = 72.dp).padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.padding(end = 16.dp)) {
+                CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant) {
+                    IconButton(onClick = onToggleStarred) {
+                        if (summary.program.starred) {
+                            Icon(Icons.Filled.Star, contentDescription = stringResource(R.string.program_list_star_remove), tint = MaterialTheme.colorScheme.primary)
+                        } else {
+                            Icon(Icons.Outlined.StarOutline, contentDescription = stringResource(R.string.program_list_star_add))
+                        }
+                    }
                 }
             }
-        },
-        headlineContent = { Text(summary.program.name) },
-        supportingContent = { Text(summary.toSupportingText().resolve()) },
-        trailingContent = {
-            when {
-                summary.program.isGone -> Icon(Icons.Filled.CloudOff, contentDescription = stringResource(R.string.common_program_gone), tint = MaterialTheme.colorScheme.error)
-                summary.program.syncEnabled -> Icon(Icons.Filled.Sync, contentDescription = stringResource(R.string.program_list_sync_enabled), tint = MaterialTheme.colorScheme.primary)
+            Column(Modifier.weight(1f)) {
+                Text(summary.program.name, style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    summary.toSupportingText().resolve(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-        },
-    )
+            Box(Modifier.padding(start = 16.dp)) {
+                when {
+                    summary.program.isGone -> Icon(Icons.Filled.CloudOff, contentDescription = stringResource(R.string.common_program_gone), tint = MaterialTheme.colorScheme.error)
+                    summary.program.syncEnabled -> Icon(Icons.Filled.Sync, contentDescription = stringResource(R.string.program_list_sync_enabled), tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+    }
 }
 
 /**
