@@ -219,6 +219,7 @@ private fun ProgramListTabs(
                         Tab(
                             selected = pagerState.currentPage == index,
                             onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
+                            unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             text = { Text(stringResource(tab.label)) },
                         )
                     }
