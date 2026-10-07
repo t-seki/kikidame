@@ -170,6 +170,7 @@ debug 版は初回（とアンインストールの後）にサーバへのロ�
 
 - アプリに変更がある PR: ビルドを実機の debug 版に入れ、人が見てからマージする
 - docs だけの PR: これも承認制。実機の確認は無く、人が差分を見て決める
+- Renovate の PR（依存の更新）: 依存の更新もアプリの変更なので、アプリに変更がある PR と同じく実機の debug 版で見てから承認する。repo の auto-merge は無効（`allow_auto_merge: false`）で、Renovate は platform の auto-merge が使えないと自分でマージするため、共通の preset（`local>t-seki/renovate-config`）の minor / patch / digest の自動マージを `renovate.json` の `packageRules` で切っている
 
 ### マージ後の確認（デプロイ）
 

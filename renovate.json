@@ -2,5 +2,13 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "local>t-seki/renovate-config"
+  ],
+  "packageRules": [
+    {
+      "description": "kikidame では自動マージしない。preset の automerge を上書きする(docs/development.md の「マージの承認」)",
+      "matchPackageNames": ["*"],
+      "automerge": false,
+      "platformAutomerge": false
+    }
   ]
 }
