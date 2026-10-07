@@ -95,7 +95,7 @@ KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTe
   認証切れ・到達不能）を 1 回ずつ呼ぶ。新しい版が出たら `resolve()` にタグを足して同じテストを当てる
 - 認証は SDK が付ける `Authorization: MediaBrowser Client="Kikidame", Version="…", DeviceId="…", Device="…"` の 1 形式だけ
   （レガシーの `X-Emby-Authorization` は送らない。2026-09-21 に記録用サーバで確認）
-- 実機（Android）からコンテナに繋ぐには、Tailscale の HTTPS（`tailscale serve`）で出す。`adb reverse` は要らない（実機は tailnet 経由でつなぐ）。
+- 実機（Android）からコンテナに繋ぐには、Tailscale の HTTPS（`tailscale serve`）で出す。アプリは `http://` の URL を受け付けない（`normalizeServerUrl` が `plain http is not supported` で弾く）ので、`adb reverse` で `http://localhost` につなぐ形は使えない。実機は tailnet 経由でつなぐ。
   下の例は Jellyfin 12（`up 12`、`http://localhost:8098`）に向けたもので、撮影（#154）で通った。`<host>.<tailnet>.ts.net` は自分のマシンと tailnet の名前に読み替える
   1. tailnet で HTTPS 証明書を有効にする（1 回だけ）。管理画面の [DNS ページ](https://login.tailscale.com/admin/dns)で MagicDNS を有効にし、
      HTTPS Certificates の Enable HTTPS を押す（[Tailscale の docs「Enabling HTTPS」](https://tailscale.com/docs/how-to/set-up-https-certificates)）。
@@ -108,15 +108,20 @@ KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTe
      ```
 
   4. `tailscale serve status` が `https://<host>.<tailnet>.ts.net (tailnet only)` / `|-- / proxy http://localhost:8098` を出し、
-     `curl https://<host>.<tailnet>.ts.net/System/Info/Public` が 200 を返すことを確かめる
-  5. アプリの接続画面で URL `https://<host>.<tailnet>.ts.net`、ユーザー `kikidame` / パスワード `kikidame-test` で入る
+     `curl` が 200 を返すことを確かめる
+
+     ```bash
+     tailscale serve status
+     curl https://<host>.<tailnet>.ts.net/System/Info/Public
+     ```
+
+  5. アプリの接続画面で URL `https://<host>.<tailnet>.ts.net`、ユーザー `kikidame` / パスワード `kikidame-test` で入る。
+     ただし「別のサーバに接続」は手元のデータを消すので、本番サーバに繋いだ実機では試さない
   6. 済んだら止める（止めるのにも sudo が要る）
 
      ```bash
      sudo tailscale serve reset
      ```
-
-  ただし「別のサーバに接続」は手元のデータを消すので、本番サーバに繋いだ実機では試さない
 
 確認した版（統合テスト 5 件、番組 2 / 各回 6）:
 
