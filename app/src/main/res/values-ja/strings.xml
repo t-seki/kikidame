@@ -49,11 +49,19 @@
     <string name="library_pick_type_livetv">ライブ TV</string>
 
     <!-- program_list -->
-    <string name="program_list_title">番組</string>
+    <string name="program_list_title">Kikidame</string>
+    <string name="program_list_tab_continue">続きから</string>
+    <string name="program_list_tab_starred">よく聴く</string>
+    <string name="program_list_tab_all">番組一覧</string>
+    <string name="program_list_continue_empty">途中まで聴いた回がここに出ます</string>
+    <string name="program_list_starred_empty">番組一覧の ☆ で、よく聴く番組をここに入れられます</string>
+    <plurals name="program_list_continue_remaining">
+        <item quantity="other">残り %1$d 分</item>
+    </plurals>
+    <string name="program_list_marked_played">再生済みにしました</string>
+    <string name="program_list_undo">元に戻す</string>
     <string name="program_list_filter">絞り込み</string>
     <string name="program_list_settings">設定</string>
-    <string name="program_list_starred">よく聴く</string>
-    <string name="program_list_others">その他</string>
     <string name="program_list_star_remove">よく聴く（タップで外す）</string>
     <string name="program_list_star_add">よく聴くに入れる</string>
     <string name="program_list_sync_enabled">同期対象</string>
@@ -67,6 +75,7 @@
     <string name="program_list_clear_publisher_filter">配信元の絞り込みを解除</string>
     <string name="program_list_no_match">「%1$s」に一致する番組がありません</string>
     <string name="program_list_no_match_in_publisher">%2$sに「%1$s」に一致する番組がありません</string>
+    <string name="program_list_no_starred_in_publisher">%1$sによく聴く番組がありません</string>
     <string name="program_list_on_device">手元 %1$d 回</string>
     <string name="program_list_on_device_of_total">手元 %1$d · 全 %2$d 回</string>
     <string name="program_list_unplayed_on_device">未再生 %1$d / 手元 %2$d 回</string>

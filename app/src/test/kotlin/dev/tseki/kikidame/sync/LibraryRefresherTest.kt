@@ -3,6 +3,7 @@ package dev.tseki.kikidame.sync
 import app.cash.turbine.test
 import dev.tseki.kikidame.domain.AppSettingsRepository
 import dev.tseki.kikidame.domain.ThemeMode
+import dev.tseki.kikidame.domain.ProgramListTab
 import dev.tseki.kikidame.domain.DownloadRepository
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.LibraryRefreshRepository
@@ -116,6 +117,10 @@ class LibraryRefresherTest {
         override val themeMode = MutableStateFlow(ThemeMode.SYSTEM)
         override suspend fun setThemeMode(value: ThemeMode) {
             themeMode.value = value
+        }
+        override val programListTab = MutableStateFlow(ProgramListTab.CONTINUE_LISTENING)
+        override suspend fun setProgramListTab(value: ProgramListTab) {
+            programListTab.value = value
         }
     }
 

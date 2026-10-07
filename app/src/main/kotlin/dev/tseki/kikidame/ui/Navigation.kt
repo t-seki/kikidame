@@ -114,6 +114,9 @@ fun KikidameNavHost(sessionViewModel: SessionViewModel = hiltViewModel()) {
                 onProgramClick = { navController.navigate(EpisodeListRoute(it.value)) },
                 onSettingsClick = { navController.navigate(SettingsRoute) },
                 onNowPlayingClick = { navController.navigate(PlayerRoute(it.value, play = false)) },
+                // 「続きから」タブ（#151）の行は各回一覧の行と同じ行き先
+                onEpisodeClick = { navController.navigate(PlayerRoute(it.value)) },
+                onEpisodeDetails = { programId, episodeId -> navController.navigate(EpisodeDetailsRoute(programId.value, episodeId.value)) },
             )
         }
         composable<EpisodeListRoute> {

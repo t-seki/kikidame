@@ -17,6 +17,17 @@ interface AppSettingsRepository {
     /** テーマ（#62）。既定は [ThemeMode.SYSTEM]。 */
     val themeMode: Flow<ThemeMode>
     suspend fun setThemeMode(value: ThemeMode)
+    /** 番組の画面で最後に開いていたタブ（#151）。起動時にこれを開く。既定は [ProgramListTab.CONTINUE_LISTENING]。 */
+    val programListTab: Flow<ProgramListTab>
+    suspend fun setProgramListTab(value: ProgramListTab)
+}
+/** 番組の画面のタブ（#151）。並びは画面の左からの順。 */
+enum class ProgramListTab {
+    CONTINUE_LISTENING, STARRED, ALL_PROGRAMS;
+    companion object {
+        /** 保存された名前から。不明な値（将来の項目や壊れた値）と未保存は [CONTINUE_LISTENING] に丸める。 */
+        fun fromStorageName(name: String?): ProgramListTab = entries.firstOrNull { it.name == name } ?: CONTINUE_LISTENING
+    }
 }
 /** ダーク／ライトの選び方（#62）。SYSTEM は端末の設定に追従。 */
 enum class ThemeMode {

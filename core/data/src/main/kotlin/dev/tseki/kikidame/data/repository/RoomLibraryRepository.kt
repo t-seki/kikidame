@@ -48,6 +48,10 @@ class RoomLibraryRepository @Inject constructor(
     override suspend fun getRecentlyListened(limit: Int): List<EpisodeWithState> =
         episodeDao.listRecentlyListened(limit, Ticks.fromDuration(PlaybackRules.NOT_STARTED_THRESHOLD))
             .map { it.toDomain() }
+    override fun observeRecentlyListened(): Flow<List<EpisodeWithState>> =
+        episodeDao.observeRecentlyListened(Ticks.fromDuration(PlaybackRules.NOT_STARTED_THRESHOLD))
+            .map { rows -> rows.map { it.toDomain() } }
+            .distinctUntilChanged()
     override suspend fun updateSync(programId: ProgramId, syncEnabled: Boolean, rule: RetentionRule) =
         programDao.updateSync(programId.value, syncEnabled, rule.keepLatest, rule.deleteAfterPlayed)
     override suspend fun setStarred(programId: ProgramId, starred: Boolean) =

@@ -1,9 +1,11 @@
 package dev.tseki.kikidame.data.repository
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.cash.turbine.test
 import dev.tseki.kikidame.data.db.EpisodeEntity
 import dev.tseki.kikidame.data.db.LocalFileEntity
 import dev.tseki.kikidame.data.db.PlaybackStateEntity
 import dev.tseki.kikidame.domain.DownloadState
+import dev.tseki.kikidame.domain.EpisodeWithState
 import dev.tseki.kikidame.domain.LocalStorageUsage
 import dev.tseki.kikidame.domain.Ticks
 import kotlinx.coroutines.flow.first
@@ -152,6 +154,40 @@ class RoomLibraryRepositoryTest : RoomTestBase() {
         // 手元に無くなった回は出ない
         db.localFileDao().upsert(LocalFileEntity(id("X 2026-06-12"), DownloadState.PENDING, path = null, pinned = false))
         assertEquals(listOf("X 2026-06-05"), repo.getRecentlyListened(20).map { it.episode.title })
+    }
+    /**
+     * 「続きから」タブ（#151）の読み出し: [RoomLibraryRepository.getRecentlyListened] と同じ条件・順で件数の上限が無く、
+     * 再生位置の保存（順が入れ替わる）・再生済み・手元のファイルの削除・同期での各回の削除に追従する。
+     */
+    @Test
+    fun observeRecentlyListenedHasNoLimitAndFollowsChanges() = runTest {
+        val programId = seedProgram()
+        val episodes = repo.observeEpisodes(programId).first()
+        val id = { title: String -> episodes.first { it.episode.title == title }.episode.id.value }
+        val minute = Ticks.fromDuration(1.minutes)
+        val at = { seconds: Long -> now + seconds.seconds }
+        val titles = { list: List<EpisodeWithState> -> list.map { it.episode.title } }
+        // 4 回とも途中まで聴いた（Auto の上限より多くても全部出る）。聴き始めていない回は出ない
+        db.playbackStateDao().upsert(PlaybackStateEntity(id("X 2026-06-05"), positionTicks = 3 * minute, played = false, updatedAt = at(10)))
+        db.playbackStateDao().upsert(PlaybackStateEntity(id("X 2026-06-12"), positionTicks = 5 * minute, played = false, updatedAt = at(20)))
+        db.playbackStateDao().upsert(PlaybackStateEntity(id("X 2026-06-19"), positionTicks = 7 * minute, played = false, updatedAt = at(30)))
+        db.playbackStateDao().upsert(PlaybackStateEntity(id("X 2026-06-12 (1)"), positionTicks = Ticks.fromDuration(2.seconds), played = false, updatedAt = at(40)))
+        repo.observeRecentlyListened().test {
+            assertEquals(listOf("X 2026-06-19", "X 2026-06-12", "X 2026-06-05"), titles(awaitItem()))
+            // 再生が進んで位置が保存されると先頭へ
+            db.playbackStateDao().upsert(PlaybackStateEntity(id("X 2026-06-05"), positionTicks = 4 * minute, played = false, updatedAt = at(50)))
+            assertEquals(listOf("X 2026-06-05", "X 2026-06-19", "X 2026-06-12"), titles(awaitItem()))
+            // 再生済みになると消える
+            db.playbackStateDao().upsert(PlaybackStateEntity(id("X 2026-06-19"), positionTicks = 7 * minute, played = true, updatedAt = at(60)))
+            assertEquals(listOf("X 2026-06-05", "X 2026-06-12"), titles(awaitItem()))
+            // 手元のファイルを消すと消える
+            db.localFileDao().delete(id("X 2026-06-12"))
+            assertEquals(listOf("X 2026-06-05"), titles(awaitItem()))
+            // 同期で各回ごと消えると消える
+            db.episodeDao().deleteById(id("X 2026-06-05"))
+            assertEquals(emptyList(), titles(awaitItem()))
+            cancelAndIgnoreRemainingEvents()
+        }
     }
     @Test
     fun getEpisodeReturnsNullForUnknownId() = runTest {

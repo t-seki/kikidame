@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import dev.tseki.kikidame.ui.UiText
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.tseki.kikidame.domain.AppSettingsRepository
 import dev.tseki.kikidame.domain.LibraryRepository
+import dev.tseki.kikidame.domain.ProgramListTab
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.ProgramSummary
 import dev.tseki.kikidame.domain.SessionRepository
@@ -19,6 +21,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
@@ -31,7 +35,16 @@ class ProgramListViewModel @Inject constructor(
     sessionRepository: SessionRepository,
     private val refresher: LibraryRefresher,
     nowPlaying: NowPlaying,
+    private val settings: AppSettingsRepository,
 ) : ViewModel() {
+    /**
+     * 起動時に開くタブ（#151）= 前回最後に開いていたタブ（初回は「続きから」）。null は読み込み前で、画面は読めるまで何も出さない
+     * （先にタブ 0 を出してから飛ぶのを避ける）。読むのは ViewModel ができたときの 1 回だけで、その後のタブは画面の状態が持つ
+     * （番組を開いて戻っても、この ViewModel と画面の状態は残る）。
+     */
+    val initialTab: StateFlow<ProgramListTab?> = flow { emit(settings.programListTab.first()) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     /**
      * 検索語（#44）。ViewModel に持つので、画面回転でも、番組を開いて戻っても残る
      * （番組一覧はバックスタックの根で、この ViewModel は生き続ける）。プロセス死からは復元しない。
@@ -52,8 +65,12 @@ class ProgramListViewModel @Inject constructor(
         val publishers: List<Publisher>,
         /** 選択中の配信元。候補に無い配信元、絞り込み自体を出さない（配信元が 2 種類未満）ときは選ばれていない扱い。 */
         val publisher: PublisherKey?,
-        /** 絞り込みが効いているか。効いていれば画面は「よく聴く」「その他」の節を解除する。 */
+        /** 絞り込みが効いているか（戻るボタンで解除する対象があるか）。 */
         val isFiltering: Boolean,
+        /** 「よく聴く」タブ（#151）に出す番組。[programs] のうちよく聴く番組だけ（並びはそのまま）。 */
+        val starred: List<ProgramSummary>,
+        /** 絞り込む前によく聴く番組が 1 つでもあるか。無ければ「よく聴く」タブは案内を出し、あれば「一致なし」を出す。 */
+        val hasStarred: Boolean,
     )
     /** null は読み込み前。 */
     val filtered: StateFlow<Filtered?> = combine(library.observePrograms(), _query, _publisher) { list, q, selected ->
@@ -64,7 +81,15 @@ class ProgramListViewModel @Inject constructor(
             // 絞り込みだけ残って解除できない状態にしない。この計算の元になった選択と同じときだけ戻す（その間の操作は潰さない）
             _publisher.compareAndSet(selected, null)
         }
-        Filtered(ProgramFilter.apply(list, q, publisher), publishers, publisher, ProgramFilter.isActive(q, publisher))
+        val programs = ProgramFilter.apply(list, q, publisher)
+        Filtered(
+            programs = programs,
+            publishers = publishers,
+            publisher = publisher,
+            isFiltering = ProgramFilter.isActive(q, publisher),
+            starred = programs.filter { it.program.starred },
+            hasStarred = list.any { it.program.starred },
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** サーバに接続済み（ライブラリ選択済み）なら「引っ張って更新」ができる。 */
@@ -90,6 +115,10 @@ class ProgramListViewModel @Inject constructor(
     fun clearFilters() {
         _query.value = ""
         _publisher.value = null
+    }
+    /** 開いているタブを覚える（次の起動で開く）。 */
+    fun selectTab(tab: ProgramListTab) {
+        viewModelScope.launch { settings.setProgramListTab(tab) }
     }
     fun refresh() {
         viewModelScope.launch { refresher.refresh() }
