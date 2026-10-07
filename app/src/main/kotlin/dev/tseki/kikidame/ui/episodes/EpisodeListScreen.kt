@@ -1,37 +1,28 @@
 package dev.tseki.kikidame.ui.episodes
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.SyncDisabled
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.outlined.CloudDownload
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -41,9 +32,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -57,18 +46,15 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -80,7 +66,6 @@ import dev.tseki.kikidame.domain.LocalStorageUsage
 import dev.tseki.kikidame.domain.Program
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.download.DownloadProgress
-import dev.tseki.kikidame.playback.NowPlayingState
 import dev.tseki.kikidame.ui.BackgroundSyncBar
 import dev.tseki.kikidame.ui.UiText
 import dev.tseki.kikidame.ui.player.MiniPlayer
@@ -89,7 +74,6 @@ import dev.tseki.kikidame.ui.toPublishedDateText
 import dev.tseki.kikidame.ui.toPerformersText
 import dev.tseki.kikidame.ui.toText
 import dev.tseki.kikidame.ui.toClockText
-import kotlin.time.Duration
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -172,14 +156,19 @@ fun EpisodeListScreen(
                     EpisodeRow(
                         item = item,
                         nowPlaying = nowPlaying?.takeIf { it.episodeId == item.episode.id },
-                        progress = progress?.takeIf { it.episodeId == item.episode.id },
-                        waitingForNetwork = waitingForNetwork,
+                        supportingText = item.toSupportingText(waitingForNetwork),
                         onClick = { onEpisodeClick(item.episode.id) },
                         onLongClick = { sheetFor = item.episode.id },
-                        onTogglePlayed = { viewModel.setPlayed(item.episode.id, item.playback?.played != true) },
-                        onDownload = { viewModel.download(item.episode.id) },
-                        onCancel = { viewModel.cancel(item.episode.id) },
-                        onRetry = { viewModel.retry(item.episode.id) },
+                        trailing = {
+                            EpisodeTrailingAction(
+                                item = item,
+                                progress = progress?.takeIf { it.episodeId == item.episode.id },
+                                onTogglePlayed = { viewModel.setPlayed(item.episode.id, item.playback?.played != true) },
+                                onDownload = { viewModel.download(item.episode.id) },
+                                onCancel = { viewModel.cancel(item.episode.id) },
+                                onRetry = { viewModel.retry(item.episode.id) },
+                            )
+                        },
                     )
                     HorizontalDivider()
                 }
@@ -240,107 +229,45 @@ fun EpisodeListScreen(
     }
 }
 
-/** タイトル前の印の大きさと、印とタイトルの間隔。印の無い行の枠と補足行の字下げにも使う。 */
-private val MARK_SIZE = 14.dp
-private val MARK_GAP = 4.dp
 /**
- * 右端のアイコンは状態を表し、タップで最も自然な 1 操作をする:
- * 雲 → ダウンロード（= 固定）、待機／進捗 → キャンセル、警告 → 再試行、手元にある回 → 再生済み切替。
- * 残りの操作は長押しのボトムシート。手元に無い回はタップで再生画面へ行かない。
- * タイトルの前に印を出す: 固定（ダウンロード済みで固定された回）のピンと、聴いている回（[nowPlaying] がこの回。背景も変える）の
- * 再生中／一時停止。両方あれば並べる。印の無い行にも同じ幅を確保し、タイトル（1 行）と補足行の開始位置を揃える。
+ * 各回一覧の行の右端: 雲 → ダウンロード（= 固定）、待機／進捗 → キャンセル、警告 → 再試行、手元にある回 → 再生済み切替。
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun EpisodeRow(
+private fun EpisodeTrailingAction(
     item: EpisodeWithState,
-    nowPlaying: NowPlayingState?,
     progress: DownloadProgress?,
-    waitingForNetwork: Boolean,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit,
     onTogglePlayed: () -> Unit,
     onDownload: () -> Unit,
     onCancel: () -> Unit,
     onRetry: () -> Unit,
 ) {
     val played = item.playback?.played == true
-    val resume = item.resumePosition
-    val runtime = item.episode.runtime
-    val playable = item.isPlayable
-    val local = item.localFile
-    val state = local?.state
-    ListItem(
-        modifier = Modifier
-            .combinedClickable(onClick = { if (playable) onClick() }, onLongClick = onLongClick)
-            .alpha(if (playable || state != null) 1f else 0.5f),
-        colors = ListItemDefaults.colors(
-            containerColor = if (nowPlaying != null) MaterialTheme.colorScheme.secondaryContainer else ListItemDefaults.containerColor,
-        ),
-        headlineContent = {
-            // 印（固定・再生中／一時停止）はタイトルの前に置くが、印の無い行にも同じ幅の枠を確保してタイトルの開始位置を揃える（#56）。
-            // 固定と聴いている回は独立した状態なので両方出す（両方ある行だけ 1 つ分右にずれるが、背景色で目立つ 1 行なので許容）
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val pinned = local?.pinned == true && state == DownloadState.DONE
-                if (pinned) {
-                    Icon(Icons.Filled.PushPin, contentDescription = stringResource(R.string.episode_list_pinned), Modifier.size(MARK_SIZE))
-                    Spacer(Modifier.width(MARK_GAP))
-                }
-                when {
-                    nowPlaying != null && nowPlaying.isPlaying -> {
-                        Icon(Icons.Filled.GraphicEq, contentDescription = stringResource(R.string.episode_list_now_playing_playing), Modifier.size(MARK_SIZE), tint = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.width(MARK_GAP))
-                    }
-                    nowPlaying != null -> {
-                        Icon(Icons.Filled.Pause, contentDescription = stringResource(R.string.episode_list_now_playing_paused), Modifier.size(MARK_SIZE), tint = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.width(MARK_GAP))
-                    }
-                    !pinned -> Spacer(Modifier.width(MARK_SIZE + MARK_GAP)) // 印が無い行の枠
-                }
-                Text(item.episode.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    when (item.localFile?.state) {
+        null -> IconButton(onClick = onDownload, enabled = item.episode.serverItemId != null) {
+            Icon(Icons.Outlined.CloudDownload, contentDescription = stringResource(R.string.episode_list_download))
+        }
+        DownloadState.PENDING -> IconButton(onClick = onCancel) {
+            Icon(Icons.Filled.Schedule, contentDescription = stringResource(R.string.episode_list_pending_tap_cancel))
+        }
+        DownloadState.RUNNING -> IconButton(onClick = onCancel) {
+            val fraction = progress?.fraction
+            if (fraction != null && fraction > 0f) {
+                CircularProgressIndicator(progress = { fraction }, modifier = Modifier.size(24.dp), strokeWidth = 3.dp)
+            } else {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 3.dp)
             }
-        },
-        supportingContent = {
-            // 補足行もタイトルと同じ位置から始める（枠＋間隔ぶんを空ける）
-            Column(Modifier.padding(start = MARK_SIZE + MARK_GAP)) {
-                Text(item.toSupportingText(waitingForNetwork).resolve())
-                if (playable && resume != null && runtime > Duration.ZERO) {
-                    LinearProgressIndicator(
-                        progress = { (resume / runtime).toFloat().coerceIn(0f, 1f) },
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    )
-                }
+        }
+        DownloadState.FAILED -> IconButton(onClick = onRetry) {
+            Icon(Icons.Filled.ErrorOutline, contentDescription = stringResource(R.string.episode_list_failed_tap_retry), tint = MaterialTheme.colorScheme.error)
+        }
+        DownloadState.DONE -> IconButton(onClick = onTogglePlayed) {
+            if (played) {
+                Icon(Icons.Default.CheckCircle, contentDescription = stringResource(R.string.episode_list_played_tap))
+            } else {
+                Icon(Icons.Outlined.Circle, contentDescription = stringResource(R.string.episode_list_unplayed_tap))
             }
-        },
-        trailingContent = {
-            when (state) {
-                null -> IconButton(onClick = onDownload, enabled = item.episode.serverItemId != null) {
-                    Icon(Icons.Outlined.CloudDownload, contentDescription = stringResource(R.string.episode_list_download))
-                }
-                DownloadState.PENDING -> IconButton(onClick = onCancel) {
-                    Icon(Icons.Filled.Schedule, contentDescription = stringResource(R.string.episode_list_pending_tap_cancel))
-                }
-                DownloadState.RUNNING -> IconButton(onClick = onCancel) {
-                    val fraction = progress?.fraction
-                    if (fraction != null && fraction > 0f) {
-                        CircularProgressIndicator(progress = { fraction }, modifier = Modifier.size(24.dp), strokeWidth = 3.dp)
-                    } else {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 3.dp)
-                    }
-                }
-                DownloadState.FAILED -> IconButton(onClick = onRetry) {
-                    Icon(Icons.Filled.ErrorOutline, contentDescription = stringResource(R.string.episode_list_failed_tap_retry), tint = MaterialTheme.colorScheme.error)
-                }
-                DownloadState.DONE -> IconButton(onClick = onTogglePlayed) {
-                    if (played) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = stringResource(R.string.episode_list_played_tap))
-                    } else {
-                        Icon(Icons.Outlined.Circle, contentDescription = stringResource(R.string.episode_list_unplayed_tap))
-                    }
-                }
-            }
-        },
-    )
+        }
+    }
 }
 
 /**
@@ -359,35 +286,6 @@ internal fun EpisodeWithState.toSupportingText(waitingForNetwork: Boolean): UiTe
     }
     val parts = listOfNotNull(published, episode.performers.toPerformersText(), UiText.Plain(episode.runtime.toClockText()), status)
     return UiText.Joined(parts, UiText.Plain(" · "))
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun EpisodeActionsSheet(
-    item: EpisodeWithState,
-    syncEnabled: Boolean,
-    onDismiss: () -> Unit,
-    onDownload: () -> Unit,
-    onUnpin: () -> Unit,
-    onDelete: () -> Unit,
-    onDetails: () -> Unit,
-) {
-    val local = item.localFile
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Text(item.episode.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
-        if (local == null && item.episode.serverItemId != null) {
-            SheetAction(Icons.Filled.Download, stringResource(R.string.episode_list_action_download)) { onDownload(); onDismiss() }
-        }
-        if (local?.state == DownloadState.DONE && local.pinned && syncEnabled) {
-            SheetAction(Icons.Outlined.PushPin, stringResource(R.string.episode_list_action_unpin)) { onUnpin(); onDismiss() }
-        }
-        if (local != null) {
-            val label = stringResource(if (item.episode.serverItemId != null) R.string.episode_list_action_delete_file else R.string.episode_list_action_delete_episode)
-            SheetAction(Icons.Filled.Delete, label) { onDelete(); onDismiss() }
-        }
-        SheetAction(Icons.Outlined.Info, stringResource(R.string.episode_list_action_details)) { onDetails() }
-        Spacer(Modifier.padding(bottom = 24.dp))
-    }
 }
 
 /**
@@ -469,13 +367,4 @@ private fun ProgramSyncSheet(
         }
         Spacer(Modifier.padding(bottom = 24.dp))
     }
-}
-
-@Composable
-private fun SheetAction(icon: ImageVector, label: String, onClick: () -> Unit) {
-    ListItem(
-        modifier = Modifier.combinedClickable(onClick = onClick),
-        leadingContent = { Icon(icon, contentDescription = null) },
-        headlineContent = { Text(label) },
-    )
 }
