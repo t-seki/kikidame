@@ -26,6 +26,10 @@ yes | latest/bin/sdkmanager --licenses
 latest/bin/sdkmanager "platforms;android-37.0" "build-tools;36.0.0" "platform-tools"
 ```
 
+この手順は WSL2 を前提に書いてある。素の Linux（devbox）でも、同じ手順で JDK と SDK を入れられ、下の「実機で試す（M1）」のワイヤレスデバッグでつなげた（2026-10-07 に確かめたのは素の Linux の方）。
+
+origin の URL は SSH（`git@github.com:...`）にしておく。HTTPS のままで credential helper が無いと、worker の素の `git push` が `could not read Username` で失敗する。HTTPS で使うなら `gh auth setup-git` で credential helper を入れる。
+
 リポジトリ直下に `local.properties`（git 管理外）を置く:
 
 ```
@@ -150,6 +154,7 @@ main のチェックアウトから fork subagent に並列で実装させて回
 - fork の worktree は repo 直下の `.claude/worktrees/`（`.gitignore` 済み）に切られる
 - `local.properties` は git 管理外なので、main のチェックアウトから worktree 直下にコピーする（`cp local.properties <worktree>/`）
 - Gradle は `JAVA_HOME=~/.local/jdk/current` を付けて回す。`build/` は worktree ごとに別なので初回ビルドが重い。`~/.gradle` のキャッシュは共有されるので依存の再ダウンロードは無い
+- 画面（UI）を変える issue は、「触るファイル」と完了条件に `docs/ui.md` と `docs/claude-code-handoff.md` の該当箇所を入れる。入れ忘れると PR のレビューで「docs が古い」と指摘されて直すことになる（過去に #79・#139・#143・#152 で起きた）
 - 担当は「同じファイルを触らない」単位で分ける（例: 2026-09-20 は `EpisodeListScreen.kt` 周りの #66→#68→#70 と、テーマ・設定・ミニプレイヤーの #59→#62 に分けて衝突なし）
 
 ### マージ前の検証
@@ -221,6 +226,32 @@ WSL2 は USB を見られないが、LAN 上の端末には TCP で届く。Wind
    export JAVA_HOME=~/.local/jdk/current ANDROID_SERIAL=<接続用の IP:ポート>
    ./gradlew :app:installDebug
    ```
+
+`adb mdns services` は、adb サーバを起動した直後には何も出さず、少し待つと出たことがある（2026-10-07、素の Linux。原因は未確認）。空なら少し待って打ち直す。
+
+### debug の署名鍵をマシン間で共有する
+
+debug の APK はマシンごとの `~/.android/debug.keystore` で署名される。別のマシンでビルドした debug 版が端末に入っていると、このマシンのビルドの上書きインストールが `INSTALL_FAILED_UPDATE_INCOMPATIBLE` で失敗する（`uninstall` すればデータが消える）。消さずに続けるには、端末に入っている方のマシンの鍵をコピーする。
+
+確かめたこと（2026-10-07）: WSL の鍵を devbox にコピーして `INSTALL_FAILED_UPDATE_INCOMPATIBLE` を解消した。解消後のビルドの APK で `apksigner verify --print-certs` の SHA-256 が、端末の debug 版の署名と一致した。
+
+次は流していない手順の案（**未確認**）。コピーの方法は `scp` 以外でもよい。
+
+```bash
+# 元のマシンで（コピー先の ~/.android は無ければ作っておく）
+scp ~/.android/debug.keystore <host>:~/.android/debug.keystore
+# コピー先で
+chmod 600 ~/.android/debug.keystore
+```
+
+指紋は、コピー後の鍵でビルドした APK の証明書の SHA-256 を、端末に入っている debug 版の署名と比べる。端末の署名の取り方は記録が無く、**未確認**（案: `$ADB shell pm path dev.tseki.kikidame.debug` で APK のパスを見て `$ADB pull` し、同じ `apksigner` にかける）。`apksigner` は build-tools の中にあり、版は `ls ~/Android/Sdk/build-tools/` で確かめる。
+
+```bash
+APKSIGNER=~/Android/Sdk/build-tools/36.0.0/apksigner   # 版は ls ~/Android/Sdk/build-tools/ で確かめる
+$APKSIGNER verify --print-certs app/build/outputs/apk/debug/app-debug.apk | grep SHA-256
+```
+
+鍵のファイルをチャットや issue に貼らない。
 
 ### 代替: Windows 側の adb に USB 接続
 
