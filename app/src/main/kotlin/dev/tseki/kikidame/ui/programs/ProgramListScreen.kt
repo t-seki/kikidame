@@ -23,6 +23,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import dev.tseki.kikidame.domain.ProgramListTab
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
@@ -142,11 +143,12 @@ private fun ProgramListTabs(
     LaunchedEffect(Unit) {
         continueViewModel.messages.collect { snackbarHostState.showSnackbar(it.resolve(context)) }
     }
-    // 「続きから」で再生済みにしたときだけ［元に戻す］を出す（各回一覧では出さない）
+    // 「続きから」で再生済みにしたときだけ［元に戻す］を出す（各回一覧では出さない）。続けて再生済みにしたら、
+    // 前のスナックバーを待たせずに新しい方へ差し替える（collectLatest が前の showSnackbar を取り消すと閉じる）
     val markedPlayedText = stringResource(R.string.program_list_marked_played)
     val undoText = stringResource(R.string.program_list_undo)
     LaunchedEffect(Unit) {
-        continueViewModel.markedPlayed.collect { episodeId ->
+        continueViewModel.markedPlayed.collectLatest { episodeId ->
             val result = snackbarHostState.showSnackbar(markedPlayedText, actionLabel = undoText, duration = SnackbarDuration.Short)
             if (result == SnackbarResult.ActionPerformed) continueViewModel.setPlayed(episodeId, false)
         }

@@ -49,7 +49,7 @@ object ProgramListRoute
 
 @Serializable
 data class EpisodeListRoute(val programId: Long)
-/** 各回の詳細（#43）。番組の各回一覧から引くので programId も持つ。 */
+/** 各回の詳細（#43）。番組の各回一覧と「続きから」タブ（#151）の長押しから開く。番組から引くので programId も持つ。 */
 @Serializable
 data class EpisodeDetailsRoute(val programId: Long, val episodeId: Long)
 
@@ -71,7 +71,8 @@ class SessionViewModel @Inject constructor(
 }
 
 /**
- * 番組一覧 → 各回一覧 → 再生画面 の 3 階層に、接続画面・ライブラリ選択・設定・各回の詳細を足したもの。
+ * 番組の画面（根。「続きから・よく聴く・番組一覧」のタブ、#151）→ 各回一覧 → 再生画面 の 3 階層に、接続画面・ライブラリ選択・設定・各回の詳細を足したもの。
+ * 「続きから」タブの行からは、各回一覧を経ずに再生画面と各回の詳細へ直接行く。
  * 起動時はセッション状態で開始画面を決め、その後は状態の**変化**（ログアウト・401・ライブラリ選択）で遷移する。
  * デバッグ用に接続画面から番組一覧へ抜けても、状態が変わらない限り戻されない。
  */
