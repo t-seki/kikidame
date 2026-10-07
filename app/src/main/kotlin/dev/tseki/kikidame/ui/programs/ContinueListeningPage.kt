@@ -108,7 +108,8 @@ private val MARK_SIZE = 14.dp
 private val MARK_GAP = 4.dp
 
 /**
- * 1 行目に各回のタイトル、2 行目に「番組名 · 残り N 分」、その下に再生位置のバー（各回一覧と同じ）。
+ * 1 行目に各回のタイトル（1 行）、2 行目に「番組名 · 残り N 分」（長ければ折り返す）、その下に再生位置のバー。
+ * タイトルと補足行の扱い・バーは各回一覧と同じ。
  * 印（固定・再生中／一時停止）と聴いている回の背景、右端の再生済みの切り替えも各回一覧の行と同じ。
  * 「続きから」の回は必ず手元にあるので、右端はダウンロードの状態ではなく常に再生済みの切り替え。
  */
@@ -154,7 +155,8 @@ private fun ContinueListeningRow(
         },
         supportingContent = {
             Column(Modifier.padding(start = MARK_SIZE + MARK_GAP)) {
-                Text(item.toSupportingText().resolve(), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // 各回一覧の補足行と同じく折り返す（長い番組名でも「残り N 分」が見えるように）
+                Text(item.toSupportingText().resolve())
                 // 尺が分からない回（runtime 0）にはバーを出さない（各回一覧と同じ）
                 if (episode.isPlayable && resume != null && runtime > Duration.ZERO) {
                     LinearProgressIndicator(

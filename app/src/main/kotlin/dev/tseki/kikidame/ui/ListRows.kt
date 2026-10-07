@@ -22,7 +22,7 @@ fun ValueRow(label: String, value: String, modifier: Modifier = Modifier, suppor
     )
 }
 
-/** 一覧の節の見出し。番組一覧の「よく聴く」、各回の詳細、設定の「サーバ」などで同じ形。 */
+/** 一覧の節の見出し。各回の詳細、設定の「サーバ」などで同じ形。 */
 @Composable
 fun SectionTitle(title: String) {
     Text(

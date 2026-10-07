@@ -85,7 +85,7 @@ data class EpisodeRow(
     @Relation(parentColumn = "id", entityColumn = "episodeId") val localFile: LocalFileEntity?,
     @Relation(parentColumn = "id", entityColumn = "episodeId") val playback: PlaybackStateEntity?,
 )
-/** 最近聴いた各回（#108）の条件と順。Auto・再開の上限付きの読み出しと、アプリの「続きから」（#151）の追従する読み出しで共有する。 */
+/** 「続きから」（#108）の条件と順。Auto・再開の上限付きの読み出しと、アプリの「続きから」タブ（#151）の追従する読み出しで共有する。 */
 private const val RECENTLY_LISTENED = """
     SELECT e.* FROM episodes e
       JOIN local_files lf ON lf.episodeId = e.id
