@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | JDK | **25** | AGP 9.4 の要件は 17+ だが、Robolectric 4.17 が SDK 37 のサンドボックスに Java 21 以上を要求する。そのうえで CI・release（#179）と揃えて 25 を使う。JDK 25 で `./gradlew test` と lint が通ることは #179 の CI で確かめた |
 | Android SDK | platform `android-37.0`、build-tools `36.0.0`、platform-tools | `sdkmanager "platforms;android-37.0" "build-tools;36.0.0" "platform-tools"` |
-| Gradle | wrapper（9.7.1） | `./gradlew` が取得する |
+| Gradle | wrapper（9.8.1） | `./gradlew` が取得する |
 | AGP | 9.4 | built-in Kotlin。`org.jetbrains.kotlin.android` は適用しない |
 
 WSL2 で sudo を使わずに揃える例:
