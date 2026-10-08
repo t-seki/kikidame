@@ -4,7 +4,7 @@
 
 | 項目 | 版 | 備考 |
 | --- | --- | --- |
-| JDK | **21** | AGP 9.4 の要件は 17+ だが、Robolectric 4.17 が SDK 37 のサンドボックスに Java 21 を要求する |
+| JDK | **25** | AGP 9.4 の要件は 17+ だが、Robolectric 4.17 が SDK 37 のサンドボックスに Java 21 以上を要求する。そのうえで CI・release（#179）と揃えて 25 を使う。JDK 25 で `./gradlew test` と lint が通ることは #179 の CI で確かめた |
 | Android SDK | platform `android-37.0`、build-tools `36.0.0`、platform-tools | `sdkmanager "platforms;android-37.0" "build-tools;36.0.0" "platform-tools"` |
 | Gradle | wrapper（9.7.1） | `./gradlew` が取得する |
 | AGP | 9.4 | built-in Kotlin。`org.jetbrains.kotlin.android` は適用しない |
@@ -14,8 +14,8 @@ WSL2 で sudo を使わずに揃える例:
 ```bash
 # JDK（Temurin）
 mkdir -p ~/.local/jdk && cd ~/.local/jdk
-curl -sSL -o jdk.tar.gz "https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/jdk/hotspot/normal/eclipse?project=jdk"
-tar xzf jdk.tar.gz && ln -sfn jdk-21* current
+curl -sSL -o jdk.tar.gz "https://api.adoptium.net/v3/binary/latest/25/ga/linux/x64/jdk/hotspot/normal/eclipse?project=jdk"
+tar xzf jdk.tar.gz && ln -sfn jdk-25* current
 export JAVA_HOME=~/.local/jdk/current
 
 # Android cmdline-tools → SDK
@@ -38,13 +38,13 @@ sdk.dir=/home/<you>/Android/Sdk
 
 `org.gradle.java.home` はコミットしない（CI と食い違う）。JDK は `JAVA_HOME` で渡す。
 
-エディタで Kotlin LSP（Zed の Kotlin 拡張など）を使うなら、repo の `gradle.properties` ではなく、ユーザー単位の `~/.gradle/gradle.properties` に JDK 21 を書く（こちらはコミットされないので書いてよい）:
+エディタで Kotlin LSP（Zed の Kotlin 拡張など）を使うなら、repo の `gradle.properties` ではなく、ユーザー単位の `~/.gradle/gradle.properties` に JDK 25 を書く（こちらはコミットされないので書いてよい）:
 
 ```
 org.gradle.java.home=/home/<you>/.local/jdk/current
 ```
 
-この設定はそのユーザーの全 Gradle プロジェクトに効き、`JAVA_HOME` より優先される（コマンドラインで `JAVA_HOME` を付けても、Gradle のデーモンはこの JDK で動く）。kikidame のコマンドラインのビルドも同じ JDK 21 なので影響は無いが、別の JDK を使うプロジェクトがあるなら注意する。
+この設定はそのユーザーの全 Gradle プロジェクトに効き、`JAVA_HOME` より優先される（コマンドラインで `JAVA_HOME` を付けても、Gradle のデーモンはこの JDK で動く）。kikidame のコマンドラインのビルドも同じ JDK 25 なので影響は無いが、別の JDK を使うプロジェクトがあるなら注意する。
 
 JetBrains の kotlin-lsp は同梱の JBR で Gradle を動かすが、JBR には `jlink` が無い。Android の JDK イメージ変換（`JdkImageTransform`）が `jlink executable .../jbr/bin/jlink does not exist` で落ち、Android のクラスが解決できず Project Diagnostics がエラーだらけになる。書いたら言語サーバーを再起動する。Zed なら取り込みのログは `~/.local/share/zed/logs/server-workspace-*.log` の `intellij/importLog` に出る。同じログの `Failed to call 'onVariants' in 'androidComponents' extension` は kotlin-lsp の Android 対応の限界で、診断には影響しない。
 
