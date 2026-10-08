@@ -73,14 +73,14 @@ Google Play では配布しない（[ADR 0008](./docs/adr/0008-open-source-distr
 
 ## ビルドと実行
 
-JDK 21 と Android SDK（platform 37）が要る。リポジトリ直下に `local.properties`（git 管理外）を置く:
+JDK 25 と Android SDK（platform 37）が要る。リポジトリ直下に `local.properties`（git 管理外）を置く:
 
 ```
 sdk.dir=/home/<you>/Android/Sdk
 ```
 
 ```bash
-export JAVA_HOME=~/.local/jdk/current   # JDK 21
+export JAVA_HOME=~/.local/jdk/current   # JDK 25
 ./gradlew test                          # ユニットテスト（エミュレータ不要、CI と同じ）
 ./gradlew :app:assembleDebug            # APK
 ./gradlew :app:installDebug             # 接続中の端末へ

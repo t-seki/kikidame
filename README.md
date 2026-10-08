@@ -73,14 +73,14 @@ Requires Android 12 (API 31) or later. Store descriptions and screenshots live i
 
 ## Build and run
 
-You need JDK 21 and the Android SDK (platform 37). Put `local.properties` (not tracked by git) at the repository root:
+You need JDK 25 and the Android SDK (platform 37). Put `local.properties` (not tracked by git) at the repository root:
 
 ```
 sdk.dir=/home/<you>/Android/Sdk
 ```
 
 ```bash
-export JAVA_HOME=~/.local/jdk/current   # JDK 21
+export JAVA_HOME=~/.local/jdk/current   # JDK 25
 ./gradlew test                          # unit tests (no emulator needed; same as CI)
 ./gradlew :app:assembleDebug            # APK
 ./gradlew :app:installDebug             # install on the connected device
