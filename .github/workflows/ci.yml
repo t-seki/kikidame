@@ -21,7 +21,7 @@ jobs:
       # lint（#111）: MissingTranslation（values/ と values-ja/ の片方だけの追加）と UnsafeOptInUsageError を落とす
       - name: Lint
         run: ./gradlew :app:lintDebug --no-daemon
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: failure()
         with:
           name: test-reports
