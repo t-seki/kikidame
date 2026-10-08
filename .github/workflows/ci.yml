@@ -15,7 +15,7 @@ jobs:
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
         with:
           packages: platforms;android-37.0 build-tools;36.0.0 platform-tools
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
       - name: Unit tests (JVM + Robolectric, no emulator)
         run: ./gradlew test --no-daemon
       # lint（#111）: MissingTranslation（values/ と values-ja/ の片方だけの追加）と UnsafeOptInUsageError を落とす
