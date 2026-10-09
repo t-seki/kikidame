@@ -14,7 +14,7 @@ enum class LocalDeletionScope {
 fun deletionScopeFor(episode: Episode): LocalDeletionScope =
     if (episode.serverItemId != null) LocalDeletionScope.FILE_ONLY else LocalDeletionScope.EPISODE
 
-/** 保存先のファイル名。フォルダ構成は radirec-tool の出力と同じ `<配信元>/<番組>/<タイトル>.<container>`。 */
+/** 保存先のファイル名。フォルダ構成は Airshelf の出力と同じ `<配信元>/<番組>/<タイトル>.<container>`。 */
 object EpisodeFileName {
     private val FORBIDDEN = Regex("""[/\\:*?"<>|\p{Cntrl}]""")
     const val DEFAULT_CONTAINER = "m4a"
