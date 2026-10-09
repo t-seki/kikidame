@@ -190,7 +190,7 @@ docs だけの PR は 1（CI）だけ。2〜5 はアプリに変更がある PR 
 1. CI（`test` job の `./gradlew test` と `./gradlew :app:lintDebug`、`release-build` job の署名なしの `./gradlew :app:assembleRelease` と `aboutlibraries.json` の鮮度の検査）が通っている
    - release ビルド（R8 の minify・resource shrink を含む）は CI の `release-build` が PR ごとに試すので、PR のたびに手元で `assembleRelease` を流して確かめなくてよい。署名と APK の配布はリリース手順（「リリース」節）で行う
    - `release-build` は `exportLibraryDefinitions` を流し、`app/src/main/res/raw/aboutlibraries.json` に差分が出ると落ちる。ログに差分と直し方（`./gradlew :app:exportLibraryDefinitions` を流して `app/src/main/res/raw/aboutlibraries.json` をコミットする）が出る。自動ではコミットしない
-   - Renovate の PR でこの検査が落ちたら、Supervisor が worker を起動し、Renovate のブランチに再生成のコミット（例: PR #174 の `9ec415f chore(deps): aboutlibraries.json を再生成する`）を積ませる。`/supervise` の「bot の版更新 PR のブランチには積まない」の例外。skill 側の対応は別 issue
+   - Renovate の PR でこの検査が落ちたら、Supervisor が worker を起動し、Renovate のブランチに再生成のコミット（例: PR #174 の `9ec415f chore(deps): aboutlibraries.json を再生成する`）を積ませる。`/supervise` の「bot の版更新 PR のブランチには積まない」の例外。skill 側の対応は t-seki/dotfiles#349
 2. 担当の fork に `./gradlew :app:assembleDebug` を頼み（「worktree の準備」の形で、`ANDROID_HOME` と `JAVA_HOME` を付けて回す）、APK のフルパス（`<worktree>/app/build/outputs/apk/debug/app-debug.apk`）を報告させる
 3. Supervisor が `$ADB install -r <APK>` で実機の **debug 版**に入れる。debug 版は applicationId が `dev.tseki.kikidame.debug`、アプリ名が「Kikidame (debug)」で、普段使いの **release 版**（`dev.tseki.kikidame`、Releases の APK）とは別アプリとして並ぶ。release 版には触らない
 4. Room のスキーマを上げる PR も入れてよい（影響は debug 版に閉じる）。その後にスキーマの古いビルドを入れてダウングレードで落ちたら、`$ADB uninstall dev.tseki.kikidame.debug` してから入れ直す（debug 版のログイン・DB・手元のファイルが消える）
