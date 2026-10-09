@@ -17,7 +17,7 @@ android {
         versionName = "0.3.0"
     }
     // release の署名（#94）。鍵とパスフレーズは repo に置かず環境変数から読む。
-    // 無ければ署名設定を付けずにビルドする（CI の test と、鍵を持たない人の assembleRelease を通すため）。
+    // 無ければ署名設定を付けずにビルドする（CI の test、CI の release-build（署名なしで assembleRelease）、鍵を持たない人の assembleRelease を通すため）。
     // KIKIDAME_KEYSTORE=/path/to/kikidame-upload.jks KIKIDAME_KEYSTORE_PASSWORD=… KIKIDAME_KEY_ALIAS=kikidame KIKIDAME_KEY_PASSWORD=…
     val keystorePath = System.getenv("KIKIDAME_KEYSTORE")
     signingConfigs {

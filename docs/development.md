@@ -139,7 +139,7 @@ release APK をビルドし、`kikidame-<version>.apk` と R8 の `mapping-<vers
 
 - upload 鍵は repo の外（例: `~/.android-keys/kikidame-upload.jks`、alias `kikidame`）。**失うと以後の更新を配れない**ので、
   keystore ファイルとパスフレーズをパスワードマネージャとオフラインの 2 箇所に控える
-- ビルドは環境変数から読む。無ければ署名無しでビルドする（CI の `test` と、鍵を持たない人の `assembleRelease` を通すため）
+- ビルドは環境変数から読む。無ければ署名無しでビルドする（CI の `test`、CI の `release-build`（署名なしで `assembleRelease`）、鍵を持たない人の `assembleRelease` を通すため）
 
   ```bash
   export KIKIDAME_KEYSTORE=~/.android-keys/kikidame-upload.jks
@@ -187,7 +187,10 @@ main のチェックアウトから fork subagent に並列で実装させて回
 
 docs だけの PR は 1（CI）だけ。2〜5 はアプリに変更がある PR で行う。Renovate の PR は、APK に入る Gradle の依存・プラグインの更新なら 2〜5 も行い、GitHub Actions・Gradle wrapper・統合テスト用のコンテナだけの更新なら 1（CI）だけ（「マージの承認」）。両方が 1 つの PR に混ざるとき（preset は minor / patch を 1 つの PR にまとめる）は、実機で見る側に倒す。Renovate の PR には担当の worker がいないので、2 のビルドは Supervisor が検証用の worktree で行う（`/supervise` の手順 7）。
 
-1. CI（`./gradlew test` と `./gradlew :app:lintDebug`）が通っている
+1. CI（`test` job の `./gradlew test` と `./gradlew :app:lintDebug`、`release-build` job の署名なしの `./gradlew :app:assembleRelease` と `aboutlibraries.json` の鮮度の検査）が通っている
+   - release ビルド（R8 の minify・resource shrink を含む）は CI の `release-build` が PR ごとに試すので、PR のたびに手元で `assembleRelease` を流して確かめなくてよい。署名と APK の配布はリリース手順（「リリース」節）で行う
+   - `release-build` は `exportLibraryDefinitions` を流し、`app/src/main/res/raw/aboutlibraries.json` に差分が出ると落ちる。ログに差分と直し方（`./gradlew :app:exportLibraryDefinitions` を流して `app/src/main/res/raw/aboutlibraries.json` をコミットする）が出る。自動ではコミットしない
+   - Renovate の PR でこの検査が落ちたら、Supervisor が worker を起動し、Renovate のブランチに再生成のコミット（例: PR #174 の `9ec415f chore(deps): aboutlibraries.json を再生成する`）を積ませる。`/supervise` の「bot の版更新 PR のブランチには積まない」の例外。skill 側の対応は別 issue
 2. 担当の fork に `./gradlew :app:assembleDebug` を頼み（「worktree の準備」の形で、`ANDROID_HOME` と `JAVA_HOME` を付けて回す）、APK のフルパス（`<worktree>/app/build/outputs/apk/debug/app-debug.apk`）を報告させる
 3. Supervisor が `$ADB install -r <APK>` で実機の **debug 版**に入れる。debug 版は applicationId が `dev.tseki.kikidame.debug`、アプリ名が「Kikidame (debug)」で、普段使いの **release 版**（`dev.tseki.kikidame`、Releases の APK）とは別アプリとして並ぶ。release 版には触らない
 4. Room のスキーマを上げる PR も入れてよい（影響は debug 版に閉じる）。その後にスキーマの古いビルドを入れてダウングレードで落ちたら、`$ADB uninstall dev.tseki.kikidame.debug` してから入れ直す（debug 版のログイン・DB・手元のファイルが消える）
