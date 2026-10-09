@@ -4,6 +4,8 @@ English: [README.md](./README.md)
 
 Jellyfin サーバに音楽ライブラリとして取り込まれた**番組型の音声**（ラジオ録音・ポッドキャスト）を、番組単位のルールで自動ダウンロード／削除し、サーバに到達できなくても聴けるようにする Android アプリ。Jellyfin プロジェクトとは無関係の非公式クライアントです。
 
+VIDEO_URL_JA
+
 <p>
 <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" width="180" alt="Continue"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" width="180" alt="Episodes"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" width="180" alt="Player"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/4.png" width="180" alt="Sync settings">
 </p>
