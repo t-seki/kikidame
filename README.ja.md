@@ -63,7 +63,7 @@ Google Play では配布しない（[ADR 0008](./docs/adr/0008-open-source-distr
   | PremiereDate（無ければ DateCreated） | 公開日（並び順・「最新 N 回」の基準） |
 
 - つまりファイルのタグが `album` = 番組、`albumartist` = 配信元、日付（M4A の `©day`）= 公開日、`artist` = 出演者 になっていればよい。Jellyfin がこれで上の構造を組む。MP3 の日付タグで公開日が取れるかは未確認
-  - ラジオ録音なら [radirec-tool](https://github.com/t-seki/radirec-tool) の出力がこの形（`albumartist` = 放送局、`©day` = 放送日）
+  - ラジオ録音なら、`album` = 番組、`albumartist` = 放送局、日付（M4A の `©day`）= 放送日、のタグを Mp3tag などの汎用のタグ編集ツールで付ければよい
   - ポッドキャストなら、フィードから落としたファイルに `album` = 番組名、`albumartist` = 配信者やネットワーク、日付 = 配信日を付けて音楽ライブラリに置く。番組ごとにフォルダを分けると Jellyfin が MusicAlbum にまとめやすい
 
 ## 仕組みの要点

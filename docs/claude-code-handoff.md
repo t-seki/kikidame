@@ -73,7 +73,7 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 | --- | --- |
 | MusicAlbum | 番組 (Program) |
 | Audio | 各回 (Episode) |
-| `AlbumArtist` | 配信元 (Publisher) — ラジオ録音なら配信元（`radirec-tool` が albumartist に書く）、ポッドキャストなら配信者やネットワーク |
+| `AlbumArtist` | 配信元 (Publisher) — ラジオ録音なら配信元（Airshelf が albumartist に書く）、ポッドキャストなら配信者やネットワーク |
 | `PremiereDate` → `DateCreated` → ファイル更新日時 | 公開日 (Published At) — 並び順・「最新 N 回」の基準。この順でフォールバック |
 | `DateCreated` | 取り込み日時 (Added At) — 保存するが新しさの判定には使わない。公開日の代用として並び順に効くのは上の行の経路（差分取得は ADR 0004 で見送り） |
 | `Id` | サーバ ID — アプリ内の主キーではない（ADR 0001） |
@@ -207,7 +207,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 - アプリ起動時: 前回同期から 1 時間以上経っていれば実行（同じ制約で待つ。#135 で「前回同期（`lastFetchedAt`）と前回の試み（`lastAttemptedAt`。失敗した全走査も数える）の新しい方から 1 時間」に）。番組一覧の手動プルは同期そのもの（M3-b の範囲を参照）
 - ダウンロード: Worker 内で HTTP ストリームを `.part` ファイルへ書き、完了後にリネーム。
   再開は `Range` ヘッダ。進捗は `setProgress` で UI へ
-- 置き場所: `getExternalFilesDir("episodes")/<配信元>/<番組>/<ファイル>`（radirec-tool の出力と同じ階層）
+- 置き場所: `getExternalFilesDir("episodes")/<配信元>/<番組>/<ファイル>`（Airshelf の出力と同じ階層）
 
 ## 実装順序
 
@@ -225,7 +225,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 
 ### M1 の範囲
 - **ファイルの供給**（**M3-c で削除**、#21。以下は M1 当時の記録）: `getExternalFilesDir("episodes")/<配信元>/<番組名>/<ファイル>.m4a|.mp3` に `adb push` する。
-  この 2 階層は `radirec-tool` の出力（`<albumartist = 放送局>/<album = 番組>/<番組> YYYY-MM-DD.m4a`）を
+  この 2 階層は Airshelf の出力（`<albumartist = 放送局>/<album = 番組>/<番組> YYYY-MM-DD.m4a`）を
   そのまま持ち込めるように合わせてある。デバッグビルド限定の番組一覧画面の「シード」ボタンが
   このフォルダを走査し、親フォルダを配信元（`publisherName`）、サブフォルダを番組、ファイルを各回として
   `ProgramEntity` / `EpisodeEntity` / `LocalFileEntity(state = DONE, pinned = true)` を生成する。
@@ -286,7 +286,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 - **取得の起点**（M2 時点）: ログイン直後と、番組一覧・各回一覧の「引っ張って更新」だけ。M3-b で番組一覧の更新は同期、各回一覧の更新は番組単位取得になり、定期・起動時の同期が加わった（「M3-b の範囲」）。
   失敗はスナックバーで、一覧は Room のまま
 - **突合（CONTEXT.md「突合」）**: `serverItemId = NULL` の行にだけ行う。番組は (配信元, 番組名) = (`AlbumArtist`, `Name`)、
-  各回は同じ番組内の `Name` 完全一致。候補が複数なら結ばない（新規行）。表記ゆれは吸収しない（radirec-tool の alias の責務）
+  各回は同じ番組内の `Name` 完全一致。候補が複数なら結ばない（新規行）。表記ゆれは吸収しない（Airshelf の alias の責務）
 - **取り込み**: サーバ由来の各回はサーバの値で上書き（タイトル・公開日・取り込み日時・尺・サイズ・コンテナ）。
   `LocalFile` と `PlaybackState` は触らない。サーバの一覧に無い番組・各回は M2 では何もしない（削除・判断保留は M3）
 - **手元に無い各回**: 一覧に同じ並びで出すが薄く表示し、タップしても再生画面へ行かない。右端は雲アイコン（M3 でダウンロードボタンになる）。

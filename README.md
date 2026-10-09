@@ -63,7 +63,7 @@ Requires Android 12 (API 31) or later. Store descriptions and screenshots live i
   | PremiereDate (DateCreated if missing) | Published At (ordering and the basis of "Keep latest N") |
 
 - In other words, the file tags need `album` = program, `albumartist` = publisher, the date (`©day` in M4A) = published at, and `artist` = performers. Jellyfin builds the structure above from them. Whether MP3 date tags yield a published date is unverified
-  - For radio recordings, the output of [radirec-tool](https://github.com/t-seki/radirec-tool) has this shape (`albumartist` = station, `©day` = broadcast date)
+  - For radio recordings, set the tags `album` = program, `albumartist` = station, and the date (`©day` in M4A) = broadcast date, using a general-purpose tag editor such as Mp3tag
   - For podcasts, tag the files you fetched from the feed with `album` = program name, `albumartist` = the publisher or network, and the date = release date, then put them in the music library. One folder per program helps Jellyfin group them into a MusicAlbum
 
 ## How it works
