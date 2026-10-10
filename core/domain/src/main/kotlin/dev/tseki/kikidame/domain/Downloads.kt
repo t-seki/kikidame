@@ -10,9 +10,9 @@ enum class LocalDeletionScope {
     EPISODE,
 }
 
-/** 削除の規則: サーバ ID がある回はファイルだけ、無い回（サーバを経由していない、落とし直せない回）は各回ごと。 */
+/** 削除の規則: 取得元 ID がある回はファイルだけ、無い回（サーバを経由していない、落とし直せない回）は各回ごと。 */
 fun deletionScopeFor(episode: Episode): LocalDeletionScope =
-    if (episode.serverItemId != null) LocalDeletionScope.FILE_ONLY else LocalDeletionScope.EPISODE
+    if (episode.sourceItemId != null) LocalDeletionScope.FILE_ONLY else LocalDeletionScope.EPISODE
 
 /** 保存先のファイル名。フォルダ構成は Airshelf の出力と同じ `<配信元>/<番組>/<タイトル>.<container>`。 */
 object EpisodeFileName {
@@ -65,7 +65,7 @@ interface DownloadRepository {
     suspend fun removeEpisode(episodeId: EpisodeId)
 
     /**
-     * 番組を手元から消す（番組・各回・ファイル・再生位置のすべて）。消失した番組とサーバ ID の無い番組の「この番組を手元から消す」用。
+     * 番組を手元から消す（番組・各回・ファイル・再生位置のすべて）。消失した番組と取得元 ID の無い番組の「この番組を手元から消す」用。
      * サーバに在る番組を消しても次の同期で戻ってくる（再生位置だけ失う）ので、呼び出し側で出し分ける。
      */
     suspend fun removeProgram(programId: ProgramId)

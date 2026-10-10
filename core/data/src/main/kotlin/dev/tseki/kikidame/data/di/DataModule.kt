@@ -17,6 +17,7 @@ import dev.tseki.kikidame.data.db.KikidameDatabase
 import dev.tseki.kikidame.data.db.LocalFileDao
 import dev.tseki.kikidame.data.db.ProgramDao
 import dev.tseki.kikidame.data.jellyfin.JellyfinGateway
+import dev.tseki.kikidame.data.jellyfin.JellyfinSource
 import dev.tseki.kikidame.data.jellyfin.SdkJellyfinGateway
 import dev.tseki.kikidame.data.repository.DataStoreSessionRepository
 import dev.tseki.kikidame.data.repository.RoomDownloadRepository
@@ -28,6 +29,7 @@ import dev.tseki.kikidame.data.session.KeystoreTokenCipher
 import dev.tseki.kikidame.data.settings.DataStoreAppSettings
 import dev.tseki.kikidame.data.session.SessionStore
 import dev.tseki.kikidame.data.session.TokenCipher
+import dev.tseki.kikidame.data.source.SourceGateway
 import dev.tseki.kikidame.domain.AppSettingsRepository
 import dev.tseki.kikidame.domain.DownloadQueue
 import dev.tseki.kikidame.domain.DownloadRepository
@@ -108,6 +110,10 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindJellyfinGateway(impl: SdkJellyfinGateway): JellyfinGateway
+
+    /** 取得元は今は Jellyfin だけ（ADR 0010）。 */
+    @Binds
+    abstract fun bindSourceGateway(impl: JellyfinSource): SourceGateway
 
     @Binds
     abstract fun bindTokenCipher(impl: KeystoreTokenCipher): TokenCipher

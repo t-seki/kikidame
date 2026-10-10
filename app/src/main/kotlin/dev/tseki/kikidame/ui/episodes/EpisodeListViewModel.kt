@@ -138,7 +138,7 @@ class EpisodeListViewModel @Inject constructor(
     private val _programRemoved = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val programRemoved: Flow<Unit> = _programRemoved
 
-    /** 消失した番組・サーバ ID の無い番組の「この番組を手元から消す」。番組・各回・ファイル・再生位置をすべて消す。 */
+    /** 消失した番組・取得元 ID の無い番組の「この番組を手元から消す」。番組・各回・ファイル・再生位置をすべて消す。 */
     fun removeProgram() = act {
         downloads.removeProgram(programId)
         _programRemoved.tryEmit(Unit)

@@ -6,21 +6,21 @@ import kotlin.time.Instant
  * ある番組について、サーバ上の各回一覧がどう見えているか（CONTEXT.md「判断保留」「到達不能」「消失」）。
  * 「一覧が空」は `Known(emptySet())` で、`Unavailable` とは型で区別する。
  */
-sealed interface ServerEpisodes {
+sealed interface SourceEpisodes {
     /** 完全な一覧が取れた。削除の権限を持つのはこの形だけ（ADR 0004）。 */
-    data class Known(val serverIds: Set<ServerItemId>) : ServerEpisodes
+    data class Known(val sourceIds: Set<SourceItemId>) : SourceEpisodes
 
     /** 一覧を取得できなかった。M3-b では全走査しか無いので番組ごとにこの形になる経路は無いが、型は残す。 */
-    data object Unavailable : ServerEpisodes
+    data object Unavailable : SourceEpisodes
 
-    /** 番組のサーバ ID がサーバの番組一覧に無い。 */
-    data object Gone : ServerEpisodes
+    /** 番組の取得元 ID が取得元の番組一覧に無い。 */
+    data object Gone : SourceEpisodes
 }
 
 /** 同期の判断に必要な列だけの手元の各回。取り込み後なので、サーバ上の各回にはすべて行がある。 */
 data class LocalEpisodeState(
     val id: EpisodeId,
-    val serverItemId: ServerItemId?,
+    val sourceItemId: SourceItemId?,
     val publishedAt: Instant,
     val title: String,
     /** 固定（`LocalFile.pinned`）。行が無ければ false。 */
@@ -34,7 +34,7 @@ data class SyncProgramInput(
     val programId: ProgramId,
     val syncEnabled: Boolean,
     val retentionRule: RetentionRule,
-    val server: ServerEpisodes,
+    val source: SourceEpisodes,
     val local: List<LocalEpisodeState>,
 )
 
@@ -68,7 +68,7 @@ data class SyncPlan(
  * 同期の純粋関数（handoff「同期エンジンの設計（M3）」「M3-b の範囲」）。I/O はしない。
  *
  * - `Unavailable` / `Gone` → 判断保留。何も出さない
- * - `Known` → サーバの一覧に無い `serverItemId != null` の各回は固定でも [SyncProgramPlan.remove]
+ * - `Known` → サーバの一覧に無い `sourceItemId != null` の各回は固定でも [SyncProgramPlan.remove]
  * - 固定された各回は保持ルールの外。「最新 N 回」の N にも数えない
  * - 同期対象でない番組は保持すべき集合が空: 固定でない手元の各回はすべて [SyncProgramPlan.delete]
  * - 同期対象なら、固定でないサーバ上の各回を公開日の新しい順に並べ、N 回まで取り、「再生済みなら削除」なら再生済みを除いたものが保持すべき集合。
@@ -76,17 +76,17 @@ data class SyncPlan(
  */
 object SyncPlanner {
     fun planProgram(input: SyncProgramInput): SyncProgramPlan {
-        val known = when (val s = input.server) {
-            is ServerEpisodes.Known -> s
-            ServerEpisodes.Unavailable, ServerEpisodes.Gone -> return SyncProgramPlan(input.programId, onHold = true)
+        val known = when (val s = input.source) {
+            is SourceEpisodes.Known -> s
+            SourceEpisodes.Unavailable, SourceEpisodes.Gone -> return SyncProgramPlan(input.programId, onHold = true)
         }
-        val (gone, present) = input.local.partition { it.serverItemId != null && it.serverItemId !in known.serverIds }
+        val (gone, present) = input.local.partition { it.sourceItemId != null && it.sourceItemId !in known.sourceIds }
 
         val unpinned = present.filter { !it.pinned }
         val keep: Set<EpisodeId> = if (!input.syncEnabled) {
             emptySet()
         } else {
-            val ordered = unpinned.filter { it.serverItemId != null }.sortedWith(NEWEST_FIRST)
+            val ordered = unpinned.filter { it.sourceItemId != null }.sortedWith(NEWEST_FIRST)
             val latest = input.retentionRule.keepLatest?.let { ordered.take(it) } ?: ordered
             latest.filter { !(input.retentionRule.deleteAfterPlayed && it.played) }.map { it.id }.toSet()
         }

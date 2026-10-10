@@ -1,8 +1,7 @@
 package dev.tseki.kikidame.data.download
 
-import dev.tseki.kikidame.data.jellyfin.JellyfinGateway
-import dev.tseki.kikidame.data.jellyfin.ServerCredentials
 import dev.tseki.kikidame.data.repository.RoomDownloadRepository
+import dev.tseki.kikidame.data.source.SourceGateway
 import dev.tseki.kikidame.domain.DownloadQueue
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.EpisodeWithState
@@ -26,23 +25,22 @@ sealed interface DownloadOutcome {
 }
 
 /**
- * 1 本を `.part` に書いて完了でリネームする。既存の `.part` があれば `Range` で続きを要求し、
- * サーバが無視して全体を返したら（200）書き直す。約 1 MB（[CHECK_EVERY]）ごとにキャンセルを見る。
+ * 1 本を `.part` に書いて完了でリネームする。既存の `.part` があれば続きを要求し、
+ * 取得元が応じずに全体を返したら書き直す。取得元には [SourceGateway] だけを通して触る（ADR 0010）。約 1 MB（[CHECK_EVERY]）ごとにキャンセルを見る。
  * 状態の更新（RUNNING / DONE / FAILED）はここで [DownloadQueue] に対して行う。
  */
 @Singleton
 class EpisodeDownloader @Inject constructor(
-    private val gateway: JellyfinGateway,
+    private val source: SourceGateway,
     private val queue: DownloadQueue,
 ) {
     suspend fun download(
         item: EpisodeWithState,
-        credentials: ServerCredentials,
         onProgress: suspend (downloaded: Long, total: Long?) -> Unit = { _, _ -> },
     ): DownloadOutcome {
         val episodeId = item.episode.id
         // 起こらないはずだが、PENDING のまま残すと Worker が同じ行を拾い続けるので FAILED に落とす
-        val serverId = item.episode.serverItemId ?: return invalid(episodeId, "no server id")
+        val sourceId = item.episode.sourceItemId ?: return invalid(episodeId, "no source id")
         val targetPath = item.localFile?.path ?: return invalid(episodeId, "no target path")
         val target = File(targetPath)
         val part = File(targetPath + RoomDownloadRepository.PART_SUFFIX)
@@ -52,7 +50,7 @@ class EpisodeDownloader @Inject constructor(
             withContext(Dispatchers.IO) {
                 target.parentFile?.mkdirs()
                 val existing = if (part.isFile) part.length() else 0L
-                gateway.openDownload(credentials, serverId, rangeStart = existing).use { stream ->
+                source.openDownload(sourceId, rangeStart = existing).use { stream ->
                     val resumedFrom = stream.resumedFrom
                     val append = when (resumedFrom) {
                         null -> false // 200: 全体が来るので書き直す

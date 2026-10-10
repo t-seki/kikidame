@@ -8,3 +8,4 @@ Media3 の `DownloadManager` は DASH/HLS/プログレッシブを `SimpleCache`
 - Wi-Fi のみ等の条件は `DownloadManager.Requirements` ではなく WorkManager の `Constraints` で表現する
 - 中断からの再開は `.part` ファイル + `Range` ヘッダで自前実装する
 - 引き継ぎ文書の「`DownloadManager` に渡す `DataSource.Factory` も同一のものを使う」という注意は不要になる。`Authorization` ヘッダの設定が必要な Media3 の `HttpDataSource.Factory` は、サーバから直接ストリーミング再生する場合（M4 以降で検討）に限られる
+- 2026-10-10 ADR 0010: 取得元に共有フォルダを加える。ダウンロードは取得元の境界（`SourceGateway.openDownload`）を通し、`/Items/{id}/Download` と `Range` は Jellyfin の実装の側に閉じた

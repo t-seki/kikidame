@@ -2,6 +2,7 @@ package dev.tseki.kikidame.data.repository
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.tseki.kikidame.data.jellyfin.JellyfinSource
 import dev.tseki.kikidame.data.db.LocalFileEntity
 import dev.tseki.kikidame.data.files.EpisodesDirectory
 import dev.tseki.kikidame.domain.DownloadState
@@ -10,10 +11,10 @@ import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.PlaybackRules
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.RetentionRule
-import dev.tseki.kikidame.domain.ServerEpisode
-import dev.tseki.kikidame.domain.ServerItemId
-import dev.tseki.kikidame.domain.ServerProgram
-import dev.tseki.kikidame.domain.ServerSnapshot
+import dev.tseki.kikidame.domain.SourceEpisode
+import dev.tseki.kikidame.domain.SourceItemId
+import dev.tseki.kikidame.domain.SourceProgram
+import dev.tseki.kikidame.domain.SourceSnapshot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -34,7 +35,7 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
-/** 再取り込み（サーバ ID の変更）後の結び直し（ADR 0005）と、タイトルが違う未結合の各回の第二段突合（公開日 + 尺）。 */
+/** 再取り込み（取得元 ID の変更）後の結び直し（ADR 0005）と、タイトルが違う未結合の各回の第二段突合（公開日 + 尺）。 */
 @RunWith(AndroidJUnit4::class)
 class RoomRematchTest : RoomTestBase() {
     @get:Rule
@@ -48,14 +49,14 @@ class RoomRematchTest : RoomTestBase() {
     private val playback by lazy { RoomPlaybackStateRepository(db, clock) }
     private val directory by lazy { EpisodesDirectory(ApplicationProvider.getApplicationContext()) }
     private val downloads by lazy { RoomDownloadRepository(db, directory, clock) }
-    private val repo by lazy { RoomLibraryRefreshRepository(db, store, gateway, downloads, clock) }
+    private val repo by lazy { RoomLibraryRefreshRepository(db, store, JellyfinSource(gateway, store), downloads, clock) }
 
     private val publisher = "TBSラジオ"
     private val programName = "パンサー向井のふらっと"
 
-    private fun se(id: String, program: String, title: String, published: String, runtime: Duration = 90.minutes) = ServerEpisode(
-        serverId = ServerItemId(id),
-        programServerId = ServerItemId(program),
+    private fun se(id: String, program: String, title: String, published: String, runtime: Duration = 90.minutes) = SourceEpisode(
+        sourceId = SourceItemId(id),
+        programSourceId = SourceItemId(program),
         title = title,
         publishedAt = Instant.parse(if ('T' in published) published else "${published}T00:00:00Z"),
         addedAt = Instant.parse("2026-09-16T02:00:00Z"),
@@ -64,14 +65,14 @@ class RoomRematchTest : RoomTestBase() {
         container = "m4a",
     )
 
-    private fun snapshot(program: String, vararg episodes: ServerEpisode) =
-        ServerSnapshot(listOf(ServerProgram(ServerItemId(program), programName, publisher)), episodes.toList())
+    private fun snapshot(program: String, vararg episodes: SourceEpisode) =
+        SourceSnapshot(listOf(SourceProgram(SourceItemId(program), programName, publisher)), episodes.toList())
 
     private val original = snapshot("P1", se("E1", "P1", "2026-09-01", "2026-09-01"), se("E2", "P1", "2026-09-02", "2026-09-02"), se("E3", "P1", "2026-09-03", "2026-09-03"))
 
     private suspend fun signInAndSelect() {
         session.signIn("jellyfin.lab.example", "alice", "secret")
-        session.selectLibrary(LibraryView(ServerItemId("lib-1"), "Radio", "music", isMusic = true))
+        session.selectLibrary(LibraryView(SourceItemId("lib-1"), "Radio", "music", isMusic = true))
     }
 
     private suspend fun programs() = library.observePrograms().first()
@@ -111,12 +112,12 @@ class RoomRematchTest : RoomTestBase() {
         val result = repo.refresh()
 
         assertEquals(1, programs().size, "no duplicate program row")
-        assertEquals("P9", programs().single().program.serverItemId?.value)
+        assertEquals("P9", programs().single().program.sourceItemId?.value)
         assertEquals(0, result.removed)
         assertEquals(0, result.onHold)
         val relinked = episode("2026-09-02")
         assertEquals(e2, relinked.episode.id, "same local row")
-        assertEquals("N2", relinked.episode.serverItemId?.value)
+        assertEquals("N2", relinked.episode.sourceItemId?.value)
         assertEquals(12.minutes, relinked.playback?.position)
         assertEquals(DownloadState.DONE, relinked.localFile?.state)
         assertTrue(file.exists())
@@ -139,7 +140,7 @@ class RoomRematchTest : RoomTestBase() {
         assertEquals(0, result.removed)
         assertTrue(pinned.exists())
         assertEquals(e1, episode("2026-09-01").episode.id)
-        assertEquals("N1", episode("2026-09-01").episode.serverItemId?.value)
+        assertEquals("N1", episode("2026-09-01").episode.sourceItemId?.value)
         assertEquals(3, episodes(programId).size)
     }
 
@@ -173,7 +174,7 @@ class RoomRematchTest : RoomTestBase() {
 
         assertEquals(0, result.removed)
         assertTrue(file.exists())
-        assertEquals("N1", episode("2026-09-01").episode.serverItemId?.value)
+        assertEquals("N1", episode("2026-09-01").episode.sourceItemId?.value)
     }
 
     @Test

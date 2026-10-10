@@ -6,7 +6,7 @@ import kotlin.time.Instant
 class EpisodeOrderTest {
     private fun episode(id: Long, publishedAt: String, title: String) = Episode(
         id = EpisodeId(id),
-        serverItemId = null,
+        sourceItemId = null,
         programId = ProgramId(1),
         title = title,
         publishedAt = Instant.parse(publishedAt),

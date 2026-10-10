@@ -82,12 +82,12 @@ class LibraryRefresher @Inject constructor(
      */
     suspend fun refresh(silent: Boolean = false): RefreshResult? = guarded(silent) { sync() }
 
-    /** 1 番組だけ取り込む。サーバ ID の無い番組は全走査（同期）にフォールバックする。 */
+    /** 1 番組だけ取り込む。取得元 ID の無い番組は全走査（同期）にフォールバックする。 */
     suspend fun refreshProgram(programId: ProgramId): RefreshResult? = guarded(silent = false) {
         refreshRepository.refreshProgram(programId)?.also { report(it.toProgramSyncMessage()) } ?: sync()
     }
 
-    /** 1 番組だけ同期する。サーバ ID の無い番組は何もしない（シート側でスイッチを無効にしている）。 */
+    /** 1 番組だけ同期する。取得元 ID の無い番組は何もしない（シート側でスイッチを無効にしている）。 */
     suspend fun syncProgram(programId: ProgramId): RefreshResult? = guarded(silent = false) {
         refreshRepository.syncProgram(programId, excluded = excluded())?.also { report(it.toProgramSyncMessage()) }
     }

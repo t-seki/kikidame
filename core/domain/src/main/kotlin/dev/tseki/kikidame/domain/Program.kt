@@ -3,7 +3,7 @@ import kotlin.time.Instant
 /** 番組。Jellyfin の MusicAlbum に対応する。 */
 data class Program(
     val id: ProgramId,
-    val serverItemId: ServerItemId?,
+    val sourceItemId: SourceItemId?,
     val name: String,
     /** 配信元。MusicAlbum の AlbumArtist、手元では番組フォルダの親フォルダ名。 */
     val publisherName: String?,

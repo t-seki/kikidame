@@ -243,7 +243,7 @@ private fun EpisodeTrailingAction(
 ) {
     val played = item.playback?.played == true
     when (item.localFile?.state) {
-        null -> IconButton(onClick = onDownload, enabled = item.episode.serverItemId != null) {
+        null -> IconButton(onClick = onDownload, enabled = item.episode.sourceItemId != null) {
             Icon(Icons.Outlined.CloudDownload, contentDescription = stringResource(R.string.episode_list_download))
         }
         DownloadState.PENDING -> IconButton(onClick = onCancel) {
@@ -290,7 +290,7 @@ internal fun EpisodeWithState.toSupportingText(waitingForNetwork: Boolean): UiTe
 
 /**
  * 同期対象と保持ルールの編集。保存するだけで、適用は次の同期（保存した瞬間には何も消えない）。
- * サーバ ID の無い番組は同期できないのでスイッチを無効にする。
+ * 取得元 ID の無い番組は同期できないのでスイッチを無効にする。
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -304,8 +304,8 @@ private fun ProgramSyncSheet(
     onSyncNow: () -> Unit,
     onRemoveProgram: () -> Unit,
 ) {
-    // 消失した番組（サーバの一覧に無く、突合でも結び直せなかった）とサーバ ID の無い番組は同期できない
-    val canSync = program.serverItemId != null && !program.isGone
+    // 消失した番組（サーバの一覧に無く、突合でも結び直せなかった）と取得元 ID の無い番組は同期できない
+    val canSync = program.sourceItemId != null && !program.isGone
     val enabled = program.syncEnabled
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Text(program.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))

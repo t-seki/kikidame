@@ -1,7 +1,7 @@
 package dev.tseki.kikidame.sync
 
 import dev.tseki.kikidame.domain.SelectedLibrary
-import dev.tseki.kikidame.domain.ServerItemId
+import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.Session
 import dev.tseki.kikidame.domain.SessionState
 import org.junit.Test
@@ -16,7 +16,7 @@ class SyncSchedulerTest {
 
     private fun ready(lastFetchedAt: Instant?, lastAttemptedAt: Instant?) = SessionState.Ready(
         session = Session("https://jellyfin.lab.example/", "alice", "user-alice", "token"),
-        library = SelectedLibrary(ServerItemId("lib-1"), "Radio"),
+        library = SelectedLibrary(SourceItemId("lib-1"), "Radio"),
         lastFetchedAt = lastFetchedAt,
         lastAttemptedAt = lastAttemptedAt,
     )

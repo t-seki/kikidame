@@ -9,8 +9,6 @@ data class PlaybackState(
     val position: Duration,
     val played: Boolean,
     val updatedAt: Instant,
-    /** null は未送信（dirty）。 */
-    val syncedAt: Instant? = null,
 ) {
     companion object {
         fun initial(episodeId: EpisodeId, now: Instant): PlaybackState =
@@ -62,18 +60,17 @@ object PlaybackRules {
         position > Duration.ZERO && runtime - position <= PLAYED_THRESHOLD
     /**
      * 再生位置の更新。末尾付近なら再生済みを立てる。一度立った再生済みは
-     * シークで戻しても自動では下ろさない。`syncedAt` はローカル変更なので null に戻す。
+     * シークで戻しても自動では下ろさない。
      */
     fun advance(state: PlaybackState, position: Duration, runtime: Duration, now: Instant): PlaybackState =
         state.copy(
             position = position,
             played = state.played || isNearEnd(position, runtime),
             updatedAt = now,
-            syncedAt = null,
         )
     /** 手動の再生済み／未再生切替。位置は変えない。 */
     fun setPlayed(state: PlaybackState, played: Boolean, now: Instant): PlaybackState =
-        state.copy(played = played, updatedAt = now, syncedAt = null)
+        state.copy(played = played, updatedAt = now)
     /**
      * 再生開始時の再開位置。残りが閾値以下なら先頭から、そうでなければ保存位置から。
      * 再生済みフラグは見ない。

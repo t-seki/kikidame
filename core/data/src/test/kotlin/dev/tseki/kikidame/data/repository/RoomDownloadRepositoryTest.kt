@@ -2,15 +2,16 @@ package dev.tseki.kikidame.data.repository
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.tseki.kikidame.data.jellyfin.JellyfinSource
 import dev.tseki.kikidame.data.files.EpisodesDirectory
 import dev.tseki.kikidame.domain.DownloadState
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.LocalDeletionScope
 import dev.tseki.kikidame.domain.PlaybackRules
-import dev.tseki.kikidame.domain.ServerEpisode
-import dev.tseki.kikidame.domain.ServerItemId
-import dev.tseki.kikidame.domain.ServerProgram
-import dev.tseki.kikidame.domain.ServerSnapshot
+import dev.tseki.kikidame.domain.SourceEpisode
+import dev.tseki.kikidame.domain.SourceItemId
+import dev.tseki.kikidame.domain.SourceProgram
+import dev.tseki.kikidame.domain.SourceSnapshot
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -30,16 +31,18 @@ class RoomDownloadRepositoryTest : RoomTestBase() {
     private val directory = EpisodesDirectory(ApplicationProvider.getApplicationContext())
     private val repo by lazy { RoomDownloadRepository(db, directory, clock) }
     private val library by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao(), db.localFileDao()) }
-    private val refresh by lazy { RoomLibraryRefreshRepository(db, testSessionStore(tmpDir(), kotlinx.coroutines.GlobalScope), FakeJellyfinGateway(), repo, clock) }
+    private val refresh by lazy { testSessionStore(tmpDir(), kotlinx.coroutines.GlobalScope).let { store ->
+        RoomLibraryRefreshRepository(db, store, JellyfinSource(FakeJellyfinGateway(), store), repo, clock)
+    } }
     private val playback by lazy { RoomPlaybackStateRepository(db, clock) }
 
     private fun tmpDir(): File = File(directory.root, "tmp").apply { mkdirs() }
 
-    private val snapshot = ServerSnapshot(
-        programs = listOf(ServerProgram(ServerItemId("album-1"), "パンサー向井のふらっと", "TBSラジオ")),
+    private val snapshot = SourceSnapshot(
+        programs = listOf(SourceProgram(SourceItemId("album-1"), "パンサー向井のふらっと", "TBSラジオ")),
         episodes = listOf(
-            ServerEpisode(ServerItemId("a1"), ServerItemId("album-1"), "2026-09-16 (1)", Instant.parse("2026-09-15T15:00:00Z"), null, 90.minutes, null, "m4a"),
-            ServerEpisode(ServerItemId("a2"), ServerItemId("album-1"), "2026-09-15 (1)", Instant.parse("2026-09-14T15:00:00Z"), null, 90.minutes, null, "m4a"),
+            SourceEpisode(SourceItemId("a1"), SourceItemId("album-1"), "2026-09-16 (1)", Instant.parse("2026-09-15T15:00:00Z"), null, 90.minutes, null, "m4a"),
+            SourceEpisode(SourceItemId("a2"), SourceItemId("album-1"), "2026-09-15 (1)", Instant.parse("2026-09-14T15:00:00Z"), null, 90.minutes, null, "m4a"),
         ),
     )
 
@@ -139,7 +142,7 @@ class RoomDownloadRepositoryTest : RoomTestBase() {
     }
 
     @Test
-    fun deleteServerEpisodeKeepsRowAndPlaybackState() = runTest {
+    fun deleteSourceEpisodeKeepsRowAndPlaybackState() = runTest {
         val id = episodeId("2026-09-16 (1)")
         repo.enqueue(id)
         val path = db.localFileDao().findByEpisode(id.value)!!.path!!
@@ -167,7 +170,7 @@ class RoomDownloadRepositoryTest : RoomTestBase() {
         assertNull(library.getEpisode(ep.episode.id))
         assertNull(db.playbackStateDao().findByEpisode(ep.episode.id.value))
         assertTrue(library.observePrograms().first().none { it.program.name == "Solo" }, "empty seeded program is removed")
-        assertNotNull(library.observePrograms().first().firstOrNull { it.program.serverItemId != null }, "server program untouched")
+        assertNotNull(library.observePrograms().first().firstOrNull { it.program.sourceItemId != null }, "server program untouched")
     }
 
     @Test

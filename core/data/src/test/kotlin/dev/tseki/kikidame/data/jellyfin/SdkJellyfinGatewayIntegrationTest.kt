@@ -6,7 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tseki.kikidame.domain.PublishedAt
 import dev.tseki.kikidame.domain.ServerException
-import dev.tseki.kikidame.domain.ServerItemId
+import dev.tseki.kikidame.domain.SourceItemId
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.atStartOfDayIn
@@ -59,7 +59,7 @@ class SdkJellyfinGatewayIntegrationTest {
         return session.credentials()
     }
 
-    private suspend fun radio(credentials: ServerCredentials): ServerItemId {
+    private suspend fun radio(credentials: ServerCredentials): SourceItemId {
         val libraries = gateway.listLibraries(credentials)
         val radio = libraries.firstOrNull { it.name == "radio" }
         assertNotNull(radio, "ライブラリ radio が無い: $libraries")
@@ -78,8 +78,8 @@ class SdkJellyfinGatewayIntegrationTest {
         assertEquals("TBSラジオ", snapshot.programs.first { it.name == "テスト番組B" }.publisherName)
 
         assertEquals(6, snapshot.episodes.size)
-        val programIds = snapshot.programs.map { it.serverId }.toSet()
-        assertTrue(snapshot.episodes.all { it.programServerId in programIds }, "番組に属さない各回が混ざっている")
+        val programIds = snapshot.programs.map { it.sourceId }.toSet()
+        assertTrue(snapshot.episodes.all { it.programSourceId in programIds }, "番組に属さない各回が混ざっている")
         val byTitle = snapshot.episodes.associateBy { it.title }
         assertEquals(setOf("2026-09-14", "2026-09-14 (1)", "夏休みスペシャル", "2026-09-07", "2026-08-31", "2026-08-24"), byTitle.keys)
 
@@ -110,18 +110,18 @@ class SdkJellyfinGatewayIntegrationTest {
         val snapshot = gateway.fetchLibrary(credentials, radio(credentials))
         val programA = snapshot.programs.first { it.name == "テスト番組A" }
 
-        val episodes = gateway.fetchProgramEpisodes(credentials, programA.serverId)
+        val episodes = gateway.fetchProgramEpisodes(credentials, programA.sourceId)
         assertEquals(setOf("2026-09-14", "2026-09-14 (1)", "夏休みスペシャル"), episodes.map { it.title }.toSet())
-        assertTrue(episodes.all { it.programServerId == programA.serverId })
+        assertTrue(episodes.all { it.programSourceId == programA.sourceId })
 
-        val program = gateway.fetchProgram(credentials, programA.serverId)
+        val program = gateway.fetchProgram(credentials, programA.sourceId)
         assertNotNull(program)
         assertEquals("テスト番組A", program.name)
         assertEquals("ニッポン放送", program.publisherName)
 
         // サーバに無い番組は null（消失）。各回の ID を番組として引いても null
-        assertNull(gateway.fetchProgram(credentials, ServerItemId(UUID.randomUUID().toString())))
-        assertNull(gateway.fetchProgram(credentials, episodes.first().serverId))
+        assertNull(gateway.fetchProgram(credentials, SourceItemId(UUID.randomUUID().toString())))
+        assertNull(gateway.fetchProgram(credentials, episodes.first().sourceId))
     }
 
     @Test
@@ -130,7 +130,7 @@ class SdkJellyfinGatewayIntegrationTest {
         val snapshot = gateway.fetchLibrary(credentials, radio(credentials))
         val episode = snapshot.episodes.first { it.title == "2026-09-07" }
 
-        val whole = gateway.openDownload(credentials, episode.serverId, rangeStart = 0)
+        val whole = gateway.openDownload(credentials, episode.sourceId, rangeStart = 0)
         val total = whole.use { stream ->
             assertNull(stream.resumedFrom)
             val bytes = stream.body.readBytes()
@@ -139,7 +139,7 @@ class SdkJellyfinGatewayIntegrationTest {
             bytes.size.toLong()
         }
 
-        gateway.openDownload(credentials, episode.serverId, rangeStart = 100).use { stream ->
+        gateway.openDownload(credentials, episode.sourceId, rangeStart = 100).use { stream ->
             val rest = stream.body.readBytes()
             if (stream.resumedFrom != null) {
                 // Range が効いた: 続きだけ返り、全体の長さは変わらない
@@ -161,7 +161,7 @@ class SdkJellyfinGatewayIntegrationTest {
         val bogus = credentials.copy(accessToken = "0123456789abcdef0123456789abcdef")
         assertFailsWith<ServerException.Unauthorized> { gateway.listLibraries(bogus) }
         val episode = gateway.fetchLibrary(credentials, radio(credentials)).episodes.first()
-        assertFailsWith<ServerException.Unauthorized> { gateway.openDownload(bogus, episode.serverId, 0) }
+        assertFailsWith<ServerException.Unauthorized> { gateway.openDownload(bogus, episode.sourceId, 0) }
     }
 
     @Test

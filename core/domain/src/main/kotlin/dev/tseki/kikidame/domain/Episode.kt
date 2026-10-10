@@ -4,7 +4,7 @@ import kotlin.time.Instant
 /** 各回。Jellyfin の Audio に対応する。 */
 data class Episode(
     val id: EpisodeId,
-    val serverItemId: ServerItemId?,
+    val sourceItemId: SourceItemId?,
     val programId: ProgramId,
     val title: String,
     /** 公開日。日単位なので同じ番組内で衝突しうる（順序は [EpisodeOrder]）。 */

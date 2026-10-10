@@ -157,14 +157,14 @@ internal fun EpisodeActionsSheet(
     val local = item.localFile
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Text(item.episode.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
-        if (onDownload != null && local == null && item.episode.serverItemId != null) {
+        if (onDownload != null && local == null && item.episode.sourceItemId != null) {
             SheetAction(Icons.Filled.Download, stringResource(R.string.episode_list_action_download)) { onDownload(); onDismiss() }
         }
         if (local?.state == DownloadState.DONE && local.pinned && syncEnabled) {
             SheetAction(Icons.Outlined.PushPin, stringResource(R.string.episode_list_action_unpin)) { onUnpin(); onDismiss() }
         }
         if (local != null) {
-            val label = stringResource(if (item.episode.serverItemId != null) R.string.episode_list_action_delete_file else R.string.episode_list_action_delete_episode)
+            val label = stringResource(if (item.episode.sourceItemId != null) R.string.episode_list_action_delete_file else R.string.episode_list_action_delete_episode)
             SheetAction(Icons.Filled.Delete, label) { onDelete(); onDismiss() }
         }
         SheetAction(Icons.Outlined.Info, stringResource(R.string.episode_list_action_details)) { onDetails() }

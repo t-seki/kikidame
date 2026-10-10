@@ -15,7 +15,7 @@ import dev.tseki.kikidame.domain.RefreshResult
 import dev.tseki.kikidame.ui.UiText
 import dev.tseki.kikidame.domain.SelectedLibrary
 import dev.tseki.kikidame.domain.ServerException
-import dev.tseki.kikidame.domain.ServerItemId
+import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.Session
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
@@ -90,7 +90,7 @@ class LibraryRefresherTest {
     private class FakeSessionRepository(ready: Boolean = true) : SessionRepository {
         val stateFlow = MutableStateFlow<SessionState>(
             if (ready) {
-                SessionState.Ready(Session("https://s", "alice", "u", "t"), SelectedLibrary(ServerItemId("lib"), "Radio"), null)
+                SessionState.Ready(Session("https://s", "alice", "u", "t"), SelectedLibrary(SourceItemId("lib"), "Radio"), null)
             } else {
                 SessionState.SignedOut(null, null)
             },

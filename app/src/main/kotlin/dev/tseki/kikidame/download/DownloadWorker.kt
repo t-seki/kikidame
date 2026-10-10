@@ -10,7 +10,6 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import dev.tseki.kikidame.data.download.DownloadOutcome
 import dev.tseki.kikidame.data.download.EpisodeDownloader
-import dev.tseki.kikidame.data.jellyfin.credentials
 import dev.tseki.kikidame.domain.DownloadQueue
 import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.SessionRepository
@@ -32,12 +31,8 @@ class DownloadWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        val session = when (val s = sessionRepository.state.first()) {
-            is SessionState.Ready -> s.session
-            is SessionState.NeedsLibrary -> s.session
-            is SessionState.SignedOut -> return Result.success()
-        }
-        val credentials = session.credentials()
+        // 接続していなければ何もしない。取得元への接続の情報は取得元の実装が持つ（ADR 0010）
+        if (sessionRepository.state.first() is SessionState.SignedOut) return Result.success()
         queue.resetRunning()
         queue.requeueFailed(MAX_ATTEMPTS)
 
@@ -46,7 +41,7 @@ class DownloadWorker @AssistedInject constructor(
             val episodeId = item.episode.id
             setProgress(workDataOf(KEY_EPISODE_ID to episodeId.value, KEY_FRACTION to 0f))
             val outcome = try {
-                downloader.download(item, credentials) { downloaded, total ->
+                downloader.download(item) { downloaded, total ->
                     val fraction = if (total != null && total > 0) (downloaded.toFloat() / total).coerceIn(0f, 1f) else 0f
                     setProgress(workDataOf(KEY_EPISODE_ID to episodeId.value, KEY_FRACTION to fraction))
                 }

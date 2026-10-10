@@ -11,13 +11,13 @@ import dev.tseki.kikidame.domain.Program
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.ProgramSummary
 import dev.tseki.kikidame.domain.RetentionRule
-import dev.tseki.kikidame.domain.ServerItemId
+import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.Ticks
 import kotlin.time.Instant
 // Entity ↔ ドメイン型。ticks ↔ Duration の変換はここに閉じ込める。
 fun ProgramEntity.toDomain(): Program = Program(
     id = ProgramId(id),
-    serverItemId = serverItemId?.let(::ServerItemId),
+    sourceItemId = sourceItemId?.let(::SourceItemId),
     name = name,
     publisherName = publisherName,
     syncEnabled = syncEnabled,
@@ -33,12 +33,12 @@ fun ProgramSummaryRow.toDomain(): ProgramSummary = ProgramSummary(
     latestPublishedAt = latestPublishedAt?.let(Instant::fromEpochMilliseconds),
 )
 fun ProgramKeyRow.toDomain(): LocalProgramKey =
-    LocalProgramKey(ProgramId(id), serverItemId?.let(::ServerItemId), publisherName, name)
+    LocalProgramKey(ProgramId(id), sourceItemId?.let(::SourceItemId), publisherName, name)
 fun EpisodeKeyRow.toDomain(): LocalEpisodeKey =
-    LocalEpisodeKey(EpisodeId(id), serverItemId?.let(::ServerItemId), ProgramId(programId), title, publishedAt, Ticks.toDuration(runtimeTicks))
+    LocalEpisodeKey(EpisodeId(id), sourceItemId?.let(::SourceItemId), ProgramId(programId), title, publishedAt, Ticks.toDuration(runtimeTicks))
 fun EpisodeSyncRow.toDomain(): LocalEpisodeState = LocalEpisodeState(
     id = EpisodeId(id),
-    serverItemId = serverItemId?.let(::ServerItemId),
+    sourceItemId = sourceItemId?.let(::SourceItemId),
     publishedAt = publishedAt,
     title = title,
     pinned = pinned == true,
@@ -47,7 +47,7 @@ fun EpisodeSyncRow.toDomain(): LocalEpisodeState = LocalEpisodeState(
 )
 fun EpisodeEntity.toDomain(): Episode = Episode(
     id = EpisodeId(id),
-    serverItemId = serverItemId?.let(::ServerItemId),
+    sourceItemId = sourceItemId?.let(::SourceItemId),
     programId = ProgramId(programId),
     title = title,
     publishedAt = publishedAt,
@@ -71,14 +71,12 @@ fun PlaybackStateEntity.toDomain(): PlaybackState = PlaybackState(
     position = Ticks.toDuration(positionTicks),
     played = played,
     updatedAt = updatedAt,
-    syncedAt = syncedAt,
 )
 fun PlaybackState.toEntity(): PlaybackStateEntity = PlaybackStateEntity(
     episodeId = episodeId.value,
     positionTicks = Ticks.fromDuration(position),
     played = played,
     updatedAt = updatedAt,
-    syncedAt = syncedAt,
 )
 fun EpisodeRow.toDomain(): EpisodeWithState = EpisodeWithState(
     episode = episode.toDomain(),

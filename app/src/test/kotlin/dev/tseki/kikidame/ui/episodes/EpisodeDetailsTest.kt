@@ -15,7 +15,7 @@ import dev.tseki.kikidame.domain.LocalFile
 import dev.tseki.kikidame.domain.PlaybackState
 import dev.tseki.kikidame.domain.Program
 import dev.tseki.kikidame.domain.ProgramId
-import dev.tseki.kikidame.domain.ServerItemId
+import dev.tseki.kikidame.domain.SourceItemId
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -32,7 +32,7 @@ class EpisodeDetailsTest {
     private val at = Instant.parse("2026-09-18T03:04:00Z") // JST 12:04
     private val episode = Episode(
         id = EpisodeId(42),
-        serverItemId = ServerItemId("abc123"),
+        sourceItemId = SourceItemId("abc123"),
         programId = ProgramId(1),
         title = "2026-09-18",
         publishedAt = published,
@@ -41,7 +41,7 @@ class EpisodeDetailsTest {
         sizeBytes = 21_900_000,
         container = "m4a",
     )
-    private val program = Program(id = ProgramId(1), serverItemId = null, name = "ハライチのターン！", publisherName = "TBSラジオ")
+    private val program = Program(id = ProgramId(1), sourceItemId = null, name = "ハライチのターン！", publisherName = "TBSラジオ")
 
     @Test
     fun userSectionsCollapseMissingFileAndPlayback() {
@@ -83,7 +83,7 @@ class EpisodeDetailsTest {
         val item = EpisodeWithState(
             episode,
             LocalFile(episode.id, DownloadState.FAILED, null, pinned = false, attemptCount = 3, lastAttemptAt = at),
-            PlaybackState(episode.id, 12.minutes, played = false, updatedAt = at, syncedAt = at),
+            PlaybackState(episode.id, 12.minutes, played = false, updatedAt = at),
         )
         val rows = EpisodeDetails.technicalRows(item).text()
         assertEquals(Row("サーバ ID", "abc123"), rows[0])
@@ -106,7 +106,7 @@ class EpisodeDetailsTest {
     }
     @Test
     fun localOnlyEpisodeSaysSo() {
-        val rows = EpisodeDetails.technicalRows(EpisodeWithState(episode.copy(serverItemId = null, addedAt = null), null, null)).text()
+        val rows = EpisodeDetails.technicalRows(EpisodeWithState(episode.copy(sourceItemId = null, addedAt = null), null, null)).text()
         assertEquals(Row("サーバ ID", "なし（手元だけの各回）"), rows[0])
         assertEquals(Row("取り込み日時", "なし"), rows[3])
         assertFalse(rows.any { it.first == "保存先" })

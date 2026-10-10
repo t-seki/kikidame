@@ -8,9 +8,8 @@ import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import dev.tseki.kikidame.data.download.EpisodeDownloader
-import dev.tseki.kikidame.data.jellyfin.DownloadStream
-import dev.tseki.kikidame.data.jellyfin.JellyfinGateway
-import dev.tseki.kikidame.data.jellyfin.ServerCredentials
+import dev.tseki.kikidame.data.source.DownloadStream
+import dev.tseki.kikidame.data.source.SourceGateway
 import dev.tseki.kikidame.domain.DownloadQueue
 import dev.tseki.kikidame.domain.DownloadState
 import dev.tseki.kikidame.domain.Episode
@@ -20,11 +19,11 @@ import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.LocalFile
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.SelectedLibrary
-import dev.tseki.kikidame.domain.ServerEpisode
+import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.ServerException
-import dev.tseki.kikidame.domain.ServerItemId
-import dev.tseki.kikidame.domain.ServerProgram
-import dev.tseki.kikidame.domain.ServerSnapshot
+import dev.tseki.kikidame.domain.SourceItemId
+import dev.tseki.kikidame.domain.SourceProgram
+import dev.tseki.kikidame.domain.SourceSnapshot
 import dev.tseki.kikidame.domain.Session
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
@@ -64,15 +63,13 @@ class DownloadWorkerTest {
         override suspend fun isStillWanted(episodeId: EpisodeId): Boolean = state[episodeId] != DownloadState.DONE
     }
 
-    private class Gateway(val files: Map<ServerItemId, ByteArray>, val unauthorized: Boolean = false) : JellyfinGateway {
-        override suspend fun signIn(serverUrl: String, userName: String, password: String) = error("unused")
-        override suspend fun listLibraries(credentials: ServerCredentials): List<LibraryView> = error("unused")
-        override suspend fun fetchLibrary(credentials: ServerCredentials, libraryId: ServerItemId): ServerSnapshot = error("unused")
-        override suspend fun fetchProgramEpisodes(credentials: ServerCredentials, programServerId: ServerItemId): List<ServerEpisode> = error("unused")
-        override suspend fun fetchProgram(credentials: ServerCredentials, programServerId: ServerItemId): ServerProgram? = error("unused")
-        override suspend fun openDownload(credentials: ServerCredentials, episodeServerId: ServerItemId, rangeStart: Long): DownloadStream {
+    private class Source(val files: Map<SourceItemId, ByteArray>, val unauthorized: Boolean = false) : SourceGateway {
+        override suspend fun fetchAll(): SourceSnapshot = error("unused")
+        override suspend fun fetchProgramEpisodes(programId: SourceItemId): List<SourceEpisode> = error("unused")
+        override suspend fun fetchProgram(programId: SourceItemId): SourceProgram? = error("unused")
+        override suspend fun openDownload(episodeId: SourceItemId, rangeStart: Long): DownloadStream {
             if (unauthorized) throw ServerException.Unauthorized()
-            val bytes = files[episodeServerId] ?: throw ServerException.Failed("HTTP 404")
+            val bytes = files[episodeId] ?: throw ServerException.Failed("HTTP 404")
             return DownloadStream(null, bytes.size.toLong(), bytes.inputStream())
         }
     }
@@ -87,28 +84,28 @@ class DownloadWorkerTest {
         override suspend fun signOut() { signedOut = true; flow.value = SessionState.SignedOut(null, null) }
     }
 
-    private val ready = SessionState.Ready(Session("https://x/", "u", "uid", "tok"), SelectedLibrary(ServerItemId("lib"), "Radio"), null)
+    private val ready = SessionState.Ready(Session("https://x/", "u", "uid", "tok"), SelectedLibrary(SourceItemId("lib"), "Radio"), null)
 
     private fun item(id: Long, server: String?) = EpisodeWithState(
-        episode = Episode(EpisodeId(id), server?.let(::ServerItemId), ProgramId(1), "t$id", Instant.parse("2026-09-15T15:00:00Z"), null, 30.minutes, 0, "m4a"),
+        episode = Episode(EpisodeId(id), server?.let(::SourceItemId), ProgramId(1), "t$id", Instant.parse("2026-09-15T15:00:00Z"), null, 30.minutes, 0, "m4a"),
         localFile = LocalFile(EpisodeId(id), DownloadState.PENDING, File(tmp.root, "s/p/t$id.m4a").absolutePath, pinned = true),
         playback = null,
     )
 
-    private fun build(queue: DownloadQueue, gateway: JellyfinGateway, sessions: SessionRepository): DownloadWorker =
+    private fun build(queue: DownloadQueue, source: SourceGateway, sessions: SessionRepository): DownloadWorker =
         TestListenableWorkerBuilder<DownloadWorker>(ApplicationProvider.getApplicationContext())
             .setWorkerFactory(object : WorkerFactory() {
                 override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters): ListenableWorker =
-                    DownloadWorker(appContext, workerParameters, queue, EpisodeDownloader(gateway, queue), sessions)
+                    DownloadWorker(appContext, workerParameters, queue, EpisodeDownloader(source, queue), sessions)
             })
             .build()
 
     @Test
     fun drainsTheQueueAndContinuesPastFailures() = runTest {
         val queue = MemoryQueue(listOf(item(1, "a1"), item(2, "missing"), item(3, "a3")))
-        val gateway = Gateway(mapOf(ServerItemId("a1") to ByteArray(10) { 1 }, ServerItemId("a3") to ByteArray(20) { 3 }))
+        val source = Source(mapOf(SourceItemId("a1") to ByteArray(10) { 1 }, SourceItemId("a3") to ByteArray(20) { 3 }))
 
-        val result = build(queue, gateway, Sessions(ready)).doWork()
+        val result = build(queue, source, Sessions(ready)).doWork()
 
         assertEquals(ListenableWorker.Result.success(), result)
         assertEquals(listOf(EpisodeId(1), EpisodeId(3)), queue.done)
@@ -119,7 +116,7 @@ class DownloadWorkerTest {
     @Test
     fun signedOutSessionDoesNothing() = runTest {
         val queue = MemoryQueue(listOf(item(1, "a1")))
-        build(queue, Gateway(emptyMap()), Sessions(SessionState.SignedOut(null, null))).doWork()
+        build(queue, Source(emptyMap()), Sessions(SessionState.SignedOut(null, null))).doWork()
         assertEquals(DownloadState.PENDING, queue.state[EpisodeId(1)])
     }
 
@@ -127,7 +124,7 @@ class DownloadWorkerTest {
     fun unauthorizedSignsOutAndStops() = runTest {
         val queue = MemoryQueue(listOf(item(1, "a1"), item(2, "a2")))
         val sessions = Sessions(ready)
-        val result = build(queue, Gateway(emptyMap(), unauthorized = true), sessions).doWork()
+        val result = build(queue, Source(emptyMap(), unauthorized = true), sessions).doWork()
 
         assertEquals(ListenableWorker.Result.success(), result)
         assertTrue(sessions.signedOut)

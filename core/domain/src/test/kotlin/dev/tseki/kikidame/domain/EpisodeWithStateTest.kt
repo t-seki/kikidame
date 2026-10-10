@@ -9,7 +9,7 @@ class EpisodeWithStateTest {
     private val now = Instant.parse("2026-09-16T00:00:00Z")
     private val episode = Episode(
         id = EpisodeId(1),
-        serverItemId = null,
+        sourceItemId = null,
         programId = ProgramId(1),
         title = "X 2026-06-12",
         publishedAt = now,

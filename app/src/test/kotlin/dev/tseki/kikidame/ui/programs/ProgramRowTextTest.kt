@@ -63,7 +63,7 @@ class ProgramRowTextTest {
     ) = ProgramSummary(
         program = Program(
             id = ProgramId(1),
-            serverItemId = null,
+            sourceItemId = null,
             name = "ハライチのターン！",
             publisherName = publisher,
             goneSince = if (gone) published else null,

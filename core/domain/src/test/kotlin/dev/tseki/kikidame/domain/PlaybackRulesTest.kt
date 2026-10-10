@@ -2,7 +2,6 @@ package dev.tseki.kikidame.domain
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -38,18 +37,11 @@ class PlaybackRulesTest {
         assertEquals(later, seekedBack.updatedAt)
     }
     @Test
-    fun `advance marks the record dirty`() {
-        val synced = PlaybackState(episode, 1.minutes, played = false, updatedAt = now, syncedAt = now)
-        val advanced = PlaybackRules.advance(synced, 2.minutes, runtime, later)
-        assertNull(advanced.syncedAt)
-    }
-    @Test
     fun `manual toggle changes played but not position`() {
         val state = PlaybackState(episode, 10.minutes, played = true, updatedAt = now)
         val unplayed = PlaybackRules.setPlayed(state, played = false, now = later)
         assertFalse(unplayed.played)
         assertEquals(10.minutes, unplayed.position)
-        assertNull(unplayed.syncedAt)
     }
     @Test
     fun `resume from saved position unless near the end`() {

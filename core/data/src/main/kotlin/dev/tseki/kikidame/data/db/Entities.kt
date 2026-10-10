@@ -7,19 +7,19 @@ import androidx.room.PrimaryKey
 import dev.tseki.kikidame.domain.DownloadState
 import kotlin.time.Instant
 /**
- * 番組 = MusicAlbum。主キーはローカル代理キー、サーバ ID は nullable unique（ADR 0001）。
+ * 番組 = MusicAlbum。主キーはローカル代理キー、取得元 ID は nullable unique（ADR 0001）。
  * (配信元, 番組名) は突合のキーだが一意ではない（サーバ側に同名の番組が複数あり得る）。
  */
 @Entity(
     tableName = "programs",
-    indices = [Index("serverItemId", unique = true), Index(value = ["stationName", "name"])],
+    indices = [Index("sourceItemId", unique = true), Index(value = ["publisherName", "name"])],
 )
 data class ProgramEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val serverItemId: String?,
+    val sourceItemId: String?,
     val name: String,
     /** 配信元（MusicAlbum.AlbumArtist）。保存先では番組フォルダの親フォルダ名になる。 */
-    @ColumnInfo(name = "stationName") val publisherName: String?,
+    val publisherName: String?,
     val syncEnabled: Boolean = false,
     /** 最新 N 回まで保持（null = 上限なし）。 */
     val keepLatest: Int? = null,
@@ -32,7 +32,7 @@ data class ProgramEntity(
 /** 各回 = Audio。 */
 @Entity(
     tableName = "episodes",
-    indices = [Index("serverItemId", unique = true), Index("programId")],
+    indices = [Index("sourceItemId", unique = true), Index("programId")],
     foreignKeys = [
         ForeignKey(
             entity = ProgramEntity::class,
@@ -44,11 +44,11 @@ data class ProgramEntity(
 )
 data class EpisodeEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val serverItemId: String?,
+    val sourceItemId: String?,
     val programId: Long,
     val title: String,
     /** 公開日。 */
-    @ColumnInfo(name = "airedAt") val publishedAt: Instant,
+    val publishedAt: Instant,
     /** 取り込み日時。サーバを経由していない行は null。 */
     val addedAt: Instant?,
     /** 1 tick = 100ns。ticks は Entity とサーバ境界にだけ現れる。 */
@@ -104,6 +104,4 @@ data class PlaybackStateEntity(
     val positionTicks: Long,
     val played: Boolean,
     val updatedAt: Instant,
-    /** null = 未送信（dirty）。 */
-    val syncedAt: Instant? = null,
 )

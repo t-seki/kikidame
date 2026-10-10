@@ -31,7 +31,7 @@ abstract class RoomTestBase {
     fun closeDatabase() {
         db.close()
     }
-    /** サーバ ID を持たない手元の行（ADR 0001。かつてのシードが作っていた形）をテスト用に組み立てる。 */
+    /** 取得元 ID を持たない手元の行（ADR 0001。かつてのシードが作っていた形）をテスト用に組み立てる。 */
     data class LocalRow(
         val publisher: String,
         val program: String,
@@ -60,10 +60,10 @@ abstract class RoomTestBase {
     protected suspend fun seed(rows: List<LocalRow>) {
         for (r in rows) {
             val programId = db.programDao().findByPublisherAndName(r.publisher, r.program)?.id
-                ?: db.programDao().insert(ProgramEntity(serverItemId = null, name = r.program, publisherName = r.publisher))
+                ?: db.programDao().insert(ProgramEntity(sourceItemId = null, name = r.program, publisherName = r.publisher))
             val episodeId = db.episodeDao().insert(
                 EpisodeEntity(
-                    serverItemId = null,
+                    sourceItemId = null,
                     programId = programId,
                     title = r.title,
                     publishedAt = r.publishedAt,

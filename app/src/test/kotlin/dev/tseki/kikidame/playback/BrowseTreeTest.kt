@@ -25,14 +25,14 @@ class BrowseTreeTest {
     private val now = Instant.parse("2026-09-20T00:00:00Z")
     private val library = InMemoryLibraryRepository()
     private val tree = BrowseTree(library, BrowseTree.Labels(continueListening = "Continue", starred = "Starred", programs = "Programs"))
-    private val harai = Program(id = ProgramId(1), serverItemId = null, name = "ハライチのターン！", publisherName = "TBSラジオ", starred = true)
-    private val ann = Program(id = ProgramId(2), serverItemId = null, name = "ANN", publisherName = "ニッポン放送")
-    private val onlyOnServer = Program(id = ProgramId(3), serverItemId = null, name = "手元に無い番組", publisherName = null, starred = true)
+    private val harai = Program(id = ProgramId(1), sourceItemId = null, name = "ハライチのターン！", publisherName = "TBSラジオ", starred = true)
+    private val ann = Program(id = ProgramId(2), sourceItemId = null, name = "ANN", publisherName = "ニッポン放送")
+    private val onlyOnServer = Program(id = ProgramId(3), sourceItemId = null, name = "手元に無い番組", publisherName = null, starred = true)
     private fun episode(id: Long, programId: ProgramId, published: String, local: Boolean = true, playback: PlaybackState? = null) =
         EpisodeWithState(
             episode = Episode(
                 id = EpisodeId(id),
-                serverItemId = null,
+                sourceItemId = null,
                 programId = programId,
                 title = published,
                 publishedAt = Instant.parse("${published}T15:00:00Z"),

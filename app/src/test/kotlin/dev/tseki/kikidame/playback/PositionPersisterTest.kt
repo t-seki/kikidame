@@ -59,7 +59,6 @@ class PositionPersisterTest {
         val saved = repo.states.value[ep1]!!
         assertEquals(65.seconds, saved.position)
         assertFalse(saved.played)
-        assertNull(saved.syncedAt)
     }
     /**
      * 倍速（#35）: プレイヤーの位置は音源の時間なので、そのまま保存する。この番人は

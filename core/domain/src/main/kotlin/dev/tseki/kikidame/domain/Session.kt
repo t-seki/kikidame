@@ -30,11 +30,11 @@ data class Session(
     val accessToken: String,
 )
 
-data class SelectedLibrary(val id: ServerItemId, val name: String)
+data class SelectedLibrary(val id: SourceItemId, val name: String)
 
 /** サーバ上のライブラリ（`/UserViews` の 1 件）。音楽ライブラリだけが選べる。 */
 data class LibraryView(
-    val id: ServerItemId,
+    val id: SourceItemId,
     val name: String,
     /** 表示用の種別名（"music" / "movies" など）。不明なら null。 */
     val collectionType: String?,
@@ -83,14 +83,14 @@ interface LibraryRefreshRepository {
 
     /**
      * 1 番組の各回だけを取得して取り込む（#12）。削除も予約もせず、最終同期の時刻も更新しない。
-     * 番組がサーバ ID を持たなければ null（呼び出し側は全体の [refresh] にフォールバックする）。
+     * 番組が取得元 ID を持たなければ null（呼び出し側は全体の [refresh] にフォールバックする）。
      */
     suspend fun refreshProgram(programId: ProgramId): RefreshResult?
 
     /**
      * 1 番組だけ同期する。番組の存在を確かめてから（無ければ消失 = 判断保留）その番組の各回一覧を取り、
      * 取り込み → [SyncPlanner] → 除去・削除・予約をこの番組に限って行う。その番組についての一覧は完全なので
-     * 削除の権限を持つ（ADR 0004）。最終同期の時刻は更新しない。サーバ ID を持たなければ null。
+     * 削除の権限を持つ（ADR 0004）。最終同期の時刻は更新しない。取得元 ID を持たなければ null。
      */
     suspend fun syncProgram(programId: ProgramId, excluded: Set<EpisodeId> = emptySet()): RefreshResult?
 }

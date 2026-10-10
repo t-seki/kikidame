@@ -2,15 +2,16 @@ package dev.tseki.kikidame.data.repository
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.tseki.kikidame.data.jellyfin.JellyfinSource
 import dev.tseki.kikidame.data.files.EpisodesDirectory
 import dev.tseki.kikidame.domain.EpisodeWithState
 import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.PlaybackRules
-import dev.tseki.kikidame.domain.ServerEpisode
+import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.ServerException
-import dev.tseki.kikidame.domain.ServerItemId
-import dev.tseki.kikidame.domain.ServerProgram
-import dev.tseki.kikidame.domain.ServerSnapshot
+import dev.tseki.kikidame.domain.SourceItemId
+import dev.tseki.kikidame.domain.SourceProgram
+import dev.tseki.kikidame.domain.SourceSnapshot
 import dev.tseki.kikidame.domain.SessionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -45,14 +46,14 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
     private val playback by lazy { RoomPlaybackStateRepository(db, clock) }
     private val directory by lazy { EpisodesDirectory(ApplicationProvider.getApplicationContext()) }
     private val downloads by lazy { RoomDownloadRepository(db, directory, clock) }
-    private val repo by lazy { RoomLibraryRefreshRepository(db, store, gateway, downloads, clock) }
+    private val repo by lazy { RoomLibraryRefreshRepository(db, store, JellyfinSource(gateway, store), downloads, clock) }
 
     private val program = "パンサー向井のふらっと"
     private val publisher = "TBSラジオ"
 
-    private fun serverEpisode(id: String, title: String, published: String, runtime: Int = 90) = ServerEpisode(
-        serverId = ServerItemId(id),
-        programServerId = ServerItemId("album-1"),
+    private fun serverEpisode(id: String, title: String, published: String, runtime: Int = 90) = SourceEpisode(
+        sourceId = SourceItemId(id),
+        programSourceId = SourceItemId("album-1"),
         title = title,
         publishedAt = Instant.parse(published),
         addedAt = Instant.parse("2026-09-16T02:00:00Z"),
@@ -61,8 +62,8 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
         container = "m4a",
     )
 
-    private val snapshot = ServerSnapshot(
-        programs = listOf(ServerProgram(ServerItemId("album-1"), program, publisher)),
+    private val snapshot = SourceSnapshot(
+        programs = listOf(SourceProgram(SourceItemId("album-1"), program, publisher)),
         episodes = listOf(
             serverEpisode("audio-1", "$program 2026-09-14-1", "2026-09-13T15:00:00Z"),
             serverEpisode("audio-2", "$program 2026-09-14-2", "2026-09-13T15:00:00Z", runtime = 60),
@@ -72,7 +73,7 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
 
     private suspend fun signInAndSelect() {
         session.signIn("jellyfin.lab.example", "alice", "secret")
-        session.selectLibrary(LibraryView(ServerItemId("lib-1"), "Radio", "music", isMusic = true))
+        session.selectLibrary(LibraryView(SourceItemId("lib-1"), "Radio", "music", isMusic = true))
     }
 
     @After
@@ -104,24 +105,24 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
         assertEquals(1, result.linkedPrograms)
         assertEquals(2, result.linkedEpisodes)
         assertEquals(1, result.newEpisodes, "relinked episodes are not new (#142)")
-        assertEquals(listOf(ServerItemId("lib-1")), gateway.fetchedLibraries)
+        assertEquals(listOf(SourceItemId("lib-1")), gateway.fetchedLibraries)
 
         val programs = library.observePrograms().first()
         assertEquals(1, programs.size, "the seeded program must not be duplicated")
         val summary = programs.single()
-        assertEquals("album-1", summary.program.serverItemId?.value)
+        assertEquals("album-1", summary.program.sourceItemId?.value)
         assertEquals(3, summary.episodeCount)
         assertEquals(2, summary.localEpisodeCount)
 
         val episodes = library.observeEpisodes(summary.program.id).first()
         assertEquals(listOf("$program 2026-09-17-1", "$program 2026-09-14-1", "$program 2026-09-14-2"), episodes.map { it.episode.title })
         val serverOnly = episodes.first()
-        assertEquals("audio-3", serverOnly.episode.serverItemId?.value)
+        assertEquals("audio-3", serverOnly.episode.sourceItemId?.value)
         assertNull(serverOnly.localFile)
         assertTrue(!serverOnly.isPlayable)
 
         val relinked = episodes.first { it.episode.title.endsWith("-2") }
-        assertEquals("audio-2", relinked.episode.serverItemId?.value)
+        assertEquals("audio-2", relinked.episode.sourceItemId?.value)
         assertEquals(24.minutes, relinked.playback?.position, "playback state survives matching")
         assertEquals(60.minutes, relinked.episode.runtime, "server metadata overwrites the seeded values")
         assertEquals(1024, relinked.episode.sizeBytes, "a value the server does not send keeps the seeded one")
@@ -138,8 +139,8 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
         repo.refresh()
 
         gateway.snapshot = snapshot.copy(
-            programs = listOf(ServerProgram(ServerItemId("album-1"), "$program（改）", publisher)),
-            episodes = snapshot.episodes.map { if (it.serverId.value == "audio-3") it.copy(title = "renamed") else it },
+            programs = listOf(SourceProgram(SourceItemId("album-1"), "$program（改）", publisher)),
+            episodes = snapshot.episodes.map { if (it.sourceId.value == "audio-3") it.copy(title = "renamed") else it },
         )
         val result = repo.refresh()
 
@@ -156,7 +157,7 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
         signInAndSelect()
         gateway.snapshot = snapshot.copy(
             episodes = snapshot.episodes.map {
-                when (it.serverId.value) {
+                when (it.sourceId.value) {
                     "audio-1" -> it.copy(performers = listOf("向井慧", "ゲスト A"))
                     else -> it
                 }
@@ -165,14 +166,14 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
         repo.refresh()
         val programId = library.observePrograms().first().single().program.id
         fun List<EpisodeWithState>.performersOf(id: String) =
-            first { it.episode.serverItemId?.value == id }.episode.performers
+            first { it.episode.sourceItemId?.value == id }.episode.performers
         var episodes = library.observeEpisodes(programId).first()
         assertEquals(listOf("向井慧", "ゲスト A"), episodes.performersOf("audio-1"))
         assertEquals(emptyList(), episodes.performersOf("audio-2"))
 
         gateway.snapshot = snapshot.copy(
             episodes = snapshot.episodes.map {
-                when (it.serverId.value) {
+                when (it.sourceId.value) {
                     "audio-1" -> it.copy(performers = emptyList())
                     "audio-2" -> it.copy(performers = listOf("向井慧"))
                     else -> it
@@ -222,7 +223,7 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
         gateway.snapshot = snapshot
         repo.refresh()
 
-        gateway.snapshot = ServerSnapshot(emptyList(), emptyList())
+        gateway.snapshot = SourceSnapshot(emptyList(), emptyList())
         repo.refresh()
 
         assertEquals(3, library.observePrograms().first().single().episodeCount)

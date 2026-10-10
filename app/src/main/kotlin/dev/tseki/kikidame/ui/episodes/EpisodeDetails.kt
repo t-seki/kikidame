@@ -73,14 +73,13 @@ object EpisodeDetails {
     /**
      * 技術的な詳細: ID・記録の生の値・パスなど。手元のファイルが無ければ保存先・失敗回数の行を、再生記録が無ければ更新日時の行を出さない。
      * 公開日は「サーバが返した生の値」ではなく、アプリが日付に丸めて JST の 0 時にした記録の瞬間（タグが無ければ取り込み日時で代用、CONTEXT.md）。
-     * `PlaybackState.syncedAt` は出さない（ADR 0007 で再生位置はサーバへ送らない）。
      */
     fun technicalRows(item: EpisodeWithState): List<Row> {
         val e = item.episode
         val local = item.localFile
         val playback = item.playback
         return listOfNotNull(
-            Row(R.string.episode_details_server_id, e.serverItemId?.value?.let(UiText::Plain) ?: UiText.Res(R.string.episode_details_server_id_none)),
+            Row(R.string.episode_details_server_id, e.sourceItemId?.value?.let(UiText::Plain) ?: UiText.Res(R.string.episode_details_server_id_none)),
             Row(R.string.episode_details_app_id, e.id.value.toString()),
             Row(R.string.episode_details_published_raw, e.publishedAt.toString()),
             Row(R.string.episode_details_added_at, e.addedAt?.toString()?.let(UiText::Plain) ?: UiText.Res(R.string.common_none)),

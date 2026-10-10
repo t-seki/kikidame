@@ -103,6 +103,8 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 主キーはすべてローカル代理キー。サーバ ID は nullable unique（ADR 0001）。
 サーバ ID を持たない行（未結合）は正規の状態（ADR 0001）。M1〜M3-b にあったシード（手元フォルダの走査）は M3-c で削除した（#21）。
 
+> 2026-10-10 注記: サーバ ID は ADR 0010 で取得元 ID に改めた。コードと Room の列の名前は `sourceItemId`（版 7）。`stationName` / `airedAt` は `publisherName` / `publishedAt` に改め、`syncedAt` は削除した（#196）。下のエンティティは改める前の形のまま残している。
+
 ```kotlin
 @Entity(indices = [Index("serverItemId", unique = true), Index("stationName", "name")])
 data class ProgramEntity(          // 番組 = MusicAlbum。(配信元, 番組名) は突合のキーだが一意ではない（v2）
