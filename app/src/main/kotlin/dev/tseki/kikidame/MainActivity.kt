@@ -15,16 +15,23 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.lifecycle.lifecycleScope
 import dev.tseki.kikidame.domain.AppSettingsRepository
+import dev.tseki.kikidame.domain.ConnectedSource
+import dev.tseki.kikidame.domain.SessionRepository
+import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.domain.ThemeMode
 import dev.tseki.kikidame.ui.KikidameNavHost
 import dev.tseki.kikidame.ui.theme.KikidameTheme
 import dev.tseki.kikidame.ui.theme.isDark
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     @Inject lateinit var settings: AppSettingsRepository
+    @Inject lateinit var sessionRepository: SessionRepository
     private val requestPermissions =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { /* 拒否されても手元の再生はできる */ }
 
@@ -53,18 +60,23 @@ class MainActivity : ComponentActivity() {
     /**
      * - Android 13+: 通知の表示に `POST_NOTIFICATIONS` が要る。無いと再生通知が出ない
      * - Android 17+（targetSdk 37）: LAN 内のサーバへ接続するのに `ACCESS_LOCAL_NETWORK` が要る。
-     *   無いと LAN 宛の TCP が黙って落ちる（DNS だけは通る）
+     *   無いと LAN 宛の TCP が黙って落ちる（DNS だけは通る）。取得元が Jellyfin か SMB のとき（ログアウト中で前回のものがあるときを含む）だけ
+     *   起動時に要求する（#199 の決定 7）。端末のフォルダの人には要求しない。まだ取得元を選んでいない人には、取得元の選択で
+     *   Jellyfin か SMB を選んだときに要求する（[dev.tseki.kikidame.ui.source.SourcePickScreen]）
      */
     private fun requestRuntimePermissionsIfNeeded() {
-        val missing = buildList {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !granted(Manifest.permission.POST_NOTIFICATIONS)) {
-                add(Manifest.permission.POST_NOTIFICATIONS)
+        lifecycleScope.launch {
+            val usesNetwork = sessionRepository.state.first().usesLocalNetwork()
+            val missing = buildList {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !granted(Manifest.permission.POST_NOTIFICATIONS)) {
+                    add(Manifest.permission.POST_NOTIFICATIONS)
+                }
+                if (usesNetwork && LocalNetworkPermission.isRequiredAndMissing(this@MainActivity)) {
+                    add(LocalNetworkPermission.NAME)
+                }
             }
-            if (Build.VERSION.SDK_INT >= LocalNetworkPermission.MIN_SDK && !granted(LocalNetworkPermission.NAME)) {
-                add(LocalNetworkPermission.NAME)
-            }
+            if (missing.isNotEmpty()) requestPermissions.launch(missing.toTypedArray())
         }
-        if (missing.isNotEmpty()) requestPermissions.launch(missing.toTypedArray())
     }
 
     private fun granted(permission: String) =
@@ -79,4 +91,14 @@ object LocalNetworkPermission {
     fun isRequiredAndMissing(context: android.content.Context): Boolean =
         Build.VERSION.SDK_INT >= MIN_SDK &&
             ContextCompat.checkSelfPermission(context, NAME) != PackageManager.PERMISSION_GRANTED
+}
+
+/**
+ * 取得元がローカルネットワークを使うか（Jellyfin か SMB。#199 の決定 7）。ログアウト中は、前回の取得元が Jellyfin か SMB なら使う。
+ * 端末のフォルダと、まだ取得元を選んでいない人は使わない。
+ */
+internal fun SessionState.usesLocalNetwork(): Boolean = when (this) {
+    is SessionState.Ready -> source !is ConnectedSource.Device
+    is SessionState.NeedsLibrary -> true
+    is SessionState.SignedOut -> lastServerUrl != null || lastSmb != null
 }

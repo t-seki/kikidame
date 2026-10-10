@@ -4,6 +4,7 @@ import dev.tseki.kikidame.data.jellyfin.JellyfinSource
 import dev.tseki.kikidame.data.sharedfolder.ScannedFiles
 import dev.tseki.kikidame.data.sharedfolder.SharedFolderSource
 import dev.tseki.kikidame.data.sharedfolder.TagReader
+import dev.tseki.kikidame.data.smb.CloseableFolderTree
 import dev.tseki.kikidame.data.smb.FolderTreeFactory
 import dev.tseki.kikidame.data.source.DownloadStream
 import dev.tseki.kikidame.data.source.ScanListener
@@ -24,11 +25,11 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 今の接続（[SessionStore]）の取得元の種類に応じて、Jellyfin（[JellyfinSource]）か共有フォルダ（[SharedFolderSource]）に振り分ける
- * [SourceGateway]（ADR 0010、#198）。同期とダウンロードは、取得元の種類を知らずにこれを通る。呼ばれるたびに接続を読み直すので、
+ * 今の接続（[SessionStore]）の取得元の種類に応じて、Jellyfin（[JellyfinSource]）か共有フォルダ（[SharedFolderSource]。SMB と端末のフォルダ）に振り分ける
+ * [SourceGateway]（ADR 0010、#198・#199）。同期とダウンロードは、取得元の種類を知らずにこれを通る。呼ばれるたびに接続を読み直すので、
  * 取得元を変えた直後も古い取得元には触らない。
  *
- * 共有フォルダは、1 回の呼び出しごとに [FolderTreeFactory] で木を作って閉じる（全走査は 1 本の接続で行い、
+ * 共有フォルダ（SMB・端末のフォルダ）は、1 回の呼び出しごとに [FolderTreeFactory] で木を作って閉じる（全走査は 1 本の接続で行い、
  * ダウンロードは [DownloadStream.close] で閉じる）。接続の寿命を呼び出しの外に持ち出さない。
  * 接続していなければ（Jellyfin の接続も無ければ）[JellyfinSource] が [ServerException.Unauthorized] を投げる。
  */
@@ -54,8 +55,7 @@ class SessionSourceGateway @Inject constructor(
         withSource { it.fetchProgram(programId) }
 
     override suspend fun openDownload(episodeId: SourceItemId, rangeStart: Long): DownloadStream {
-        val smb = smbOrNull() ?: return jellyfin.openDownload(episodeId, rangeStart)
-        val tree = trees.open(smb.connection)
+        val tree = openTreeOrNull() ?: return jellyfin.openDownload(episodeId, rangeStart)
         try {
             val inner = SharedFolderSource(tree, tags, scanned, io).openDownload(episodeId, rangeStart)
             // inner は作り直す。body は新しい DownloadStream が閉じ、続けて木（接続）を閉じる
@@ -68,8 +68,7 @@ class SessionSourceGateway @Inject constructor(
     }
 
     private suspend fun <T> withSource(block: suspend (SourceGateway) -> T): T {
-        val smb = smbOrNull() ?: return block(jellyfin)
-        val tree = trees.open(smb.connection)
+        val tree = openTreeOrNull() ?: return block(jellyfin)
         try {
             return block(SharedFolderSource(tree, tags, scanned, io))
         } catch (e: Throwable) {
@@ -89,6 +88,11 @@ class SessionSourceGateway @Inject constructor(
         const val TAG = "SessionSourceGateway"
     }
 
-    private suspend fun smbOrNull(): ConnectedSource.Smb? =
-        (store.current() as? SessionState.Ready)?.source as? ConnectedSource.Smb
+    /** 今の取得元が共有フォルダ（SMB・端末のフォルダ）なら、その木を開く。Jellyfin か未接続なら null。 */
+    private suspend fun openTreeOrNull(): CloseableFolderTree? =
+        when (val source = (store.current() as? SessionState.Ready)?.source) {
+            is ConnectedSource.Smb -> trees.open(source.connection)
+            is ConnectedSource.Device -> trees.open(source.folder)
+            is ConnectedSource.Jellyfin, null -> null
+        }
 }

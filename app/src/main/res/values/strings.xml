@@ -61,6 +61,26 @@
     <string name="source_pick_jellyfin_description">Use a music library on a Jellyfin server</string>
     <string name="source_pick_smb">Shared folder on a NAS (SMB)</string>
     <string name="source_pick_smb_description">Read recordings straight from a shared folder. Folders are laid out as publisher / program / episode files</string>
+    <string name="source_pick_device">Folder on this device</string>
+    <string name="source_pick_device_description">Copy recordings from a folder in internal storage or on an SD card. Folders are laid out as publisher / program / episode files</string>
+
+    <!-- ===== device_folder: explain and pick a folder on this device (Storage Access Framework) ===== -->
+    <string name="device_folder_title">Folder on this device</string>
+    <string name="device_folder_description">Pick the folder that holds your recordings. Below it, folders are laid out as publisher / program / episode files, for example:</string>
+    <!-- Example layout. Keep the slashes; the folder and file names are only examples -->
+    <string name="device_folder_example">Radio/&lt;publisher&gt;/&lt;program&gt;/&lt;episode&gt;.m4a</string>
+    <string name="device_folder_pick_hint">In this example, pick Radio. Android does not let apps use the top of the internal storage or the Download folder itself, so make a folder below them and pick that.</string>
+    <string name="device_folder_copy_hint">Episodes are copied into the app before you listen, just like the other sources. Kikidame never changes or deletes files in the folder.</string>
+    <string name="device_folder_storage_hint">Each copied episode takes space twice on this device: the file in the folder and the copy in the app. Use the per-program sync and keep rules to limit how many episodes are copied.</string>
+    <string name="device_folder_keep_hint">Keep the files in the folder. If you delete a file from the folder, Kikidame treats that episode as gone from the source and deletes its copy too, even if it is pinned.</string>
+    <string name="device_folder_pick">Pick a folder</string>
+    <!-- First part of the path of a folder on this device, e.g. "Internal storage / Recordings / Radio" -->
+    <string name="device_folder_internal_storage">Internal storage</string>
+    <!-- Shown while signed out from a folder on this device (access was lost, or the user signed out). %1$s = where the folder is on this device, e.g. "Internal storage / Recordings / Radio" -->
+    <string name="device_folder_lost">Not connected to the folder “%1$s”. Pick the folder again</string>
+    <string name="device_folder_error_not_device">This is not a folder on this device. Pick a folder in internal storage or on an SD card</string>
+    <!-- Picking failed (no access, or the folder could not be read). The details go to logcat, not to the screen -->
+    <string name="device_folder_error_failed">Could not read the folder. Pick the folder again</string>
 
     <!-- ===== smb_connect: connect to an SMB shared folder ===== -->
     <string name="smb_connect_title">Connect to a shared folder</string>
@@ -290,6 +310,8 @@
     <string name="settings_source">Source</string>
     <string name="settings_source_jellyfin">Jellyfin</string>
     <string name="settings_source_smb">Shared folder (SMB)</string>
+    <string name="settings_source_device">Folder on this device</string>
+    <string name="settings_device_folder">Folder</string>
     <string name="settings_smb_host">Host</string>
     <string name="settings_smb_share">Share</string>
     <string name="settings_smb_path">Folder</string>
@@ -367,6 +389,8 @@
     </plurals>
     <string name="sync_not_on_wifi">Not on Wi-Fi, so nothing was updated</string>
     <string name="sync_error_session_expired">Authentication for the source has expired. Connect again</string>
+    <!-- The app lost access to the folder on this device (permission revoked, or the folder was moved or deleted) -->
+    <string name="sync_error_device_folder_lost">Kikidame can no longer read the folder. Pick the folder again</string>
     <string name="sync_error_unreachable">Cannot reach the source. Showing what is on the device</string>
     <!-- %1$s = server message -->
     <string name="sync_error_fetch_failed">Fetch failed: %1$s</string>

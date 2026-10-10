@@ -50,6 +50,7 @@ import dev.tseki.kikidame.domain.ConnectedSource
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.ui.SectionTitle
 import dev.tseki.kikidame.ui.ValueRow
+import dev.tseki.kikidame.ui.connect.displayPath
 import dev.tseki.kikidame.ui.resolve
 import dev.tseki.kikidame.ui.toDateTimeText
 import dev.tseki.kikidame.ui.toText
@@ -96,7 +97,8 @@ fun SettingsScreen(
             val jellyfin = connected as? ConnectedSource.Jellyfin
             val jellyfinSession = jellyfin?.session ?: (s as? SessionState.NeedsLibrary)?.session
             val smb = (connected as? ConnectedSource.Smb)?.connection
-            val isConnected = jellyfinSession != null || smb != null
+            val deviceFolder = (connected as? ConnectedSource.Device)?.folder
+            val isConnected = jellyfinSession != null || smb != null || deviceFolder != null
             // 値を見せる行はラベル上・値下（#58、各回の詳細と同じ向き）。操作の行は操作名が上で説明が下
             // 今の取得元（種類と場所）を出す（#198）。取得元は同時に 1 つ
             SectionTitle(stringResource(R.string.settings_section_source))
@@ -104,6 +106,7 @@ fun SettingsScreen(
                 stringResource(R.string.settings_source),
                 when {
                     smb != null -> stringResource(R.string.settings_source_smb)
+                    deviceFolder != null -> stringResource(R.string.settings_source_device)
                     jellyfinSession != null -> stringResource(R.string.settings_source_jellyfin)
                     else -> stringResource(R.string.settings_not_connected)
                 },
@@ -113,6 +116,9 @@ fun SettingsScreen(
                 ValueRow(stringResource(R.string.settings_smb_share), smb.share)
                 ValueRow(stringResource(R.string.settings_smb_path), smb.path.ifEmpty { stringResource(R.string.settings_smb_path_root) })
                 ValueRow(stringResource(R.string.settings_user), if (smb.guest) stringResource(R.string.settings_smb_guest) else smb.userName)
+            } else if (deviceFolder != null) {
+                // 端末のフォルダ（#199）は端末の中のパス（ツリーの URI は利用者に読めない形なので出さない）
+                ValueRow(stringResource(R.string.settings_device_folder), deviceFolder.displayPath().resolve())
             } else if (jellyfinSession != null) {
                 ValueRow("URL", jellyfinSession.serverUrl)
                 ValueRow(stringResource(R.string.settings_user), jellyfinSession.userName)

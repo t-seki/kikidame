@@ -1,5 +1,6 @@
 package dev.tseki.kikidame.data.repository
 
+import dev.tseki.kikidame.data.sharedfolder.MemoryDeviceDocuments
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tseki.kikidame.data.jellyfin.JellyfinSource
@@ -46,7 +47,7 @@ class RoomSyncTest : RoomTestBase() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val gateway = FakeJellyfinGateway()
     private val store by lazy { testSessionStore(tmp.root, scope) }
-    private val session by lazy { DataStoreSessionRepository(store, gateway, FakeFolderTreeFactory()) }
+    private val session by lazy { DataStoreSessionRepository(store, gateway, FakeFolderTreeFactory(), MemoryDeviceDocuments()) }
     private val library by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao(), db.localFileDao()) }
     private val playback by lazy { RoomPlaybackStateRepository(db, clock) }
     private val directory by lazy { EpisodesDirectory(ApplicationProvider.getApplicationContext()) }

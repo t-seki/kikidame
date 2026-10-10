@@ -39,6 +39,22 @@
     <string name="source_pick_jellyfin_description">Jellyfin サーバの音楽ライブラリを使う</string>
     <string name="source_pick_smb">NAS の共有フォルダ（SMB）</string>
     <string name="source_pick_smb_description">共有フォルダの録音を直接読む。フォルダは 配信元 / 番組 / 各回のファイル の構成</string>
+    <string name="source_pick_device">端末のフォルダ</string>
+    <string name="source_pick_device_description">内部ストレージか SD カードのフォルダの録音をコピーして聴く。フォルダは 配信元 / 番組 / 各回のファイル の構成</string>
+
+    <!-- device_folder -->
+    <string name="device_folder_title">端末のフォルダ</string>
+    <string name="device_folder_description">録音を置いたフォルダを選びます。その下は 配信元 / 番組 / 各回のファイル の構成にします。例:</string>
+    <string name="device_folder_example">Radio/&lt;配信元&gt;/&lt;番組&gt;/&lt;回&gt;.m4a</string>
+    <string name="device_folder_pick_hint">この例では Radio を選びます。内部ストレージの直下や Download そのものは Android の決まりで選べないので、その下にフォルダを作って選んでください。</string>
+    <string name="device_folder_copy_hint">ほかの取得元と同じく、各回はアプリの中にコピーしてから聴きます。フォルダの中のファイルを変えたり消したりはしません。</string>
+    <string name="device_folder_storage_hint">コピーした回は、フォルダのファイルとアプリの中のコピーとで、端末の容量を二重に使います。番組ごとの同期対象と保持ルールで、コピーする数を絞れます。</string>
+    <string name="device_folder_keep_hint">フォルダのファイルは消さずに置いておいてください。フォルダからファイルを消すと、その回は取得元から消えたものとして扱われ、手元のコピーも消えます（固定していても消えます）。</string>
+    <string name="device_folder_pick">フォルダを選ぶ</string>
+    <string name="device_folder_internal_storage">内部ストレージ</string>
+    <string name="device_folder_lost">フォルダ「%1$s」につながっていません。フォルダを選び直してください</string>
+    <string name="device_folder_error_not_device">端末のフォルダではありません。内部ストレージか SD カードのフォルダを選び直してください</string>
+    <string name="device_folder_error_failed">フォルダを読めませんでした。フォルダを選び直してください</string>
 
     <!-- smb_connect -->
     <string name="smb_connect_title">共有フォルダに接続</string>
@@ -214,6 +230,8 @@
     <string name="settings_source">種類</string>
     <string name="settings_source_jellyfin">Jellyfin</string>
     <string name="settings_source_smb">共有フォルダ（SMB）</string>
+    <string name="settings_source_device">端末のフォルダ</string>
+    <string name="settings_device_folder">フォルダ</string>
     <string name="settings_smb_host">ホスト</string>
     <string name="settings_smb_share">共有名</string>
     <string name="settings_smb_path">フォルダ</string>
@@ -279,6 +297,7 @@
     </plurals>
     <string name="sync_not_on_wifi">Wi-Fi に接続していないため更新しません</string>
     <string name="sync_error_session_expired">取得元の認証が切れました。もう一度接続してください</string>
+    <string name="sync_error_device_folder_lost">フォルダを読めなくなりました。フォルダを選び直してください</string>
     <string name="sync_error_unreachable">取得元に接続できません。手元の一覧を表示しています</string>
     <string name="sync_error_fetch_failed">取得に失敗しました: %1$s</string>
     <string name="sync_error_import_failed">取り込みに失敗しました: %1$s</string>

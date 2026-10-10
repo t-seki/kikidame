@@ -12,6 +12,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.tseki.kikidame.domain.AppSettingsRepository
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
+import dev.tseki.kikidame.domain.isDeviceFolder
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -25,7 +26,8 @@ import kotlin.time.toJavaDuration
  * 同期の起点を WorkManager に登録する。
  * - 定期: 6 時間ごと。起動のたびに `UPDATE` で登録し直し、「Wi-Fi のみ」の変更を拾う
  * - 起動時: 前回同期（または前回の試み。失敗を含む）から 1 時間以上なら一度だけ（`KEEP`）。制約を満たすまで待つ
- * 制約は `DownloadWorker` と同じ（Wi-Fi のみなら UNMETERED、そうでなければ CONNECTED）。充電中は課さない。
+ * 制約は `DownloadWorker` と同じ（Wi-Fi のみなら UNMETERED、そうでなければ CONNECTED。取得元が端末のフォルダならネットワークの条件をかけない
+ * （NOT_REQUIRED）。[requiredNetworkType]）。充電中は課さない。取得元によって制約が変わるので、取得元を接続したら [reschedule] で組み直す（#199）。
  */
 @Singleton
 class SyncScheduler @Inject constructor(
@@ -49,7 +51,7 @@ class SyncScheduler @Inject constructor(
         workManager.enqueueUniquePeriodicWork(SyncWorker.PERIODIC_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
     }
 
-    /** 「Wi-Fi のみ」を変えたら制約を組み直す。 */
+    /** 「Wi-Fi のみ」を変えたとき、取得元を接続したとき（#199）に制約を組み直す。 */
     suspend fun reschedule() = schedulePeriodic()
     /** 「取得元を変える」（#50）の前に、定期同期と起動時同期を止めて完了を待つ（消している最中に行を作り直さない）。 */
     suspend fun cancelAll() {
@@ -67,14 +69,28 @@ class SyncScheduler @Inject constructor(
         workManager.enqueueUniqueWork(SyncWorker.ONCE_NAME, ExistingWorkPolicy.KEEP, request)
     }
 
-    private suspend fun constraints(): Constraints {
-        val wifiOnly = settings.wifiOnly.first()
-        return Constraints.Builder()
-            .setRequiredNetworkType(if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
+    private suspend fun constraints(): Constraints =
+        Constraints.Builder()
+            .setRequiredNetworkType(requiredNetworkType(settings.wifiOnly.first(), sessionRepository.state.first()))
             .build()
-    }
 
     companion object {
+        /**
+         * 「Wi-Fi のみ」が効くか（#199 の決定 4）。取得元が端末のフォルダなら、端末の中から端末の中へのコピーなので効かせない。
+         * Jellyfin と SMB は設定どおり。手動の同期の従量制での中止（`LibraryRefresher`）がこれで決める。
+         */
+        fun wifiOnlyApplies(wifiOnly: Boolean, state: SessionState): Boolean = wifiOnly && !state.isDeviceFolder
+
+        /**
+         * 同期とダウンロードの Worker のネットワークの制約。取得元が端末のフォルダなら NOT_REQUIRED（ネットワークの条件をかけない。
+         * #199 の「決定の追記」）。Jellyfin と SMB は「Wi-Fi のみ」なら UNMETERED、そうでなければ CONNECTED。
+         */
+        fun requiredNetworkType(wifiOnly: Boolean, state: SessionState): NetworkType = when {
+            state.isDeviceFolder -> NetworkType.NOT_REQUIRED
+            wifiOnly -> NetworkType.UNMETERED
+            else -> NetworkType.CONNECTED
+        }
+
         val PERIOD: Duration = 6.hours
         val STALE_AFTER: Duration = 1.hours
 

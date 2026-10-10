@@ -30,8 +30,14 @@ import dev.tseki.kikidame.data.sharedfolder.RetrieverTagReader
 import dev.tseki.kikidame.data.sharedfolder.RoomScannedFiles
 import dev.tseki.kikidame.data.sharedfolder.ScannedFiles
 import dev.tseki.kikidame.data.sharedfolder.TagReader
+import dev.tseki.kikidame.data.sharedfolder.ContentResolverDeviceDocuments
+import dev.tseki.kikidame.data.sharedfolder.DeviceDocuments
+import dev.tseki.kikidame.data.sharedfolder.DeviceFolderTree
+import dev.tseki.kikidame.data.smb.CloseableFolderTree
 import dev.tseki.kikidame.data.smb.FolderTreeFactory
 import dev.tseki.kikidame.data.smb.SmbFolderTree
+import dev.tseki.kikidame.domain.DeviceFolder
+import dev.tseki.kikidame.domain.SmbConnection
 import dev.tseki.kikidame.data.settings.DataStoreAppSettings
 import dev.tseki.kikidame.data.session.SessionStore
 import dev.tseki.kikidame.data.session.TokenCipher
@@ -67,7 +73,17 @@ object DatabaseModule {
 
     @Provides
     @Singleton
-    fun provideFolderTreeFactory(): FolderTreeFactory = FolderTreeFactory { SmbFolderTree(it) }
+    fun provideDeviceDocuments(@ApplicationContext context: Context): DeviceDocuments =
+        ContentResolverDeviceDocuments(context.contentResolver)
+
+    /** 共有フォルダの木。SMB（#198）か端末のフォルダ（SAF、#199）。 */
+    @Provides
+    @Singleton
+    fun provideFolderTreeFactory(documents: DeviceDocuments): FolderTreeFactory = object : FolderTreeFactory {
+        override fun open(connection: SmbConnection): CloseableFolderTree = SmbFolderTree(connection)
+
+        override fun open(folder: DeviceFolder): CloseableFolderTree = DeviceFolderTree(documents, folder.treeUri)
+    }
 
     @Provides
     @Singleton

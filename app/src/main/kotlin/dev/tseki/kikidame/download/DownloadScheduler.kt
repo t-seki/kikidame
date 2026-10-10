@@ -11,6 +11,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.tseki.kikidame.domain.AppSettingsRepository
 import dev.tseki.kikidame.domain.DownloadRepository
 import dev.tseki.kikidame.domain.EpisodeId
+import dev.tseki.kikidame.domain.SessionRepository
+import dev.tseki.kikidame.sync.SyncScheduler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -30,6 +32,7 @@ class DownloadScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
     private val downloads: DownloadRepository,
     private val settings: AppSettingsRepository,
+    private val sessionRepository: SessionRepository,
 ) : DownloadKicker {
     private val workManager get() = WorkManager.getInstance(context)
 
@@ -45,11 +48,13 @@ class DownloadScheduler @Inject constructor(
 
     suspend fun cancel(episodeId: EpisodeId) = downloads.cancel(episodeId)
 
-    /** PENDING が残っていれば Worker を起動する（アプリ起動時・設定変更時・同期の後にも呼ぶ）。 */
+    /**
+     * PENDING が残っていれば Worker を起動する（アプリ起動時・設定変更時・同期の後にも呼ぶ）。
+     * 取得元が端末のフォルダならネットワークの条件をかけない（#199 の決定 4 と「決定の追記」。[SyncScheduler.requiredNetworkType]）。
+     */
     override suspend fun kick() {
-        val wifiOnly = settings.wifiOnly.first()
         val constraints = Constraints.Builder()
-            .setRequiredNetworkType(if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
+            .setRequiredNetworkType(SyncScheduler.requiredNetworkType(settings.wifiOnly.first(), sessionRepository.state.first()))
             .build()
         val request = OneTimeWorkRequestBuilder<DownloadWorker>().setConstraints(constraints).build()
         workManager.enqueueUniqueWork(DownloadWorker.UNIQUE_NAME, ExistingWorkPolicy.KEEP, request)

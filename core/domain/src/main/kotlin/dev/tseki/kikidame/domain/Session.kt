@@ -5,18 +5,19 @@ import kotlin.time.Instant
 
 /**
  * 取得元（CONTEXT.md）に対する現在の接続状態。取得元は同時に 1 つ（epic #195 の決定 2）。
- * Jellyfin は 1 サーバ・1 ユーザー・1 ライブラリ、共有フォルダ（SMB）は 1 つの共有。
+ * Jellyfin は 1 サーバ・1 ユーザー・1 ライブラリ、共有フォルダ（SMB）は 1 つの共有、端末のフォルダ（SAF、#199）は 1 つのフォルダ。
  */
 sealed interface SessionState {
     /**
      * 一度も接続していない、またはログアウト済み。手元のデータは残っている。
-     * 直前に使っていた取得元の入力補助として、Jellyfin なら [lastServerUrl]・[lastUserName]、SMB なら [lastSmb]（パスワードは空）を持つ。
-     * どちらも無ければ初回（取得元の選択画面から始める）。
+     * 直前に使っていた取得元の入力補助として、Jellyfin なら [lastServerUrl]・[lastUserName]、SMB なら [lastSmb]（パスワードは空）、
+     * 端末のフォルダなら [lastDeviceFolder]（アクセスが切れたフォルダ。#199）を持つ。どれも無ければ初回（取得元の選択画面から始める）。
      */
     data class SignedOut(
         val lastServerUrl: String?,
         val lastUserName: String?,
         val lastSmb: SmbConnection? = null,
+        val lastDeviceFolder: DeviceFolder? = null,
     ) : SessionState
 
     /** Jellyfin にログイン済みだがライブラリ未選択。 */
@@ -40,7 +41,76 @@ sealed interface ConnectedSource {
 
     /** NAS の共有フォルダ（SMB）。 */
     data class Smb(val connection: SmbConnection) : ConnectedSource
+
+    /** 端末のフォルダ（SAF、#199）。 */
+    data class Device(val folder: DeviceFolder) : ConnectedSource
 }
+
+/** 取得元が端末のフォルダか（接続済み、またはアクセスが切れてログアウトした状態。#199）。「Wi-Fi のみ」とローカルネットワークの権限の分岐に使う。 */
+val SessionState.isDeviceFolder: Boolean
+    get() = when (this) {
+        is SessionState.Ready -> source is ConnectedSource.Device
+        is SessionState.SignedOut -> lastDeviceFolder != null
+        is SessionState.NeedsLibrary -> false
+    }
+
+/**
+ * 端末のフォルダ（#199）。[treeUri] は `ACTION_OPEN_DOCUMENT_TREE` で選んだツリーの URI（文字列）、[name] は表示用のフォルダ名。
+ * 端末のストレージ（内部ストレージと SD カード）のフォルダだけを受け付ける（[isDeviceStorage]）。
+ */
+data class DeviceFolder(val treeUri: String, val name: String) {
+    /**
+     * 端末の中の場所（画面に出すパスの元。PR #214 のマージ前の検証で、人の判断で足した）。ツリーの文書 ID
+     * （`DocumentsContract.getTreeDocumentId` の値。URI の `/tree/` の後ろを百分率の符号から戻したもの）を `<ボリューム>:<パス>` として読む。
+     * 例: `primary:KikidameTest/Radio` → ボリューム `primary`、パス `KikidameTest`・`Radio`。
+     *
+     * この形は `ExternalStorageProvider`（受け付ける唯一の provider。[isDeviceStorage]）の実装の決まりで、`DocumentsContract` の
+     * 公開の契約ではない（文書 ID は provider ごとに不透明とされている）。この形を前提にするのは未確認の前提で、形が崩れていたら null を返し、
+     * 呼び出し側は保存済みの表示名（[name]）に戻す。保存（DataStore の `device_*`）は変えず、表示のたびに URI から作る。
+     */
+    val location: DeviceFolderLocation?
+        get() {
+            val raw = runCatching { java.net.URI(treeUri).rawPath }.getOrNull() ?: return null
+            val encoded = raw.removePrefix("/tree/").takeIf { it != raw && it.isNotEmpty() && '/' !in it } ?: return null
+            // URLDecoder は「+」を空白にするので、先に「+」そのものに戻るよう符号にしておく
+            val documentId = runCatching { java.net.URLDecoder.decode(encoded.replace("+", "%2B"), "UTF-8") }.getOrNull() ?: return null
+            val volume = documentId.substringBefore(':', missingDelimiterValue = "")
+            if (volume.isEmpty() || volume.contains('/')) return null
+            val segments = documentId.substringAfter(':').split('/').filter { it.isNotEmpty() }
+            return DeviceFolderLocation(volume, segments)
+        }
+
+    companion object {
+        /** 内部ストレージと SD カードの文書の provider（`ExternalStorageProvider`）の authority。 */
+        const val EXTERNAL_STORAGE_AUTHORITY: String = "com.android.externalstorage.documents"
+
+        /**
+         * 選んだツリーが端末のストレージのものか（#199 の決定 3）。authority が [EXTERNAL_STORAGE_AUTHORITY] の `content:` の URI だけ。
+         * ほかの provider（Google ドライブ、SAF 経由の SMB など）は受け付けない。
+         */
+        fun isDeviceStorage(treeUri: String): Boolean {
+            val uri = runCatching { java.net.URI(treeUri) }.getOrNull() ?: return false
+            return uri.scheme == "content" && uri.authority == EXTERNAL_STORAGE_AUTHORITY
+        }
+    }
+}
+
+/**
+ * 端末のフォルダの、端末の中の場所（[DeviceFolder.location]）。[volume] は `ExternalStorageProvider` のボリュームの ID で、
+ * 内部ストレージは [PRIMARY_VOLUME]、それ以外（SD カードなど）はボリュームの UUID の形（例 `1234-5678`。実機では未確認）。
+ * [segments] はボリュームの根からのフォルダ名（ボリュームの根そのものなら空）。
+ */
+data class DeviceFolderLocation(val volume: String, val segments: List<String>) {
+    val isPrimary: Boolean get() = volume == PRIMARY_VOLUME
+
+    companion object {
+        /** 内部ストレージのボリュームの ID（`ExternalStorageProvider` の実装の決まり。公開の契約ではない）。 */
+        const val PRIMARY_VOLUME: String = "primary"
+    }
+}
+
+/** 端末のストレージ以外の provider のフォルダを選んだ（#199 の決定 3）。端末のストレージのフォルダを選び直させる。 */
+class UnsupportedFolderException(treeUri: String) : IllegalArgumentException("not a folder on the device storage: $treeUri")
 
 data class Session(
     val serverUrl: String,
@@ -77,10 +147,13 @@ data class LibraryView(
 
 /** 取得元とのやり取りの失敗。UI はこれで文言を決める。 */
 sealed class ServerException(message: String, cause: Throwable? = null) : Exception(message, cause) {
-    /** 認証情報が無効（Jellyfin の 401/403、SMB の認証の失敗）。接続をやり直させる。 */
+    /**
+     * 認証情報が無効（Jellyfin の 401/403、SMB の認証の失敗）、または端末のフォルダの永続権限が無い・取り消された、選んだフォルダ（根）が
+     * 無いと分かった（#199 の決定 5）。接続をやり直させる（ログアウトし、端末のフォルダは選び直させる）。
+     */
     class Unauthorized(cause: Throwable? = null) : ServerException("unauthorized", cause)
 
-    /** 到達できない（DNS・接続・タイムアウト）。 */
+    /** 到達できない（DNS・接続・タイムアウト。共有フォルダの読み取りがやり直しても失敗したときも。端末のフォルダの一時的な失敗を含む）。 */
     class Unreachable(cause: Throwable? = null) : ServerException("unreachable", cause)
 
     /** それ以外（5xx、想定外のレスポンス）。 */
@@ -100,11 +173,19 @@ interface SessionRepository {
      */
     suspend fun connectSharedFolder(connection: SmbConnection)
 
+    /**
+     * 端末のフォルダ（[treeUri] は `ACTION_OPEN_DOCUMENT_TREE` の結果）を取得元にする（#199）。端末のストレージのフォルダでなければ
+     * [UnsupportedFolderException]。永続的な読み取りの権限を取り、フォルダの直下が読めるかを確かめてから保存する。読めなければ
+     * [ServerException] を投げ、取った権限を手放す。保存すると [SessionState.Ready] になり、ほかの取得元の接続は消える。
+     * 読めたら、保存の前に、そのフォルダ以外に持っている永続権限を手放す（保存を最後にする。保存すると画面が離れるため）。
+     */
+    suspend fun connectDeviceFolder(treeUri: String)
+
     suspend fun listLibraries(): List<LibraryView>
 
     suspend fun selectLibrary(library: LibraryView)
 
-    /** 認証情報だけを消す（Jellyfin のトークン、SMB のパスワード）。手元のデータは残す。 */
+    /** 認証情報だけを消す（Jellyfin のトークン、SMB のパスワード。端末のフォルダはログアウトの印を立てる）。手元のデータは残す。 */
     suspend fun signOut()
 }
 
