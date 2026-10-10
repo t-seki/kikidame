@@ -606,7 +606,7 @@ SMB の取得元（epic #195 の C、#198）は、worker の環境に NAS も実
 
 ## 実機で試す（#199: 端末のフォルダ）
 
-端末のフォルダの取得元（epic #195 の D、#199）は、worker の環境に実機が無いため、**実機では何も確かめていない**。単体テストと CI が見ているのは、受け付けるツリーの URI の判定、SAF 版の木（`DeviceFolderTree`）のパスの解決と null・例外の使い分け（文書はメモリ上の `MemoryDeviceDocuments`）、セッションの型と DataStore の読み書き、取得元の振り分け、「Wi-Fi のみ」の分岐まで。`ContentResolver` と `DocumentsContract` を通す部分（`ContentResolverDeviceDocuments`）は単体テストしていない。マージ前の検証で、Supervisor と人が debug 版の実機で次を確かめる。
+端末のフォルダの取得元（epic #195 の D、#199）は、worker の環境に実機が無いため、worker は実機では何も確かめていない。PR #214 のマージ前の検証（2026-10-11、Android 17 の実機、内部ストレージ）で人が確かめた結果は、下のチェックリストの [x] にある（SD カード、ファイルの多いフォルダ、`Download` の下のフォルダは [ ] のまま未確認）。単体テストと CI が見ているのは、受け付けるツリーの URI の判定、SAF 版の木（`DeviceFolderTree`）のパスの解決と null・例外の使い分け（文書はメモリ上の `MemoryDeviceDocuments`）、セッションの型と DataStore の読み書き、取得元の振り分け、「Wi-Fi のみ」の分岐まで。`ContentResolver` と `DocumentsContract` を通す部分（`ContentResolverDeviceDocuments`）は単体テストしていない。マージ前の検証で、Supervisor と人が debug 版の実機で次を確かめる。
 
 ### 準備
 
