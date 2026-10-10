@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 試作 #204（マージしない）。Bluetooth の接続から始めた再生が Android 17 で鳴るかを確かめる debug 専用の宣言。 -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE" />
+    <uses-permission android:name="android.permission.REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND" />
+    <application>
+        <!-- 経路 1: ブロードキャスト -->
+        <receiver
+            android:name="dev.tseki.kikidame.proto.A2dpConnectedReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+        <!-- 経路 2: コンパニオンデバイス -->
+        <service
+            android:name="dev.tseki.kikidame.proto.ProtoCompanionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_COMPANION_DEVICE_SERVICE">
+            <intent-filter>
+                <action android:name="android.companion.CompanionDeviceService" />
+            </intent-filter>
+        </service>
+        <!-- 経路の切り替えと、存在監視の開始（adb の am broadcast から使う） -->
+        <receiver
+            android:name="dev.tseki.kikidame.proto.ProtoControlReceiver"
+            android:exported="true" />
+    </application>
+</manifest>
