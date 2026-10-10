@@ -12,6 +12,8 @@ object Proto {
     const val TAG = "Proto204"
     const val ROUTE_OFF = "off"
     const val ROUTE_BROADCAST = "broadcast"
+    /** ブロードキャストで受けて、再生はせず準備だけする（経路 1 の別モード） */
+    const val ROUTE_PREPARE = "prepare"
     const val ROUTE_COMPANION = "companion"
 
     private const val PREFS = "proto204"
