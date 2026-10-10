@@ -12,6 +12,7 @@ import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.download.DownloadScheduler
 import dev.tseki.kikidame.ui.source.SourceChanger
+import dev.tseki.kikidame.sync.LibraryRefresher
 import dev.tseki.kikidame.sync.SyncScheduler
 import dev.tseki.kikidame.ui.UiText
 import kotlinx.coroutines.CancellationException
@@ -29,6 +30,7 @@ class SettingsViewModel @Inject constructor(
     private val scheduler: DownloadScheduler,
     private val syncScheduler: SyncScheduler,
     private val sourceChanger: SourceChanger,
+    private val refresher: LibraryRefresher,
     library: LibraryRepository,
 ) : ViewModel() {
     /** 手元のファイルの合計（#42）。null は読み込み前。 */
@@ -73,7 +75,11 @@ class SettingsViewModel @Inject constructor(
 
     /** 認証情報だけ消す。手元の番組・各回・再生位置は残る。 */
     fun signOut() {
-        viewModelScope.launch { sessionRepository.signOut() }
+        viewModelScope.launch {
+            // 走っている同期を止めてから認証情報を消す（途中で認証が消えた走査の結果が残らないように）
+            refresher.cancelAndAwait()
+            sessionRepository.signOut()
+        }
     }
 
     /**

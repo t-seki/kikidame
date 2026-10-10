@@ -18,6 +18,8 @@ import dev.tseki.kikidame.ui.UiText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -113,6 +115,9 @@ class LibraryRefresher @Inject constructor(
         /** 合流した呼び出しが待つ、この実行の結果。 */
         val result = CompletableDeferred<RefreshResult?>()
 
+        /** この実行を走らせている呼び出し側のコルーチンの Job。[cancelAndAwait] が取り消す。 */
+        var job: Job? = null
+
         /** 途中の文言（手元の整合）。silent なら捨てる。 */
         fun say(message: UiText) {
             synchronized(lock) {
@@ -130,6 +135,17 @@ class LibraryRefresher @Inject constructor(
                 if (silent && !evenIfSilent) unreported = message else _messages.tryEmit(message)
             }
         }
+    }
+
+    /**
+     * 走っている実行（定期・手動・初回のどれでも）を取り消し、終わるのを待つ。「取得元を変える」とログアウトの前に呼ぶ
+     * （取得元を変えた後に古い取得元の走査が走り続けたり、結果が新しい取得元の DB に書かれたり、「同時に 1 つ」で新しい取得元の同期が
+     * 捨てられたりしないように。#198）。実行が無ければ何もしない。走査はフォルダごと・ファイルごとに取り消しを見るので、待ちは短い。
+     */
+    suspend fun cancelAndAwait() {
+        val run = synchronized(lock) { running } ?: return
+        run.job?.cancel(CancellationException("source changed"))
+        run.result.await()
     }
 
     /**
@@ -163,6 +179,7 @@ class LibraryRefresher @Inject constructor(
         if (run == null) return null
         var result: RefreshResult? = null
         try {
+            run.job = currentCoroutineContext()[Job]
             result = run.execute(block)
             return result
         } finally {

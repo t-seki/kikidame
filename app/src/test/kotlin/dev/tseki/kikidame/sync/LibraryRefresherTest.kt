@@ -593,6 +593,36 @@ class LibraryRefresherTest {
         assertEquals(1, repo.calls)
         assertFalse(refresher.isRefreshing.value)
     }
+
+    /**
+     * 「取得元を変える」とログアウトの前に、走っている同期を取り消して終わるのを待つ（#198）。
+     * 古い取得元の実行が残って、新しい取得元の同期が「同時に 1 つ」で捨てられない。
+     */
+    @Test
+    fun cancelAndAwaitStopsTheRunningRefreshAndLetsANewOneRun() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply {
+            result = RefreshResult(3, 40, 1, 6, now)
+            gate = CompletableDeferred()
+        }
+        val refresher = refresher(repo)
+
+        val first = async { refresher.refresh() }
+        runCurrent()
+        assertTrue(refresher.isRefreshing.value)
+        assertNull(refresher.refresh(), "a second refresh does not run alongside the first")
+
+        refresher.cancelAndAwait()
+
+        assertTrue(first.isCancelled)
+        assertFalse(refresher.isRefreshing.value)
+        repo.gate = null
+        assertEquals(3, refresher.refresh()?.programs, "a refresh right after the change is not dropped")
+    }
+
+    @Test
+    fun cancelAndAwaitWithoutARunningRefreshDoesNothing() = runTest(StandardTestDispatcher()) {
+        refresher(FakeRefreshRepository()).cancelAndAwait()
+    }
 }
 
 /** 「最新の状態です」だけの文言。 */

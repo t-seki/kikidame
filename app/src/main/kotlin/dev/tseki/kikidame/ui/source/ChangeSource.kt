@@ -17,6 +17,7 @@ import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.LocalDataReset
 import dev.tseki.kikidame.download.DownloadScheduler
 import dev.tseki.kikidame.playback.PlayerConnection
+import dev.tseki.kikidame.sync.LibraryRefresher
 import dev.tseki.kikidame.sync.SyncScheduler
 import javax.inject.Inject
 
@@ -29,6 +30,7 @@ class SourceChanger @Inject constructor(
     private val connection: PlayerConnection,
     private val scheduler: DownloadScheduler,
     private val syncScheduler: SyncScheduler,
+    private val refresher: LibraryRefresher,
     private val reset: LocalDataReset,
 ) {
     suspend fun changeSource() {
@@ -36,6 +38,8 @@ class SourceChanger @Inject constructor(
             .onFailure { Log.w("SourceChanger", "stop playback before reset failed", it) }
         scheduler.cancelAll()
         syncScheduler.cancelAll()
+        // Worker の取り消しは、走っている走査（ブロッキングの I/O）や初回の走査（アプリのスコープ）を止めない。終わるのを待ってから消す
+        refresher.cancelAndAwait()
         reset.resetAll()
     }
 }
