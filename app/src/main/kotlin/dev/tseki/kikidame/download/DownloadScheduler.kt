@@ -68,7 +68,7 @@ class DownloadScheduler @Inject constructor(
     }
 
     /**
-     * 「別のサーバに接続」（#50）の前に、キューの Worker を止めて完了を待つ。実行中の転送も切る
+     * 「取得元を変える」（#50）の前に、キューの Worker を止めて完了を待つ。実行中の転送も切る
      * （行とファイルをこれから消すので、続けても `.part` が残るか、古い取得元へ無駄に取りに行くだけ）。
      */
     suspend fun cancelAll() {

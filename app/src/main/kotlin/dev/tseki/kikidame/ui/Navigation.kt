@@ -19,6 +19,8 @@ import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.download.DownloadScheduler
 import dev.tseki.kikidame.ui.connect.ConnectScreen
+import dev.tseki.kikidame.ui.connect.SmbConnectScreen
+import dev.tseki.kikidame.ui.source.SourcePickScreen
 import dev.tseki.kikidame.ui.episodes.EpisodeDetailsScreen
 import dev.tseki.kikidame.ui.episodes.EpisodeListScreen
 import dev.tseki.kikidame.ui.library.LibraryPickScreen
@@ -33,8 +35,17 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import javax.inject.Inject
 
+/** 初回の取得元の選択（#198）。 */
+@Serializable
+object SourcePickRoute
+
+/** Jellyfin への接続。 */
 @Serializable
 object ConnectRoute
+
+/** NAS の共有フォルダ（SMB）への接続（#198）。 */
+@Serializable
+object SmbConnectRoute
 
 @Serializable
 object LibraryPickRoute
@@ -71,7 +82,7 @@ class SessionViewModel @Inject constructor(
 }
 
 /**
- * 番組の画面（根。「続きから・よく聴く・番組一覧」のタブ、#151）→ 各回一覧 → 再生画面 の 3 階層に、接続画面・ライブラリ選択・設定・各回の詳細を足したもの。
+ * 番組の画面（根。「続きから・よく聴く・番組一覧」のタブ、#151）→ 各回一覧 → 再生画面 の 3 階層に、取得元の選択（#198）・Jellyfin の接続画面・SMB の接続画面（#198）・ライブラリ選択・設定・各回の詳細を足したもの。
  * 「続きから」タブの行からは、各回一覧を経ずに再生画面と各回の詳細へ直接行く。
  * 起動時はセッション状態で開始画面を決め、その後は状態の**変化**（ログアウト・401・ライブラリ選択）で遷移する。
  * デバッグ用に接続画面から番組一覧へ抜けても、状態が変わらない限り戻されない。
@@ -88,8 +99,23 @@ fun KikidameNavHost(sessionViewModel: SessionViewModel = hiltViewModel()) {
     }
 
     NavHost(navController = navController, startDestination = startDestination) {
+        composable<SourcePickRoute> {
+            SourcePickScreen(
+                onPickJellyfin = { navController.navigate(ConnectRoute) },
+                onPickSmb = { navController.navigate(SmbConnectRoute) },
+            )
+        }
         composable<ConnectRoute> {
-            ConnectScreen()
+            ConnectScreen(
+                onBack = if (navController.previousBackStackEntry != null) navController::popIfNotRoot else null,
+                onSourceChanged = { navController.navigate(SourcePickRoute) { popUpTo(0) } },
+            )
+        }
+        composable<SmbConnectRoute> {
+            SmbConnectScreen(
+                onBack = if (navController.previousBackStackEntry != null) navController::popIfNotRoot else null,
+                onSourceChanged = { navController.navigate(SourcePickRoute) { popUpTo(0) } },
+            )
         }
         composable<LibraryPickRoute> {
             val fromSettings = navController.previousBackStackEntry != null
@@ -146,18 +172,32 @@ private fun NavHostController.popIfNotRoot() {
 }
 
 private fun SessionState.startDestination(): Any = when (this) {
-    is SessionState.SignedOut -> ConnectRoute
+    is SessionState.SignedOut -> signedOutDestination()
     is SessionState.NeedsLibrary -> LibraryPickRoute
     is SessionState.Ready -> ProgramListRoute
 }
 
+/** ログアウト中の行き先: 直前に使っていた取得元の接続画面。一度も接続していなければ取得元の選択。 */
+private fun SessionState.SignedOut.signedOutDestination(): Any = when {
+    lastSmb != null -> SmbConnectRoute
+    lastServerUrl != null -> ConnectRoute
+    else -> SourcePickRoute
+}
+
+/** 取得元を選んで接続する画面（まだ番組一覧に入っていない）。 */
+private val SIGN_IN_ROUTES = listOf("SourcePickRoute", "ConnectRoute", "SmbConnectRoute")
+
 /** セッション状態が変わったときだけ呼ぶ。今いる画面と食い違う場合にスタックを作り直す。 */
 private fun NavHostController.followSessionChange(state: SessionState) {
     val current = currentBackStackEntry?.destination?.route ?: return
-    val onAuthScreen = current.endsWith("ConnectRoute") || current.endsWith("LibraryPickRoute")
+    // route は完全修飾名なので末尾で比べる（"SmbConnectRoute" は "ConnectRoute" で終わらないが、念のため完全一致にする）
+    val name = current.substringAfterLast('.')
+    val onSignInScreen = name in SIGN_IN_ROUTES
     when (state) {
-        is SessionState.SignedOut -> if (!current.endsWith("ConnectRoute")) navigate(ConnectRoute) { popUpTo(0) }
-        is SessionState.NeedsLibrary -> if (!current.endsWith("LibraryPickRoute")) navigate(LibraryPickRoute) { popUpTo(0) }
-        is SessionState.Ready -> if (onAuthScreen && previousBackStackEntry == null) navigate(ProgramListRoute) { popUpTo(0) }
+        // 取得元を選んでいる途中の画面にいる間は動かさない
+        is SessionState.SignedOut -> if (!onSignInScreen) navigate(state.signedOutDestination()) { popUpTo(0) }
+        is SessionState.NeedsLibrary -> if (name != "LibraryPickRoute") navigate(LibraryPickRoute) { popUpTo(0) }
+        is SessionState.Ready ->
+            if (onSignInScreen || (name == "LibraryPickRoute" && previousBackStackEntry == null)) navigate(ProgramListRoute) { popUpTo(0) }
     }
 }

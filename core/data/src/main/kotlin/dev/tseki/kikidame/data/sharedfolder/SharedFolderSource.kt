@@ -11,7 +11,9 @@ import dev.tseki.kikidame.domain.SourceSnapshot
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.coroutineContext
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toLocalDateTime
 import java.io.FileNotFoundException
@@ -33,7 +35,7 @@ import kotlin.time.Instant
  * - 木の操作が例外を投げたら [ServerException.Unreachable]（今の Jellyfin と同じく到達不能、判断保留）。
  *   番組のフォルダが無ければ [fetchProgram] が null（消失）
  *
- * 接続の情報は [tree] の側で持つ。Hilt の bind はまだしない（取得元を選ぶ画面と合わせて #198 で行う）。
+ * 接続の情報は [tree] の側で持つ。取得元の種類による切り替えは `SessionSourceGateway`（#198）が行う。
  */
 class SharedFolderSource(
     private val tree: FolderTree,
@@ -45,20 +47,22 @@ class SharedFolderSource(
     /** 全走査。返す一覧は完全な一覧（ADR 0004）。共有フォルダの根が無ければ到達不能。 */
     override suspend fun fetchAll(): SourceSnapshot {
         val previous = scanned.load()
-        return onTree {
+        return onTree { checkActive ->
             val root = tree.list(ROOT) ?: throw IOException("shared folder root not found")
             val programs = ArrayList<SourceProgram>()
             val episodes = ArrayList<SourceEpisode>()
             for (publisher in root.directories()) {
+                checkActive()
                 val publisherPath = publisher.name
                 // 走査の途中で消えたフォルダは、無いものとして扱う
                 val programDirs = tree.list(publisherPath)?.directories() ?: continue
                 for (program in programDirs) {
+                    checkActive()
                     val programPath = "$publisherPath/${program.name}"
                     val files = tree.list(programPath) ?: continue
                     val programId = SourceItemId(programPath)
                     programs += SourceProgram(sourceId = programId, name = program.name, publisherName = publisher.name)
-                    episodes += episodesIn(programId, files, previous)
+                    episodes += episodesIn(programId, files, previous, checkActive)
                 }
             }
             SourceSnapshot(programs, episodes)
@@ -69,8 +73,8 @@ class SharedFolderSource(
     override suspend fun fetchProgramEpisodes(programId: SourceItemId): List<SourceEpisode> {
         if (programSegments(programId) == null) return emptyList()
         val previous = scanned.load()
-        return onTree {
-            episodesIn(programId, tree.list(programId.value).orEmpty(), previous)
+        return onTree { checkActive ->
+            episodesIn(programId, tree.list(programId.value).orEmpty(), previous, checkActive)
         }
     }
 
@@ -101,14 +105,23 @@ class SharedFolderSource(
         )
     }
 
-    private fun episodesIn(programId: SourceItemId, entries: List<FolderEntry>, previous: Map<SourceItemId, ScannedFile>): List<SourceEpisode> =
+    private fun episodesIn(
+        programId: SourceItemId,
+        entries: List<FolderEntry>,
+        previous: Map<SourceItemId, ScannedFile>,
+        checkActive: () -> Unit,
+    ): List<SourceEpisode> =
         entries.filter { !it.isDirectory && !isIgnoredName(it.name) && extensionOf(it.name) in AUDIO_EXTENSIONS }
             .sortedBy { it.name }
-            .map { episodeOf(programId, it, previous) }
+            .map {
+                // タグの読み取り（ファイルごとに数秒）の合間に、取り消されていれば止まる
+                checkActive()
+                episodeOf(programId, it, previous)
+            }
 
     private fun episodeOf(programId: SourceItemId, file: FolderEntry, previous: Map<SourceItemId, ScannedFile>): SourceEpisode {
         val id = SourceItemId("${programId.value}/${file.name}")
-        // Room には ms で入るので、ms に揃えてから比べる（ms より細かい更新日時が来ても同じとみなす。SMB の実装から何が来るかは #198 で確かめる。未確認）
+        // Room には ms で入るので、ms に揃えてから比べる（ms より細かい更新日時が来ても同じとみなす。SMB の実装（smbj）が実機で何の精度を返すかは未確認。docs/development.md の実機の確認項目）
         val modifiedAt = file.modifiedAt.truncatedToMillis()
         val cached = previous[id]?.takeIf { it.sizeBytes == file.sizeBytes && it.modifiedAt == modifiedAt }
         val values = cached?.let { TagValues(it.title, it.publishedAt, it.runtime, it.performers) }
@@ -141,10 +154,15 @@ class SharedFolderSource(
         )
     }
 
-    /** 木の操作の失敗を到達不能に正規化する。 */
-    private suspend fun <T> onTree(block: () -> T): T = withContext(io) {
+    /**
+     * 木の操作の失敗を到達不能に正規化する。木の操作は blocking でコルーチンの取り消しに気づかないので、
+     * [block] には取り消されていれば [CancellationException] を投げる関数を渡す。走査はフォルダごと・ファイルごとにこれを呼び、
+     * 取り消された走査が共有全体を最後まで読み続けない（取得元を変えた後も古い走査が走り続けるのを防ぐ。#198）。
+     */
+    private suspend fun <T> onTree(block: (checkActive: () -> Unit) -> T): T = withContext(io) {
+        val context = coroutineContext
         try {
-            block()
+            block { context.ensureActive() }
         } catch (e: CancellationException) {
             throw e
         } catch (e: ServerException) {

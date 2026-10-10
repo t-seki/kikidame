@@ -1,11 +1,15 @@
 package dev.tseki.kikidame.data.session
 
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import dev.tseki.kikidame.domain.ConnectedSource
 import dev.tseki.kikidame.domain.SelectedLibrary
+import dev.tseki.kikidame.domain.SmbConnection
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.Session
 import dev.tseki.kikidame.domain.SessionState
@@ -15,8 +19,10 @@ import kotlinx.coroutines.flow.map
 import kotlin.time.Instant
 
 /**
- * セッションの永続化（Preferences DataStore）。トークンだけ [TokenCipher] で暗号化して置く。
- * パスワードは保存しない。
+ * セッションの永続化（Preferences DataStore）。取得元は同時に 1 つで、Jellyfin のキー（`server_url` など。
+ * 以前のバージョンから変えていないので、更新の後も接続が残る。epic #195 の決定 12）か、SMB のキー（`smb_*`）のどちらかを持つ。
+ * `smb_host` があれば SMB、無ければ Jellyfin とみなす。
+ * Jellyfin のトークンと SMB のパスワードは [TokenCipher] で暗号化して置く。Jellyfin のパスワードは保存しない。
  */
 class SessionStore(
     private val dataStore: DataStore<Preferences>,
@@ -33,8 +39,26 @@ class SessionStore(
             it[USER_NAME] = session.userName
             it[USER_ID] = session.userId
             it[TOKEN] = encrypted
+            it.removeSmb()
             it.remove(LIBRARY_ID)
             it.remove(LIBRARY_NAME)
+            it.remove(LAST_FETCHED_AT)
+            it.remove(LAST_ATTEMPTED_AT)
+        }
+    }
+
+    /** SMB の接続を保存する。Jellyfin の接続は消す（取得元は同時に 1 つ）。 */
+    suspend fun saveSmb(connection: SmbConnection) {
+        val encrypted = if (connection.guest) null else cipher.encrypt(connection.password)
+        dataStore.edit {
+            it.removeJellyfin()
+            it[SMB_HOST] = connection.host
+            it[SMB_SHARE] = connection.share
+            it[SMB_PATH] = connection.path
+            it[SMB_USER] = connection.userName
+            it[SMB_GUEST] = connection.guest
+            it.remove(SMB_SIGNED_OUT)
+            if (encrypted != null) it[SMB_PASSWORD] = encrypted else it.remove(SMB_PASSWORD)
             it.remove(LAST_FETCHED_AT)
             it.remove(LAST_ATTEMPTED_AT)
         }
@@ -56,11 +80,14 @@ class SessionStore(
         dataStore.edit { it[LAST_ATTEMPTED_AT] = at.toEpochMilliseconds() }
     }
 
-    /** ログアウト。サーバ URL とユーザー名は次回の入力補助として残す。 */
+    /** ログアウト。サーバ URL とユーザー名（SMB はホスト・共有名・パス・ユーザー名）は次回の入力補助として残す。 */
     suspend fun clearCredentials() {
         dataStore.edit {
             it.remove(USER_ID)
             it.remove(TOKEN)
+            it.remove(SMB_PASSWORD)
+            // ゲスト接続はパスワードが無いので、ログアウトした印を別に置く。ゲストかどうかはホストなどと同じく次回の入力補助として残す
+            if (it[SMB_HOST] != null) it[SMB_SIGNED_OUT] = true
             it.remove(LIBRARY_ID)
             it.remove(LIBRARY_NAME)
             it.remove(LAST_FETCHED_AT)
@@ -72,7 +99,48 @@ class SessionStore(
         dataStore.edit { it.clear() }
     }
 
-    private fun Preferences.toState(): SessionState {
+    private fun MutablePreferences.removeJellyfin() {
+        remove(SERVER_URL)
+        remove(USER_NAME)
+        remove(USER_ID)
+        remove(TOKEN)
+        remove(LIBRARY_ID)
+        remove(LIBRARY_NAME)
+    }
+
+    private fun MutablePreferences.removeSmb() {
+        remove(SMB_HOST)
+        remove(SMB_SHARE)
+        remove(SMB_PATH)
+        remove(SMB_USER)
+        remove(SMB_PASSWORD)
+        remove(SMB_GUEST)
+        remove(SMB_SIGNED_OUT)
+    }
+
+    private fun Preferences.toState(): SessionState =
+        if (this[SMB_HOST] != null) toSmbState() else toJellyfinState()
+
+    private fun Preferences.toSmbState(): SessionState {
+        val host = this[SMB_HOST]
+        val share = this[SMB_SHARE]
+        val userName = this[SMB_USER].orEmpty()
+        val path = this[SMB_PATH].orEmpty()
+        val guest = this[SMB_GUEST] ?: false
+        val password = this[SMB_PASSWORD]?.let { stored -> runCatching { cipher.decrypt(stored) }.getOrNull() }
+        if (host == null || share == null) return SessionState.SignedOut(null, null)
+        // ログアウトするとパスワードが消え、印が立つ（ゲストはパスワードが要らないので、印で見分ける）
+        if (this[SMB_SIGNED_OUT] == true || (!guest && password == null)) {
+            return SessionState.SignedOut(null, null, lastSmb = SmbConnection(host, share, path, userName, password = "", guest = guest))
+        }
+        return SessionState.Ready(
+            source = ConnectedSource.Smb(SmbConnection(host, share, path, userName, password.orEmpty(), guest)),
+            lastFetchedAt = this[LAST_FETCHED_AT]?.let(Instant::fromEpochMilliseconds),
+            lastAttemptedAt = this[LAST_ATTEMPTED_AT]?.let(Instant::fromEpochMilliseconds),
+        )
+    }
+
+    private fun Preferences.toJellyfinState(): SessionState {
         val serverUrl = this[SERVER_URL]
         val userName = this[USER_NAME]
         val userId = this[USER_ID]
@@ -85,8 +153,7 @@ class SessionStore(
         val libraryName = this[LIBRARY_NAME]
         if (libraryId == null || libraryName == null) return SessionState.NeedsLibrary(session)
         return SessionState.Ready(
-            session = session,
-            library = SelectedLibrary(SourceItemId(libraryId), libraryName),
+            source = ConnectedSource.Jellyfin(session, SelectedLibrary(SourceItemId(libraryId), libraryName)),
             lastFetchedAt = this[LAST_FETCHED_AT]?.let(Instant::fromEpochMilliseconds),
             lastAttemptedAt = this[LAST_ATTEMPTED_AT]?.let(Instant::fromEpochMilliseconds),
         )
@@ -101,5 +168,12 @@ class SessionStore(
         val LIBRARY_NAME = stringPreferencesKey("library_name")
         val LAST_FETCHED_AT = longPreferencesKey("last_fetched_at")
         val LAST_ATTEMPTED_AT = longPreferencesKey("last_attempted_at")
+        val SMB_HOST = stringPreferencesKey("smb_host")
+        val SMB_SHARE = stringPreferencesKey("smb_share")
+        val SMB_PATH = stringPreferencesKey("smb_path")
+        val SMB_USER = stringPreferencesKey("smb_user")
+        val SMB_PASSWORD = stringPreferencesKey("smb_password")
+        val SMB_GUEST = booleanPreferencesKey("smb_guest")
+        val SMB_SIGNED_OUT = booleanPreferencesKey("smb_signed_out")
     }
 }

@@ -44,7 +44,7 @@ class RoomRematchTest : RoomTestBase() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val gateway = FakeJellyfinGateway()
     private val store by lazy { testSessionStore(tmp.root, scope) }
-    private val session by lazy { DataStoreSessionRepository(store, gateway) }
+    private val session by lazy { DataStoreSessionRepository(store, gateway, FakeFolderTreeFactory()) }
     private val library by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao(), db.localFileDao()) }
     private val playback by lazy { RoomPlaybackStateRepository(db, clock) }
     private val directory by lazy { EpisodesDirectory(ApplicationProvider.getApplicationContext()) }

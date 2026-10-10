@@ -79,7 +79,7 @@ object EpisodeDetails {
         val local = item.localFile
         val playback = item.playback
         return listOfNotNull(
-            Row(R.string.episode_details_server_id, e.sourceItemId?.value?.let(UiText::Plain) ?: UiText.Res(R.string.episode_details_server_id_none)),
+            Row(R.string.episode_details_source_id, e.sourceItemId?.value?.let(UiText::Plain) ?: UiText.Res(R.string.episode_details_source_id_none)),
             Row(R.string.episode_details_app_id, e.id.value.toString()),
             Row(R.string.episode_details_published_raw, e.publishedAt.toString()),
             Row(R.string.episode_details_added_at, e.addedAt?.toString()?.let(UiText::Plain) ?: UiText.Res(R.string.common_none)),

@@ -92,7 +92,7 @@ class ProgramListViewModel @Inject constructor(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    /** サーバに接続済み（ライブラリ選択済み）なら「引っ張って更新」ができる。 */
+    /** 取得元に接続済み（Jellyfin ならライブラリ選択済み）なら「引っ張って更新」ができる。 */
     val canRefresh: StateFlow<Boolean> = sessionRepository.state
         .map { it is SessionState.Ready }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)

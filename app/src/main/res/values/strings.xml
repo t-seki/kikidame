@@ -15,7 +15,7 @@
     <string name="common_cancel">Cancel</string>
     <!-- Separator between names in a list, e.g. performers "A, B". Keep the trailing space if your language uses one -->
     <string name="common_list_separator">", "</string>
-    <!-- Value shown when a field has no value (performers, server ID) -->
+    <!-- Value shown when a field has no value (performers, source ID) -->
     <string name="common_none">None</string>
     <!-- Value shown when a field is not known (publisher, file size) -->
     <string name="common_unknown">Unknown</string>
@@ -24,8 +24,8 @@
     <!-- Episode has been listened to (CONTEXT.md: Played) -->
     <string name="common_played">Played</string>
     <string name="common_unplayed">Unplayed</string>
-    <!-- Program is Gone: its server ID is no longer in the server listing -->
-    <string name="common_program_gone">Not found on the server</string>
+    <!-- Program is Gone: its source ID is no longer in the source listing -->
+    <string name="common_program_gone">Not found in the source</string>
     <!-- Total size and count of files on the device: %1$s = "12.3 GB", %2$d = episode count -->
     <plurals name="common_storage_usage">
         <item quantity="one">%1$s (%2$d episode)</item>
@@ -53,6 +53,29 @@
     <string name="connect_error_save_failed">Could not save: %1$s</string>
     <!-- Appended to an "unreachable" error on Android 17+ when the local-network permission is denied. Starts with a line break -->
     <string name="connect_hint_local_network_permission">\nThe “Local network” permission is not granted. Allow it under Settings → Apps → Kikidame → Permissions</string>
+
+    <!-- ===== source_pick: first screen, choose where programs come from ===== -->
+    <string name="source_pick_title">Choose a source</string>
+    <string name="source_pick_description">Where do your programs come from? You can change this later in Settings</string>
+    <string name="source_pick_jellyfin">Connect to Jellyfin</string>
+    <string name="source_pick_jellyfin_description">Use a music library on a Jellyfin server</string>
+    <string name="source_pick_smb">Shared folder on a NAS (SMB)</string>
+    <string name="source_pick_smb_description">Read recordings straight from a shared folder. Folders are laid out as publisher / program / episode files</string>
+
+    <!-- ===== smb_connect: connect to an SMB shared folder ===== -->
+    <string name="smb_connect_title">Connect to a shared folder</string>
+    <string name="smb_connect_host">Host</string>
+    <string name="smb_connect_host_hint">Name or IP address, e.g. 192.168.1.10. The name must be resolvable from this device</string>
+    <string name="smb_connect_share">Share name</string>
+    <string name="smb_connect_path">Folder in the share (optional)</string>
+    <string name="smb_connect_path_hint">Leave empty to use the top of the share. Below it: publisher / program / episode files</string>
+    <string name="smb_connect_guest">Connect as guest</string>
+    <string name="smb_connect_error_invalid">Check the host, the share name and the folder</string>
+    <!-- Wrong credentials, or the account has no access to the share -->
+    <string name="smb_error_unauthorized">Wrong username or password, or no access to this share</string>
+    <string name="smb_error_unreachable">Cannot reach the NAS. Check the host and your network</string>
+    <!-- %1$s = reason reported by the share -->
+    <string name="smb_error_failed">Could not read the shared folder: %1$s</string>
 
     <!-- ===== library_pick: choose which Jellyfin library to use ===== -->
     <string name="library_pick_title">Choose a library</string>
@@ -120,7 +143,7 @@
     <string name="program_list_no_match_in_publisher">No programs in %2$s match “%1$s”</string>
     <!-- Empty Starred tab when only a publisher filter is active. %1$s = publisher name -->
     <string name="program_list_no_starred_in_publisher">No starred programs in %1$s</string>
-    <!-- Program row: counts of episodes. "on device" = downloaded; "total" = known on the server -->
+    <!-- Program row: counts of episodes. "on device" = downloaded; "total" = known in the source -->
     <string name="program_list_on_device">%1$d on device</string>
     <string name="program_list_on_device_of_total">%1$d on device · %2$d total</string>
     <string name="program_list_unplayed_on_device" tools:ignore="PluralsCandidate">%1$d unplayed / %2$d on device</string>
@@ -128,8 +151,8 @@
     <!-- Program row: date of the newest episode. %1$s = "08-02" or "2025-08-02" -->
     <string name="program_list_latest">Latest: %1$s</string>
     <string name="program_list_empty_title">No programs</string>
-    <string name="program_list_empty_pull">Pull down to fetch from the server</string>
-    <string name="program_list_empty_connect">Connect to a server from Settings</string>
+    <string name="program_list_empty_pull">Pull down to fetch from the source</string>
+    <string name="program_list_empty_connect">Connect to a source from Settings</string>
 
     <!-- ===== episode_list: episodes of one program ===== -->
     <!-- Sync settings icon when the program is synced / not synced -->
@@ -163,15 +186,15 @@
     <string name="episode_list_action_download">Download (pin)</string>
     <string name="episode_list_action_unpin">Unpin (apply retention rules)</string>
     <string name="episode_list_action_delete_file">Delete file (playback position is kept)</string>
-    <string name="episode_list_action_delete_episode">Remove this episode (not on the server, cannot be restored)</string>
+    <string name="episode_list_action_delete_episode">Remove this episode (not in the source, cannot be restored)</string>
     <string name="episode_list_action_details">Details</string>
     <!-- Sync sheet: files of this program on the device. %1$s = "12.3 GB (123 episodes)" -->
     <string name="episode_list_storage">Files on device: %1$s</string>
     <string name="episode_list_storage_empty">No files on device</string>
     <string name="episode_list_sync_this_program">Sync this program</string>
     <!-- Program is Gone. %1$s = date since when -->
-    <string name="episode_list_sync_gone">Not found on the server (since %1$s). Sync is stopped. Episodes on the device can still be played</string>
-    <string name="episode_list_sync_unavailable">Cannot sync because it has not been found on the server</string>
+    <string name="episode_list_sync_gone">Not found in the source (since %1$s). Sync is stopped. Episodes on the device can still be played</string>
+    <string name="episode_list_sync_unavailable">Cannot sync because it has not been found in the source</string>
     <string name="episode_list_sync_description">Downloads episodes according to the retention rules and deletes ones that fall outside them. Pinned episodes are kept</string>
     <!-- Retention rule: keep the newest N episodes -->
     <string name="episode_list_keep_latest">Keep latest N</string>
@@ -190,7 +213,7 @@
     <string name="episode_list_msg_unpinned">Unpinned. Retention rules now apply</string>
     <string name="episode_list_msg_file_deleted_synced">File deleted. This program is synced, so the episode is downloaded again at the next sync if it should be kept</string>
     <string name="episode_list_msg_file_deleted">File deleted. The playback position is kept</string>
-    <string name="episode_list_msg_episode_removed">This episode is not on the server, so it was removed from the list too</string>
+    <string name="episode_list_msg_episode_removed">This episode is not in the source, so it was removed from the list too</string>
     <!-- %1$s = exception class name -->
     <string name="episode_list_msg_action_failed">Action failed: %1$s</string>
 
@@ -216,8 +239,8 @@
     <string name="episode_details_position">Position</string>
     <string name="episode_details_no_record">No record</string>
     <!-- Technical rows -->
-    <string name="episode_details_server_id">Server ID</string>
-    <string name="episode_details_server_id_none">None (device-only episode)</string>
+    <string name="episode_details_source_id">Source ID</string>
+    <string name="episode_details_source_id_none">None (device-only episode)</string>
     <string name="episode_details_app_id">ID (in app)</string>
     <string name="episode_details_published_raw">Published (raw value, UTC)</string>
     <string name="episode_details_added_at">Added</string>
@@ -263,7 +286,15 @@
 
     <!-- ===== settings ===== -->
     <string name="settings_title">Settings</string>
-    <string name="settings_section_server">Server</string>
+    <string name="settings_section_source">Source</string>
+    <string name="settings_source">Source</string>
+    <string name="settings_source_jellyfin">Jellyfin</string>
+    <string name="settings_source_smb">Shared folder (SMB)</string>
+    <string name="settings_smb_host">Host</string>
+    <string name="settings_smb_share">Share</string>
+    <string name="settings_smb_path">Folder</string>
+    <string name="settings_smb_path_root">Top of the share</string>
+    <string name="settings_smb_guest">Guest</string>
     <string name="settings_not_connected">Not connected</string>
     <string name="settings_user">User</string>
     <string name="settings_library">Library</string>
@@ -285,8 +316,8 @@
     <string name="settings_section_account">Account</string>
     <string name="settings_sign_out">Sign out</string>
     <string name="settings_sign_out_description">Removes only the credentials. Programs, episodes and playback positions on the device are kept</string>
-    <string name="settings_connect_elsewhere">Connect to another server</string>
-    <string name="settings_connect_elsewhere_description">Deletes all programs, episodes, playback positions and audio files on the device, then returns to the connect screen</string>
+    <string name="settings_connect_elsewhere">Change source</string>
+    <string name="settings_connect_elsewhere_description">Deletes all programs, episodes, playback positions and audio files on the device, then returns to the source selection screen</string>
     <string name="settings_section_about">About</string>
     <string name="settings_version">Version</string>
     <string name="settings_license">License</string>
@@ -294,8 +325,8 @@
     <string name="settings_open_source_licenses">Open source licenses</string>
     <string name="settings_open_source_licenses_description">Libraries in use and their licenses</string>
     <string name="settings_sign_out_title">Sign out?</string>
-    <string name="settings_sign_out_text">Data on the device is kept. You will need to sign in again next time.</string>
-    <string name="settings_reset_title">Delete the data on the device and connect to another server?</string>
+    <string name="settings_sign_out_text">Data on the device is kept. You will need to connect again next time.</string>
+    <string name="settings_reset_title">Delete the data on the device and change the source?</string>
     <string name="settings_reset_text">All programs, episodes, playback positions, played marks and audio files will be deleted. This cannot be undone.</string>
     <string name="settings_reset_confirm">Delete and continue</string>
 
@@ -319,12 +350,12 @@
         <item quantity="one">%d episode deleted</item>
         <item quantity="other">%d episodes deleted</item>
     </plurals>
-    <!-- Programs put On Hold because they were not found on the server -->
+    <!-- Programs put On Hold because they were not found in the source -->
     <plurals name="sync_on_hold">
-        <item quantity="one">%d program not found on the server, left as is</item>
-        <item quantity="other">%d programs not found on the server, left as is</item>
+        <item quantity="one">%d program not found in the source, left as is</item>
+        <item quantity="other">%d programs not found in the source, left as is</item>
     </plurals>
-    <string name="sync_program_gone">This program is not on the server. Nothing was changed</string>
+    <string name="sync_program_gone">This program is not in the source. Nothing was changed</string>
     <!-- A refresh or sync found no new episodes, queued nothing, and deleted nothing -->
     <string name="sync_up_to_date">Everything is up to date</string>
     <!-- Files that disappeared from the device (deleted by a file manager) had their records cleaned up -->
@@ -333,8 +364,8 @@
         <item quantity="other">Cleaned up the records of %d episodes no longer on the device</item>
     </plurals>
     <string name="sync_not_on_wifi">Not on Wi-Fi, so nothing was updated</string>
-    <string name="sync_error_session_expired">The session has expired. Sign in again</string>
-    <string name="sync_error_unreachable">Cannot reach the server. Showing what is on the device</string>
+    <string name="sync_error_session_expired">Authentication for the source has expired. Connect again</string>
+    <string name="sync_error_unreachable">Cannot reach the source. Showing what is on the device</string>
     <!-- %1$s = server message -->
     <string name="sync_error_fetch_failed">Fetch failed: %1$s</string>
     <!-- %1$s = exception class name -->
@@ -342,8 +373,8 @@
     <!-- Sign-in errors -->
     <string name="sync_error_unauthorized">Wrong username or password</string>
     <string name="sync_error_unreachable_connect">Cannot reach the server. Check the URL and your network</string>
-    <!-- %1$s = server message -->
-    <string name="sync_error_server_failed">The server returned an error: %1$s</string>
+    <!-- %1$s = message from the source -->
+    <string name="sync_error_server_failed">The source returned an error: %1$s</string>
 
     <!-- ===== playback: the playback service (notification / lock screen / Android Auto). Resolved by the Service itself (ADR 0009 の例外) ===== -->
     <!-- Skip back by 10 seconds (the app skips 10 s, not 15 or 30) -->

@@ -16,9 +16,11 @@ import dev.tseki.kikidame.ui.UiText
 import dev.tseki.kikidame.domain.SelectedLibrary
 import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.SourceItemId
+import dev.tseki.kikidame.domain.ConnectedSource
 import dev.tseki.kikidame.domain.Session
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
+import dev.tseki.kikidame.domain.SmbConnection
 import dev.tseki.kikidame.download.DownloadKicker
 import dev.tseki.kikidame.playback.NowPlaying
 import dev.tseki.kikidame.playback.NowPlayingState
@@ -74,7 +76,7 @@ class LibraryRefresherTest {
         }
     }
 
-    private class FakeDownloads(var missing: Int = 0) : DownloadRepository {
+    private class FakeDownloads(var missing: Int = 0, var gate: CompletableDeferred<Unit>? = null) : DownloadRepository {
         override suspend fun enqueue(episodeId: EpisodeId) = Unit
         override suspend fun enqueueForSync(episodeIds: List<EpisodeId>) = episodeIds.size
         override suspend fun removeEpisode(episodeId: EpisodeId) = Unit
@@ -83,14 +85,17 @@ class LibraryRefresherTest {
         override suspend fun retry(episodeId: EpisodeId) = Unit
         override suspend fun unpin(episodeId: EpisodeId) = Unit
         override suspend fun deleteLocal(episodeId: EpisodeId) = LocalDeletionScope.FILE_ONLY
-        override suspend fun reconcileMissingFiles(): Int = missing
+        override suspend fun reconcileMissingFiles(): Int {
+            gate?.await()
+            return missing
+        }
         override suspend fun ensureFilePresent(episodeId: EpisodeId): Boolean = true
     }
 
     private class FakeSessionRepository(ready: Boolean = true) : SessionRepository {
         val stateFlow = MutableStateFlow<SessionState>(
             if (ready) {
-                SessionState.Ready(Session("https://s", "alice", "u", "t"), SelectedLibrary(SourceItemId("lib"), "Radio"), null)
+                SessionState.Ready(ConnectedSource.Jellyfin(Session("https://s", "alice", "u", "t"), SelectedLibrary(SourceItemId("lib"), "Radio")), null)
             } else {
                 SessionState.SignedOut(null, null)
             },
@@ -98,6 +103,7 @@ class LibraryRefresherTest {
         var signedOut = false
         override val state: Flow<SessionState> = stateFlow
         override suspend fun signIn(serverUrl: String, userName: String, password: String) = Unit
+        override suspend fun connectSharedFolder(connection: SmbConnection) = Unit
         override suspend fun listLibraries(): List<LibraryView> = emptyList()
         override suspend fun selectLibrary(library: LibraryView) = Unit
         override suspend fun signOut() {
@@ -589,6 +595,55 @@ class LibraryRefresherTest {
         }
         assertEquals(1, repo.calls)
         assertFalse(refresher.isRefreshing.value)
+    }
+
+    /**
+     * 「取得元を変える」とログアウトの前に、走っている同期を取り消して終わるのを待つ（#198）。
+     * 古い取得元の実行が残って、新しい取得元の同期が「同時に 1 つ」で捨てられない。
+     */
+    @Test
+    fun cancelAndAwaitStopsTheRunningRefreshAndLetsANewOneRun() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply {
+            result = RefreshResult(3, 40, 1, 6, now)
+            gate = CompletableDeferred()
+        }
+        val refresher = refresher(repo)
+
+        val first = async { refresher.refresh() }
+        runCurrent()
+        assertTrue(refresher.isRefreshing.value)
+        assertNull(refresher.refresh(), "a second refresh does not run alongside the first")
+
+        refresher.cancelAndAwait()
+
+        assertTrue(first.isCancelled)
+        assertFalse(refresher.isRefreshing.value)
+        repo.gate = null
+        assertEquals(3, refresher.refresh()?.programs, "a refresh right after the change is not dropped")
+    }
+
+    /** Run を作った直後、取得元に問い合わせる前（手元の整合の最中）に来ても、取り消せる（job は Run を running に入れるのと同時に入る）。 */
+    @Test
+    fun cancelAndAwaitCancelsARunThatHasNotReachedTheSourceYet() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { result = RefreshResult(3, 40, 1, 6, now) }
+        val downloads = FakeDownloads(gate = CompletableDeferred())
+        val refresher = refresher(repo, downloads = downloads)
+
+        val first = async { refresher.refresh() }
+        runCurrent()
+        assertTrue(refresher.isRefreshing.value)
+        assertEquals(0, repo.calls, "the run is still before the source")
+
+        refresher.cancelAndAwait()
+
+        assertTrue(first.isCancelled)
+        assertEquals(0, repo.calls)
+        assertFalse(refresher.isRefreshing.value)
+    }
+
+    @Test
+    fun cancelAndAwaitWithoutARunningRefreshDoesNothing() = runTest(StandardTestDispatcher()) {
+        refresher(FakeRefreshRepository()).cancelAndAwait()
     }
 }
 

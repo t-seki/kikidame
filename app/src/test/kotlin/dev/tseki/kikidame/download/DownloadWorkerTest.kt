@@ -24,9 +24,11 @@ import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SourceProgram
 import dev.tseki.kikidame.domain.SourceSnapshot
+import dev.tseki.kikidame.domain.ConnectedSource
 import dev.tseki.kikidame.domain.Session
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
+import dev.tseki.kikidame.domain.SmbConnection
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -79,12 +81,13 @@ class DownloadWorkerTest {
         var signedOut = false
         override val state: Flow<SessionState> = flow
         override suspend fun signIn(serverUrl: String, userName: String, password: String) = Unit
+        override suspend fun connectSharedFolder(connection: SmbConnection) = Unit
         override suspend fun listLibraries(): List<LibraryView> = emptyList()
         override suspend fun selectLibrary(library: LibraryView) = Unit
         override suspend fun signOut() { signedOut = true; flow.value = SessionState.SignedOut(null, null) }
     }
 
-    private val ready = SessionState.Ready(Session("https://x/", "u", "uid", "tok"), SelectedLibrary(SourceItemId("lib"), "Radio"), null)
+    private val ready = SessionState.Ready(ConnectedSource.Jellyfin(Session("https://x/", "u", "uid", "tok"), SelectedLibrary(SourceItemId("lib"), "Radio")), null)
 
     private fun item(id: Long, server: String?) = EpisodeWithState(
         episode = Episode(EpisodeId(id), server?.let(::SourceItemId), ProgramId(1), "t$id", Instant.parse("2026-09-15T15:00:00Z"), null, 30.minutes, 0, "m4a"),

@@ -1,19 +1,18 @@
 package dev.tseki.kikidame.ui.settings
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.AppSettingsRepository
 import dev.tseki.kikidame.domain.ThemeMode
-import dev.tseki.kikidame.domain.LocalDataReset
 import dev.tseki.kikidame.domain.LibraryRepository
 import dev.tseki.kikidame.domain.LocalStorageUsage
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.download.DownloadScheduler
-import dev.tseki.kikidame.playback.PlayerConnection
+import dev.tseki.kikidame.ui.source.SourceChanger
+import dev.tseki.kikidame.sync.LibraryRefresher
 import dev.tseki.kikidame.sync.SyncScheduler
 import dev.tseki.kikidame.ui.UiText
 import kotlinx.coroutines.CancellationException
@@ -27,11 +26,11 @@ import javax.inject.Inject
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val sessionRepository: SessionRepository,
-    private val reset: LocalDataReset,
     private val settings: AppSettingsRepository,
     private val scheduler: DownloadScheduler,
     private val syncScheduler: SyncScheduler,
-    private val connection: PlayerConnection,
+    private val sourceChanger: SourceChanger,
+    private val refresher: LibraryRefresher,
     library: LibraryRepository,
 ) : ViewModel() {
     /** 手元のファイルの合計（#42）。null は読み込み前。 */
@@ -76,21 +75,19 @@ class SettingsViewModel @Inject constructor(
 
     /** 認証情報だけ消す。手元の番組・各回・再生位置は残る。 */
     fun signOut() {
-        viewModelScope.launch { sessionRepository.signOut() }
+        viewModelScope.launch {
+            // 走っている同期を止めてから認証情報を消す（途中で認証が消えた走査の結果が残らないように）
+            refresher.cancelAndAwait()
+            sessionRepository.signOut()
+        }
     }
 
     /**
-     * 「別のサーバに接続」。再生とダウンロード・同期の Worker を止めてから、手元のデータと音声ファイルを全部消して接続画面へ
+     * 「取得元を変える」。再生とダウンロード・同期の Worker を止めてから、手元のデータと音声ファイルを全部消して取得元の選択画面へ
      * （セッション状態の変化で遷移する）。止めずに消すと、開いているファイルを消したり、Worker が行を作り直したりする（#50）。
      */
     fun resetAndConnectElsewhere() {
-        viewModelScope.launch {
-            runCatching { connection.use { it.stop(); it.clearMediaItems() } }
-                .onFailure { Log.w("SettingsViewModel", "stop playback before reset failed", it) }
-            scheduler.cancelAll()
-            syncScheduler.cancelAll()
-            reset.resetAll()
-        }
+        viewModelScope.launch { sourceChanger.changeSource() }
     }
 
     fun consumeMessage() {

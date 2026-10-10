@@ -86,7 +86,7 @@ class EpisodeDetailsTest {
             PlaybackState(episode.id, 12.minutes, played = false, updatedAt = at),
         )
         val rows = EpisodeDetails.technicalRows(item).text()
-        assertEquals(Row("サーバ ID", "abc123"), rows[0])
+        assertEquals(Row("取得元 ID", "abc123"), rows[0])
         assertEquals(Row("ID（アプリ内）", "42"), rows[1])
         assertEquals(Row("公開日（記録の瞬間、UTC）", "2026-09-17T15:00:00Z"), rows[2])
         assertTrue(rows.any { it == Row("保存先", "なし") })
@@ -107,7 +107,7 @@ class EpisodeDetailsTest {
     @Test
     fun localOnlyEpisodeSaysSo() {
         val rows = EpisodeDetails.technicalRows(EpisodeWithState(episode.copy(sourceItemId = null, addedAt = null), null, null)).text()
-        assertEquals(Row("サーバ ID", "なし（手元だけの各回）"), rows[0])
+        assertEquals(Row("取得元 ID", "なし（手元だけの各回）"), rows[0])
         assertEquals(Row("取り込み日時", "なし"), rows[3])
         assertFalse(rows.any { it.first == "保存先" })
     }

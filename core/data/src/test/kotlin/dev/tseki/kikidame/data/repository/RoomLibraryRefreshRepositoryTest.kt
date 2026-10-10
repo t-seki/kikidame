@@ -41,7 +41,7 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val gateway = FakeJellyfinGateway()
     private val store by lazy { testSessionStore(tmp.root, scope) }
-    private val session by lazy { DataStoreSessionRepository(store, gateway) }
+    private val session by lazy { DataStoreSessionRepository(store, gateway, FakeFolderTreeFactory()) }
     private val library by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao(), db.localFileDao()) }
     private val playback by lazy { RoomPlaybackStateRepository(db, clock) }
     private val directory by lazy { EpisodesDirectory(ApplicationProvider.getApplicationContext()) }
@@ -273,7 +273,7 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
         assertEquals(attemptedAt, assertIs<SessionState.Ready>(session.state.first()).lastAttemptedAt)
     }
 
-    /** 「別のサーバに接続」は行・セッションに加えて音声ファイルも消す（#50。残しても到達する手段が無い）。 */
+    /** 「取得元を変える」は行・セッションに加えて音声ファイルも消す（#50。残しても到達する手段が無い）。 */
     @Test
     fun resetAllClearsRowsSessionAndFiles() = runTest {
         signInAndSelect()

@@ -46,6 +46,7 @@ import android.os.Build
 import android.provider.Settings
 import dev.tseki.kikidame.BuildConfig
 import dev.tseki.kikidame.R
+import dev.tseki.kikidame.domain.ConnectedSource
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.ui.SectionTitle
 import dev.tseki.kikidame.ui.ValueRow
@@ -91,21 +92,37 @@ fun SettingsScreen(
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
             val s = session
-            val current = when (s) {
-                is SessionState.Ready -> s.session
-                is SessionState.NeedsLibrary -> s.session
-                else -> null
-            }
+            val connected = (s as? SessionState.Ready)?.source
+            val jellyfin = connected as? ConnectedSource.Jellyfin
+            val jellyfinSession = jellyfin?.session ?: (s as? SessionState.NeedsLibrary)?.session
+            val smb = (connected as? ConnectedSource.Smb)?.connection
+            val isConnected = jellyfinSession != null || smb != null
             // 値を見せる行はラベル上・値下（#58、各回の詳細と同じ向き）。操作の行は操作名が上で説明が下
-            SectionTitle(stringResource(R.string.settings_section_server))
-            ValueRow("URL", current?.serverUrl ?: stringResource(R.string.settings_not_connected))
-            ValueRow(stringResource(R.string.settings_user), current?.userName ?: "-")
+            // 今の取得元（種類と場所）を出す（#198）。取得元は同時に 1 つ
+            SectionTitle(stringResource(R.string.settings_section_source))
             ValueRow(
-                stringResource(R.string.settings_library),
-                (s as? SessionState.Ready)?.library?.name ?: stringResource(R.string.settings_library_none),
-                modifier = Modifier.clickable(enabled = current != null, onClick = onChangeLibrary),
-                supporting = stringResource(R.string.settings_library_tap),
+                stringResource(R.string.settings_source),
+                when {
+                    smb != null -> stringResource(R.string.settings_source_smb)
+                    jellyfinSession != null -> stringResource(R.string.settings_source_jellyfin)
+                    else -> stringResource(R.string.settings_not_connected)
+                },
             )
+            if (smb != null) {
+                ValueRow(stringResource(R.string.settings_smb_host), smb.host)
+                ValueRow(stringResource(R.string.settings_smb_share), smb.share)
+                ValueRow(stringResource(R.string.settings_smb_path), smb.path.ifEmpty { stringResource(R.string.settings_smb_path_root) })
+                ValueRow(stringResource(R.string.settings_user), if (smb.guest) stringResource(R.string.settings_smb_guest) else smb.userName)
+            } else if (jellyfinSession != null) {
+                ValueRow("URL", jellyfinSession.serverUrl)
+                ValueRow(stringResource(R.string.settings_user), jellyfinSession.userName)
+                ValueRow(
+                    stringResource(R.string.settings_library),
+                    jellyfin?.library?.name ?: stringResource(R.string.settings_library_none),
+                    modifier = Modifier.clickable(onClick = onChangeLibrary),
+                    supporting = stringResource(R.string.settings_library_tap),
+                )
+            }
             ValueRow(stringResource(R.string.settings_last_sync), (s as? SessionState.Ready)?.lastFetchedAt?.toDateTimeText() ?: "-")
             HorizontalDivider()
             SectionTitle(stringResource(R.string.settings_section_download))
@@ -149,7 +166,7 @@ fun SettingsScreen(
             // 見出しが無いと「表示」の続きに見えるので群にする（#62 のレビュー指摘）
             SectionTitle(stringResource(R.string.settings_section_account))
             ListItem(
-                modifier = Modifier.clickable(enabled = current != null) { confirmSignOut = true },
+                modifier = Modifier.clickable(enabled = isConnected) { confirmSignOut = true },
                 headlineContent = { Text(stringResource(R.string.settings_sign_out)) },
                 supportingContent = { Text(stringResource(R.string.settings_sign_out_description)) },
             )

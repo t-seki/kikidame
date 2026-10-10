@@ -46,7 +46,7 @@ class ProgramRowTextTest {
     @Test
     fun goneAndMissingPartsAreHandled() {
         assertEquals(
-            "手元 0 · 全 3 回 · サーバ上で見つかりません",
+            "手元 0 · 全 3 回 · 取得元に見つかりません",
             summary(unplayed = 0, local = 0, total = 3, publisher = null, latest = null, gone = true).text(),
         )
     }
