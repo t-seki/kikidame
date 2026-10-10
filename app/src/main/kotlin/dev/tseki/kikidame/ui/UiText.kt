@@ -15,7 +15,7 @@ import androidx.compose.ui.res.stringResource
  * data class なので、テストは `assertEquals(UiText.Res(R.string.x, 12), actual)` で「どの文言が、どの引数で選ばれたか」を比較できる。
  */
 sealed interface UiText {
-    /** サーバから来た名前など、翻訳しない文字列。 */
+    /** 取得元から来た名前など、翻訳しない文字列。 */
     data class Plain(val text: String) : UiText
 
     data class Res(@StringRes val id: Int, val args: List<Any>) : UiText {

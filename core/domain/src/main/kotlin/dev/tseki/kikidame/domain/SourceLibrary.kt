@@ -1,7 +1,5 @@
 package dev.tseki.kikidame.domain
 
-import kotlinx.datetime.LocalDate
-import kotlinx.datetime.atStartOfDayIn
 import kotlin.time.Duration
 import kotlin.time.Instant
 
@@ -44,7 +42,3 @@ sealed interface SnapshotScope {
     /** 1 番組分。その番組の各回については完全なので結び直しと削除ができるが、番組一覧は無いので番組の結び直しはしない。 */
     data class Program(val programSourceId: SourceItemId) : SnapshotScope
 }
-
-/** サーバの日時（`PremiereDate` → `DateCreated`）から公開日を作る。日付部分だけ取り JST 0 時に置く。 */
-fun serverPublishedAt(premiereDate: LocalDate?, dateCreated: LocalDate): Instant =
-    (premiereDate ?: dateCreated).atStartOfDayIn(PublishedAt.ZONE)

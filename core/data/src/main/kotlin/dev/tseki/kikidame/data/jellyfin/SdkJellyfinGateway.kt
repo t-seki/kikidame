@@ -13,7 +13,6 @@ import dev.tseki.kikidame.domain.SourceSnapshot
 import dev.tseki.kikidame.domain.Session
 import dev.tseki.kikidame.domain.PublishedAt
 import dev.tseki.kikidame.domain.Ticks
-import dev.tseki.kikidame.domain.serverPublishedAt
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.toLocalDateTime
 import org.jellyfin.sdk.Jellyfin
@@ -234,7 +233,7 @@ class SdkJellyfinGateway @Inject constructor(
             sourceId = SourceItemId(id.toString()),
             programSourceId = SourceItemId(albumId.toString()),
             title = name.orEmpty(),
-            publishedAt = serverPublishedAt(premiereDate?.toKotlinLocalDate(), created.toKotlinLocalDate()),
+            publishedAt = jellyfinPublishedAt(premiereDate?.toKotlinLocalDate(), created.toKotlinLocalDate()),
             addedAt = created.toInstantUtc(),
             runtime = runTimeTicks?.let(Ticks::toDuration) ?: Duration.ZERO,
             // ファイルサイズは基本フィールドに無い（MediaSources を避けるため）。M3 のダウンロードで確定する

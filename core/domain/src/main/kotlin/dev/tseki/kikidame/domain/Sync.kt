@@ -3,7 +3,7 @@ package dev.tseki.kikidame.domain
 import kotlin.time.Instant
 
 /**
- * ある番組について、サーバ上の各回一覧がどう見えているか（CONTEXT.md「判断保留」「到達不能」「消失」）。
+ * ある番組について、取得元の各回一覧がどう見えているか（CONTEXT.md「判断保留」「到達不能」「消失」）。
  * 「一覧が空」は `Known(emptySet())` で、`Unavailable` とは型で区別する。
  */
 sealed interface SourceEpisodes {
@@ -17,7 +17,7 @@ sealed interface SourceEpisodes {
     data object Gone : SourceEpisodes
 }
 
-/** 同期の判断に必要な列だけの手元の各回。取り込み後なので、サーバ上の各回にはすべて行がある。 */
+/** 同期の判断に必要な列だけの手元の各回。取り込み後なので、取得元の各回にはすべて行がある。 */
 data class LocalEpisodeState(
     val id: EpisodeId,
     val sourceItemId: SourceItemId?,
@@ -43,7 +43,7 @@ data class SyncProgramInput(
  *
  * @property download 保持すべきなのに手元に無い各回（公開日の新しい順）
  * @property delete 保持ルールで手元に置かない各回。ファイルと `LocalFile` だけ消す（再生位置は残る）
- * @property remove サーバの一覧から消えた各回。`Episode` 行ごと消す（固定でも）
+ * @property remove 取得元の一覧から消えた各回。`Episode` 行ごと消す（固定でも）
  * @property onHold 判断保留（到達不能・消失）。他の 3 つは空
  */
 data class SyncProgramPlan(
@@ -68,10 +68,10 @@ data class SyncPlan(
  * 同期の純粋関数（handoff「同期エンジンの設計（M3）」「M3-b の範囲」）。I/O はしない。
  *
  * - `Unavailable` / `Gone` → 判断保留。何も出さない
- * - `Known` → サーバの一覧に無い `sourceItemId != null` の各回は固定でも [SyncProgramPlan.remove]
+ * - `Known` → 取得元の一覧に無い `sourceItemId != null` の各回は固定でも [SyncProgramPlan.remove]
  * - 固定された各回は保持ルールの外。「最新 N 回」の N にも数えない
  * - 同期対象でない番組は保持すべき集合が空: 固定でない手元の各回はすべて [SyncProgramPlan.delete]
- * - 同期対象なら、固定でないサーバ上の各回を公開日の新しい順に並べ、N 回まで取り、「再生済みなら削除」なら再生済みを除いたものが保持すべき集合。
+ * - 同期対象なら、固定でない取得元の各回を公開日の新しい順に並べ、N 回まで取り、「再生済みなら削除」なら再生済みを除いたものが保持すべき集合。
  *   保持すべき − 手元にある → download、手元にある − 保持すべき → delete
  */
 object SyncPlanner {

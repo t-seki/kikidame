@@ -9,12 +9,12 @@ data class Episode(
     val title: String,
     /** 公開日。日単位なので同じ番組内で衝突しうる（順序は [EpisodeOrder]）。 */
     val publishedAt: Instant,
-    /** 取り込み日時。サーバを経由していない各回は null。 */
+    /** 取り込み日時。取得元を経由していない各回は null。 */
     val addedAt: Instant?,
     val runtime: Duration,
     val sizeBytes: Long,
     val container: String,
-    /** 出演者（Jellyfin の Audio の `Artists`）。回ごとに変わる。番組の配信元（AlbumArtist）とは別。サーバに無ければ空。 */
+    /** 出演者（Jellyfin の Audio の `Artists`）。回ごとに変わる。番組の配信元（AlbumArtist）とは別。取得元に無ければ空。 */
     val performers: List<String> = emptyList(),
 )
 /**

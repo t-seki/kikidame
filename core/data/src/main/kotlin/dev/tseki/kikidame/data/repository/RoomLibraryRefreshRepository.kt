@@ -121,10 +121,10 @@ class RoomLibraryRefreshRepository @Inject constructor(
             programDao.insert(ProgramEntity(sourceItemId = sp.sourceId.value, name = sp.name, publisherName = sp.publisherName))
         }
         // 番組名・配信元は取得元が正
-        val programIdByServerId = HashMap<SourceItemId, Long>()
+        val programIdBySourceId = HashMap<SourceItemId, Long>()
         for (sp in snapshot.programs) {
             val row = programDao.findBySourceItemId(sp.sourceId.value) ?: continue
-            programIdByServerId[sp.sourceId] = row.id
+            programIdBySourceId[sp.sourceId] = row.id
             if (row.name != sp.name || row.publisherName != sp.publisherName) {
                 programDao.updateNames(row.id, sp.name, sp.publisherName)
             }
@@ -136,7 +136,7 @@ class RoomLibraryRefreshRepository @Inject constructor(
         // 結び直した回は上で取得元 ID を得ているので、ここで挿入されるのは手元に無かった回だけ（#142 の「新しい回」）
         var newEpisodes = 0
         for (se in snapshot.episodes) {
-            val programId = programIdByServerId[se.programSourceId] ?: continue
+            val programId = programIdBySourceId[se.programSourceId] ?: continue
             val existing = episodeDao.findBySourceItemId(se.sourceId.value)
             if (existing == null) {
                 episodeDao.insert(se.toEntity(programId, existingSize = null))
@@ -205,8 +205,8 @@ class RoomLibraryRefreshRepository @Inject constructor(
 
     /** [onlyProgramId] を渡すとその番組だけを入力にする（1 番組の同期。他の番組は一覧に無くても消失扱いにしない）。 */
     private suspend fun inputs(snapshot: SourceSnapshot, onlyProgramId: ProgramId? = null): List<SyncProgramInput> {
-        val serverProgramIds = snapshot.programs.map { it.sourceId }.toSet()
-        val serverEpisodesByProgram = snapshot.episodes.groupBy({ it.programSourceId }, { it.sourceId })
+        val sourceProgramIds = snapshot.programs.map { it.sourceId }.toSet()
+        val sourceEpisodesByProgram = snapshot.episodes.groupBy({ it.programSourceId }, { it.sourceId })
         val localByProgram = db.episodeDao().listSyncRows().groupBy { it.programId }
         val programs = if (onlyProgramId == null) db.programDao().listAll() else listOfNotNull(db.programDao().findById(onlyProgramId.value))
         val inputs = programs.mapNotNull { p ->
@@ -215,8 +215,8 @@ class RoomLibraryRefreshRepository @Inject constructor(
                 programId = ProgramId(p.id),
                 syncEnabled = p.syncEnabled,
                 retentionRule = RetentionRule(p.keepLatest, p.deleteAfterPlayed),
-                source = if (sourceId in serverProgramIds) {
-                    SourceEpisodes.Known(serverEpisodesByProgram[sourceId].orEmpty().toSet())
+                source = if (sourceId in sourceProgramIds) {
+                    SourceEpisodes.Known(sourceEpisodesByProgram[sourceId].orEmpty().toSet())
                 } else {
                     SourceEpisodes.Gone
                 },

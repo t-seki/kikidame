@@ -55,7 +55,7 @@ class EpisodeDownloader @Inject constructor(
                     val append = when (resumedFrom) {
                         null -> false // 200: 全体が来るので書き直す
                         existing -> true // 206: 続きから
-                        else -> throw IOException("server resumed from $resumedFrom, expected $existing")
+                        else -> throw IOException("source resumed from $resumedFrom, expected $existing")
                     }
                     var written = if (append) existing else 0L
                     FileOutputStream(part, append).use { out ->

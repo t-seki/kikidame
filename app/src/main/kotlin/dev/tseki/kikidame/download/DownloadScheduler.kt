@@ -69,7 +69,7 @@ class DownloadScheduler @Inject constructor(
 
     /**
      * 「別のサーバに接続」（#50）の前に、キューの Worker を止めて完了を待つ。実行中の転送も切る
-     * （行とファイルをこれから消すので、続けても `.part` が残るか、古いサーバへ無駄に取りに行くだけ）。
+     * （行とファイルをこれから消すので、続けても `.part` が残るか、古い取得元へ無駄に取りに行くだけ）。
      */
     suspend fun cancelAll() {
         workManager.cancelUniqueWork(DownloadWorker.UNIQUE_NAME)

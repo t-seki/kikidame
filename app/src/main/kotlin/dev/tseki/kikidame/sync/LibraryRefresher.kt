@@ -34,7 +34,7 @@ import javax.inject.Singleton
  * - [refresh]: 全走査 = ライブラリ全体の同期（ADR 0004）。番組一覧の「引っ張って更新」、定期・起動時の Worker が呼ぶ
  * - [syncProgram]: 1 番組の同期。シートの「この番組を今すぐ同期」が呼ぶ
  * - [refreshProgram]: 番組単位の取り込み（#12）。各回一覧の「引っ張って更新」が呼ぶ。削除しない
- * - 「Wi-Fi のみ」は手動を含めて効く。従量制ならサーバに触らず理由を出して終える。手元のファイルの整合（#5）はその前に走る
+ * - 「Wi-Fi のみ」は手動を含めて効く。従量制なら取得元に触らず理由を出して終える。手元のファイルの整合（#5）はその前に走る
  * - 401 はログアウトと同じ処理をする（セッション状態が変わり、画面側が接続画面へ導く）
  * - 定期・起動時の silent な同期ではクルクルを出さない。その最中に手動の操作が来たら、走っている同期に合流する（#134）
  * - 結果の文言は手元の変化（新しい回・予約・削除）だけを並べる。手動は変化が無ければ「最新の状態です」、silent は変化があったときだけ出す（#142）
@@ -252,7 +252,7 @@ private fun RefreshResult.changes(): List<UiText> {
 fun RefreshResult.toSyncMessage(): UiText =
     sentences(changes() + listOfNotNull(onHold.takeIf { it > 0 }?.let { UiText.Plural(R.plurals.sync_on_hold, it) }))
 
-/** 1 番組の同期・取り込みの文言。番組がサーバ上で見つからなければそれだけを出す。 */
+/** 1 番組の同期・取り込みの文言。番組が取得元で見つからなければそれだけを出す。 */
 fun RefreshResult.toProgramSyncMessage(): UiText {
     if (onHold > 0) return UiText.Res(R.string.sync_program_gone)
     return sentences(changes())

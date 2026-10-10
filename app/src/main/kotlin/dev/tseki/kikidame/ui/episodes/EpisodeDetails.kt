@@ -12,9 +12,9 @@ import dev.tseki.kikidame.ui.toDateTimeText
 import dev.tseki.kikidame.ui.toSizeText
 
 /**
- * 各回の詳細画面（#43）に並べる値。Room にあるものを整形するだけで、サーバへは問い合わせない。
+ * 各回の詳細画面（#43）に並べる値。Room にあるものを整形するだけで、取得元へは問い合わせない。
  * 利用者向けの群と、デバッグ向けの「技術的な詳細」に分ける（後者は折り畳み、長押しでコピー）。
- * ラベルと定型の値は [UiText]（ADR 0009）。サーバから来た値・日付・尺は [UiText.Plain]。
+ * ラベルと定型の値は [UiText]（ADR 0009）。取得元から来た値・日付・尺は [UiText.Plain]。
  */
 object EpisodeDetails {
     data class Row(val label: UiText, val value: UiText) {
@@ -72,7 +72,7 @@ object EpisodeDetails {
 
     /**
      * 技術的な詳細: ID・記録の生の値・パスなど。手元のファイルが無ければ保存先・失敗回数の行を、再生記録が無ければ更新日時の行を出さない。
-     * 公開日は「サーバが返した生の値」ではなく、アプリが日付に丸めて JST の 0 時にした記録の瞬間（タグが無ければ取り込み日時で代用、CONTEXT.md）。
+     * 公開日は「取得元が返した生の値」ではなく、アプリが日付に丸めて JST の 0 時にした記録の瞬間（タグが無ければ取り込み日時で代用、CONTEXT.md）。
      */
     fun technicalRows(item: EpisodeWithState): List<Row> {
         val e = item.episode

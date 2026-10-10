@@ -3,14 +3,14 @@ package dev.tseki.kikidame.domain
 
 /** 手元のファイルを消すときの範囲。 */
 enum class LocalDeletionScope {
-    /** ファイルと手元の記録だけ消す。各回と再生位置は残る（サーバから落とし直せる）。 */
+    /** ファイルと手元の記録だけ消す。各回と再生位置は残る（取得元から落とし直せる）。 */
     FILE_ONLY,
 
-    /** 各回ごと消す（再生位置も）。サーバに対応が無く、二度と手に入らない回。 */
+    /** 各回ごと消す（再生位置も）。取得元に対応が無く、二度と手に入らない回。 */
     EPISODE,
 }
 
-/** 削除の規則: 取得元 ID がある回はファイルだけ、無い回（サーバを経由していない、落とし直せない回）は各回ごと。 */
+/** 削除の規則: 取得元 ID がある回はファイルだけ、無い回（取得元を経由していない、落とし直せない回）は各回ごと。 */
 fun deletionScopeFor(episode: Episode): LocalDeletionScope =
     if (episode.sourceItemId != null) LocalDeletionScope.FILE_ONLY else LocalDeletionScope.EPISODE
 
@@ -59,14 +59,14 @@ interface DownloadRepository {
     suspend fun enqueueForSync(episodeIds: List<EpisodeId>): Int
 
     /**
-     * サーバの一覧から消えた各回を `Episode` 行ごと消す（`LocalFile` / `PlaybackState` は cascade、ファイルも消す）。
+     * 取得元の一覧から消えた各回を `Episode` 行ごと消す（`LocalFile` / `PlaybackState` は cascade、ファイルも消す）。
      * [deletionScopeFor] は「落とし直せる」前提なので、ここには当てはまらない。
      */
     suspend fun removeEpisode(episodeId: EpisodeId)
 
     /**
      * 番組を手元から消す（番組・各回・ファイル・再生位置のすべて）。消失した番組と取得元 ID の無い番組の「この番組を手元から消す」用。
-     * サーバに在る番組を消しても次の同期で戻ってくる（再生位置だけ失う）ので、呼び出し側で出し分ける。
+     * 取得元に在る番組を消しても次の同期で戻ってくる（再生位置だけ失う）ので、呼び出し側で出し分ける。
      */
     suspend fun removeProgram(programId: ProgramId)
 

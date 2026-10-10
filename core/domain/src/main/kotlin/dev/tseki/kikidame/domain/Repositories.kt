@@ -5,11 +5,11 @@ import kotlin.time.Instant
 /** 番組一覧の 1 行。[LibraryRepository.observePrograms] は最新の各回の公開日順で返す（「よく聴く」タブはそのうちよく聴く番組だけを同じ順で出す。#151）。 */
 data class ProgramSummary(
     val program: Program,
-    /** サーバ上の分も含めた各回の数。 */
+    /** 取得元にしか無い分も含めた各回の数。 */
     val episodeCount: Int,
     /** 手元にファイルがある各回の数。 */
     val localEpisodeCount: Int,
-    /** 手元にファイルがあって再生済みでない各回の数（#41）。聴きかけ・聴いている回も再生済みでなければ数える。サーバ上にしか無い回は数えない。 */
+    /** 手元にファイルがあって再生済みでない各回の数（#41）。聴きかけ・聴いている回も再生済みでなければ数える。取得元にしか無い回は数えない。 */
     val unplayedLocalCount: Int,
     val latestPublishedAt: Instant?,
 )

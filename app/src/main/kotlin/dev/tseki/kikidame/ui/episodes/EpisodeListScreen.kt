@@ -304,7 +304,7 @@ private fun ProgramSyncSheet(
     onSyncNow: () -> Unit,
     onRemoveProgram: () -> Unit,
 ) {
-    // 消失した番組（サーバの一覧に無く、突合でも結び直せなかった）と取得元 ID の無い番組は同期できない
+    // 消失した番組（取得元の一覧に無く、突合でも結び直せなかった）と取得元 ID の無い番組は同期できない
     val canSync = program.sourceItemId != null && !program.isGone
     val enabled = program.syncEnabled
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
@@ -362,7 +362,7 @@ private fun ProgramSyncSheet(
                 Text(stringResource(R.string.episode_list_sync_now))
             }
         } else {
-            // サーバに在る番組を消しても次の同期で戻ってくる（再生位置だけ失う）ので、消せるのはサーバに無い番組だけ
+            // 取得元に在る番組を消しても次の同期で戻ってくる（再生位置だけ失う）ので、消せるのは取得元に無い番組だけ
             SheetAction(Icons.Filled.Delete, stringResource(R.string.episode_list_remove_program)) { onRemoveProgram() }
         }
         Spacer(Modifier.padding(bottom = 24.dp))

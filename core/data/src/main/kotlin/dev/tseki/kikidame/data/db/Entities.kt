@@ -8,7 +8,7 @@ import dev.tseki.kikidame.domain.DownloadState
 import kotlin.time.Instant
 /**
  * 番組 = MusicAlbum。主キーはローカル代理キー、取得元 ID は nullable unique（ADR 0001）。
- * (配信元, 番組名) は突合のキーだが一意ではない（サーバ側に同名の番組が複数あり得る）。
+ * (配信元, 番組名) は突合のキーだが一意ではない（取得元に同名の番組が複数あり得る）。
  */
 @Entity(
     tableName = "programs",
@@ -24,7 +24,7 @@ data class ProgramEntity(
     /** 最新 N 回まで保持（null = 上限なし）。 */
     val keepLatest: Int? = null,
     val deleteAfterPlayed: Boolean = false,
-    /** 消失した日時。null ならサーバに在る。v4 で追加 */
+    /** 消失した日時。null なら取得元に在る。v4 で追加 */
     val goneSince: Instant? = null,
     /** よく聴く（表示用の印。CONTEXT.md）。v5 で追加 */
     @ColumnInfo(defaultValue = "0") val starred: Boolean = false,
@@ -49,9 +49,9 @@ data class EpisodeEntity(
     val title: String,
     /** 公開日。 */
     val publishedAt: Instant,
-    /** 取り込み日時。サーバを経由していない行は null。 */
+    /** 取り込み日時。取得元を経由していない行は null。 */
     val addedAt: Instant?,
-    /** 1 tick = 100ns。ticks は Entity とサーバ境界にだけ現れる。 */
+    /** 1 tick = 100ns。ticks は Entity と取得元の境界にだけ現れる。 */
     val runtimeTicks: Long,
     val sizeBytes: Long,
     val container: String,
