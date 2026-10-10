@@ -11,11 +11,12 @@ What it does:
 
 Not for: music (episodes do not pile up) or audiobooks (you listen from the oldest chapter, so "keep the latest N" makes no sense).
 
-Requires, depending on where your recordings are:
+Requires one of these, depending on where your recordings are:
 
 - Jellyfin 10.10 or later, with your audio in a music library (album = program, album artist = publisher)
-- A NAS shared folder (SMB2/3), organized as <publisher>/<program>/<episode files>
-- A folder on your device, organized as <publisher>/<program>/<episode files>
-- Android 12 or later
+- A NAS shared folder (SMB2/3), organized as publisher/program/episode files
+- A folder on your device, organized as publisher/program/episode files
 
-Kikidame assumes one source at a time (one Jellyfin server, user and library, or one shared folder), and that this app is the only place you listen. Source and issues: https://github.com/t-seki/kikidame
+And Android 12 or later.
+
+Kikidame assumes one source at a time (one Jellyfin server, user and library, or one folder (a NAS shared folder or a folder on the device)), and that this app is the only place you listen. Source and issues: https://github.com/t-seki/kikidame
