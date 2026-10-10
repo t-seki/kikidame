@@ -51,7 +51,7 @@ Google Play では配布しない（[ADR 0008](./docs/adr/0008-open-source-distr
 
 ## 取得元の前提
 
-接続できるのは **Jellyfin**・**NAS の共有フォルダ（SMB）**・**端末のフォルダ** のどれか 1 つ。以前の release 版では Jellyfin しか選べない（SMB は debug 版だけだった）。端末のフォルダは #199 の後のビルドから。
+接続できるのは **Jellyfin**・**NAS の共有フォルダ（SMB）**・**端末のフォルダ** のどれか 1 つ。以前の release 版では Jellyfin しか選べない（SMB は debug 版だけだった）。端末のフォルダは、まだリリースした版には入っていない。
 
 ### Jellyfin
 

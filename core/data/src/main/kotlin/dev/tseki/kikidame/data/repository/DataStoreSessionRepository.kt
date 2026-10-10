@@ -1,5 +1,6 @@
 package dev.tseki.kikidame.data.repository
 
+import android.util.Log
 import dev.tseki.kikidame.data.jellyfin.JellyfinGateway
 import dev.tseki.kikidame.data.jellyfin.credentials
 import dev.tseki.kikidame.data.session.SessionStore
@@ -73,7 +74,15 @@ class DataStoreSessionRepository @Inject constructor(
                 trees.open(DeviceFolder(treeUri, name = "")).use { tree ->
                     tree.list("") ?: throw ServerException.Failed("folder not found")
                 }
-                documents.query(treeUri, documents.rootDocumentId(treeUri))?.name.orEmpty()
+                val name = documents.query(treeUri, documents.rootDocumentId(treeUri))?.name.orEmpty()
+                // 前に選んでいたフォルダ（アクセスが切れて選び直したときなど）の権限を手放す。失敗しても接続は続ける。
+                // 保存（Ready になり画面が離れる）より前に済ませ、保存を最後の一手にする
+                try {
+                    documents.persistedTreeUris().filter { it != treeUri }.forEach { documents.releasePermission(it) }
+                } catch (e: Exception) {
+                    Log.w(TAG, "release an old folder permission failed", e)
+                }
+                name
             } catch (e: Exception) {
                 // 取った権限を手放す。手放すのに失敗しても、元の失敗を投げる
                 runCatching { documents.releasePermission(treeUri) }
@@ -85,12 +94,6 @@ class DataStoreSessionRepository @Inject constructor(
             }
         }
         store.saveDeviceFolder(DeviceFolder(treeUri, name))
-        // 前に選んでいたフォルダ（アクセスが切れて選び直したときなど）の権限を手放す。失敗しても接続は済んでいる
-        withContext(Dispatchers.IO) {
-            runCatching {
-                documents.persistedTreeUris().filter { it != treeUri }.forEach { documents.releasePermission(it) }
-            }
-        }
     }
 
     override suspend fun listLibraries(): List<LibraryView> =
@@ -110,6 +113,8 @@ class DataStoreSessionRepository @Inject constructor(
     }
 
     companion object {
+        private const val TAG = "SessionRepository"
+
         /** スキーム省略は `https://` を補う。平文 HTTP は受け付けない。末尾のスラッシュを揃える。 */
         fun normalizeServerUrl(input: String): String {
             val trimmed = input.trim().trimEnd('/')

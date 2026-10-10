@@ -139,7 +139,7 @@ interface SessionRepository {
      * 端末のフォルダ（[treeUri] は `ACTION_OPEN_DOCUMENT_TREE` の結果）を取得元にする（#199）。端末のストレージのフォルダでなければ
      * [UnsupportedFolderException]。永続的な読み取りの権限を取り、フォルダの直下が読めるかを確かめてから保存する。読めなければ
      * [ServerException] を投げ、取った権限を手放す。保存すると [SessionState.Ready] になり、ほかの取得元の接続は消える。
-     * 保存したら、そのフォルダ以外に持っている永続権限を手放す。
+     * 読めたら、保存の前に、そのフォルダ以外に持っている永続権限を手放す（保存を最後にする。保存すると画面が離れるため）。
      */
     suspend fun connectDeviceFolder(treeUri: String)
 
