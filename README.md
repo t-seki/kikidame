@@ -2,7 +2,7 @@
 
 日本語: [README.ja.md](./README.ja.md)
 
-An Android app for **episodic audio** (radio recordings and podcasts) kept in a Jellyfin music library or in a shared folder on a NAS (SMB). It downloads and deletes episodes automatically by per-program rules, and keeps playing when the server or NAS is unreachable. Kikidame is an unofficial client with no affiliation to the Jellyfin project.
+An Android app for **episodic audio** (radio recordings and podcasts) kept in a Jellyfin music library. It downloads and deletes episodes automatically by per-program rules, and keeps playing when the server is unreachable. Kikidame is an unofficial client with no affiliation to the Jellyfin project.
 
 https://github.com/user-attachments/assets/23b4710a-9410-4d2f-aa2b-c8faac1184e3
 
@@ -24,7 +24,7 @@ Existing Jellyfin clients (the official app, Findroid, Finamp) are built around 
 - **Offline first** — playback always uses the files on the device. Playback position and played state live on the device only and are never sent to the server
 - **Retention rules** — per program, choose "Keep latest N" and "Delete after played"; sync then downloads what is missing and removes what is no longer needed
 
-It assumes one source at a time (one Jellyfin server, user and library, or one SMB shared folder) and that this app is the only place you listen. Changing the source deletes the programs, episodes, playback positions and files on the device and starts over. Sharing with other devices or the web player is not a goal.
+It assumes one source at a time (one Jellyfin server, user and library) and that this app is the only place you listen. Changing the source deletes the programs, episodes, playback positions and files on the device and starts over. Sharing with other devices or the web player is not a goal.
 
 ## What it does
 
@@ -51,7 +51,7 @@ Requires Android 12 (API 31) or later. Store descriptions and screenshots live i
 
 ## Source prerequisites
 
-Pick one source on first launch: **Jellyfin** or a **shared folder on a NAS (SMB)**. The sections below cover each.
+The release build connects to **Jellyfin**. A **shared folder on a NAS (SMB)** is under development: it is not selectable in the current release build and can be tried only in the debug build.
 
 ### Jellyfin
 
@@ -70,7 +70,9 @@ Pick one source on first launch: **Jellyfin** or a **shared folder on a NAS (SMB
   - For radio recordings, set the tags `album` = program, `albumartist` = station, and the date (`©day` in M4A) = broadcast date, using a general-purpose tag editor such as Mp3tag
   - For podcasts, tag the files you fetched from the feed with `album` = program name, `albumartist` = the publisher or network, and the date = release date, then put them in the music library. One folder per program helps Jellyfin group them into a MusicAlbum
 
-### Shared folder on a NAS (SMB)
+### Shared folder on a NAS (SMB) — under development
+
+Not selectable in the current release build (debug build only). On a large share (about 6,000 episode files) the first full scan was cut off by a dropped connection before anything was imported, so it stays hidden until the scan is reworked and confirmed on a real device.
 
 - SMB2/3 only (SMB1 is not supported). Enter the host (a name or an IP address), the share name, an optional folder inside the share, and a username and password, or connect as a guest. The password is stored encrypted on the device. The app only reads the share and never writes to or deletes anything on it
 - Inside the share (or the folder you entered) the layout is exactly **`<publisher>/<program>/<episode files>`**, three levels:
