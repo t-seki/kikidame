@@ -28,12 +28,14 @@ import dev.tseki.kikidame.playback.NowPlayingState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -59,6 +61,8 @@ class LibraryRefresherTest {
         var enqueuedOnTheWay: List<Int> = emptyList()
         /** 渡された「再生中の回」を読む関数（番組ごとに読み直すことを試す。#209）。 */
         var excludedReader: (() -> Set<EpisodeId>)? = null
+        /** [gate] を取り消しに気づかずに待つ（ブロッキングの I/O の代わり）。その後に [error] を投げる。 */
+        var ignoresCancellation = false
         override suspend fun refresh(
             excluded: () -> Set<EpisodeId>,
             onProgress: (ScanProgress) -> Unit,
@@ -69,7 +73,8 @@ class LibraryRefresherTest {
             excludedReader = excluded
             progress.forEach(onProgress)
             enqueuedOnTheWay.forEach(onEnqueued)
-            gate?.await()
+            // ブロッキングの I/O のように、取り消しに気づかずに待ち続ける
+            if (ignoresCancellation) withContext(NonCancellable) { gate?.await() } else gate?.await()
             error?.let { throw it }
             return result!!
         }
@@ -729,6 +734,32 @@ class LibraryRefresherTest {
         val run = async { refresher.refresh() }
         runCurrent()
         refresher.cancelAndAwait()
+
+        assertTrue(run.isCancelled)
+        assertEquals(0, kicker.kicks)
+    }
+
+    /**
+     * ブロッキングの I/O の最中に取り消されると、取り消しが到達不能に包まれて届くことがある。そのときも起こさない
+     * （取得元を変える最中に、手元を消す前の Worker を動かさない）。
+     */
+    @Test
+    fun aCancellationWrappedAsUnreachableDoesNotKick() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply {
+            enqueuedOnTheWay = listOf(2)
+            gate = CompletableDeferred()
+            ignoresCancellation = true
+            error = ServerException.Unreachable(java.io.InterruptedIOException("interrupted"))
+        }
+        val kicker = FakeKicker()
+        val refresher = refresher(repo, kicker = kicker)
+
+        val run = async { refresher.refresh() }
+        runCurrent()
+        val cancelling = async { refresher.cancelAndAwait() }
+        runCurrent()
+        repo.gate!!.complete(Unit)
+        cancelling.await()
 
         assertTrue(run.isCancelled)
         assertEquals(0, kicker.kicks)

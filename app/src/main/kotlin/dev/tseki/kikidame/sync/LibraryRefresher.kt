@@ -21,6 +21,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -258,9 +259,11 @@ class LibraryRefresher @Inject constructor(
     /**
      * 全走査が途中で失敗しても、それまでに番組ごとの同期が予約していれば Worker を起こす（#209）。予約は DB に残っていて、
      * 次の同期ではその回の予約が数に入らない（もう行がある）ので、ここで起こさないと次の起動かダウンロードの操作まで待つ。
-     * 認証の失敗（ログアウトする）と取り消しでは起こさない。
+     * 認証の失敗（ログアウトする）と取り消しでは起こさない。ブロッキングの I/O の最中に取り消されると、取り消しが
+     * [ServerException.Unreachable] などに包まれて届くことがあるので、先に取り消し済みかを確かめ、そうなら取り消しとして投げ直す。
      */
     private suspend fun Run.kickIfEnqueuedBeforeFailure() {
+        currentCoroutineContext().ensureActive()
         if (enqueuedSoFar.get() > 0) kickDownloads()
     }
 
