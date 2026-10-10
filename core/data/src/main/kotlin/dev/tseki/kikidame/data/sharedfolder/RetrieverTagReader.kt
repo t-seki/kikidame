@@ -12,7 +12,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * - retriever がファイルを解釈できないとき（[RuntimeException]）は空の [AudioTags]
  * - 日付は `METADATA_KEY_YEAR` → `METADATA_KEY_DATE` の順に、年月日まで読めるほうを使う（どちらに何が入るかは形式による。実機で未確認）
  *
- * JVM のテストでは動かないので、実機で確かめる（#198）。
+ * JVM のテストで動くかは確かめていない（未確認）。テストはフェイクの [TagReader] で行い、このクラス自体はテストしていない。実機で確かめる（#198）。
  */
 class RetrieverTagReader : TagReader {
     override fun read(tree: FolderTree, path: String, sizeBytes: Long): AudioTags {

@@ -106,7 +106,7 @@ class SharedFolderSource(
 
     private fun episodeOf(programId: SourceItemId, file: FolderEntry, previous: Map<SourceItemId, ScannedFile>): SourceEpisode {
         val id = SourceItemId("${programId.value}/${file.name}")
-        // Room には ms で入るので、ms に揃えてから比べる（SMB の更新日時は 100ns 単位で来る）
+        // Room には ms で入るので、ms に揃えてから比べる（ms より細かい更新日時が来ても同じとみなす。SMB の実装から何が来るかは #198 で確かめる。未確認）
         val modifiedAt = file.modifiedAt.truncatedToMillis()
         val cached = previous[id]?.takeIf { it.sizeBytes == file.sizeBytes && it.modifiedAt == modifiedAt }
         val values = cached?.let { TagValues(it.title, it.publishedAt, it.runtime, it.performers) }

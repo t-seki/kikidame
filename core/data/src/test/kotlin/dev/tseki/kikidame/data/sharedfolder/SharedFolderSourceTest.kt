@@ -154,7 +154,7 @@ class SharedFolderSourceTest : RoomTestBase() {
 
     @Test
     fun unchangedFilesAreNotReadAgain() = runTest {
-        // SMB の更新日時は 100ns 単位で来る。Room は ms で持つので、それでも同じとみなすこと
+        // ms より細かい更新日時が来ても（SMB の実装から何が来るかは #198 で確かめる。未確認）、Room は ms で持つので同じとみなすこと
         val modified = Instant.parse("2026-09-17T16:00:00Z") + 1234.nanoseconds
         folder.put("P/番組/a.m4a", ByteArray(10), modified)
         tags.tagsByPath["P/番組/a.m4a"] = AudioTags(title = "タグの題", duration = 30.minutes)
