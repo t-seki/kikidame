@@ -8,10 +8,10 @@ Bluetooth の機器がつながったときに、前回の回の続きから**�
 
 ## 理由
 
-1. **Android 17 では、接続をきっかけにしたバックグラウンドの再生がオーディオフォーカスを拒否される**。マニフェストの BroadcastReceiver で `BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED` を受け、フォアグラウンドサービスを始めるところまでは通る（`Background started FGS: Allowed [... code:BLUETOOTH_BROADCAST ...]`）。しかしその後、`AS.HardeningEnforcer: AudioHardening focus request ... ignored ... level: partial` でフォーカスの要求が拒否される。Media3 の既定（`handleAudioFocus=true`）ではプレイヤーが一時停止のまま鳴らない（試作の 2・3 回目）。1 回目は直前まで画面で使っていたため `level: full`・「would be ignored」（記録だけ）で鳴った。2 回目以降との差が生じる条件は確かめていない【推測: 直前に画面で使っていたか】。根拠: Android 17 の background audio hardening（https://developer.android.com/about/versions/17/changes/bg-audio ）
+1. **Android 17 では、接続をきっかけにしたバックグラウンドの再生がオーディオフォーカスを拒否される**。マニフェストの BroadcastReceiver で `BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED` を受け、フォアグラウンドサービスを始めるところまでは通る（`Background started FGS: Allowed [... code:BLUETOOTH_BROADCAST ...]`）。しかしその後、`AS.HardeningEnforcer: AudioHardening focus request ... ignored ... level: partial` でフォーカスの要求が拒否される。Media3 の既定（`handleAudioFocus=true`）ではプレイヤーが一時停止のまま鳴らない（試作の 2・3 回目）。1 回目は、直前まで人が画面でアプリを使い、最近のアプリの一覧から閉じたがプロセスは残っていた。このとき `level: full`・「would be ignored」（記録だけ）と記録され、音が出た。2 回目以降との差が、直前に画面で使っていたかどうかで分かれるのかは【推測】で、どの条件で分かれるかは確かめていない。根拠: Android 17 の background audio hardening（https://developer.android.com/about/versions/17/changes/bg-audio ）
 2. **Poweramp 型（フォーカス無しで鳴らす）は採らない**。Poweramp（targetSdk 36）は同じ受信の仕組みで同じくフォーカスを拒否されるが、フォーカス無しで鳴らし続ける。システムは `background playback would be muted` と記録するだけで、今は消音しない。ただしフォーカス無しだと、ほかのアプリの音（動画、着信音など）と重なっても自動で一時停止・音量下げをしない。将来の更新で消音が実施される恐れもある【推測。いつ・どの条件かは未確認】
-3. **イヤホンの ▶ は最後に鳴らしたアプリに届く**。人が Twitch を見た後は `dumpsys media_session` の `Last MediaButtonReceiver` が Twitch に変わり、イヤホンの ▶ で Twitch の続きが流れた。接続時に Kikidame が一時停止で準備しても（試作の「準備だけ」のモード、約 0.2 秒で完了）、▶ の届け先は Kikidame に戻らなかった。原因は最後に実際に鳴らしたアプリで決まるためと読んでいる【推測。`MediaSessionService` のソースでは確かめていない】
-4. **既存の #108（`onPlaybackResumption`）で、足りる**。Kikidame のプロセスが無く再生の通知も無い状態でイヤホンをつなぐと、ロック画面のメディアのコントロールに Kikidame の再開のカードが残っていて、その ▶ で保存した位置から流れた（人の報告）。システムはその ▶ を利用者の操作として扱い（`Background started FGS: Allowed [... code:TEMP_ALLOWED_WHILE_IN ...]`）、フォーカスも拒否されなかった（`AudioHardening` の記録なし）。夜にほかのアプリを使っても Kikidame のカードは別に残った
+3. **イヤホンの ▶ は、観察では最後に鳴らしたアプリに届いた**。人が Twitch を見た後は `dumpsys media_session` の `Last MediaButtonReceiver` が Twitch に変わり、イヤホンの ▶ で Twitch の続きが流れた。接続時に Kikidame が一時停止で準備しても（試作の「準備だけ」のモード、約 0.2 秒で完了）、▶ の届け先は Kikidame に戻らなかった。届け先が最後に実際に鳴らしたアプリで決まるかは、ソースで確かめていない【推測】（`MediaSessionService` は未確認）
+4. **既存の #108（`onPlaybackResumption`）で、足りる**。Kikidame のプロセスが無く再生の通知も無い状態でイヤホンをつなぐと、ロック画面のメディアのコントロールに Kikidame の再開のカードが残っていて、その ▶ で保存した位置から流れた（人の報告）。ログは、`Background started FGS: Allowed [... code:TEMP_ALLOWED_WHILE_IN...`、`requestAudioFocus()` の後に `AudioHardening` の記録が無かったこと、`Media button session is changed to dev.tseki.kikidame.debug`。システムがロック画面の ▶ を利用者の操作として扱ったとみられる【推測】。夜にほかのアプリを使っても Kikidame のカードは別に残った
 
 ## 代わりの案と、採らなかった理由
 
@@ -23,9 +23,9 @@ Bluetooth の機器がつながったときに、前回の回の続きから**�
 
 ## 利用者への案内
 
-アプリが閉じていても、ロック画面（通知の上）のメディアのコントロールに Kikidame の再開のカードが残り、その ▶ で続きから聴ける。イヤホンや車の ▶ は、ほかのアプリが最後に鳴っていればそちらに届く（Kikidame が最後のときは Kikidame が続きから再開する。#119）。README（英日）の「再生」の項に書く（#207）。
+アプリが閉じていても、ロック画面のメディアのコントロールに Kikidame の再開のカードが残り、その ▶ で続きから聴ける。イヤホンや車の ▶ ボタン（メディアボタン）は、観察では最後に実際に鳴らしたアプリ（Twitch）に届いた。届け先が最後に鳴らしたアプリで決まるかはソースで確かめていない【推測】。Kikidame が最後に鳴らしたときは、Kikidame が続きから再開する（#119）。README（英日）の「再生」の項に書いた（#207）。
 
 ## 結果
 
-- コードは変えない。試作 #204 と draft の PR #205 は閉じる
+- コードは変えない。試作 #204 と draft の PR #205 は閉じた
 - 接続時の自動再生・準備に使う受信の仕組み（`BLUETOOTH_CONNECT` の許可など）は足さない
