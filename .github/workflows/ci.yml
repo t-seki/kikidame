@@ -8,6 +8,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # ADR を足したら docs/claude-code-handoff.md の「参照」の一覧にも足す（#211）
+      - name: ADR index in handoff is complete
+        run: scripts/check-adr-index.sh
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
           distribution: temurin
