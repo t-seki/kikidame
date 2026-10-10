@@ -21,6 +21,7 @@ import dev.tseki.kikidame.domain.SmbConnection
 import java.io.IOException
 import java.io.InputStream
 import java.util.EnumSet
+import java.util.concurrent.CancellationException
 import java.util.concurrent.TimeUnit
 import kotlin.time.Instant
 
@@ -67,6 +68,8 @@ class SmbFolderTree(private val connection: SmbConnection) : CloseableFolderTree
                 }
         } catch (e: SMBApiException) {
             if (SmbErrors.isNotFound(e.status)) null else throw SmbErrors.translate(e, connecting = false, path = path)
+        } catch (e: Exception) {
+            throw SmbErrors.translate(e, connecting = false, path = path)
         }
     }
 
@@ -78,7 +81,7 @@ class SmbFolderTree(private val connection: SmbConnection) : CloseableFolderTree
         }
         return try {
             file.read(buffer, position, offset, size.coerceAtMost(MAX_CHUNK))
-        } catch (e: SMBApiException) {
+        } catch (e: Exception) {
             throw SmbErrors.translate(e, connecting = false, path = path)
         }
     }
@@ -90,7 +93,7 @@ class SmbFolderTree(private val connection: SmbConnection) : CloseableFolderTree
             FolderFileStream(file.length, SmbFileInputStream(file, offset))
         } catch (e: Exception) {
             closeQuietly { file.close() }
-            throw if (e is SMBApiException) SmbErrors.translate(e, connecting = false, path = path) else e
+            throw SmbErrors.translate(e, connecting = false, path = path)
         }
     }
 
@@ -119,7 +122,7 @@ class SmbFolderTree(private val connection: SmbConnection) : CloseableFolderTree
                 SMB2CreateDisposition.FILE_OPEN,
                 null,
             )
-        } catch (e: SMBApiException) {
+        } catch (e: Exception) {
             throw SmbErrors.translate(e, connecting = false, path = path)
         }
     }
@@ -189,6 +192,12 @@ private class SmbFileInputStream(private val file: File, offset: Long) : InputSt
             file.read(b, position, off, len.coerceAtMost(CHUNK))
         } catch (e: SMBApiException) {
             throw IOException("SMB read failed: ${e.status}", e)
+        } catch (e: IOException) {
+            throw e // InterruptedIOException を含む
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: RuntimeException) {
+            throw IOException("SMB read failed: ${e.message}", e)
         }
         if (n <= 0) return -1
         position += n

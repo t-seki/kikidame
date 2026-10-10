@@ -11,7 +11,7 @@
     <string name="common_pause">一時停止</string>
     <string name="common_played">再生済み</string>
     <string name="common_unplayed">未再生</string>
-    <string name="common_program_gone">サーバ上で見つかりません</string>
+    <string name="common_program_gone">取得元に見つかりません</string>
     <plurals name="common_storage_usage">
         <item quantity="other">%1$s（%2$d 回）</item>
     </plurals>
@@ -48,7 +48,7 @@
     <string name="smb_connect_path">共有の中のフォルダ（省略可）</string>
     <string name="smb_connect_path_hint">空なら共有の直下。その下に 配信元 / 番組 / 各回のファイル</string>
     <string name="smb_connect_guest">ゲストとして接続</string>
-    <string name="smb_connect_error_invalid">ホストと共有名を確認してください</string>
+    <string name="smb_connect_error_invalid">ホスト・共有名・フォルダを確認してください</string>
     <string name="smb_error_unauthorized">ユーザー名かパスワードが違うか、この共有に入る権限がありません</string>
     <string name="smb_error_unreachable">NAS に接続できません。ホストとネットワークを確認してください</string>
     <string name="smb_error_failed">共有フォルダを読めませんでした: %1$s</string>
@@ -103,8 +103,8 @@
     <string name="program_list_unplayed_on_device_of_total">未再生 %1$d / 手元 %2$d · 全 %3$d 回</string>
     <string name="program_list_latest">最新 %1$s</string>
     <string name="program_list_empty_title">番組がありません</string>
-    <string name="program_list_empty_pull">引っ張って更新するとサーバから取得します</string>
-    <string name="program_list_empty_connect">設定からサーバに接続してください</string>
+    <string name="program_list_empty_pull">引っ張って更新すると取得元から取得します</string>
+    <string name="program_list_empty_connect">設定から取得元に接続してください</string>
 
     <!-- episode_list -->
     <string name="episode_list_sync_settings_on">同期の設定（同期対象）</string>
@@ -129,13 +129,13 @@
     <string name="episode_list_action_download">ダウンロード（固定）</string>
     <string name="episode_list_action_unpin">固定を外す（保持ルールの対象にする）</string>
     <string name="episode_list_action_delete_file">ファイルを削除（再生位置は残る）</string>
-    <string name="episode_list_action_delete_episode">この回を消す（サーバに無いため戻せない）</string>
+    <string name="episode_list_action_delete_episode">この回を消す（取得元に無いため戻せない）</string>
     <string name="episode_list_action_details">詳細</string>
     <string name="episode_list_storage">手元のファイル: %1$s</string>
     <string name="episode_list_storage_empty">手元にファイルはありません</string>
     <string name="episode_list_sync_this_program">この番組を同期する</string>
-    <string name="episode_list_sync_gone">サーバ上で見つかりません（%1$s から）。同期は止まっています。手元の回はそのまま聴けます</string>
-    <string name="episode_list_sync_unavailable">サーバ上で見つかっていないため同期できません</string>
+    <string name="episode_list_sync_gone">取得元に見つかりません（%1$s から）。同期は止まっています。手元の回はそのまま聴けます</string>
+    <string name="episode_list_sync_unavailable">取得元に見つかっていないため同期できません</string>
     <string name="episode_list_sync_description">保持ルールに従って自動でダウンロードし、外れた回を削除します。固定した回は残ります</string>
     <string name="episode_list_keep_latest">最新 N 回まで保持</string>
     <plurals name="episode_list_keep_latest_choice">
@@ -149,7 +149,7 @@
     <string name="episode_list_msg_unpinned">固定を外しました。保持ルールの対象になります</string>
     <string name="episode_list_msg_file_deleted_synced">ファイルを削除しました。同期対象の番組なので、保持すべき回なら次の同期で落とし直されます</string>
     <string name="episode_list_msg_file_deleted">ファイルを削除しました。再生位置は残っています</string>
-    <string name="episode_list_msg_episode_removed">この回はサーバに無いため、一覧からも消しました</string>
+    <string name="episode_list_msg_episode_removed">この回は取得元に無いため、一覧からも消しました</string>
     <string name="episode_list_msg_action_failed">操作に失敗しました: %1$s</string>
 
     <!-- episode_details -->
@@ -248,7 +248,7 @@
     <string name="settings_open_source_licenses">オープンソースライセンス</string>
     <string name="settings_open_source_licenses_description">使っているライブラリとそのライセンス</string>
     <string name="settings_sign_out_title">ログアウトしますか？</string>
-    <string name="settings_sign_out_text">手元のデータは残ります。次回はもう一度ログインが必要です。</string>
+    <string name="settings_sign_out_text">手元のデータは残ります。次回はもう一度接続が必要です。</string>
     <string name="settings_reset_title">手元のデータを消して取得元を変えますか？</string>
     <string name="settings_reset_text">番組・各回・再生位置・再生済み・音声ファイルがすべて消えます。この操作は取り消せません。</string>
     <string name="settings_reset_confirm">消して取得元の選択へ</string>
@@ -268,21 +268,21 @@
         <item quantity="other">%d 回を削除</item>
     </plurals>
     <plurals name="sync_on_hold">
-        <item quantity="other">%d 番組はサーバ上で見つからず、そのままにしました</item>
+        <item quantity="other">%d 番組は取得元で見つからず、そのままにしました</item>
     </plurals>
-    <string name="sync_program_gone">この番組はサーバ上で見つかりません。何も変えていません</string>
+    <string name="sync_program_gone">この番組は取得元に見つかりません。何も変えていません</string>
     <string name="sync_up_to_date">最新の状態です</string>
     <plurals name="sync_reconciled">
         <item quantity="other">手元に無くなっていた %d 回の記録を整理しました</item>
     </plurals>
     <string name="sync_not_on_wifi">Wi-Fi に接続していないため更新しません</string>
-    <string name="sync_error_session_expired">サーバの認証が切れました。もう一度ログインしてください</string>
-    <string name="sync_error_unreachable">サーバに接続できません。手元の一覧を表示しています</string>
+    <string name="sync_error_session_expired">取得元の認証が切れました。もう一度接続してください</string>
+    <string name="sync_error_unreachable">取得元に接続できません。手元の一覧を表示しています</string>
     <string name="sync_error_fetch_failed">取得に失敗しました: %1$s</string>
     <string name="sync_error_import_failed">取り込みに失敗しました: %1$s</string>
     <string name="sync_error_unauthorized">ユーザー名またはパスワードが違います</string>
     <string name="sync_error_unreachable_connect">サーバに接続できません。URL とネットワークを確認してください</string>
-    <string name="sync_error_server_failed">サーバがエラーを返しました: %1$s</string>
+    <string name="sync_error_server_failed">取得元がエラーを返しました: %1$s</string>
 
     <!-- playback -->
     <string name="playback_skip_back">10 秒戻る</string>

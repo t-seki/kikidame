@@ -8,6 +8,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.tseki.kikidame.LocalNetworkPermission
 import dev.tseki.kikidame.R
 import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.ui.source.SourceChanger
 import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
@@ -34,6 +35,7 @@ data class ConnectUiState(
 class ConnectViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val sessionRepository: SessionRepository,
+    private val sourceChanger: SourceChanger,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ConnectUiState())
     val uiState: StateFlow<ConnectUiState> = _uiState
@@ -52,6 +54,14 @@ class ConnectViewModel @Inject constructor(
     fun onServerUrlChange(value: String) = _uiState.update { it.copy(serverUrl = value, error = null) }
     fun onUserNameChange(value: String) = _uiState.update { it.copy(userName = value, error = null) }
     fun onPasswordChange(value: String) = _uiState.update { it.copy(password = value, error = null) }
+
+    /** 「取得元を変える」。手元を全部消した後に [onDone]（初回の取得元の選択画面へ戻る）を呼ぶ。 */
+    fun changeSource(onDone: () -> Unit) {
+        viewModelScope.launch {
+            sourceChanger.changeSource()
+            onDone()
+        }
+    }
 
     fun submit() {
         val s = _uiState.value

@@ -196,6 +196,18 @@ class DataStoreSessionRepositoryTest {
         assertFalse("smb_password" in keys)
     }
 
+    /** ゲストかどうかもホストなどと同じく残る（再接続の画面でスイッチが前の値のまま出る）。パスワードの無いゲストでもログアウトできる。 */
+    @Test
+    fun signOutOfAGuestConnectionKeepsGuestAndLogsOut() = runTest {
+        repo.connectSharedFolder(SmbConnection("nas.local", "public", "", "", "", guest = true))
+        repo.signOut()
+        val signedOut = assertIs<SessionState.SignedOut>(repo.state.first())
+        assertEquals(SmbConnection("nas.local", "public", "", "", "", guest = true), signedOut.lastSmb)
+
+        repo.connectSharedFolder(SmbConnection("nas.local", "public", "", "", "", guest = true))
+        assertIs<SessionState.Ready>(repo.state.first())
+    }
+
     /** 取得元は同時に 1 つ。片方に接続すると、もう片方の接続は消える。 */
     @Test
     fun connectingToOneSourceForgetsTheOther() = runTest {

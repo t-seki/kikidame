@@ -34,12 +34,14 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tseki.kikidame.R
 import dev.tseki.kikidame.ui.resolve
+import dev.tseki.kikidame.ui.source.ChangeSourceButton
 
 /** Jellyfin のサーバ URL・ユーザー名・パスワードでログインする。成功するとセッション状態が変わり、NavHost が次の画面へ導く。[onBack] は取得元の選択から来たときだけ渡す。 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConnectScreen(
     onBack: (() -> Unit)? = null,
+    onSourceChanged: () -> Unit,
     viewModel: ConnectViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -100,6 +102,8 @@ fun ConnectScreen(
                     Text(stringResource(R.string.connect_submit))
                 }
             }
+            // ログアウトした後は取得元を選び直す入口が他に無い。取得元の選択から来たときは戻るで選び直せる
+            if (onBack == null) ChangeSourceButton(onConfirm = { viewModel.changeSource(onSourceChanged) })
         }
     }
 }

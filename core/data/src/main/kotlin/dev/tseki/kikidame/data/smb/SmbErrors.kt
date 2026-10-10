@@ -4,6 +4,8 @@ import com.hierynomus.mserref.NtStatus
 import com.hierynomus.mssmb2.SMBApiException
 import dev.tseki.kikidame.domain.ServerException
 import java.io.FileNotFoundException
+import java.io.IOException
+import java.util.concurrent.CancellationException
 
 /**
  * smbj の失敗を、[dev.tseki.kikidame.data.sharedfolder.FolderTree] の約束（接続・認証・権限の失敗は必ず例外にし、
@@ -36,10 +38,15 @@ internal object SmbErrors {
      * [e] を投げ直す例外にする。[connecting] は共有につなぐ段階（認証と共有への接続）で、そこでの「アクセス拒否」は
      * 資格情報に共有への権利が無いことなので [ServerException.Unauthorized]。つないだ後の個別のパスの「アクセス拒否」は
      * そのパスだけの問題なので [ServerException.Failed]（読めないフォルダがあるたびにログアウトさせない）。
-     * smbj 以外の例外（[java.io.IOException] など）はそのまま返す。
+     * [ServerException]・[IOException]（[java.io.InterruptedIOException] を含む）・[InterruptedException]・コルーチンの取り消し
+     * （[CancellationException]）はそのまま返す。それ以外の smbj の実行時の例外は [IOException] に包む
+     * （[dev.tseki.kikidame.data.sharedfolder.FolderTree] の契約: 失敗は例外で、呼び出し側が分類する）。
      */
-    fun translate(e: Exception, connecting: Boolean, path: String = ""): Exception =
-        if (e is SMBApiException) classify(e.status, connecting, path, e) else e
+    fun translate(e: Exception, connecting: Boolean, path: String = ""): Exception = when (e) {
+        is SMBApiException -> classify(e.status, connecting, path, e)
+        is ServerException, is IOException, is InterruptedException, is CancellationException -> e
+        else -> IOException("SMB failure: ${e.message}", e)
+    }
 
     fun classify(status: NtStatus, connecting: Boolean, path: String, cause: Exception? = null): Exception = when {
         status in BAD_CREDENTIALS -> ServerException.Unauthorized(cause)

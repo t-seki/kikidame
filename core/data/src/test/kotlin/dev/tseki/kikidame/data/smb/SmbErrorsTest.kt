@@ -67,4 +67,17 @@ class SmbErrorsTest {
         val failed = ServerException.Failed("x")
         assertSame(failed, SmbErrors.translate(failed, connecting = false))
     }
+
+    /** smbj の実行時の例外は IOException に包む。割り込みと取り消しは包まない（FolderTree の契約）。 */
+    @Test
+    fun otherRuntimeFailuresBecomeIoExceptionButInterruptionsPassThrough() {
+        val runtime = IllegalStateException("bad packet")
+        val wrapped = assertIs<IOException>(SmbErrors.translate(runtime, connecting = false, path = "a"))
+        assertSame(runtime, wrapped.cause)
+
+        val interrupted = java.io.InterruptedIOException("interrupted")
+        assertSame(interrupted, SmbErrors.translate(interrupted, connecting = false))
+        val cancelled = java.util.concurrent.CancellationException("cancelled")
+        assertSame(cancelled, SmbErrors.translate(cancelled, connecting = false))
+    }
 }

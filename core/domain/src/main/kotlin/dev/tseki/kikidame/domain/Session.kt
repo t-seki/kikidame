@@ -157,7 +157,7 @@ data class RefreshResult(
     val hasChanges: Boolean get() = newEpisodes > 0 || enqueued > 0 || deleted + removed > 0
 }
 
-/** 「取得元を変える」（#50 の「別のサーバに接続」を改めたもの）。手元の番組・各回・再生位置・セッションを全部消し、音声ファイルも消す（#50）。 */
+/** 「取得元を変える」（#50）。手元の番組・各回・再生位置・セッションを全部消し、音声ファイルも消す（#50）。 */
 interface LocalDataReset {
     suspend fun resetAll()
 }

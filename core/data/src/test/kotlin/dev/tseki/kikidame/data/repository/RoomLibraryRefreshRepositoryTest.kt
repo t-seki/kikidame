@@ -273,7 +273,7 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
         assertEquals(attemptedAt, assertIs<SessionState.Ready>(session.state.first()).lastAttemptedAt)
     }
 
-    /** 「別のサーバに接続」は行・セッションに加えて音声ファイルも消す（#50。残しても到達する手段が無い）。 */
+    /** 「取得元を変える」は行・セッションに加えて音声ファイルも消す（#50。残しても到達する手段が無い）。 */
     @Test
     fun resetAllClearsRowsSessionAndFiles() = runTest {
         signInAndSelect()

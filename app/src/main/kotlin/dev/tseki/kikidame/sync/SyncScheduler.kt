@@ -51,7 +51,7 @@ class SyncScheduler @Inject constructor(
 
     /** 「Wi-Fi のみ」を変えたら制約を組み直す。 */
     suspend fun reschedule() = schedulePeriodic()
-    /** 「別のサーバに接続」（#50）の前に、定期同期と起動時同期を止めて完了を待つ（消している最中に行を作り直さない）。 */
+    /** 「取得元を変える」（#50）の前に、定期同期と起動時同期を止めて完了を待つ（消している最中に行を作り直さない）。 */
     suspend fun cancelAll() {
         workManager.cancelUniqueWork(SyncWorker.PERIODIC_NAME)
         workManager.cancelUniqueWork(SyncWorker.ONCE_NAME)

@@ -106,10 +106,16 @@ fun KikidameNavHost(sessionViewModel: SessionViewModel = hiltViewModel()) {
             )
         }
         composable<ConnectRoute> {
-            ConnectScreen(onBack = if (navController.previousBackStackEntry != null) navController::popIfNotRoot else null)
+            ConnectScreen(
+                onBack = if (navController.previousBackStackEntry != null) navController::popIfNotRoot else null,
+                onSourceChanged = { navController.navigate(SourcePickRoute) { popUpTo(0) } },
+            )
         }
         composable<SmbConnectRoute> {
-            SmbConnectScreen(onBack = if (navController.previousBackStackEntry != null) navController::popIfNotRoot else null)
+            SmbConnectScreen(
+                onBack = if (navController.previousBackStackEntry != null) navController::popIfNotRoot else null,
+                onSourceChanged = { navController.navigate(SourcePickRoute) { popUpTo(0) } },
+            )
         }
         composable<LibraryPickRoute> {
             val fromSettings = navController.previousBackStackEntry != null

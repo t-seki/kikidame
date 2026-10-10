@@ -37,6 +37,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tseki.kikidame.R
 import dev.tseki.kikidame.ui.resolve
+import dev.tseki.kikidame.ui.source.ChangeSourceButton
 
 /**
  * NAS の共有フォルダ（SMB）に接続する（#198）。ホスト・共有名・共有の中のパス・ユーザー名・パスワード。ゲスト接続も選べる。
@@ -46,6 +47,7 @@ import dev.tseki.kikidame.ui.resolve
 @Composable
 fun SmbConnectScreen(
     onBack: (() -> Unit)?,
+    onSourceChanged: () -> Unit,
     viewModel: SmbConnectViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -130,6 +132,8 @@ fun SmbConnectScreen(
                     Text(stringResource(R.string.connect_submit))
                 }
             }
+            // ログアウトした後は取得元を選び直す入口が他に無い。取得元の選択から来たときは戻るで選び直せる
+            if (onBack == null) ChangeSourceButton(onConfirm = { viewModel.changeSource(onSourceChanged) })
         }
     }
 }

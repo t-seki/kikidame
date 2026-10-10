@@ -14,6 +14,7 @@ import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.domain.SmbConnection
 import dev.tseki.kikidame.sync.LibraryRefresher
 import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.ui.source.SourceChanger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,6 +42,7 @@ data class SmbConnectUiState(
 class SmbConnectViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val sessionRepository: SessionRepository,
+    private val sourceChanger: SourceChanger,
     private val refresher: LibraryRefresher,
 ) : ViewModel() {
     private companion object {
@@ -55,7 +57,7 @@ class SmbConnectViewModel @Inject constructor(
             // ログアウトした後の入力補助（パスワードは残さない）
             val last = (sessionRepository.state.first() as? SessionState.SignedOut)?.lastSmb ?: return@launch
             _uiState.update {
-                it.copy(host = last.host, share = last.share, path = last.path, userName = last.userName)
+                it.copy(host = last.host, share = last.share, path = last.path, userName = last.userName, guest = last.guest)
             }
         }
     }
@@ -66,6 +68,14 @@ class SmbConnectViewModel @Inject constructor(
     fun onGuestChange(value: Boolean) = _uiState.update { it.copy(guest = value, error = null) }
     fun onUserNameChange(value: String) = _uiState.update { it.copy(userName = value, error = null) }
     fun onPasswordChange(value: String) = _uiState.update { it.copy(password = value, error = null) }
+
+    /** 「取得元を変える」。手元を全部消した後に [onDone]（初回の取得元の選択画面へ戻る）を呼ぶ。 */
+    fun changeSource(onDone: () -> Unit) {
+        viewModelScope.launch {
+            sourceChanger.changeSource()
+            onDone()
+        }
+    }
 
     fun submit() {
         val s = _uiState.value

@@ -57,6 +57,7 @@ class SessionStore(
             it[SMB_PATH] = connection.path
             it[SMB_USER] = connection.userName
             it[SMB_GUEST] = connection.guest
+            it.remove(SMB_SIGNED_OUT)
             if (encrypted != null) it[SMB_PASSWORD] = encrypted else it.remove(SMB_PASSWORD)
             it.remove(LAST_FETCHED_AT)
             it.remove(LAST_ATTEMPTED_AT)
@@ -85,7 +86,8 @@ class SessionStore(
             it.remove(USER_ID)
             it.remove(TOKEN)
             it.remove(SMB_PASSWORD)
-            it.remove(SMB_GUEST)
+            // ゲスト接続はパスワードが無いので、ログアウトした印を別に置く。ゲストかどうかはホストなどと同じく次回の入力補助として残す
+            if (it[SMB_HOST] != null) it[SMB_SIGNED_OUT] = true
             it.remove(LIBRARY_ID)
             it.remove(LIBRARY_NAME)
             it.remove(LAST_FETCHED_AT)
@@ -113,6 +115,7 @@ class SessionStore(
         remove(SMB_USER)
         remove(SMB_PASSWORD)
         remove(SMB_GUEST)
+        remove(SMB_SIGNED_OUT)
     }
 
     private fun Preferences.toState(): SessionState =
@@ -126,9 +129,9 @@ class SessionStore(
         val guest = this[SMB_GUEST] ?: false
         val password = this[SMB_PASSWORD]?.let { stored -> runCatching { cipher.decrypt(stored) }.getOrNull() }
         if (host == null || share == null) return SessionState.SignedOut(null, null)
-        // ログアウトするとパスワードが消える（ゲストはパスワードが要らないので、ゲストのままなら Ready）
-        if (!guest && password == null) {
-            return SessionState.SignedOut(null, null, lastSmb = SmbConnection(host, share, path, userName, password = ""))
+        // ログアウトするとパスワードが消え、印が立つ（ゲストはパスワードが要らないので、印で見分ける）
+        if (this[SMB_SIGNED_OUT] == true || (!guest && password == null)) {
+            return SessionState.SignedOut(null, null, lastSmb = SmbConnection(host, share, path, userName, password = "", guest = guest))
         }
         return SessionState.Ready(
             source = ConnectedSource.Smb(SmbConnection(host, share, path, userName, password.orEmpty(), guest)),
@@ -171,5 +174,6 @@ class SessionStore(
         val SMB_USER = stringPreferencesKey("smb_user")
         val SMB_PASSWORD = stringPreferencesKey("smb_password")
         val SMB_GUEST = booleanPreferencesKey("smb_guest")
+        val SMB_SIGNED_OUT = booleanPreferencesKey("smb_signed_out")
     }
 }
