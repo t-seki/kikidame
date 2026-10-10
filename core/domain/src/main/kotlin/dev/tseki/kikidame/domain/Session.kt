@@ -59,6 +59,27 @@ val SessionState.isDeviceFolder: Boolean
  * 端末のストレージ（内部ストレージと SD カード）のフォルダだけを受け付ける（[isDeviceStorage]）。
  */
 data class DeviceFolder(val treeUri: String, val name: String) {
+    /**
+     * 端末の中の場所（画面に出すパスの元。PR #214 のマージ前の検証で、人の判断で足した）。ツリーの文書 ID
+     * （`DocumentsContract.getTreeDocumentId` の値。URI の `/tree/` の後ろを百分率の符号から戻したもの）を `<ボリューム>:<パス>` として読む。
+     * 例: `primary:KikidameTest/Radio` → ボリューム `primary`、パス `KikidameTest`・`Radio`。
+     *
+     * この形は `ExternalStorageProvider`（受け付ける唯一の provider。[isDeviceStorage]）の実装の決まりで、`DocumentsContract` の
+     * 公開の契約ではない（文書 ID は provider ごとに不透明とされている）。この形を前提にするのは未確認の前提で、形が崩れていたら null を返し、
+     * 呼び出し側は保存済みの表示名（[name]）に戻す。保存（DataStore の `device_*`）は変えず、表示のたびに URI から作る。
+     */
+    val location: DeviceFolderLocation?
+        get() {
+            val raw = runCatching { java.net.URI(treeUri).rawPath }.getOrNull() ?: return null
+            val encoded = raw.removePrefix("/tree/").takeIf { it != raw && it.isNotEmpty() && '/' !in it } ?: return null
+            // URLDecoder は「+」を空白にするので、先に「+」そのものに戻るよう符号にしておく
+            val documentId = runCatching { java.net.URLDecoder.decode(encoded.replace("+", "%2B"), Charsets.UTF_8) }.getOrNull() ?: return null
+            val volume = documentId.substringBefore(':', missingDelimiterValue = "")
+            if (volume.isEmpty() || volume.contains('/')) return null
+            val segments = documentId.substringAfter(':').split('/').filter { it.isNotEmpty() }
+            return DeviceFolderLocation(volume, segments)
+        }
+
     companion object {
         /** 内部ストレージと SD カードの文書の provider（`ExternalStorageProvider`）の authority。 */
         const val EXTERNAL_STORAGE_AUTHORITY: String = "com.android.externalstorage.documents"
@@ -71,6 +92,20 @@ data class DeviceFolder(val treeUri: String, val name: String) {
             val uri = runCatching { java.net.URI(treeUri) }.getOrNull() ?: return false
             return uri.scheme == "content" && uri.authority == EXTERNAL_STORAGE_AUTHORITY
         }
+    }
+}
+
+/**
+ * 端末のフォルダの、端末の中の場所（[DeviceFolder.location]）。[volume] は `ExternalStorageProvider` のボリュームの ID で、
+ * 内部ストレージは [PRIMARY_VOLUME]、それ以外（SD カードなど）はボリュームの UUID の形（例 `1234-5678`。実機では未確認）。
+ * [segments] はボリュームの根からのフォルダ名（ボリュームの根そのものなら空）。
+ */
+data class DeviceFolderLocation(val volume: String, val segments: List<String>) {
+    val isPrimary: Boolean get() = volume == PRIMARY_VOLUME
+
+    companion object {
+        /** 内部ストレージのボリュームの ID（`ExternalStorageProvider` の実装の決まり。公開の契約ではない）。 */
+        const val PRIMARY_VOLUME: String = "primary"
     }
 }
 

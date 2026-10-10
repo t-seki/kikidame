@@ -50,6 +50,7 @@ import dev.tseki.kikidame.domain.ConnectedSource
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.ui.SectionTitle
 import dev.tseki.kikidame.ui.ValueRow
+import dev.tseki.kikidame.ui.connect.displayPath
 import dev.tseki.kikidame.ui.resolve
 import dev.tseki.kikidame.ui.toDateTimeText
 import dev.tseki.kikidame.ui.toText
@@ -116,8 +117,8 @@ fun SettingsScreen(
                 ValueRow(stringResource(R.string.settings_smb_path), smb.path.ifEmpty { stringResource(R.string.settings_smb_path_root) })
                 ValueRow(stringResource(R.string.settings_user), if (smb.guest) stringResource(R.string.settings_smb_guest) else smb.userName)
             } else if (deviceFolder != null) {
-                // 端末のフォルダ（#199）はフォルダ名だけ（ツリーの URI は利用者に読めない形なので出さない）
-                ValueRow(stringResource(R.string.settings_device_folder), deviceFolder.name)
+                // 端末のフォルダ（#199）は端末の中のパス（ツリーの URI は利用者に読めない形なので出さない）
+                ValueRow(stringResource(R.string.settings_device_folder), deviceFolder.displayPath().resolve())
             } else if (jellyfinSession != null) {
                 ValueRow("URL", jellyfinSession.serverUrl)
                 ValueRow(stringResource(R.string.settings_user), jellyfinSession.userName)

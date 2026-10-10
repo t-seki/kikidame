@@ -23,8 +23,8 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class DeviceFolderUiState(
-    /** アクセスが切れてログアウトしたフォルダの名前（#199 の決定 5）。選び直しを案内する。 */
-    val lostFolderName: String? = null,
+    /** ログアウトしたフォルダの、端末の中の場所（[displayPath]。#199 の決定 5）。選び直しを案内する。 */
+    val lostFolder: UiText? = null,
     val isSubmitting: Boolean = false,
     val error: UiText? = null,
 )
@@ -50,7 +50,7 @@ class DeviceFolderViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             val lost = (sessionRepository.state.first() as? SessionState.SignedOut)?.lastDeviceFolder ?: return@launch
-            _uiState.update { it.copy(lostFolderName = lost.name) }
+            _uiState.update { it.copy(lostFolder = lost.displayPath()) }
         }
     }
 

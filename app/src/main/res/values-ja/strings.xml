@@ -51,6 +51,7 @@
     <string name="device_folder_storage_hint">コピーした回は、フォルダのファイルとアプリの中のコピーとで、端末の容量を二重に使います。番組ごとの同期対象と保持ルールで、コピーする数を絞れます。</string>
     <string name="device_folder_keep_hint">フォルダのファイルは消さずに置いておいてください。フォルダからファイルを消すと、その回は取得元から消えたものとして扱われ、手元のコピーも消えます（固定していても消えます）。</string>
     <string name="device_folder_pick">フォルダを選ぶ</string>
+    <string name="device_folder_internal_storage">内部ストレージ</string>
     <string name="device_folder_lost">フォルダ「%1$s」につながっていません。フォルダを選び直してください</string>
     <string name="device_folder_error_not_device">端末のフォルダではありません。内部ストレージか SD カードのフォルダを選び直してください</string>
     <string name="device_folder_error_failed">フォルダを読めませんでした。フォルダを選び直してください</string>

@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tseki.kikidame.R
+import dev.tseki.kikidame.domain.DeviceFolder
+import dev.tseki.kikidame.ui.UiText
 import dev.tseki.kikidame.ui.resolve
 import dev.tseki.kikidame.ui.source.ChangeSourceButton
 
@@ -74,8 +76,8 @@ fun DeviceFolderScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Spacer(Modifier.height(8.dp))
-            state.lostFolderName?.let {
-                Text(stringResource(R.string.device_folder_lost, it), color = MaterialTheme.colorScheme.error)
+            state.lostFolder?.let {
+                Text(stringResource(R.string.device_folder_lost, it.resolve()), color = MaterialTheme.colorScheme.error)
             }
             Text(stringResource(R.string.device_folder_description), style = MaterialTheme.typography.bodyMedium)
             Text(
@@ -104,4 +106,19 @@ fun DeviceFolderScreen(
             if (onBack == null) ChangeSourceButton(onConfirm = { viewModel.changeSource(onSourceChanged) })
         }
     }
+}
+
+/**
+ * 端末のフォルダの、画面に出す場所（設定の取得元の行と、選び直しの案内。PR #214 のマージ前の検証で、人の判断で足した）。
+ * 例「内部ストレージ / KikidameTest / Radio」。ツリーの文書 ID（[DeviceFolder.location]）から作る。
+ *
+ * - 内部ストレージ（ボリューム `primary`）は「内部ストレージ」と出す
+ * - それ以外のボリューム（SD カード、USB のストレージなど）は、ボリュームの ID（例 `1234-5678`）をそのまま出す。ID だけでは
+ *   SD カードか USB のストレージかを見分けられず、ボリュームの表示名を引くには別の問い合わせ（`StorageManager` など）が要るため
+ * - 文書 ID が想定の形でない（[DeviceFolder.location] が null）ときは、保存済みの表示名（選んだフォルダ自身の名前）に戻す
+ */
+fun DeviceFolder.displayPath(): UiText {
+    val location = location ?: return UiText.Plain(name)
+    val volume = if (location.isPrimary) UiText.Res(R.string.device_folder_internal_storage) else UiText.Plain(location.volume)
+    return UiText.Joined(listOf(volume) + location.segments.map(UiText::Plain), UiText.Plain(" / "))
 }

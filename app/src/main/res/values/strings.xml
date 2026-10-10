@@ -74,7 +74,9 @@
     <string name="device_folder_storage_hint">Each copied episode takes space twice on this device: the file in the folder and the copy in the app. Use the per-program sync and keep rules to limit how many episodes are copied.</string>
     <string name="device_folder_keep_hint">Keep the files in the folder. If you delete a file from the folder, Kikidame treats that episode as gone from the source and deletes its copy too, even if it is pinned.</string>
     <string name="device_folder_pick">Pick a folder</string>
-    <!-- Shown while signed out from a folder on this device (access was lost, or the user signed out). %1$s = folder name -->
+    <!-- First part of the path of a folder on this device, e.g. "Internal storage / Recordings / Radio" -->
+    <string name="device_folder_internal_storage">Internal storage</string>
+    <!-- Shown while signed out from a folder on this device (access was lost, or the user signed out). %1$s = where the folder is on this device, e.g. "Internal storage / Recordings / Radio" -->
     <string name="device_folder_lost">Not connected to the folder “%1$s”. Pick the folder again</string>
     <string name="device_folder_error_not_device">This is not a folder on this device. Pick a folder in internal storage or on an SD card</string>
     <!-- Picking failed (no access, or the folder could not be read). The details go to logcat, not to the screen -->
