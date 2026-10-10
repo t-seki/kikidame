@@ -184,6 +184,7 @@ main のチェックアウトから fork subagent に並列で実装させて回
 - Gradle は `ANDROID_HOME=~/Android/Sdk JAVA_HOME=~/.local/jdk/current ./gradlew <タスク>` の形で回す（例: `./gradlew :app:assembleDebug`。#161 の head `59784fc` でこの形のビルドが通ることを確かめた）。`build/` は worktree ごとに別なので初回ビルドが重い。`~/.gradle` のキャッシュは共有されるので依存の再ダウンロードは無い
 - Gradle のデーモンも `~/.gradle` 単位で、main と全 worktree が共有している。ほかの worktree でビルドが走っている間は `./gradlew --stop` を打たない（走っているビルドが `Gradle build daemon has been stopped: stop command received` で落ちる。2026-10-08 に Supervisor が検証用の worktree を消す前に打ち、worker の `assembleDebug` が落ちた）。検証用の worktree は `--stop` なしで `git worktree remove` してよい
 - 画面（UI）を変える issue は、「触るファイル」と完了条件に `docs/ui.md` と `docs/claude-code-handoff.md` の該当箇所を入れる。入れ忘れると PR のレビューで「docs が古い」と指摘されて直すことになる（過去に #79・#139・#143・#152 で起きた）
+- CI（`.github/workflows/ci.yml` の job・ステップ）を変える issue は、「触るファイル」と完了条件に「マージ前の検証」の 1 の CI の列挙（この docs の `docs/development.md`）を入れる。入れ忘れると PR のレビューで「列挙が古い」と指摘されて直すことになる（過去に PR #212（#211）1 周目 #1 と PR #217（#215）1 周目 #1 で起きた）
 - 担当は「同じファイルを触らない」単位で分ける（例: 2026-09-20 は `EpisodeListScreen.kt` 周りの #66→#68→#70 と、テーマ・設定・ミニプレイヤーの #59→#62 に分けて衝突なし）
 
 ### マージ前の検証
