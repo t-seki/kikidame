@@ -14,7 +14,8 @@ kotlin {
 dependencies {
     api(libs.kotlinx.datetime)
     api(libs.kotlinx.coroutines.core)
-    signature("net.sf.androidscents.signature:android-api-level-31:12_r1@signature")
+    // シグネチャの 31 は minSdk（app/build.gradle.kts と core/data/build.gradle.kts）に合わせて上げる。@signature の拡張子は catalog で表せないので、ここで足す
+    signature(libs.android.api.signature.get().let { "${it.module}:${it.versionConstraint.requiredVersion}@signature" })
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlin.test.junit5)
