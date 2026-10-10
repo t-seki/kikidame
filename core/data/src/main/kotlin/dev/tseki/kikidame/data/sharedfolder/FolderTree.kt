@@ -32,6 +32,10 @@ data class FolderEntry(
     val isDirectory: Boolean,
     /** ファイルのサイズ（バイト）。フォルダでは意味を持たない。 */
     val sizeBytes: Long,
+    /**
+     * 更新日時。必須で、null にしない（取り込み日時と、タグを読み直すかの判定に使う）。
+     * 更新日時を取れない取得元では、実装の側で補う。
+     */
     val modifiedAt: Instant,
 )
 

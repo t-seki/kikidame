@@ -25,6 +25,8 @@ import kotlin.time.Instant
  * - 構成はちょうど `<配信元>/<番組>/<各回のファイル>` の 3 段（epic #195 の決定 5）。2 段目のフォルダはすべて番組
  *   （音声ファイルが 0 本でも番組）。3 段目の、拡張子が [AUDIO_EXTENSIONS] のファイルだけを各回とし、
  *   それ以外（1・2 段目のファイル、4 段目以下、音声でないファイル）は黙って無視する。配信元と番組はフォルダの名前で決める
+ * - 名前が `.`・`@`・`#` で始まるフォルダとファイル（NAS や OS が作るもの）は、どの段でも無視する（[isIgnoredName]、#197 の追加の決定）。
+ *   [fetchProgram]・[fetchProgramEpisodes] も同じ規則で、そういう名前の番組は無いものとして扱う
  * - 取得元 ID は相対パス（決定 7）。番組は `<配信元>/<番組>`、各回は `<配信元>/<番組>/<ファイル名>`
  * - 回の情報はタグから読む（決定 8・9）。取得元 ID・サイズ・更新日時がどれも前の走査（[ScannedFiles]）と同じ回は、
  *   タグを読み直さずに前の値を使う
@@ -72,7 +74,7 @@ class SharedFolderSource(
         }
     }
 
-    /** 番組のフォルダが無ければ null（消失）。取得元 ID が `<配信元>/<番組>` の形でなければ null。 */
+    /** 番組のフォルダが無ければ null（消失）。取得元 ID が `<配信元>/<番組>` の形でない（無視する名前を含む）ときも null。 */
     override suspend fun fetchProgram(programId: SourceItemId): SourceProgram? {
         val (publisher, program) = programSegments(programId) ?: return null
         return onTree {
@@ -100,7 +102,7 @@ class SharedFolderSource(
     }
 
     private fun episodesIn(programId: SourceItemId, entries: List<FolderEntry>, previous: Map<SourceItemId, ScannedFile>): List<SourceEpisode> =
-        entries.filter { !it.isDirectory && extensionOf(it.name) in AUDIO_EXTENSIONS }
+        entries.filter { !it.isDirectory && !isIgnoredName(it.name) && extensionOf(it.name) in AUDIO_EXTENSIONS }
             .sortedBy { it.name }
             .map { episodeOf(programId, it, previous) }
 
@@ -161,12 +163,19 @@ class SharedFolderSource(
         private fun extensionOf(name: String): String =
             name.substringAfterLast('.', missingDelimiterValue = "").lowercase()
 
-        private fun List<FolderEntry>.directories(): List<FolderEntry> = filter { it.isDirectory }.sortedBy { it.name }
+        /** 無視する名前の頭文字。NAS や OS が作るフォルダ・ファイル（`@eaDir`・`#recycle`・`._<名前>.m4a`・`.DS_Store` など）。 */
+        private val IGNORED_PREFIXES = charArrayOf('.', '@', '#')
 
-        /** `<配信元>/<番組>` を 2 つに分ける。形が違えば null。 */
+        /** 名前が `.`・`@`・`#` で始まるフォルダとファイルは、どの段でも無視する（#197 の追加の決定）。 */
+        fun isIgnoredName(name: String): Boolean = name.firstOrNull()?.let { it in IGNORED_PREFIXES } ?: true
+
+        private fun List<FolderEntry>.directories(): List<FolderEntry> =
+            filter { it.isDirectory && !isIgnoredName(it.name) }.sortedBy { it.name }
+
+        /** `<配信元>/<番組>` を 2 つに分ける。形が違う、または無視する名前を含むなら null（[fetchAll] に現れない番組）。 */
         private fun programSegments(id: SourceItemId): Pair<String, String>? {
             val parts = id.value.split('/')
-            return if (parts.size == 2 && parts.all { it.isNotEmpty() }) parts[0] to parts[1] else null
+            return if (parts.size == 2 && parts.none(::isIgnoredName)) parts[0] to parts[1] else null
         }
 
         private fun Instant.truncatedToMillis(): Instant = Instant.fromEpochMilliseconds(toEpochMilliseconds())

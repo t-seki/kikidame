@@ -96,6 +96,33 @@ class SharedFolderSourceTest : RoomTestBase() {
         assertEquals(setOf(SourceItemId("TBSラジオ/ハライチのターン！")), snapshot.episodes.map { it.programSourceId }.toSet())
     }
 
+    /** 名前が `.`・`@`・`#` で始まるフォルダとファイルは、どの段でも無視する（#197 の追加の決定）。 */
+    @Test
+    fun namesStartingWithDotAtOrHashAreIgnoredOnEveryLevel() = runTest {
+        folder.put("TBSラジオ/番組/2026-09-18.m4a")
+        folder.put("TBSラジオ/番組/._2026-09-18.m4a")
+        folder.put("TBSラジオ/番組/@thumb.m4a")
+        folder.put("TBSラジオ/番組/#old.m4a")
+        folder.put("TBSラジオ/番組/.DS_Store")
+        folder.put("TBSラジオ/@eaDir/a.m4a")
+        folder.put("TBSラジオ/#recycle/b.m4a")
+        folder.put("TBSラジオ/.hidden/c.m4a")
+        folder.put("@Recycle/番組/d.m4a")
+        folder.put(".@__thumb/番組/e.m4a")
+        folder.put("#snapshot/番組/f.m4a")
+
+        val snapshot = source.fetchAll()
+
+        assertEquals(listOf(SourceItemId("TBSラジオ/番組")), snapshot.programs.map { it.sourceId })
+        assertEquals(listOf("TBSラジオ/番組/2026-09-18.m4a"), snapshot.episodes.map { it.id() })
+        // 1 番組の取得も同じ規則（fetchAll と食い違わない）
+        assertEquals(listOf("TBSラジオ/番組/2026-09-18.m4a"), source.fetchProgramEpisodes(SourceItemId("TBSラジオ/番組")).map { it.id() })
+        for (id in listOf("TBSラジオ/@eaDir", "TBSラジオ/#recycle", "TBSラジオ/.hidden", "@Recycle/番組", ".@__thumb/番組", "#snapshot/番組")) {
+            assertNull(source.fetchProgram(SourceItemId(id)), id)
+            assertEquals(emptyList(), source.fetchProgramEpisodes(SourceItemId(id)), id)
+        }
+    }
+
     @Test
     fun programFetchAnswersFromThatFolderOnly() = runTest {
         folder.put("TBSラジオ/A/1.m4a")
