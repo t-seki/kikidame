@@ -51,7 +51,7 @@ Requires Android 12 (API 31) or later. Store descriptions and screenshots live i
 
 ## Source prerequisites
 
-The release build connects to **Jellyfin**. A **shared folder on a NAS (SMB)** is under development: it is not selectable in the current release build and can be tried only in the debug build.
+The app connects to **Jellyfin** or a **shared folder on a NAS (SMB)**, one at a time. Earlier release builds offer only Jellyfin (SMB was in the debug build only).
 
 ### Jellyfin
 
@@ -70,9 +70,7 @@ The release build connects to **Jellyfin**. A **shared folder on a NAS (SMB)** i
   - For radio recordings, set the tags `album` = program, `albumartist` = station, and the date (`©day` in M4A) = broadcast date, using a general-purpose tag editor such as Mp3tag
   - For podcasts, tag the files you fetched from the feed with `album` = program name, `albumartist` = the publisher or network, and the date = release date, then put them in the music library. One folder per program helps Jellyfin group them into a MusicAlbum
 
-### Shared folder on a NAS (SMB) — under development
-
-Not selectable in the current release build (debug build only). On a large share (about 6,000 episode files) the first full scan was cut off by a dropped connection before anything was imported, so it stays hidden until the scan is reworked and confirmed on a real device.
+### Shared folder on a NAS (SMB)
 
 - SMB2/3 only (SMB1 is not supported). Enter the host (a name or an IP address), the share name, an optional folder inside the share, and a username and password, or connect as a guest. The password is stored encrypted on the device. The app only reads the share and never writes to or deletes anything on it
 - Inside the share (or the folder you entered) the layout is exactly **`<publisher>/<program>/<episode files>`**, three levels:
@@ -85,8 +83,11 @@ Not selectable in the current release build (debug build only). On a large share
 
   Other files (non-audio files, files at other levels) are silently ignored. Folders and files whose names start with `.`, `@` or `#` (`@eaDir`, `#recycle`, `._foo.m4a` and the like, made by NAS units and operating systems) are ignored at every level
 - Publisher and program come from the folder names; the tags are not used for them. For each episode the app reads the tags: title (the file name without the extension if missing), date (the file's modified time if there is no full date), duration, and artist (performers). The tags are read again only when a file's path, size or modified time changes
+- The first full scan lists every folder first, then reads the tags program by program. Each program shows up in the program list as soon as its tags are read, and while tags are being read the program list shows a count such as "Reading tags 1,234 / 6,090". The first import of a share with thousands of episode files takes on the order of ten minutes or more (about 12 minutes for about 6,000 files on the developer's NAS; it depends on your NAS, network and files)
+- **Keep the app open with the screen on during the first import.** When the screen turns off and the app goes to the background, Android cuts the app's network connection after a while (from a few seconds to a few minutes; it varies with the device and the situation), and the import stops. Programs already imported stay, and the next time you open the app the import continues with the programs not read yet (their tags are not read again). Whether a program has disappeared from the share is decided only by a scan that reaches the end
+- If a read fails, the app reconnects and tries the same file again, and ends the sync as unreachable after three failures in a row. Whether reconnecting actually lets a scan continue (for example after a short network glitch) has not been seen on a real device yet
 - Renaming an episode file makes it unlinked and it is matched again by title (then by published day and duration) within the same program. Renaming a program folder makes the program Gone (On Hold), because the publisher and program name no longer match
-- Whether this works on your NAS and network (name resolution, guest access, how long the first full scan takes) is not verified on real devices yet; see "実機の確認項目" in [docs/development.md](./docs/development.md) (Japanese)
+- Whether this works on your NAS and network (name resolution, guest access, how long the first import takes) is verified only on the developer's NAS and device; see "実機で試す（#198: SMB の共有フォルダ）" and its checklists in [docs/development.md](./docs/development.md) (Japanese)
 
 ## How it works
 

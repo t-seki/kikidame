@@ -15,6 +15,8 @@ import dev.tseki.kikidame.domain.SelectedLibrary
 import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.Session
 import dev.tseki.kikidame.domain.SmbConnection
+import dev.tseki.kikidame.data.source.ScanListener
+import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SourceProgram
 import dev.tseki.kikidame.domain.SourceSnapshot
@@ -85,6 +87,31 @@ class SessionSourceGatewayTest {
         assertEquals(listOf(SourceItemId("TBSラジオ/番組")), snapshot.programs.map { it.sourceId })
         assertEquals(listOf(smb), opened)
         assertEquals(1, closes.size, "the connection is closed after the scan")
+    }
+
+    /** 途中経過の受け手も共有フォルダへ渡す（渡さないと全部読んでから取り込む形に戻る。#209）。 */
+    @Test
+    fun sharedFolderScanStreamsProgramsToTheListener() = runTest {
+        store.saveSmb(smb)
+        folder.put("TBSラジオ/番組/2026-09-18.m4a")
+        val streamed = ArrayList<SourceItemId>()
+        val progress = ArrayList<Pair<Int, Int>>()
+
+        gateway.fetchAll(
+            object : ScanListener {
+                override fun onTagProgress(read: Int, total: Int) {
+                    progress += read to total
+                }
+
+                override suspend fun onProgramScanned(program: SourceProgram, episodes: List<SourceEpisode>) {
+                    streamed += program.sourceId
+                }
+            },
+        )
+
+        assertEquals(listOf(SourceItemId("TBSラジオ/番組")), streamed)
+        assertEquals(listOf(0 to 1, 1 to 1), progress)
+        assertEquals(1, closes.size)
     }
 
     @Test

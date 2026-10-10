@@ -19,6 +19,13 @@ interface SourceGateway {
      */
     suspend fun fetchAll(): SourceSnapshot
 
+    /**
+     * [fetchAll] と同じ全走査で、途中経過を [listener] に流す（#209）。返す一覧は [fetchAll] と同じく完全な一覧。
+     * 既定は [fetchAll] をそのまま呼び、途中経過は流さない（Jellyfin。一覧が一度に返るので番組ごとに分けない）。
+     * 共有フォルダ（`SharedFolderSource`）は、タグを読んだ番組をその番組を読み終えるたびに流す。
+     */
+    suspend fun fetchAll(listener: ScanListener): SourceSnapshot = fetchAll()
+
     /** 1 番組の各回だけを取得する。他の番組に属する各回は含めない。 */
     suspend fun fetchProgramEpisodes(programId: SourceItemId): List<SourceEpisode>
 
@@ -33,6 +40,29 @@ interface SourceGateway {
      * 全体を返すこともある（[DownloadStream.resumedFrom] で判別）。使い終わったら [DownloadStream.close]。
      */
     suspend fun openDownload(episodeId: SourceItemId, rangeStart: Long): DownloadStream
+}
+
+/**
+ * 全走査の途中経過の受け手（#209）。走査はここで投げた例外を包まずにそのまま [SourceGateway.fetchAll] から投げる。
+ */
+interface ScanListener {
+    /**
+     * タグを読む回が [total] 本あり、そのうち [read] 本を読み終えた。走査の始めに `read = 0` で 1 回、
+     * その後は 1 本読むごとに呼ぶ。タグを読む回が無い走査（[total] が 0）では呼ばない。
+     */
+    fun onTagProgress(read: Int, total: Int) {}
+
+    /**
+     * 1 番組の各回を読み終えた。[episodes] はその番組について完全（[dev.tseki.kikidame.domain.SnapshotScope.Program] として取り込める）。
+     * タグを読んだ回がある番組だけを流す（タグを読まなかった番組は、前の同期から変わっていない回か、消えた回しか持たないので、
+     * 全走査の終わりの取り込みに任せる）。
+     */
+    suspend fun onProgramScanned(program: SourceProgram, episodes: List<SourceEpisode>) {}
+
+    companion object {
+        /** 何もしない受け手。 */
+        val None: ScanListener = object : ScanListener {}
+    }
 }
 
 class DownloadStream(

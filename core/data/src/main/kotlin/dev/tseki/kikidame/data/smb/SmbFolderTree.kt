@@ -40,6 +40,8 @@ fun interface FolderTreeFactory {
  * - 接続・認証・権限の失敗は必ず例外にする。[list] が null を返すのは、そのパスが無いときだけ（[SmbErrors]）。
  *   null で返すと、共有が外れたときに `fetchProgram` が全番組を消失と判断する（PR #202（#197）1 周目 #3）
  * - ゲスト接続は smbj の [AuthenticationContext.guest]。NAS ごとに通るかは実機で確かめる（未確認）
+ * - 全走査が失敗した操作をやり直す前に [reset] を呼ぶので、そこで接続を閉じ、次の操作で張り直す（#209）。
+ *   切れた接続を smbj が「つながっている」と見せたまま残すかは確かめていない（未確認）ので、[share] の `isConnected` だけに頼らない
  * - 単体テストしない（ネットワークに出るため）。パスの組み立てと失敗の分類は [SmbPaths] と [SmbErrors] で試す
  *
  * [read] は同じファイルを続けて読むことが多いので、最後に開いたファイルのハンドルを持ち回す。
@@ -95,6 +97,12 @@ class SmbFolderTree(private val connection: SmbConnection) : CloseableFolderTree
             closeQuietly { file.close() }
             throw SmbErrors.translate(e, connecting = false, path = path)
         }
+    }
+
+    /** 接続を閉じる（#209）。次の操作が [share] で張り直す。[close] と同じで、木はその後も使える。 */
+    @Synchronized
+    override fun reset() {
+        close()
     }
 
     @Synchronized

@@ -231,7 +231,8 @@ class RoomSyncTest : RoomTestBase() {
         val playing = markDone("a1", pinned = false)
         val other = markDone("a2", pinned = false)
 
-        val result = repo.refresh(excluded = setOf(episode("a1").episode.id))
+        val nowPlaying = setOf(episode("a1").episode.id)
+        val result = repo.refresh(excluded = { nowPlaying })
 
         assertEquals(1, result.deleted)
         assertTrue(playing.exists())

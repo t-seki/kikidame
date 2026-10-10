@@ -333,6 +333,8 @@
     <!-- ===== sync: shown under the top bar while syncing ===== -->
     <!-- Small text under the top bar while a scheduled or on-start sync runs, next to a thin progress bar -->
     <string name="sync_in_background">Syncing in background…</string>
+    <!-- #209: shared-folder scan: files whose tags were read / files to read -->
+    <string name="sync_reading_tags">Reading tags %1$,d / %2$,d</string>
 
     <!-- ===== sync: results of refresh / sync, shown in a snackbar ===== -->
     <!-- Separates sentences in a combined message. Keep the trailing space if your language uses one -->

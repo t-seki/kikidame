@@ -12,6 +12,7 @@ import dev.tseki.kikidame.domain.LocalDeletionScope
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.RefreshResult
+import dev.tseki.kikidame.domain.ScanProgress
 import dev.tseki.kikidame.ui.UiText
 import dev.tseki.kikidame.domain.SelectedLibrary
 import dev.tseki.kikidame.domain.ServerException
@@ -27,12 +28,14 @@ import dev.tseki.kikidame.playback.NowPlayingState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -52,10 +55,26 @@ class LibraryRefresherTest {
         var calls = 0
         var programCalls = 0
         var lastExcluded: Set<EpisodeId> = emptySet()
-        override suspend fun refresh(excluded: Set<EpisodeId>): RefreshResult {
+        /** 全走査の途中で流す進み具合（#209）。[gate] の前に流す。 */
+        var progress: List<ScanProgress> = emptyList()
+        /** 全走査の途中で番組ごとに予約した数（#209）。[gate] の前に流す。 */
+        var enqueuedOnTheWay: List<Int> = emptyList()
+        /** 渡された「再生中の回」を読む関数（番組ごとに読み直すことを試す。#209）。 */
+        var excludedReader: (() -> Set<EpisodeId>)? = null
+        /** [gate] を取り消しに気づかずに待つ（ブロッキングの I/O の代わり）。その後に [error] を投げる。 */
+        var ignoresCancellation = false
+        override suspend fun refresh(
+            excluded: () -> Set<EpisodeId>,
+            onProgress: (ScanProgress) -> Unit,
+            onEnqueued: (Int) -> Unit,
+        ): RefreshResult {
             calls++
-            lastExcluded = excluded
-            gate?.await()
+            lastExcluded = excluded()
+            excludedReader = excluded
+            progress.forEach(onProgress)
+            enqueuedOnTheWay.forEach(onEnqueued)
+            // ブロッキングの I/O のように、取り消しに気づかずに待ち続ける
+            if (ignoresCancellation) withContext(NonCancellable) { gate?.await() } else gate?.await()
             error?.let { throw it }
             return result!!
         }
@@ -620,6 +639,150 @@ class LibraryRefresherTest {
         assertFalse(refresher.isRefreshing.value)
         repo.gate = null
         assertEquals(3, refresher.refresh()?.programs, "a refresh right after the change is not dropped")
+    }
+
+    /** タグを読んでいる間は件数が流れ、終われば消える（#209 の決定 6）。silent な同期でも出す。 */
+    @Test
+    fun tagProgressFlowsWhileScanningAndClearsAfterwards() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply {
+            result = RefreshResult(3, 40, 0, 0, now)
+            progress = listOf(ScanProgress(0, 6090), ScanProgress(1234, 6090))
+            gate = CompletableDeferred()
+        }
+        val refresher = refresher(repo)
+
+        val run = async { refresher.refresh(silent = true) }
+        runCurrent()
+        assertEquals(ScanProgress(1234, 6090), refresher.tagProgress.value)
+
+        repo.gate!!.complete(Unit)
+        run.await()
+        assertNull(refresher.tagProgress.value)
+    }
+
+    /** 失敗や取り消しで終わっても、件数は残らない。 */
+    @Test
+    fun tagProgressClearsWhenTheScanFailsOrIsCancelled() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply {
+            result = RefreshResult(3, 40, 0, 0, now)
+            progress = listOf(ScanProgress(5, 10))
+            gate = CompletableDeferred()
+        }
+        val refresher = refresher(repo)
+
+        val first = async { refresher.refresh() }
+        runCurrent()
+        assertEquals(ScanProgress(5, 10), refresher.tagProgress.value)
+        refresher.cancelAndAwait()
+        assertTrue(first.isCancelled)
+        assertNull(refresher.tagProgress.value)
+
+        repo.gate = null
+        repo.error = ServerException.Unreachable(java.io.IOException("abort"))
+        assertNull(refresher.refresh())
+        assertNull(refresher.tagProgress.value)
+    }
+
+    /** タグを読む回が無い同期では、件数を出さない。 */
+    @Test
+    fun noTagProgressWithoutTagReads() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { result = RefreshResult(3, 40, 0, 0, now) }
+        val refresher = refresher(repo)
+
+        refresher.tagProgress.test {
+            assertNull(awaitItem())
+            refresher.refresh()
+            expectNoEvents()
+        }
+    }
+
+    /** 全走査が途中で失敗しても、番組ごとに予約していれば Worker を起こす（#209）。 */
+    @Test
+    fun aFailedScanStillKicksTheWorkerForDownloadsEnqueuedOnTheWay() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply {
+            enqueuedOnTheWay = listOf(2)
+            error = ServerException.Unreachable(java.io.IOException("abort"))
+        }
+        val kicker = FakeKicker()
+
+        assertNull(refresher(repo, kicker = kicker).refresh())
+
+        assertEquals(1, kicker.kicks)
+    }
+
+    @Test
+    fun aFailedScanWithoutDownloadsOnTheWayDoesNotKick() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { error = ServerException.Unreachable(java.io.IOException("abort")) }
+        val kicker = FakeKicker()
+
+        refresher(repo, kicker = kicker).refresh()
+
+        assertEquals(0, kicker.kicks)
+    }
+
+    /** 取り消し（取得元を変える前）では起こさない。SourceChanger が Worker を止めた後に手元を消すので、その間に動き出させない。 */
+    @Test
+    fun aCancelledScanDoesNotKickEvenWithDownloadsOnTheWay() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply {
+            result = RefreshResult(3, 40, 0, 0, now)
+            enqueuedOnTheWay = listOf(2)
+            gate = CompletableDeferred()
+        }
+        val kicker = FakeKicker()
+        val refresher = refresher(repo, kicker = kicker)
+
+        val run = async { refresher.refresh() }
+        runCurrent()
+        refresher.cancelAndAwait()
+
+        assertTrue(run.isCancelled)
+        assertEquals(0, kicker.kicks)
+    }
+
+    /**
+     * ブロッキングの I/O の最中に取り消されると、取り消しが到達不能に包まれて届くことがある。そのときも起こさない
+     * （取得元を変える最中に、手元を消す前の Worker を動かさない）。
+     */
+    @Test
+    fun aCancellationWrappedAsUnreachableDoesNotKick() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply {
+            enqueuedOnTheWay = listOf(2)
+            gate = CompletableDeferred()
+            ignoresCancellation = true
+            error = ServerException.Unreachable(java.io.InterruptedIOException("interrupted"))
+        }
+        val kicker = FakeKicker()
+        val refresher = refresher(repo, kicker = kicker)
+
+        val run = async { refresher.refresh() }
+        runCurrent()
+        val cancelling = async { refresher.cancelAndAwait() }
+        runCurrent()
+        repo.gate!!.complete(Unit)
+        cancelling.await()
+
+        assertTrue(run.isCancelled)
+        assertEquals(0, kicker.kicks)
+    }
+
+    /** 再生中の回は、走査の開始時の値でなく、読むたびに今の値を返す（長い走査の途中で再生を始めた回を消さない。#209）。 */
+    @Test
+    fun theExcludedEpisodeIsReadAgainDuringTheScan() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply {
+            result = RefreshResult(3, 40, 0, 0, now)
+            gate = CompletableDeferred()
+        }
+        val nowPlaying = NowPlaying()
+        val refresher = refresher(repo, nowPlaying = nowPlaying)
+
+        val run = async { refresher.refresh() }
+        runCurrent()
+        assertEquals(emptySet(), repo.lastExcluded)
+        nowPlaying.set(nowPlaying(42))
+        assertEquals(setOf(EpisodeId(42)), repo.excludedReader!!())
+
+        repo.gate!!.complete(Unit)
+        run.await()
     }
 
     /** Run を作った直後、取得元に問い合わせる前（手元の整合の最中）に来ても、取り消せる（job は Run を running に入れるのと同時に入る）。 */

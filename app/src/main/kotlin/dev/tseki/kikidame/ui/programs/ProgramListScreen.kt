@@ -137,6 +137,7 @@ private fun ProgramListTabs(
     val canRefresh by viewModel.canRefresh.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val isSyncingInBackground by viewModel.isSyncingInBackground.collectAsStateWithLifecycle()
+    val tagProgress by viewModel.tagProgress.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     // 他のシートと同じく remember（プロセス死で開き直さない。絞り込みの状態も復元しないので）
@@ -229,7 +230,7 @@ private fun ProgramListTabs(
                         )
                     }
                 }
-                BackgroundSyncBar(isSyncingInBackground)
+                BackgroundSyncBar(isSyncingInBackground, tagProgress)
                 if (filterable) {
                     FilterChipsRow(
                         query = ProgramFilter.normalize(query),

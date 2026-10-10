@@ -8,6 +8,7 @@ import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.LibraryRefreshRepository
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.RefreshResult
+import dev.tseki.kikidame.domain.ScanProgress
 import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
@@ -20,6 +21,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +29,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -41,6 +44,9 @@ import javax.inject.Singleton
  * - 定期・起動時の silent な同期ではクルクルを出さない。その最中に手動の操作が来たら、走っている同期に合流する（#134）
  * - 結果の文言は手元の変化（新しい回・予約・削除）だけを並べる。手動は変化が無ければ「最新の状態です」、silent は変化があったときだけ出す（#142）
  * - silent な同期の間は [isSyncingInBackground] を立てる（画面は細いバーを出す。#138）。合流したらクルクルに切り替える
+ * - 全走査でタグを読む回がある間は、読んだ数を [tagProgress] に流す（silent でも手動でも。#209）
+ * - 全走査が途中で失敗しても、それまでに番組ごとの同期が予約していればダウンロードの Worker を起こす。取り消し・認証の失敗では起こさない（#209）
+ * - 再生中の回（削除から外す回）は、全走査の中で番組ごとに読み直す（#209）
  */
 @Singleton
 class LibraryRefresher @Inject constructor(
@@ -67,6 +73,14 @@ class LibraryRefresher @Inject constructor(
 
     /** silent な実行の間だけ true。手動が合流したら false に戻し、[isRefreshing] に譲る（両方は立てない。#138）。 */
     val isSyncingInBackground: StateFlow<Boolean> = _isSyncingInBackground
+
+    private val _tagProgress = MutableStateFlow<ScanProgress?>(null)
+
+    /**
+     * 全走査でタグを読んでいる回の数と、読み終えた数（#209 の決定 6）。タグを読む回が無い間（全走査でないとき、
+     * 2 回目以降で変化の無い同期）は null。実行が終われば（成功・失敗・取り消しのどれでも）null に戻る。
+     */
+    val tagProgress: StateFlow<ScanProgress?> = _tagProgress
 
     // 連続した更新の結果を取りこぼさないよう少し余裕を持ち、溢れたら古い方を捨てる
     private val _messages = MutableSharedFlow<UiText>(extraBufferCapacity = 4, onBufferOverflow = BufferOverflow.DROP_OLDEST)
@@ -96,7 +110,11 @@ class LibraryRefresher @Inject constructor(
 
     /** 全走査して結果の文言を出す。手元に変化があれば silent でも出す（#142）。 */
     private suspend fun Run.sync(): RefreshResult =
-        refreshRepository.refresh(excluded = excluded()).also { report(it.toSyncMessage(), evenIfSilent = it.hasChanges) }
+        refreshRepository.refresh(
+            excluded = { excluded() },
+            onProgress = { _tagProgress.value = it },
+            onEnqueued = { enqueuedSoFar.addAndGet(it) },
+        ).also { report(it.toSyncMessage(), evenIfSilent = it.hasChanges) }
 
     /** 聴いている回は削除から外す。ただし聴き終えて止まっている回は「再生済みなら削除」に任せる（#27）。 */
     private fun excluded(): Set<EpisodeId> = setOfNotNull(nowPlaying.excludedFromSync)
@@ -117,6 +135,9 @@ class LibraryRefresher @Inject constructor(
 
         /** この実行を走らせている呼び出し側のコルーチンの Job。[cancelAndAwait] が取り消す。 */
         var job: Job? = null
+
+        /** 全走査の途中で、番組ごとの同期が予約したダウンロードの数（#209）。走査が途中で失敗しても Worker を起こすために数える。 */
+        val enqueuedSoFar = AtomicInteger()
 
         /** 途中の文言（手元の整合）。silent なら捨てる。 */
         fun say(message: UiText) {
@@ -189,6 +210,7 @@ class LibraryRefresher @Inject constructor(
                 running = null
                 _isRefreshing.value = false
                 _isSyncingInBackground.value = false
+                _tagProgress.value = null
             }
             run.result.complete(result)
         }
@@ -206,15 +228,7 @@ class LibraryRefresher @Inject constructor(
             }
             val result = block() ?: return null
             // 同期は済んでいる。Worker を起こせなくても結果は返す（次の起動やダウンロード操作で拾われる）
-            if (result.enqueued > 0) {
-                try {
-                    kicker.kick()
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    Log.w(TAG, "could not start the download worker", e)
-                }
-            }
+            if (result.enqueued > 0) kickDownloads()
             return result
         } catch (e: ServerException.Unauthorized) {
             // ログアウトすると画面が接続画面へ移るので、文言を先に出す
@@ -222,18 +236,45 @@ class LibraryRefresher @Inject constructor(
             sessionRepository.signOut()
             return null
         } catch (e: ServerException.Unreachable) {
+            kickIfEnqueuedBeforeFailure()
             report(UiText.Res(R.string.sync_error_unreachable))
             return null
         } catch (e: ServerException.Failed) {
+            kickIfEnqueuedBeforeFailure()
             report(UiText.Res(R.string.sync_error_fetch_failed, e.message.orEmpty()))
             return null
         } catch (e: CancellationException) {
+            // 取り消し（取得元を変える・ログアウトの前の cancelAndAwait）では起こさない。取得元を変える処理（SourceChanger）は
+            // ダウンロードの Worker を止めてから走査を取り消し、手元を消すので、ここで起こすと消す前に Worker が動き出す
             throw e
         } catch (e: Exception) {
             // Room / DataStore / Keystore の失敗。落とさずに文言にする
             Log.e(TAG, "refresh failed", e)
+            kickIfEnqueuedBeforeFailure()
             report(UiText.Res(R.string.sync_error_import_failed, e::class.simpleName.orEmpty()))
             return null
+        }
+    }
+
+    /**
+     * 全走査が途中で失敗しても、それまでに番組ごとの同期が予約していれば Worker を起こす（#209）。予約は DB に残っていて、
+     * 次の同期ではその回の予約が数に入らない（もう行がある）ので、ここで起こさないと次の起動かダウンロードの操作まで待つ。
+     * 認証の失敗（ログアウトする）と取り消しでは起こさない。ブロッキングの I/O の最中に取り消されると、取り消しが
+     * [ServerException.Unreachable] などに包まれて届くことがあるので、先に取り消し済みかを確かめ、そうなら取り消しとして投げ直す。
+     */
+    private suspend fun Run.kickIfEnqueuedBeforeFailure() {
+        currentCoroutineContext().ensureActive()
+        if (enqueuedSoFar.get() > 0) kickDownloads()
+    }
+
+    /** ダウンロードの Worker を起こす。起こせなくても同期の結果は変えない（次の起動やダウンロード操作で拾われる）。 */
+    private suspend fun kickDownloads() {
+        try {
+            kicker.kick()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "could not start the download worker", e)
         }
     }
 

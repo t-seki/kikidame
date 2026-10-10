@@ -24,6 +24,13 @@ interface FolderTree {
 
     /** ファイルを [offset] から読むストリーム（ダウンロードの続きから取る `.part` の再開用）。ファイルが無ければ [java.io.FileNotFoundException]。 */
     fun open(path: String, offset: Long): FolderFileStream
+
+    /**
+     * 接続を捨て、次の操作で張り直させる（#209）。操作が失敗した後、同じ操作をやり直す前に [SharedFolderSource] が呼ぶ。
+     * 切れた接続が「つながっている」と見えたまま残り、やり直しが同じ失敗を繰り返さないようにするため。
+     * 接続を持たない木（端末のフォルダなど）は何もしない。失敗しても例外を投げない。
+     */
+    fun reset() {}
 }
 
 /** フォルダの子の 1 件。 */
