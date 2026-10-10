@@ -11,6 +11,7 @@ import dev.tseki.kikidame.data.sharedfolder.ScannedFiles
 import dev.tseki.kikidame.data.sharedfolder.TagReader
 import dev.tseki.kikidame.data.smb.CloseableFolderTree
 import dev.tseki.kikidame.data.smb.FolderTreeFactory
+import dev.tseki.kikidame.domain.DeviceFolder
 import dev.tseki.kikidame.domain.SelectedLibrary
 import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.Session
@@ -46,15 +47,26 @@ class SessionSourceGatewayTest {
     private val store by lazy { testSessionStore(tmp.root, scope) }
     private val folder = MemoryFolderTree()
     private val opened = ArrayList<SmbConnection>()
+    private val openedFolders = ArrayList<DeviceFolder>()
     private val closes = ArrayList<Boolean>()
-    private val trees = FolderTreeFactory { connection ->
-        opened += connection
-        object : CloseableFolderTree, FolderTree by folder.tree {
+    private val trees = object : FolderTreeFactory {
+        override fun open(connection: SmbConnection): CloseableFolderTree {
+            opened += connection
+            return closeable()
+        }
+
+        override fun open(folder: DeviceFolder): CloseableFolderTree {
+            openedFolders += folder
+            return closeable()
+        }
+
+        private fun closeable() = object : CloseableFolderTree, FolderTree by folder.tree {
             override fun close() {
                 closes += true
             }
         }
     }
+    private val deviceFolder = DeviceFolder("content://com.android.externalstorage.documents/tree/primary%3ARadio", "Radio")
     private val tags = object : TagReader {
         override fun read(tree: FolderTree, path: String, sizeBytes: Long) = AudioTags()
     }
@@ -150,5 +162,39 @@ class SessionSourceGatewayTest {
         store.clearCredentials()
         assertFailsWith<ServerException.Unauthorized> { gateway.fetchProgram(SourceItemId("A/B")) }
         assertFalse(opened.isNotEmpty(), "a signed-out shared folder is not opened")
+    }
+
+    /** 端末のフォルダ（#199）も共有フォルダとして、その木で走査して閉じる。 */
+    @Test
+    fun deviceFolderScansItsTreeAndClosesIt() = runTest {
+        store.saveDeviceFolder(deviceFolder)
+        folder.put("TBSラジオ/番組/2026-09-18.m4a")
+
+        val snapshot = gateway.fetchAll()
+
+        assertEquals(listOf(SourceItemId("TBSラジオ/番組")), snapshot.programs.map { it.sourceId })
+        assertEquals(listOf(deviceFolder), openedFolders)
+        assertEquals(emptyList(), opened, "no SMB connection is opened")
+        assertEquals(1, closes.size)
+    }
+
+    @Test
+    fun deviceFolderDownloadReadsFromItsTree() = runTest {
+        store.saveDeviceFolder(deviceFolder)
+        folder.put("A/B/a.m4a", ByteArray(10))
+
+        val stream = gateway.openDownload(SourceItemId("A/B/a.m4a"), rangeStart = 0)
+        assertEquals(10L, stream.totalBytes)
+        stream.close()
+        assertEquals(listOf(deviceFolder), openedFolders)
+        assertEquals(1, closes.size)
+    }
+
+    @Test
+    fun signedOutDeviceFolderIsNotOpened() = runTest {
+        store.saveDeviceFolder(deviceFolder)
+        store.clearCredentials()
+        assertFailsWith<ServerException.Unauthorized> { gateway.fetchAll() }
+        assertEquals(emptyList(), openedFolders)
     }
 }

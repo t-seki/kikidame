@@ -19,6 +19,7 @@ import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.download.DownloadScheduler
 import dev.tseki.kikidame.ui.connect.ConnectScreen
+import dev.tseki.kikidame.ui.connect.DeviceFolderScreen
 import dev.tseki.kikidame.ui.connect.SmbConnectScreen
 import dev.tseki.kikidame.ui.source.SourcePickScreen
 import dev.tseki.kikidame.ui.episodes.EpisodeDetailsScreen
@@ -46,6 +47,10 @@ object ConnectRoute
 /** NAS の共有フォルダ（SMB）への接続（#198）。 */
 @Serializable
 object SmbConnectRoute
+
+/** 端末のフォルダ（SAF）の説明と選択（#199）。 */
+@Serializable
+object DeviceFolderRoute
 
 @Serializable
 object LibraryPickRoute
@@ -82,7 +87,8 @@ class SessionViewModel @Inject constructor(
 }
 
 /**
- * 番組の画面（根。「続きから・よく聴く・番組一覧」のタブ、#151）→ 各回一覧 → 再生画面 の 3 階層に、取得元の選択（#198）・Jellyfin の接続画面・SMB の接続画面（#198）・ライブラリ選択・設定・各回の詳細を足したもの。
+ * 番組の画面（根。「続きから・よく聴く・番組一覧」のタブ、#151）→ 各回一覧 → 再生画面 の 3 階層に、取得元の選択（#198）・Jellyfin の接続画面・SMB の接続画面（#198）・
+ * 端末のフォルダの説明と選択（#199）・ライブラリ選択・設定・各回の詳細を足したもの。
  * 「続きから」タブの行からは、各回一覧を経ずに再生画面と各回の詳細へ直接行く。
  * 起動時はセッション状態で開始画面を決め、その後は状態の**変化**（ログアウト・401・ライブラリ選択）で遷移する。
  * デバッグ用に接続画面から番組一覧へ抜けても、状態が変わらない限り戻されない。
@@ -103,6 +109,7 @@ fun KikidameNavHost(sessionViewModel: SessionViewModel = hiltViewModel()) {
             SourcePickScreen(
                 onPickJellyfin = { navController.navigate(ConnectRoute) },
                 onPickSmb = { navController.navigate(SmbConnectRoute) },
+                onPickDeviceFolder = { navController.navigate(DeviceFolderRoute) },
             )
         }
         composable<ConnectRoute> {
@@ -113,6 +120,12 @@ fun KikidameNavHost(sessionViewModel: SessionViewModel = hiltViewModel()) {
         }
         composable<SmbConnectRoute> {
             SmbConnectScreen(
+                onBack = if (navController.previousBackStackEntry != null) navController::popIfNotRoot else null,
+                onSourceChanged = { navController.navigate(SourcePickRoute) { popUpTo(0) } },
+            )
+        }
+        composable<DeviceFolderRoute> {
+            DeviceFolderScreen(
                 onBack = if (navController.previousBackStackEntry != null) navController::popIfNotRoot else null,
                 onSourceChanged = { navController.navigate(SourcePickRoute) { popUpTo(0) } },
             )
@@ -180,12 +193,13 @@ private fun SessionState.startDestination(): Any = when (this) {
 /** ログアウト中の行き先: 直前に使っていた取得元の接続画面。一度も接続していなければ取得元の選択。 */
 private fun SessionState.SignedOut.signedOutDestination(): Any = when {
     lastSmb != null -> SmbConnectRoute
+    lastDeviceFolder != null -> DeviceFolderRoute
     lastServerUrl != null -> ConnectRoute
     else -> SourcePickRoute
 }
 
 /** 取得元を選んで接続する画面（まだ番組一覧に入っていない）。 */
-private val SIGN_IN_ROUTES = listOf("SourcePickRoute", "ConnectRoute", "SmbConnectRoute")
+private val SIGN_IN_ROUTES = listOf("SourcePickRoute", "ConnectRoute", "SmbConnectRoute", "DeviceFolderRoute")
 
 /** セッション状態が変わったときだけ呼ぶ。今いる画面と食い違う場合にスタックを作り直す。 */
 private fun NavHostController.followSessionChange(state: SessionState) {

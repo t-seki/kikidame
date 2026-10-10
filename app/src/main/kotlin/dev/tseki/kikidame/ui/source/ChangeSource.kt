@@ -13,7 +13,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import dev.tseki.kikidame.R
+import dev.tseki.kikidame.data.sharedfolder.DeviceDocuments
 import dev.tseki.kikidame.domain.LocalDataReset
 import dev.tseki.kikidame.download.DownloadScheduler
 import dev.tseki.kikidame.playback.PlayerConnection
@@ -25,6 +28,7 @@ import javax.inject.Inject
  * 「取得元を変える」の処理（epic #195 の決定 2）。設定と、ログアウト後の接続画面（Jellyfin・SMB）が共有する。
  * 再生とダウンロード・同期の Worker を止めてから、手元のデータと音声ファイルを全部消す。止めずに消すと、
  * 開いているファイルを消したり、Worker が行を作り直したりする（#50）。
+ * 最後に、端末のフォルダ（#199）の永続的な権限を全部手放す（決定 6）。保存した URI に頼らず、持っているものを全部手放す。
  */
 class SourceChanger @Inject constructor(
     private val connection: PlayerConnection,
@@ -32,6 +36,7 @@ class SourceChanger @Inject constructor(
     private val syncScheduler: SyncScheduler,
     private val refresher: LibraryRefresher,
     private val reset: LocalDataReset,
+    private val documents: DeviceDocuments,
 ) {
     suspend fun changeSource() {
         runCatching { connection.use { it.stop(); it.clearMediaItems() } }
@@ -41,6 +46,12 @@ class SourceChanger @Inject constructor(
         // Worker の取り消しは、走っている走査（ブロッキングの I/O）や初回の走査（アプリのスコープ）を止めない。終わるのを待ってから消す
         refresher.cancelAndAwait()
         reset.resetAll()
+        withContext(Dispatchers.IO) {
+            for (uri in runCatching { documents.persistedTreeUris() }.getOrDefault(emptyList())) {
+                runCatching { documents.releasePermission(uri) }
+                    .onFailure { Log.w("SourceChanger", "release the folder permission failed", it) }
+            }
+        }
     }
 }
 

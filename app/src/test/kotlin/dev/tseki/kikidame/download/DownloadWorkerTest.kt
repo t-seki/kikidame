@@ -82,6 +82,7 @@ class DownloadWorkerTest {
         override val state: Flow<SessionState> = flow
         override suspend fun signIn(serverUrl: String, userName: String, password: String) = Unit
         override suspend fun connectSharedFolder(connection: SmbConnection) = Unit
+        override suspend fun connectDeviceFolder(treeUri: String) = Unit
         override suspend fun listLibraries(): List<LibraryView> = emptyList()
         override suspend fun selectLibrary(library: LibraryView) = Unit
         override suspend fun signOut() { signedOut = true; flow.value = SessionState.SignedOut(null, null) }

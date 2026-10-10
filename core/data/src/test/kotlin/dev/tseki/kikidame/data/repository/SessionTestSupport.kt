@@ -9,6 +9,7 @@ import dev.tseki.kikidame.data.sharedfolder.FolderEntry
 import dev.tseki.kikidame.data.sharedfolder.FolderFileStream
 import dev.tseki.kikidame.data.smb.CloseableFolderTree
 import dev.tseki.kikidame.data.smb.FolderTreeFactory
+import dev.tseki.kikidame.domain.DeviceFolder
 import dev.tseki.kikidame.domain.SmbConnection
 import kotlinx.coroutines.CoroutineScope
 import java.io.File
@@ -50,9 +51,15 @@ class FakeFolderTree(
 
 class FakeFolderTreeFactory(val tree: FakeFolderTree = FakeFolderTree()) : FolderTreeFactory {
     val opened = mutableListOf<SmbConnection>()
+    val openedFolders = mutableListOf<DeviceFolder>()
 
     override fun open(connection: SmbConnection): CloseableFolderTree {
         opened += connection
+        return tree
+    }
+
+    override fun open(folder: DeviceFolder): CloseableFolderTree {
+        openedFolders += folder
         return tree
     }
 }

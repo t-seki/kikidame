@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dev.tseki.kikidame.domain.ConnectedSource
+import dev.tseki.kikidame.domain.DeviceFolder
 import dev.tseki.kikidame.domain.SelectedLibrary
 import dev.tseki.kikidame.domain.SmbConnection
 import dev.tseki.kikidame.domain.SourceItemId
@@ -20,8 +21,9 @@ import kotlin.time.Instant
 
 /**
  * セッションの永続化（Preferences DataStore）。取得元は同時に 1 つで、Jellyfin のキー（`server_url` など。
- * 以前のバージョンから変えていないので、更新の後も接続が残る。epic #195 の決定 12）か、SMB のキー（`smb_*`）のどちらかを持つ。
- * `smb_host` があれば SMB、無ければ Jellyfin とみなす。
+ * 以前のバージョンから変えていないので、更新の後も接続が残る。epic #195 の決定 12）、SMB のキー（`smb_*`）、
+ * 端末のフォルダのキー（`device_*`、#199）のどれか 1 つを持つ。`smb_host` があれば SMB、`device_tree_uri` があれば端末のフォルダ、
+ * どちらも無ければ Jellyfin とみなす。
  * Jellyfin のトークンと SMB のパスワードは [TokenCipher] で暗号化して置く。Jellyfin のパスワードは保存しない。
  */
 class SessionStore(
@@ -40,6 +42,7 @@ class SessionStore(
             it[USER_ID] = session.userId
             it[TOKEN] = encrypted
             it.removeSmb()
+            it.removeDevice()
             it.remove(LIBRARY_ID)
             it.remove(LIBRARY_NAME)
             it.remove(LAST_FETCHED_AT)
@@ -52,6 +55,7 @@ class SessionStore(
         val encrypted = if (connection.guest) null else cipher.encrypt(connection.password)
         dataStore.edit {
             it.removeJellyfin()
+            it.removeDevice()
             it[SMB_HOST] = connection.host
             it[SMB_SHARE] = connection.share
             it[SMB_PATH] = connection.path
@@ -59,6 +63,19 @@ class SessionStore(
             it[SMB_GUEST] = connection.guest
             it.remove(SMB_SIGNED_OUT)
             if (encrypted != null) it[SMB_PASSWORD] = encrypted else it.remove(SMB_PASSWORD)
+            it.remove(LAST_FETCHED_AT)
+            it.remove(LAST_ATTEMPTED_AT)
+        }
+    }
+
+    /** 端末のフォルダを保存する（#199）。Jellyfin と SMB の接続は消す（取得元は同時に 1 つ）。 */
+    suspend fun saveDeviceFolder(folder: DeviceFolder) {
+        dataStore.edit {
+            it.removeJellyfin()
+            it.removeSmb()
+            it[DEVICE_TREE_URI] = folder.treeUri
+            it[DEVICE_NAME] = folder.name
+            it.remove(DEVICE_SIGNED_OUT)
             it.remove(LAST_FETCHED_AT)
             it.remove(LAST_ATTEMPTED_AT)
         }
@@ -80,7 +97,10 @@ class SessionStore(
         dataStore.edit { it[LAST_ATTEMPTED_AT] = at.toEpochMilliseconds() }
     }
 
-    /** ログアウト。サーバ URL とユーザー名（SMB はホスト・共有名・パス・ユーザー名）は次回の入力補助として残す。 */
+    /**
+     * ログアウト。サーバ URL とユーザー名（SMB はホスト・共有名・パス・ユーザー名）は次回の入力補助として残す。
+     * 端末のフォルダは、URI と名前を残してログアウトの印を立てる（アクセスが切れたフォルダを選び直させる。#199）。
+     */
     suspend fun clearCredentials() {
         dataStore.edit {
             it.remove(USER_ID)
@@ -88,6 +108,7 @@ class SessionStore(
             it.remove(SMB_PASSWORD)
             // ゲスト接続はパスワードが無いので、ログアウトした印を別に置く。ゲストかどうかはホストなどと同じく次回の入力補助として残す
             if (it[SMB_HOST] != null) it[SMB_SIGNED_OUT] = true
+            if (it[DEVICE_TREE_URI] != null) it[DEVICE_SIGNED_OUT] = true
             it.remove(LIBRARY_ID)
             it.remove(LIBRARY_NAME)
             it.remove(LAST_FETCHED_AT)
@@ -118,8 +139,27 @@ class SessionStore(
         remove(SMB_SIGNED_OUT)
     }
 
-    private fun Preferences.toState(): SessionState =
-        if (this[SMB_HOST] != null) toSmbState() else toJellyfinState()
+    private fun MutablePreferences.removeDevice() {
+        remove(DEVICE_TREE_URI)
+        remove(DEVICE_NAME)
+        remove(DEVICE_SIGNED_OUT)
+    }
+
+    private fun Preferences.toState(): SessionState = when {
+        this[SMB_HOST] != null -> toSmbState()
+        this[DEVICE_TREE_URI] != null -> toDeviceState()
+        else -> toJellyfinState()
+    }
+
+    private fun Preferences.toDeviceState(): SessionState {
+        val folder = DeviceFolder(treeUri = this[DEVICE_TREE_URI].orEmpty(), name = this[DEVICE_NAME].orEmpty())
+        if (this[DEVICE_SIGNED_OUT] == true) return SessionState.SignedOut(null, null, lastDeviceFolder = folder)
+        return SessionState.Ready(
+            source = ConnectedSource.Device(folder),
+            lastFetchedAt = this[LAST_FETCHED_AT]?.let(Instant::fromEpochMilliseconds),
+            lastAttemptedAt = this[LAST_ATTEMPTED_AT]?.let(Instant::fromEpochMilliseconds),
+        )
+    }
 
     private fun Preferences.toSmbState(): SessionState {
         val host = this[SMB_HOST]
@@ -175,5 +215,8 @@ class SessionStore(
         val SMB_PASSWORD = stringPreferencesKey("smb_password")
         val SMB_GUEST = booleanPreferencesKey("smb_guest")
         val SMB_SIGNED_OUT = booleanPreferencesKey("smb_signed_out")
+        val DEVICE_TREE_URI = stringPreferencesKey("device_tree_uri")
+        val DEVICE_NAME = stringPreferencesKey("device_name")
+        val DEVICE_SIGNED_OUT = booleanPreferencesKey("device_signed_out")
     }
 }

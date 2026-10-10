@@ -16,6 +16,7 @@ import com.hierynomus.smbj.share.File
 import dev.tseki.kikidame.data.sharedfolder.FolderEntry
 import dev.tseki.kikidame.data.sharedfolder.FolderFileStream
 import dev.tseki.kikidame.data.sharedfolder.FolderTree
+import dev.tseki.kikidame.domain.DeviceFolder
 import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.SmbConnection
 import java.io.IOException
@@ -28,9 +29,14 @@ import kotlin.time.Instant
 /** 使い終わったら閉じる [FolderTree]。閉じると接続も閉じる。 */
 interface CloseableFolderTree : FolderTree, AutoCloseable
 
-/** 接続の設定から木を作る。1 回の取得元の操作ごとに作って閉じる（接続の寿命を呼び出しの外に持ち出さない）。 */
-fun interface FolderTreeFactory {
+/**
+ * 共有フォルダの取得元から木を作る。1 回の取得元の操作ごとに作って閉じる（接続の寿命を呼び出しの外に持ち出さない）。
+ * SMB（#198）と端末のフォルダ（SAF、#199）。
+ */
+interface FolderTreeFactory {
     fun open(connection: SmbConnection): CloseableFolderTree
+
+    fun open(folder: DeviceFolder): CloseableFolderTree
 }
 
 /**

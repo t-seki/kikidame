@@ -12,6 +12,7 @@ import dev.tseki.kikidame.domain.ScanProgress
 import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
+import dev.tseki.kikidame.domain.isDeviceFolder
 import dev.tseki.kikidame.download.DownloadKicker
 import dev.tseki.kikidame.R
 import dev.tseki.kikidame.playback.NowPlaying
@@ -39,8 +40,10 @@ import javax.inject.Singleton
  * - [refresh]: 全走査 = ライブラリ全体の同期（ADR 0004）。番組一覧の「引っ張って更新」、定期・起動時の Worker が呼ぶ
  * - [syncProgram]: 1 番組の同期。シートの「この番組を今すぐ同期」が呼ぶ
  * - [refreshProgram]: 番組単位の取り込み（#12）。各回一覧の「引っ張って更新」が呼ぶ。削除しない
- * - 「Wi-Fi のみ」は手動を含めて効く。従量制なら取得元に触らず理由を出して終える。手元のファイルの整合（#5）はその前に走る
- * - 401 はログアウトと同じ処理をする（セッション状態が変わり、画面側が接続画面へ導く）
+ * - 「Wi-Fi のみ」は手動を含めて効く。従量制なら取得元に触らず理由を出して終える。手元のファイルの整合（#5）はその前に走る。
+ *   取得元が端末のフォルダなら効かせない（#199 の決定 4。[SyncScheduler.wifiOnlyApplies]）
+ * - 401 はログアウトと同じ処理をする（セッション状態が変わり、画面側が接続画面へ導く）。端末のフォルダでアクセスが切れたときも同じで、
+ *   文言は「フォルダを選び直して」にする（#199 の決定 5）
  * - 定期・起動時の silent な同期ではクルクルを出さない。その最中に手動の操作が来たら、走っている同期に合流する（#134）
  * - 結果の文言は手元の変化（新しい回・予約・削除）だけを並べる。手動は変化が無ければ「最新の状態です」、silent は変化があったときだけ出す（#142）
  * - silent な同期の間は [isSyncingInBackground] を立てる（画面は細いバーを出す。#138）。合流したらクルクルに切り替える
@@ -218,11 +221,11 @@ class LibraryRefresher @Inject constructor(
 
     private suspend fun Run.execute(block: suspend Run.() -> RefreshResult?): RefreshResult? {
         try {
-            if (sessionRepository.state.first() !is SessionState.Ready) return null
+            val state = sessionRepository.state.first() as? SessionState.Ready ?: return null
             // 手元のファイルが消えていないか先に整合する（#5）。ローカル I/O なのでネットワークの条件は見ない
             val reconciled = downloads.reconcileMissingFiles()
             if (reconciled > 0) say(UiText.Plural(R.plurals.sync_reconciled, reconciled))
-            if (settings.wifiOnly.first() && network.isMetered()) {
+            if (SyncScheduler.wifiOnlyApplies(settings.wifiOnly.first(), state) && network.isMetered()) {
                 report(UiText.Res(R.string.sync_not_on_wifi))
                 return null
             }
@@ -231,8 +234,9 @@ class LibraryRefresher @Inject constructor(
             if (result.enqueued > 0) kickDownloads()
             return result
         } catch (e: ServerException.Unauthorized) {
-            // ログアウトすると画面が接続画面へ移るので、文言を先に出す
-            report(UiText.Res(R.string.sync_error_session_expired))
+            // ログアウトすると画面が接続画面へ移るので、文言を先に出す。端末のフォルダはアクセスが切れた（#199 の決定 5）
+            val deviceFolder = sessionRepository.state.first().isDeviceFolder
+            report(UiText.Res(if (deviceFolder) R.string.sync_error_device_folder_lost else R.string.sync_error_session_expired))
             sessionRepository.signOut()
             return null
         } catch (e: ServerException.Unreachable) {

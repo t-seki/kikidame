@@ -6,7 +6,10 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dev.tseki.kikidame.data.sharedfolder.FolderEntry
+import dev.tseki.kikidame.data.sharedfolder.MemoryDeviceDocuments
 import dev.tseki.kikidame.domain.ConnectedSource
+import dev.tseki.kikidame.domain.DeviceFolder
+import dev.tseki.kikidame.domain.UnsupportedFolderException
 import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.SmbConnection
 import java.io.IOException
@@ -29,6 +32,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 @RunWith(AndroidJUnit4::class)
@@ -41,7 +45,9 @@ class DataStoreSessionRepositoryTest {
     private val dataStore by lazy { testDataStore(tmp.root, scope) }
     private val store by lazy { SessionStore(dataStore, FakeTokenCipher()) }
     private val trees = FakeFolderTreeFactory()
-    private val repo by lazy { DataStoreSessionRepository(store, gateway, trees) }
+    private val documents = MemoryDeviceDocuments(granted = false)
+    private val repo by lazy { DataStoreSessionRepository(store, gateway, trees, documents) }
+    private val folderUri = MemoryDeviceDocuments.TREE_URI
     private val smb = SmbConnection("nas.local", "recordings", "radio", "alice", "pw")
     private val music = LibraryView(SourceItemId("lib-music"), "Radio", "music", isMusic = true)
     private val movies = LibraryView(SourceItemId("lib-movies"), "Movies", "movies", isMusic = false)
@@ -226,5 +232,86 @@ class DataStoreSessionRepositoryTest {
     fun jellyfinCallsFailWhileConnectedToASharedFolder() = runTest {
         repo.connectSharedFolder(smb)
         assertFailsWith<ServerException.Unauthorized> { repo.listLibraries() }
+    }
+
+    /** 端末のフォルダ（#199）: 永続権限を取り、直下が読めたらフォルダ名と一緒に保存する。 */
+    @Test
+    fun connectDeviceFolderTakesThePermissionChecksTheRootThenReachesReady() = runTest {
+        repo.connectDeviceFolder(folderUri)
+
+        assertEquals(listOf(DeviceFolder(folderUri, "")), trees.openedFolders, "the root is read before saving")
+        assertEquals(true, trees.tree.closed, "the probe tree is closed")
+        assertTrue(documents.hasReadPermission(folderUri), "the persisted permission is taken")
+        val ready = assertIs<SessionState.Ready>(repo.state.first())
+        assertEquals(ConnectedSource.Device(DeviceFolder(folderUri, "Radio")), ready.source)
+        assertNull(ready.lastFetchedAt)
+    }
+
+    /** 端末のストレージ以外の provider（#199 の決定 3）は、権限を取らずに断る。 */
+    @Test
+    fun otherProvidersAreRejectedBeforeTakingThePermission() = runTest {
+        val drive = "content://com.google.android.apps.docs.storage/tree/acc%3D1%3Bdoc%3Dabc"
+        assertFailsWith<UnsupportedFolderException> { repo.connectDeviceFolder(drive) }
+        assertEquals(emptyList(), documents.persistedTreeUris())
+        assertEquals(emptyList(), trees.openedFolders)
+        assertIs<SessionState.SignedOut>(repo.state.first())
+    }
+
+    /** 直下が読めなければ保存せず、取った権限を手放す。 */
+    @Test
+    fun deviceFolderFailuresAreNotSavedAndReleaseThePermission() = runTest {
+        trees.tree.entries = emptyMap() // 根が読めない
+        assertFailsWith<ServerException.Failed> { repo.connectDeviceFolder(folderUri) }
+        trees.tree.entries = mapOf("" to emptyList())
+        trees.tree.failure = ServerException.Unauthorized()
+        assertFailsWith<ServerException.Unauthorized> { repo.connectDeviceFolder(folderUri) }
+        trees.tree.failure = IOException("I/O error")
+        assertFailsWith<ServerException.Failed> { repo.connectDeviceFolder(folderUri) }
+
+        assertIs<SessionState.SignedOut>(repo.state.first())
+        assertEquals(emptyList(), documents.persistedTreeUris())
+        assertEquals(listOf(folderUri, folderUri, folderUri), documents.released)
+    }
+
+    /** アクセスが切れてログアウトしても（#199 の決定 5）、どのフォルダだったかは残り、選び直せば接続に戻る。 */
+    @Test
+    fun signOutOfADeviceFolderKeepsTheFolderAndCanPickAgain() = runTest {
+        repo.connectDeviceFolder(folderUri)
+        repo.signOut()
+        val signedOut = assertIs<SessionState.SignedOut>(repo.state.first())
+        assertEquals(DeviceFolder(folderUri, "Radio"), signedOut.lastDeviceFolder)
+        assertNull(signedOut.lastSmb)
+        assertNull(signedOut.lastServerUrl)
+
+        repo.connectDeviceFolder(folderUri)
+        assertIs<ConnectedSource.Device>(assertIs<SessionState.Ready>(repo.state.first()).source)
+    }
+
+    /** 選び直したら、前に選んでいたフォルダの権限は手放す（持っている権限の数には上限がある）。 */
+    @Test
+    fun pickingAnotherFolderReleasesTheOldPermission() = runTest {
+        val old = "content://com.android.externalstorage.documents/tree/primary%3AOld"
+        documents.grant(old)
+        repo.connectDeviceFolder(folderUri)
+        assertEquals(listOf(folderUri), documents.persistedTreeUris())
+        assertEquals(listOf(old), documents.released)
+    }
+
+    /** 取得元は同時に 1 つ。端末のフォルダとほかの取得元は、片方に接続するともう片方が消える。 */
+    @Test
+    fun deviceFolderAndOtherSourcesForgetEachOther() = runTest {
+        repo.connectSharedFolder(smb)
+        repo.connectDeviceFolder(folderUri)
+        assertIs<ConnectedSource.Device>(assertIs<SessionState.Ready>(repo.state.first()).source)
+        assertFalse("smb_host" in dataStore.data.first().asMap().keys.map { it.name })
+
+        repo.connectSharedFolder(smb)
+        assertIs<ConnectedSource.Smb>(assertIs<SessionState.Ready>(repo.state.first()).source)
+        assertFalse("device_tree_uri" in dataStore.data.first().asMap().keys.map { it.name })
+
+        repo.connectDeviceFolder(folderUri)
+        repo.signIn("jellyfin.lab.example", "alice", "secret")
+        assertIs<SessionState.NeedsLibrary>(repo.state.first())
+        assertFalse("device_tree_uri" in dataStore.data.first().asMap().keys.map { it.name })
     }
 }

@@ -18,6 +18,7 @@ import dev.tseki.kikidame.domain.SelectedLibrary
 import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.ConnectedSource
+import dev.tseki.kikidame.domain.DeviceFolder
 import dev.tseki.kikidame.domain.Session
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
@@ -111,18 +112,19 @@ class LibraryRefresherTest {
         override suspend fun ensureFilePresent(episodeId: EpisodeId): Boolean = true
     }
 
-    private class FakeSessionRepository(ready: Boolean = true) : SessionRepository {
+    private class FakeSessionRepository(ready: Boolean = true, deviceFolder: Boolean = false) : SessionRepository {
         val stateFlow = MutableStateFlow<SessionState>(
-            if (ready) {
-                SessionState.Ready(ConnectedSource.Jellyfin(Session("https://s", "alice", "u", "t"), SelectedLibrary(SourceItemId("lib"), "Radio")), null)
-            } else {
-                SessionState.SignedOut(null, null)
+            when {
+                !ready -> SessionState.SignedOut(null, null)
+                deviceFolder -> SessionState.Ready(ConnectedSource.Device(DeviceFolder(DEVICE_TREE, "Radio")), null)
+                else -> SessionState.Ready(ConnectedSource.Jellyfin(Session("https://s", "alice", "u", "t"), SelectedLibrary(SourceItemId("lib"), "Radio")), null)
             },
         )
         var signedOut = false
         override val state: Flow<SessionState> = stateFlow
         override suspend fun signIn(serverUrl: String, userName: String, password: String) = Unit
         override suspend fun connectSharedFolder(connection: SmbConnection) = Unit
+        override suspend fun connectDeviceFolder(treeUri: String) = Unit
         override suspend fun listLibraries(): List<LibraryView> = emptyList()
         override suspend fun selectLibrary(library: LibraryView) = Unit
         override suspend fun signOut() {
@@ -275,6 +277,15 @@ class LibraryRefresherTest {
         assertEquals(1, refresher.refresh()?.programs)
     }
 
+    /** 端末のフォルダには「Wi-Fi のみ」をかけない（端末の中から端末の中へのコピー。#199 の決定 4）。 */
+    @Test
+    fun meteredNetworkIsFineForADeviceFolderEvenWithWifiOnly() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now) }
+        val refresher = refresher(repo, session = FakeSessionRepository(deviceFolder = true), network = FakeNetwork(metered = true))
+        assertEquals(1, refresher.refresh()?.programs)
+        assertEquals(1, repo.calls)
+    }
+
     @Test
     fun silentRefreshWithoutChangesEmitsNoMessages() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now) }
@@ -403,6 +414,20 @@ class LibraryRefresherTest {
         refresher.messages.test {
             assertNull(refresher.refresh())
             assertEquals(UiText.Res(R.string.sync_error_session_expired), awaitItem())
+        }
+        assertTrue(session.signedOut)
+    }
+
+    /** 端末のフォルダのアクセスが切れたら、ログアウトして「フォルダを選び直して」と出す（#199 の決定 5）。 */
+    @Test
+    fun lostDeviceFolderSignsOutAndAsksToPickAgain() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { error = ServerException.Unauthorized() }
+        val session = FakeSessionRepository(deviceFolder = true)
+        val refresher = refresher(repo, session = session)
+
+        refresher.messages.test {
+            assertNull(refresher.refresh())
+            assertEquals(UiText.Res(R.string.sync_error_device_folder_lost), awaitItem())
         }
         assertTrue(session.signedOut)
     }
@@ -818,3 +843,5 @@ private fun sentences(vararg parts: UiText): UiText = UiText.Joined(parts.toList
 
 /** 「N 回をダウンロード予約、M 回を削除」の部分。 */
 private fun actions(vararg parts: UiText): UiText = UiText.Joined(parts.toList(), UiText.Res(R.string.common_list_separator))
+
+private const val DEVICE_TREE = "content://com.android.externalstorage.documents/tree/primary%3ARadio"

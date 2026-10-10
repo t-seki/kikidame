@@ -5,18 +5,19 @@ import kotlin.time.Instant
 
 /**
  * 取得元（CONTEXT.md）に対する現在の接続状態。取得元は同時に 1 つ（epic #195 の決定 2）。
- * Jellyfin は 1 サーバ・1 ユーザー・1 ライブラリ、共有フォルダ（SMB）は 1 つの共有。
+ * Jellyfin は 1 サーバ・1 ユーザー・1 ライブラリ、共有フォルダ（SMB）は 1 つの共有、端末のフォルダ（SAF、#199）は 1 つのフォルダ。
  */
 sealed interface SessionState {
     /**
      * 一度も接続していない、またはログアウト済み。手元のデータは残っている。
-     * 直前に使っていた取得元の入力補助として、Jellyfin なら [lastServerUrl]・[lastUserName]、SMB なら [lastSmb]（パスワードは空）を持つ。
-     * どちらも無ければ初回（取得元の選択画面から始める）。
+     * 直前に使っていた取得元の入力補助として、Jellyfin なら [lastServerUrl]・[lastUserName]、SMB なら [lastSmb]（パスワードは空）、
+     * 端末のフォルダなら [lastDeviceFolder]（アクセスが切れたフォルダ。#199）を持つ。どれも無ければ初回（取得元の選択画面から始める）。
      */
     data class SignedOut(
         val lastServerUrl: String?,
         val lastUserName: String?,
         val lastSmb: SmbConnection? = null,
+        val lastDeviceFolder: DeviceFolder? = null,
     ) : SessionState
 
     /** Jellyfin にログイン済みだがライブラリ未選択。 */
@@ -40,7 +41,41 @@ sealed interface ConnectedSource {
 
     /** NAS の共有フォルダ（SMB）。 */
     data class Smb(val connection: SmbConnection) : ConnectedSource
+
+    /** 端末のフォルダ（SAF、#199）。 */
+    data class Device(val folder: DeviceFolder) : ConnectedSource
 }
+
+/** 取得元が端末のフォルダか（接続済み、またはアクセスが切れてログアウトした状態。#199）。「Wi-Fi のみ」とローカルネットワークの権限の分岐に使う。 */
+val SessionState.isDeviceFolder: Boolean
+    get() = when (this) {
+        is SessionState.Ready -> source is ConnectedSource.Device
+        is SessionState.SignedOut -> lastDeviceFolder != null
+        is SessionState.NeedsLibrary -> false
+    }
+
+/**
+ * 端末のフォルダ（#199）。[treeUri] は `ACTION_OPEN_DOCUMENT_TREE` で選んだツリーの URI（文字列）、[name] は表示用のフォルダ名。
+ * 端末のストレージ（内部ストレージと SD カード）のフォルダだけを受け付ける（[isDeviceStorage]）。
+ */
+data class DeviceFolder(val treeUri: String, val name: String) {
+    companion object {
+        /** 内部ストレージと SD カードの文書の provider（`ExternalStorageProvider`）の authority。 */
+        const val EXTERNAL_STORAGE_AUTHORITY: String = "com.android.externalstorage.documents"
+
+        /**
+         * 選んだツリーが端末のストレージのものか（#199 の決定 3）。authority が [EXTERNAL_STORAGE_AUTHORITY] の `content:` の URI だけ。
+         * ほかの provider（Google ドライブ、SAF 経由の SMB など）は受け付けない。
+         */
+        fun isDeviceStorage(treeUri: String): Boolean {
+            val uri = runCatching { java.net.URI(treeUri) }.getOrNull() ?: return false
+            return uri.scheme == "content" && uri.authority == EXTERNAL_STORAGE_AUTHORITY
+        }
+    }
+}
+
+/** 端末のストレージ以外の provider のフォルダを選んだ（#199 の決定 3）。端末のストレージのフォルダを選び直させる。 */
+class UnsupportedFolderException(treeUri: String) : IllegalArgumentException("not a folder on the device storage: $treeUri")
 
 data class Session(
     val serverUrl: String,
@@ -100,11 +135,19 @@ interface SessionRepository {
      */
     suspend fun connectSharedFolder(connection: SmbConnection)
 
+    /**
+     * 端末のフォルダ（[treeUri] は `ACTION_OPEN_DOCUMENT_TREE` の結果）を取得元にする（#199）。端末のストレージのフォルダでなければ
+     * [UnsupportedFolderException]。永続的な読み取りの権限を取り、フォルダの直下が読めるかを確かめてから保存する。読めなければ
+     * [ServerException] を投げ、取った権限を手放す。保存すると [SessionState.Ready] になり、ほかの取得元の接続は消える。
+     * 保存したら、そのフォルダ以外に持っている永続権限を手放す。
+     */
+    suspend fun connectDeviceFolder(treeUri: String)
+
     suspend fun listLibraries(): List<LibraryView>
 
     suspend fun selectLibrary(library: LibraryView)
 
-    /** 認証情報だけを消す（Jellyfin のトークン、SMB のパスワード）。手元のデータは残す。 */
+    /** 認証情報だけを消す（Jellyfin のトークン、SMB のパスワード。端末のフォルダはログアウトの印を立てる）。手元のデータは残す。 */
     suspend fun signOut()
 }
 
