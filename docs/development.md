@@ -66,6 +66,8 @@ Robolectric と JUnit 5 は統一しない（Robolectric の公式ランナー�
 Robolectric が SDK 37 で JDK 内部 API へアクセスするための `--add-opens` はルートの
 `build.gradle.kts` で Android モジュールのテストタスクに付けている。
 
+ADR（`docs/adr/`）を足したら、`docs/claude-code-handoff.md` の「参照」の ADR の一覧にも足す。CI の `test` job の先頭で `scripts/check-adr-index.sh`（#211）が、`docs/adr/*.md` のファイル名が handoff に出ているかを確かめ、欠けていれば名前を出して落とす（手元でも repo 直下で流せる）。一覧の文面が正しいかは確かめない。
+
 Room のスキーマは `core/data/schemas/` に書き出す（`room { schemaDirectory(...) }`）。
 Entity を変えたら version を上げ、書き出された JSON もコミットする。
 
