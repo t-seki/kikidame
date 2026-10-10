@@ -7,8 +7,10 @@ import dev.tseki.kikidame.domain.ProgramListTab
 import dev.tseki.kikidame.domain.ThemeMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -28,9 +30,13 @@ class DataStoreAppSettingsTest {
     private val settings get() = DataStoreAppSettings(dataStore.value)
     @After
     fun tearDown() = scope.cancel()
-    /** 最初の DataStore を閉じてから同じファイルで作り直す（アプリの再起動に相当。同じファイルに 2 つ同時には開けない）。 */
-    private fun restart() {
-        scope.cancel()
+    /**
+     * 最初の DataStore を閉じてから同じファイルで作り直す（アプリの再起動に相当。同じファイルに 2 つ同時には開けない）。
+     * `cancel()` は戻った時点では閉じ終わっていない（ファイルの使用中の登録が外れるのは scope の Job の完了後）ので、
+     * 完了まで待ってから作り直す。待たないと登録が残ったまま 2 つ目を作り、「multiple DataStores active」で落ちうる。
+     */
+    private suspend fun restart() {
+        scope.coroutineContext[Job]!!.cancelAndJoin()
         scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         dataStore = lazy { PreferenceDataStoreFactory.create(scope = scope) { file } }
     }
