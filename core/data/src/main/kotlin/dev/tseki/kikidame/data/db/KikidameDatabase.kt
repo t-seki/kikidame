@@ -8,7 +8,7 @@ import androidx.room.TypeConverters
 import androidx.room.migration.AutoMigrationSpec
 @Database(
     entities = [ProgramEntity::class, EpisodeEntity::class, LocalFileEntity::class, PlaybackStateEntity::class],
-    version = 7,
+    version = 8,
     exportSchema = true,
     autoMigrations = [
         // v2: programs の (publisherName, name) を unique でなくした（サーバに同名の番組があり得る）
@@ -23,6 +23,8 @@ import androidx.room.migration.AutoMigrationSpec
         AutoMigration(from = 5, to = 6),
         // v7: 列名をコードの名前に揃え、使わない playback_states.syncedAt を消す（ADR 0010、#196）
         AutoMigration(from = 6, to = 7, spec = KikidameDatabase.V6ToV7::class),
+        // v8: episodes.sourceFileSize / sourceModifiedAt（共有フォルダのタグを読み直すかの判定、#197）
+        AutoMigration(from = 7, to = 8),
     ],
 )
 @TypeConverters(Converters::class)

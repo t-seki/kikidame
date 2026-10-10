@@ -31,7 +31,8 @@ import kotlin.time.Clock
 
 /**
  * 取得元の一覧を [SourceGateway] から取得し、突合（[LibraryMatching]）して Room に 1 トランザクションで適用する。
- * 取得元由来の各回は取得元の値で上書きし（取得元が返さないサイズだけ手元の値を残す。出演者は空でも上書き）、`LocalFile` / `PlaybackState` は触らない。
+ * 取得元由来の各回は取得元の値で上書きし（取得元が返さないサイズだけ手元の値を残す。出演者は空でも上書き。
+ * 共有フォルダのファイルのサイズ・更新日時（`sourceFileSize` / `sourceModifiedAt`、#197）も取得元の値で書く）、`LocalFile` / `PlaybackState` は触らない。
  *
  * 全走査（[refresh]）は同期そのもの: 取り込んだ後に [SyncPlanner] を回し、保持ルールによる削除・取得元から消えた各回の除去・
  * ダウンロードの予約まで行う（ADR 0004）。番組単位（[refreshProgram]）は取り込みだけで、削除はしない。
@@ -237,5 +238,7 @@ class RoomLibraryRefreshRepository @Inject constructor(
         sizeBytes = sizeBytes ?: existingSize ?: 0L,
         container = container,
         performers = performers,
+        sourceFileSize = sourceFileSize,
+        sourceModifiedAt = sourceModifiedAt,
     )
 }

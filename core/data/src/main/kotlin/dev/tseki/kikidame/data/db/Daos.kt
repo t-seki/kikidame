@@ -21,6 +21,16 @@ data class LocalUsageRow(val totalBytes: Long, val episodeCount: Int)
 /** 突合に必要な列だけ。 */
 data class ProgramKeyRow(val id: Long, val sourceItemId: String?, val publisherName: String?, val name: String)
 data class EpisodeKeyRow(val id: Long, val sourceItemId: String?, val programId: Long, val title: String, val publishedAt: Instant, val runtimeTicks: Long)
+/** 共有フォルダで前に取り込んだ回の、タグ由来の値とファイルのサイズ・更新日時（#197）。 */
+data class ScannedFileRow(
+    val sourceItemId: String,
+    val title: String,
+    val publishedAt: Instant,
+    val runtimeTicks: Long,
+    val performers: List<String>,
+    val sourceFileSize: Long,
+    val sourceModifiedAt: Instant,
+)
 /** 同期の判断に必要な列だけ（`SyncPlanner` の入力）。`local_files` / `playback_states` が無ければ null。 */
 data class EpisodeSyncRow(
     val id: Long,
@@ -120,6 +130,15 @@ interface EpisodeDao {
     suspend fun findBySourceItemId(sourceItemId: String): EpisodeEntity?
     @Query("SELECT id, sourceItemId, programId, title, publishedAt, runtimeTicks FROM episodes")
     suspend fun listKeys(): List<EpisodeKeyRow>
+    /** 共有フォルダで取り込んだ回（ファイルのサイズと更新日時を持つ行）だけ。タグを読み直すかの判定に使う（#197）。 */
+    @Query(
+        """
+        SELECT sourceItemId, title, publishedAt, runtimeTicks, performers, sourceFileSize, sourceModifiedAt
+        FROM episodes
+        WHERE sourceItemId IS NOT NULL AND sourceFileSize IS NOT NULL AND sourceModifiedAt IS NOT NULL
+        """,
+    )
+    suspend fun listScannedFiles(): List<ScannedFileRow>
     /** 全各回を 1 クエリで（番組ごとに @Relation を引かない）。 */
     @Query(
         """
