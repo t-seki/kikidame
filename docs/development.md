@@ -53,6 +53,7 @@ JetBrains の kotlin-lsp は同梱の JBR で Gradle を動かすが、JBR に�
 ```bash
 ./gradlew test            # 全ユニットテスト（エミュレータ不要）。CI と同じ
 ./gradlew :app:lintDebug  # lint。CI と同じ。MissingTranslation（values/ と values-ja/ の片方だけの追加）はエラー。抑止は app/lint.xml に理由付きで
+./gradlew :core:domain:animalsnifferMain  # core/domain（純 JVM、Android Lint の NewApi が効かない）が minSdk 31 に無い API を呼んでいないか。CI と同じ。違反は Android の API シグネチャ（android-api-level-31）に無い参照として出る
 ./gradlew :app:assembleDebug
 ```
 
