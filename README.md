@@ -51,7 +51,7 @@ Requires Android 12 (API 31) or later. Store descriptions and screenshots live i
 
 ## Source prerequisites
 
-The app connects to **Jellyfin**, a **shared folder on a NAS (SMB)** or a **folder on this device**, one at a time. Earlier release builds offer only Jellyfin (SMB was in the debug build only); the folder on this device is not in the released builds yet.
+The app connects to **Jellyfin**, a **shared folder on a NAS (SMB)** or a **folder on this device**, one at a time. The SMB shared folder and the folder on this device are available from v0.4.0 (release builds up to v0.3.0 offer only Jellyfin).
 
 ### Jellyfin
 
