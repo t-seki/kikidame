@@ -24,6 +24,14 @@ data class SourceEpisode(
     val container: String,
     /** 出演者（Jellyfin では `Artists`）。取得元が返さなければ空（空で上書きする。サイズと違い「返さない」と「無い」を区別しない）。 */
     val performers: List<String> = emptyList(),
+    /**
+     * 共有フォルダでの、取得元のファイルのサイズ（バイト）。Jellyfin では null。
+     * 更新日時（[sourceModifiedAt]）・取得元 ID（パス）と合わせて、タグを読み直すかの判定に使う（#197）。
+     * [sizeBytes] はダウンロードの完了時に実サイズで上書きされるので、判定には使わない。
+     */
+    val sourceFileSize: Long? = null,
+    /** 共有フォルダでの、取得元のファイルの更新日時。Jellyfin では null。 */
+    val sourceModifiedAt: Instant? = null,
 )
 
 /**

@@ -11,10 +11,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.time.Instant
 
 /**
- * 過去のスキーマ（`schemas/` の JSON）から最新まで AutoMigration で上がること。v4→v5・v5→v6 は既存の行の既定値まで見る。
+ * 過去のスキーマ（`schemas/` の JSON）から最新まで AutoMigration で上がること。v4→v5・v5→v6・v7→v8 は既存の行の既定値まで、
+ * v6→v7 は改名した列の値まで見る。
  * 古い版への INSERT は、その版の列名（`serverItemId`・`stationName`・`airedAt` など）で書く。
  */
 @RunWith(AndroidJUnit4::class)
@@ -127,11 +129,44 @@ class MigrationTest {
         }
     }
 
+    /** v7→v8: episodes.sourceFileSize / sourceModifiedAt（共有フォルダのタグの読み直しの判定、#197）。既存の行は null で読め、値は残る。 */
+    @Test
+    fun v7ToV8AddsSourceFileColumnsAsNull() {
+        helper.createDatabase(DB_NAME, 7).use { db ->
+            db.execSQL(
+                "INSERT INTO programs (id, sourceItemId, name, publisherName, syncEnabled, keepLatest, deleteAfterPlayed, goneSince, starred) " +
+                    "VALUES (1, 'srv-1', 'ハライチのターン！', 'TBSラジオ', 1, 3, 0, NULL, 1)",
+            )
+            db.execSQL(
+                "INSERT INTO episodes (id, sourceItemId, programId, title, publishedAt, addedAt, runtimeTicks, sizeBytes, container, performers) " +
+                    "VALUES (10, 'ep-1', 1, '2026-09-18', 1789300800000, NULL, 36000000000, 1234, 'm4a', '')",
+            )
+        }
+        helper.runMigrationsAndValidate(DB_NAME, 8, true).close()
+
+        val migrated = Room.databaseBuilder(
+            ApplicationProvider.getApplicationContext(),
+            KikidameDatabase::class.java,
+            DB_NAME,
+        ).allowMainThreadQueries().build()
+        try {
+            val episode = runBlocking { migrated.episodeDao().findById(10) }!!.episode
+            assertNull(episode.sourceFileSize)
+            assertNull(episode.sourceModifiedAt)
+            assertEquals("ep-1", episode.sourceItemId)
+            assertEquals(1234L, episode.sizeBytes)
+            assertEquals(Instant.fromEpochMilliseconds(1789300800000), episode.publishedAt)
+            assertEquals(emptyList(), runBlocking { migrated.episodeDao().listScannedFiles() }, "rows without file stamps are not scanned files")
+        } finally {
+            migrated.close()
+        }
+    }
+
     /** 最初のスキーマからの通し。列追加が nullable か既定値付きで、途中のどこも手書きマイグレーションを要さないこと。 */
     @Test
     fun v1MigratesAllTheWayToLatest() {
         helper.createDatabase(DB_NAME, 1).close()
-        helper.runMigrationsAndValidate(DB_NAME, 7, true).close()
+        helper.runMigrationsAndValidate(DB_NAME, 8, true).close()
     }
 
     companion object {

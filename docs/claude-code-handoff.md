@@ -98,12 +98,58 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 サーバの `PremiereDate`（無ければ `DateCreated`）は日時で来るが、**日付部分だけ取って JST 0 時の `Instant`** にする
 （日単位の値として並び順を安定させる）。
 
+## 共有フォルダの走査（#197）
+
+共有フォルダ（`CONTEXT.md`）を取得元にするときの、中身のたどり方（epic #195 の決定 5・7・8・9、ADR 0010）。
+実装は `core/data/.../data/sharedfolder/` の `SharedFolderSource`（`SourceGateway` の実装）。Hilt の bind は `JellyfinSource` のままで、
+取得元を選ぶ画面と合わせて #198 で切り替える。
+
+**フォルダの木の抽象**（`FolderTree`）: SMB（#198）と端末のフォルダ（SAF、#199）がこれを実装する。走査はこの上だけで書き、テストはメモリ上の木で行う。
+
+- 子の一覧（名前・フォルダかどうか・サイズ・更新日時）。フォルダが無ければ null、失敗なら例外
+- ファイルの部分読み（位置と長さを指定。タグの読み取り用。ファイル全体を転送しない）
+- ファイルのストリーム（オフセットから。ダウンロードの続きから取る `.part` の再開用）
+- パスは共有フォルダの根からの相対パスで、区切りは `/`。どのメソッドも blocking で、走査の側が IO のスレッドで呼ぶ。読むだけで書き込まない
+
+**3 段の規則**: 中はちょうど `<配信元>/<番組>/<各回のファイル>` の 3 段。
+
+- 2 段目のフォルダはすべて番組（音声ファイルが 0 本でも番組。1 番組の取得がフォルダの有無で答えるのと揃える）。配信元と番組はフォルダの名前で決め、タグは使わない
+- 3 段目の、拡張子が `m4a` / `mp3` / `aac` / `ogg` / `opus` / `flac` / `wav`（大文字・小文字を区別しない）のファイルだけを各回とする。
+  それ以外（1・2 段目のファイル、4 段目以下、音声でないファイル）は黙って無視する。形式（`container`）は拡張子（小文字）
+- 隠しフォルダ（NAS が作る `@eaDir`・`#recycle` など）も除外しない（配信元・番組として拾われる）。除外するかは未決定
+- 取得元 ID は相対パス。番組は `<配信元>/<番組>`、各回は `<配信元>/<番組>/<ファイル名>`。ファイル名を変えると未結合になり、
+  今の突合（同じ番組内のタイトル → 公開日と尺）で結び直す。手元のコピーのパス（`local_files.path`）はキューに入れたときに決めたものを使い続けるので、
+  結び直してタイトルが変わってもコピーは旧タイトルの名前のまま見つかる（`SharedFolderSourceTest` で確かめている）。番組のフォルダ名を変えると消失になる
+- 全走査は完全な一覧（ADR 0004）。根が無いときは空の一覧でなく到達不能にする。1 番組の取得は、その番組のフォルダの中身だけで答える
+- 木の操作（一覧・部分読み）が例外を投げたら到達不能（`ServerException.Unreachable`。今の Jellyfin と同じく判断保留）。番組のフォルダが無ければ消失
+
+**タグ**（`TagReader`。Android では `MediaMetadataRetriever` に部分読みの `MediaDataSource` を渡す `RetrieverTagReader`）:
+
+| 項目 | タグがあるとき | 無いとき |
+| --- | --- | --- |
+| タイトル | title | 拡張子を除いたファイル名 |
+| 公開日 | 日付（年月日まであるときだけ。JST の日付の 0 時） | 取り込み日時（ファイルの更新日時）の JST の日付の 0 時 |
+| 取り込み日時 | — | ファイルの更新日時 |
+| 尺 | 音声の長さ（ticks で持つ） | 0（不明。突合の第 2 段の対象外） |
+| 出演者 | artist（1 件。分割しない） | 空 |
+
+- 年だけ・年月だけ・読めない日付は、無いものとして扱う（`TagDate`）
+- ファイルを解釈できないときはタグ無しとして補う。木の読み取りの失敗は到達不能にする（タグ無しとして保存すると、
+  サイズと更新日時が同じ間は読み直されないため）
+- `RetrieverTagReader` は JVM のテストでは動かず、実機で未確認（#198 で確かめる）
+
+**タグの読み直しの条件**: 回の行に、ファイルのサイズと更新日時（`sourceFileSize` / `sourceModifiedAt`、v8）を持つ。
+走査のときに前の行を取得元 ID（相対パス）で引き、パス・サイズ・更新日時がどれも同じなら、タグを読まずに前の行のタイトル・公開日・尺・出演者を使う。
+どれかが変わったファイルと新しいファイルだけタグを読む。更新日時は ms に揃えて比べる（Room は ms で持つ）。
+`sizeBytes` はダウンロードの完了時に実サイズで上書きされるので、この判定には使わない。
+
 ## Room スキーマ（この形で作る）
 
 主キーはすべてローカル代理キー。取得元 ID は nullable unique（ADR 0001）。
 取得元 ID を持たない行（未結合）は正規の状態（ADR 0001）。M1〜M3-b にあったシード（手元フォルダの走査）は M3-c で削除した（#21）。
 
 版 7（#196、ADR 0010）で、列 `serverItemId` を `sourceItemId` に、`stationName` / `airedAt` を `publisherName` / `publishedAt` に改め、`playback_states.syncedAt` を削除した。
+版 8（#197）で、`episodes` に共有フォルダのファイルのサイズと更新日時（`sourceFileSize` / `sourceModifiedAt`、nullable）を足した（「共有フォルダの走査」節）。
 
 ```kotlin
 @Entity(indices = [Index("sourceItemId", unique = true), Index("publisherName", "name")])
@@ -129,7 +175,9 @@ data class EpisodeEntity(          // 各回（Jellyfin では Audio）
   val addedAt: Instant?,           // 取り込み日時（Jellyfin では DateCreated）
   val runtimeTicks: Long, val sizeBytes: Long,
   val container: String,
-  val performers: List<String>     // 出演者（v6、#70）
+  val performers: List<String>,    // 出演者（v6、#70）
+  val sourceFileSize: Long?,       // 共有フォルダのファイルのサイズ（v8、#197）。Jellyfin では null。sizeBytes はダウンロードで上書きされるので別に持つ
+  val sourceModifiedAt: Instant?   // 共有フォルダのファイルの更新日時（v8、#197）。Jellyfin では null
 )
 
 @Entity

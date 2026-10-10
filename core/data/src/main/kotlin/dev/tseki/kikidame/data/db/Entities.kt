@@ -57,6 +57,13 @@ data class EpisodeEntity(
     val container: String,
     /** 出演者（Audio.Artists、#70）。[Converters] で 1 列に畳む。v6 で追加 */
     @ColumnInfo(defaultValue = "") val performers: List<String> = emptyList(),
+    /**
+     * 共有フォルダでの、取得元のファイルのサイズと更新日時（#197）。Jellyfin の行と、v8 より前に取り込んだ行は null。
+     * 取得元 ID（相対パス）とこの 2 つがどれも前と同じ回は、タグを読み直さずにこの行の値を使う。
+     * [sizeBytes] はダウンロードの完了時に実サイズで上書きされるので、この判定には使わない。v8 で追加
+     */
+    val sourceFileSize: Long? = null,
+    val sourceModifiedAt: Instant? = null,
 )
 /** ダウンロード状態の唯一の正（ADR 0003）。 */
 @Entity(
