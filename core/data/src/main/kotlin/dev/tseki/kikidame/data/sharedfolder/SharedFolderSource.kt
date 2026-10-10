@@ -38,7 +38,7 @@ import kotlin.time.Instant
  *   タグを読み直さずに前の値を使う
  * - 全走査は一覧を先に全部取ってから番組ごとにタグを読み、読み終えた番組を [ScanListener] に流す（#209 の決定 1。epic #195 の決定 8 の
  *   「全部読んでからまとめて取り込む」を改めた）。取り込み済みの回は DB に大きさと更新日時を持つので、途中で止まっても次の走査は
- *   その回のタグを読まない（#209 の決定 2）。木の操作の失敗は、接続を張り直して続けて 3 回までやり直す（#209 の決定 4）
+ *   その回のタグを読まない（#209 の決定 2）。木の操作が失敗したら接続を張り直してやり直し、続けて 3 回失敗したら到達不能（#209 の決定 4）
  * - 木の操作が例外を投げたら（全走査ではやり直しても失敗したら）[ServerException.Unreachable]（今の Jellyfin と同じく到達不能、判断保留）。
  *   番組のフォルダが無ければ [fetchProgram] が null（消失）
  *
@@ -78,7 +78,7 @@ class SharedFolderSource(
             val programEpisodes = ArrayList<SourceEpisode>(files.size)
             var readHere = false
             for (file in files) {
-                // タグの読み取り（ファイルごとに 1〜2 秒。#209 の計測）の合間に、取り消されていれば止まる
+                // タグの読み取り（まとめ読みの前の計測で m4a は 1 本 0.9〜1.3 秒。#209）の合間に、取り消されていれば止まる
                 currentCoroutineContext().ensureActive()
                 val id = episodeIdOf(program.sourceId, file)
                 val values = cachedValues(program.sourceId, file, previous) ?: run {
@@ -241,8 +241,8 @@ class SharedFolderSource(
 
     /**
      * 木の操作の失敗を到達不能に正規化する。木の操作は blocking でコルーチンの取り消しに気づかないので、
-     * [block] には取り消されていれば [CancellationException] を投げる関数を渡す。走査はフォルダごと・ファイルごとにこれを呼び、
-     * 取り消された走査が共有全体を最後まで読み続けない（取得元を変えた後も古い走査が走り続けるのを防ぐ。#198）。
+     * [block] には取り消されていれば [CancellationException] を投げる関数を渡す。1 番組の取得（[fetchProgramEpisodes]）はファイルごとにこれを呼び、
+     * 取り消されたら残りを読まない（#198）。全走査（[fetchAll]）はこれを通らず、[Retry] でやり直し、ファイルごと・フォルダごとに取り消しを見る（#209）。
      */
     private suspend fun <T> onTree(block: (checkActive: () -> Unit) -> T): T = withContext(io) {
         val context = coroutineContext
