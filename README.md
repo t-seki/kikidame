@@ -2,7 +2,7 @@
 
 日本語: [README.ja.md](./README.ja.md)
 
-An Android app for **episodic audio** (radio recordings and podcasts) kept in a Jellyfin music library. It downloads and deletes episodes automatically by per-program rules, and keeps playing when the server is unreachable. Kikidame is an unofficial client with no affiliation to the Jellyfin project.
+An Android app for recorded radio programs kept on a Jellyfin server, a NAS shared folder or a folder on your device (podcast files work too). It downloads and deletes episodes automatically by per-program rules, and keeps playing when the source is unreachable. Kikidame is an unofficial client with no affiliation to the Jellyfin project.
 
 https://github.com/user-attachments/assets/23b4710a-9410-4d2f-aa2b-c8faac1184e3
 
@@ -24,7 +24,7 @@ Existing Jellyfin clients (the official app, Findroid, Finamp) are built around 
 - **Offline first** — playback always uses the files on the device. Playback position and played state live on the device only and are never sent to the server
 - **Retention rules** — per program, choose "Keep latest N" and "Delete after played"; sync then downloads what is missing and removes what is no longer needed
 
-It assumes one source at a time (one Jellyfin server, user and library) and that this app is the only place you listen. Changing the source deletes the programs, episodes, playback positions and files on the device and starts over. Sharing with other devices or the web player is not a goal.
+It assumes one source at a time (one Jellyfin server, user and library, or one shared folder) and that this app is the only place you listen. Changing the source deletes the programs, episodes, playback positions and files on the device and starts over. Sharing with other devices or the web player is not a goal.
 
 ## What it does
 
