@@ -73,7 +73,7 @@ data class DeviceFolder(val treeUri: String, val name: String) {
             val raw = runCatching { java.net.URI(treeUri).rawPath }.getOrNull() ?: return null
             val encoded = raw.removePrefix("/tree/").takeIf { it != raw && it.isNotEmpty() && '/' !in it } ?: return null
             // URLDecoder は「+」を空白にするので、先に「+」そのものに戻るよう符号にしておく
-            val documentId = runCatching { java.net.URLDecoder.decode(encoded.replace("+", "%2B"), Charsets.UTF_8) }.getOrNull() ?: return null
+            val documentId = runCatching { java.net.URLDecoder.decode(encoded.replace("+", "%2B"), "UTF-8") }.getOrNull() ?: return null
             val volume = documentId.substringBefore(':', missingDelimiterValue = "")
             if (volume.isEmpty() || volume.contains('/')) return null
             val segments = documentId.substringAfter(':').split('/').filter { it.isNotEmpty() }
