@@ -156,10 +156,13 @@ class LibraryRefresher @Inject constructor(
      */
     private suspend fun guarded(silent: Boolean, block: suspend Run.() -> RefreshResult?): RefreshResult? {
         var joined: Run? = null
+        // Run を running に入れるのと同じ synchronized の中で job を入れる（cancelAndAwait が job の無い Run を見る隙間を作らない）
+        val callerJob = currentCoroutineContext()[Job]
         val run = synchronized(lock) {
             val current = running
             when {
                 current == null -> Run(silent).also {
+                    it.job = callerJob
                     running = it
                     if (silent) _isSyncingInBackground.value = true else _isRefreshing.value = true
                 }
@@ -179,7 +182,6 @@ class LibraryRefresher @Inject constructor(
         if (run == null) return null
         var result: RefreshResult? = null
         try {
-            run.job = currentCoroutineContext()[Job]
             result = run.execute(block)
             return result
         } finally {

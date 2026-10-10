@@ -76,7 +76,7 @@ class LibraryRefresherTest {
         }
     }
 
-    private class FakeDownloads(var missing: Int = 0) : DownloadRepository {
+    private class FakeDownloads(var missing: Int = 0, var gate: CompletableDeferred<Unit>? = null) : DownloadRepository {
         override suspend fun enqueue(episodeId: EpisodeId) = Unit
         override suspend fun enqueueForSync(episodeIds: List<EpisodeId>) = episodeIds.size
         override suspend fun removeEpisode(episodeId: EpisodeId) = Unit
@@ -85,7 +85,10 @@ class LibraryRefresherTest {
         override suspend fun retry(episodeId: EpisodeId) = Unit
         override suspend fun unpin(episodeId: EpisodeId) = Unit
         override suspend fun deleteLocal(episodeId: EpisodeId) = LocalDeletionScope.FILE_ONLY
-        override suspend fun reconcileMissingFiles(): Int = missing
+        override suspend fun reconcileMissingFiles(): Int {
+            gate?.await()
+            return missing
+        }
         override suspend fun ensureFilePresent(episodeId: EpisodeId): Boolean = true
     }
 
@@ -617,6 +620,25 @@ class LibraryRefresherTest {
         assertFalse(refresher.isRefreshing.value)
         repo.gate = null
         assertEquals(3, refresher.refresh()?.programs, "a refresh right after the change is not dropped")
+    }
+
+    /** Run を作った直後、取得元に問い合わせる前（手元の整合の最中）に来ても、取り消せる（job は Run を running に入れるのと同時に入る）。 */
+    @Test
+    fun cancelAndAwaitCancelsARunThatHasNotReachedTheSourceYet() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { result = RefreshResult(3, 40, 1, 6, now) }
+        val downloads = FakeDownloads(gate = CompletableDeferred())
+        val refresher = refresher(repo, downloads = downloads)
+
+        val first = async { refresher.refresh() }
+        runCurrent()
+        assertTrue(refresher.isRefreshing.value)
+        assertEquals(0, repo.calls, "the run is still before the source")
+
+        refresher.cancelAndAwait()
+
+        assertTrue(first.isCancelled)
+        assertEquals(0, repo.calls)
+        assertFalse(refresher.isRefreshing.value)
     }
 
     @Test

@@ -37,6 +37,7 @@ import org.jellyfin.sdk.model.api.SortOrder
 import org.jellyfin.sdk.model.api.request.GetItemsRequest
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -244,10 +245,13 @@ class SdkJellyfinGateway @Inject constructor(
         )
     }
 
-    /** SDK の例外を [ServerException] に正規化する。原因の連鎖はログに残す（トークンは含まれない）。 */
-    private suspend fun <T> call(block: suspend () -> T): T = try {
+    /** SDK の例外を [ServerException] に正規化する（コルーチンの取り消しは包まずに通す。SDK が取り消しをそのまま投げるかは未確認）。原因の連鎖はログに残す（トークンは含まれない）。 */
+    internal suspend fun <T> call(block: suspend () -> T): T = try {
         block()
     } catch (e: ServerException) {
+        throw e
+    } catch (e: CancellationException) {
+        // コルーチンの取り消しは失敗ではない。Failed に包むと、取り消された同期が失敗の文言になり、取り消しが伝わらない
         throw e
     } catch (e: Exception) {
         Log.w(TAG, "server call failed: ${e.causeChain()}")
