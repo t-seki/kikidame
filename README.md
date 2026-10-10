@@ -51,7 +51,7 @@ Requires Android 12 (API 31) or later. Store descriptions and screenshots live i
 
 ## Source prerequisites
 
-The app connects to **Jellyfin** or a **shared folder on a NAS (SMB)**, one at a time. Releases made before #209 offer only Jellyfin (SMB was in the debug build only).
+The app connects to **Jellyfin** or a **shared folder on a NAS (SMB)**, one at a time. Earlier release builds offer only Jellyfin (SMB was in the debug build only).
 
 ### Jellyfin
 
@@ -86,7 +86,7 @@ The app connects to **Jellyfin** or a **shared folder on a NAS (SMB)**, one at a
 - The first full scan lists every folder first, then reads the tags program by program. Each program shows up in the program list as soon as its tags are read, and while tags are being read the program list shows a count such as "Reading tags 1,234 / 6,090". The first scan of a large share can take a long time (how long is not measured yet)
 - If the connection drops, the app reconnects and reads the same file again; after three failures in a row the sync ends as unreachable. Programs already imported stay, and the next sync does not read their tags again, so it continues from where it stopped. Whether a program has disappeared from the share is decided only by a scan that reaches the end
 - Renaming an episode file makes it unlinked and it is matched again by title (then by published day and duration) within the same program. Renaming a program folder makes the program Gone (On Hold), because the publisher and program name no longer match
-- Whether this works on your NAS and network (name resolution, guest access, how long the first full scan of a large share takes) is not fully verified on real devices yet; see "実機の確認項目" in [docs/development.md](./docs/development.md) (Japanese)
+- Whether this works on your NAS and network (name resolution, guest access, how long the first full scan of a large share takes) is not fully verified on real devices yet; see "実機で試す（#198: SMB の共有フォルダ）" and its checklists in [docs/development.md](./docs/development.md) (Japanese)
 
 ## How it works
 

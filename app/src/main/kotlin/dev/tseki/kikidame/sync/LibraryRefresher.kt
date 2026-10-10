@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -43,6 +44,8 @@ import javax.inject.Singleton
  * - 結果の文言は手元の変化（新しい回・予約・削除）だけを並べる。手動は変化が無ければ「最新の状態です」、silent は変化があったときだけ出す（#142）
  * - silent な同期の間は [isSyncingInBackground] を立てる（画面は細いバーを出す。#138）。合流したらクルクルに切り替える
  * - 全走査でタグを読む回がある間は、読んだ数を [tagProgress] に流す（silent でも手動でも。#209）
+ * - 全走査が途中で失敗しても、それまでに番組ごとの同期が予約していればダウンロードの Worker を起こす。取り消し・認証の失敗では起こさない（#209）
+ * - 再生中の回（削除から外す回）は、全走査の中で番組ごとに読み直す（#209）
  */
 @Singleton
 class LibraryRefresher @Inject constructor(
@@ -106,8 +109,11 @@ class LibraryRefresher @Inject constructor(
 
     /** 全走査して結果の文言を出す。手元に変化があれば silent でも出す（#142）。 */
     private suspend fun Run.sync(): RefreshResult =
-        refreshRepository.refresh(excluded = excluded()) { _tagProgress.value = it }
-            .also { report(it.toSyncMessage(), evenIfSilent = it.hasChanges) }
+        refreshRepository.refresh(
+            excluded = { excluded() },
+            onProgress = { _tagProgress.value = it },
+            onEnqueued = { enqueuedSoFar.addAndGet(it) },
+        ).also { report(it.toSyncMessage(), evenIfSilent = it.hasChanges) }
 
     /** 聴いている回は削除から外す。ただし聴き終えて止まっている回は「再生済みなら削除」に任せる（#27）。 */
     private fun excluded(): Set<EpisodeId> = setOfNotNull(nowPlaying.excludedFromSync)
@@ -128,6 +134,9 @@ class LibraryRefresher @Inject constructor(
 
         /** この実行を走らせている呼び出し側のコルーチンの Job。[cancelAndAwait] が取り消す。 */
         var job: Job? = null
+
+        /** 全走査の途中で、番組ごとの同期が予約したダウンロードの数（#209）。走査が途中で失敗しても Worker を起こすために数える。 */
+        val enqueuedSoFar = AtomicInteger()
 
         /** 途中の文言（手元の整合）。silent なら捨てる。 */
         fun say(message: UiText) {
@@ -218,15 +227,7 @@ class LibraryRefresher @Inject constructor(
             }
             val result = block() ?: return null
             // 同期は済んでいる。Worker を起こせなくても結果は返す（次の起動やダウンロード操作で拾われる）
-            if (result.enqueued > 0) {
-                try {
-                    kicker.kick()
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    Log.w(TAG, "could not start the download worker", e)
-                }
-            }
+            if (result.enqueued > 0) kickDownloads()
             return result
         } catch (e: ServerException.Unauthorized) {
             // ログアウトすると画面が接続画面へ移るので、文言を先に出す
@@ -234,18 +235,43 @@ class LibraryRefresher @Inject constructor(
             sessionRepository.signOut()
             return null
         } catch (e: ServerException.Unreachable) {
+            kickIfEnqueuedBeforeFailure()
             report(UiText.Res(R.string.sync_error_unreachable))
             return null
         } catch (e: ServerException.Failed) {
+            kickIfEnqueuedBeforeFailure()
             report(UiText.Res(R.string.sync_error_fetch_failed, e.message.orEmpty()))
             return null
         } catch (e: CancellationException) {
+            // 取り消し（取得元を変える・ログアウトの前の cancelAndAwait）では起こさない。取得元を変える処理（SourceChanger）は
+            // ダウンロードの Worker を止めてから走査を取り消し、手元を消すので、ここで起こすと消す前に Worker が動き出す
             throw e
         } catch (e: Exception) {
             // Room / DataStore / Keystore の失敗。落とさずに文言にする
             Log.e(TAG, "refresh failed", e)
+            kickIfEnqueuedBeforeFailure()
             report(UiText.Res(R.string.sync_error_import_failed, e::class.simpleName.orEmpty()))
             return null
+        }
+    }
+
+    /**
+     * 全走査が途中で失敗しても、それまでに番組ごとの同期が予約していれば Worker を起こす（#209）。予約は DB に残っていて、
+     * 次の同期ではその回の予約が数に入らない（もう行がある）ので、ここで起こさないと次の起動かダウンロードの操作まで待つ。
+     * 認証の失敗（ログアウトする）と取り消しでは起こさない。
+     */
+    private suspend fun Run.kickIfEnqueuedBeforeFailure() {
+        if (enqueuedSoFar.get() > 0) kickDownloads()
+    }
+
+    /** ダウンロードの Worker を起こす。起こせなくても同期の結果は変えない（次の起動やダウンロード操作で拾われる）。 */
+    private suspend fun kickDownloads() {
+        try {
+            kicker.kick()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "could not start the download worker", e)
         }
     }
 

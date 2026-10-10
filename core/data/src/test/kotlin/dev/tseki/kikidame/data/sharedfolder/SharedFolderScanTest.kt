@@ -2,12 +2,15 @@ package dev.tseki.kikidame.data.sharedfolder
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.tseki.kikidame.data.db.LocalFileEntity
 import dev.tseki.kikidame.data.files.EpisodesDirectory
 import dev.tseki.kikidame.data.repository.RoomDownloadRepository
 import dev.tseki.kikidame.data.repository.RoomLibraryRefreshRepository
 import dev.tseki.kikidame.data.repository.RoomTestBase
 import dev.tseki.kikidame.data.repository.testSessionStore
 import dev.tseki.kikidame.data.source.ScanListener
+import dev.tseki.kikidame.domain.DownloadState
+import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.ScanProgress
 import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.SessionState
@@ -230,6 +233,52 @@ class SharedFolderScanTest : RoomTestBase() {
         assertEquals(2, second.enqueued)
         assertNotNull(db.localFileDao().findByEpisode(db.episodeDao().findBySourceItemId("P/A/1.m4a")!!.id))
         assertNotNull(db.localFileDao().findByEpisode(db.episodeDao().findBySourceItemId("P/A/2.m4a")!!.id))
+    }
+
+    /**
+     * 再生中の回は、走査の開始時の値でなく、番組ごとの削除の前に読み直す（長い走査の途中で再生を始めた回を消さない）。
+     * 同期の対象でない番組の手元のファイルは、固定していなければ削除の対象になる。
+     */
+    @Test
+    fun theEpisodeStartedDuringTheScanIsNotDeleted() = runTest {
+        connect()
+        folder.put("P/A/1.m4a")
+        folder.put("P/B/1.m4a", ByteArray(10))
+        repo().refresh()
+        val b1 = db.episodeDao().findBySourceItemId("P/B/1.m4a")!!.id
+        db.localFileDao().upsert(LocalFileEntity(b1, DownloadState.DONE, "${directory.root}/P/B/1.m4a", pinned = false, downloadedAt = now))
+        folder.put("P/A/2.m4a")
+        folder.put("P/B/1.m4a", ByteArray(11)) // 大きさが変わり、タグを読み直す
+        var playing: EpisodeId? = null
+        val startsPlayingB1 = TagReader { tree, path, size ->
+            if (path == "P/B/1.m4a") playing = EpisodeId(b1)
+            tags.read(tree, path, size)
+        }
+
+        repo(source(startsPlayingB1)).refresh(excluded = { setOfNotNull(playing) })
+
+        assertNotNull(db.localFileDao().findByEpisode(b1), "the episode that started playing during the scan is kept")
+    }
+
+    /** 番組ごとに予約した数は、その場で流れる（走査が途中で失敗しても、呼び出し側が Worker を起こせる）。 */
+    @Test
+    fun downloadsEnqueuedPerProgramAreReportedEvenIfTheScanFailsLater() = runTest {
+        connect()
+        folder.put("P/A/1.m4a")
+        repo().refresh()
+        val programId = db.programDao().findBySourceItemId("P/A")!!.id
+        db.programDao().updateSync(programId, syncEnabled = true, keepLatest = null, deleteAfterPlayed = false)
+        folder.put("P/A/2.m4a")
+        folder.put("P/B/1.m4a")
+        val brokenB = TagReader { tree, path, size ->
+            if (path.startsWith("P/B/")) throw IOException("connection abort")
+            tags.read(tree, path, size)
+        }
+        val enqueued = ArrayList<Int>()
+
+        assertFailsWith<ServerException.Unreachable> { repo(source(brokenB)).refresh(onEnqueued = { enqueued += it }) }
+
+        assertEquals(listOf(2), enqueued)
     }
 
     // --- 張り直し（決定 4） ---

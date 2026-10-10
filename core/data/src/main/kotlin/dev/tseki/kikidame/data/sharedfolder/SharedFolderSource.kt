@@ -64,7 +64,8 @@ class SharedFolderSource(
      *
      * 木の操作（一覧・タグの読み取り）が失敗したら、[FolderTree.reset] で接続を捨ててから同じ操作をやり直す（タグは同じファイルの頭から）。
      * 続けて [MAX_CONSECUTIVE_FAILURES] 回失敗したら到達不能で終わる。成功を挟めば数え直す。
-     * [ServerException]（認証・権限など、やり直しても変わらない失敗）と、ファイルが無い（[FileNotFoundException]）は、やり直さずに今までどおり投げる。
+     * [ServerException]（認証・権限など、やり直しても変わらない失敗）はやり直さずにそのまま投げる。ファイルが無い（[FileNotFoundException]）も
+     * やり直さず、今までどおり [ServerException.Unreachable] に包んで投げる。
      */
     override suspend fun fetchAll(listener: ScanListener): SourceSnapshot {
         val previous = scanned.load()

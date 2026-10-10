@@ -55,10 +55,20 @@ class LibraryRefresherTest {
         var lastExcluded: Set<EpisodeId> = emptySet()
         /** 全走査の途中で流す進み具合（#209）。[gate] の前に流す。 */
         var progress: List<ScanProgress> = emptyList()
-        override suspend fun refresh(excluded: Set<EpisodeId>, onProgress: (ScanProgress) -> Unit): RefreshResult {
+        /** 全走査の途中で番組ごとに予約した数（#209）。[gate] の前に流す。 */
+        var enqueuedOnTheWay: List<Int> = emptyList()
+        /** 渡された「再生中の回」を読む関数（番組ごとに読み直すことを試す。#209）。 */
+        var excludedReader: (() -> Set<EpisodeId>)? = null
+        override suspend fun refresh(
+            excluded: () -> Set<EpisodeId>,
+            onProgress: (ScanProgress) -> Unit,
+            onEnqueued: (Int) -> Unit,
+        ): RefreshResult {
             calls++
-            lastExcluded = excluded
+            lastExcluded = excluded()
+            excludedReader = excluded
             progress.forEach(onProgress)
+            enqueuedOnTheWay.forEach(onEnqueued)
             gate?.await()
             error?.let { throw it }
             return result!!
@@ -679,6 +689,69 @@ class LibraryRefresherTest {
             refresher.refresh()
             expectNoEvents()
         }
+    }
+
+    /** 全走査が途中で失敗しても、番組ごとに予約していれば Worker を起こす（#209）。 */
+    @Test
+    fun aFailedScanStillKicksTheWorkerForDownloadsEnqueuedOnTheWay() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply {
+            enqueuedOnTheWay = listOf(2)
+            error = ServerException.Unreachable(java.io.IOException("abort"))
+        }
+        val kicker = FakeKicker()
+
+        assertNull(refresher(repo, kicker = kicker).refresh())
+
+        assertEquals(1, kicker.kicks)
+    }
+
+    @Test
+    fun aFailedScanWithoutDownloadsOnTheWayDoesNotKick() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { error = ServerException.Unreachable(java.io.IOException("abort")) }
+        val kicker = FakeKicker()
+
+        refresher(repo, kicker = kicker).refresh()
+
+        assertEquals(0, kicker.kicks)
+    }
+
+    /** 取り消し（取得元を変える前）では起こさない。SourceChanger が Worker を止めた後に手元を消すので、その間に動き出させない。 */
+    @Test
+    fun aCancelledScanDoesNotKickEvenWithDownloadsOnTheWay() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply {
+            result = RefreshResult(3, 40, 0, 0, now)
+            enqueuedOnTheWay = listOf(2)
+            gate = CompletableDeferred()
+        }
+        val kicker = FakeKicker()
+        val refresher = refresher(repo, kicker = kicker)
+
+        val run = async { refresher.refresh() }
+        runCurrent()
+        refresher.cancelAndAwait()
+
+        assertTrue(run.isCancelled)
+        assertEquals(0, kicker.kicks)
+    }
+
+    /** 再生中の回は、走査の開始時の値でなく、読むたびに今の値を返す（長い走査の途中で再生を始めた回を消さない。#209）。 */
+    @Test
+    fun theExcludedEpisodeIsReadAgainDuringTheScan() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply {
+            result = RefreshResult(3, 40, 0, 0, now)
+            gate = CompletableDeferred()
+        }
+        val nowPlaying = NowPlaying()
+        val refresher = refresher(repo, nowPlaying = nowPlaying)
+
+        val run = async { refresher.refresh() }
+        runCurrent()
+        assertEquals(emptySet(), repo.lastExcluded)
+        nowPlaying.set(nowPlaying(42))
+        assertEquals(setOf(EpisodeId(42)), repo.excludedReader!!())
+
+        repo.gate!!.complete(Unit)
+        run.await()
     }
 
     /** Run を作った直後、取得元に問い合わせる前（手元の整合の最中）に来ても、取り消せる（job は Run を running に入れるのと同時に入る）。 */

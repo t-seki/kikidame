@@ -51,15 +51,19 @@ class RoomLibraryRefreshRepository @Inject constructor(
     private val clock: Clock,
 ) : LibraryRefreshRepository {
 
-    override suspend fun refresh(excluded: Set<EpisodeId>, onProgress: (ScanProgress) -> Unit): RefreshResult {
+    override suspend fun refresh(
+        excluded: () -> Set<EpisodeId>,
+        onProgress: (ScanProgress) -> Unit,
+        onEnqueued: (Int) -> Unit,
+    ): RefreshResult {
         requireReady()
         // 失敗しても記録する。到達できない間、起動時同期が前面に出るたびに積まれないように（#135）
         store.saveLastAttemptedAt(clock.now())
-        val scanned = ProgramByProgram(excluded, onProgress)
+        val scanned = ProgramByProgram(excluded, onProgress, onEnqueued)
         val snapshot = source.fetchAll(scanned)
         // 番組ごとに取り込み済みの回は、ここでは変化にならない（予約・削除も済んでいる）。消失の判断と結び直しはここで全体を相手に行う
         val result = apply(snapshot)
-        val outcome = synchronize(snapshot, excluded)
+        val outcome = synchronize(snapshot, excluded())
         store.saveLastFetchedAt(result.fetchedAt)
         return result.copy(
             enqueued = outcome.enqueued + scanned.enqueued,
@@ -73,11 +77,13 @@ class RoomLibraryRefreshRepository @Inject constructor(
     /**
      * 全走査の途中で、読み終えた番組を 1 つずつ取り込む（#209 の決定 1）。取り込みの範囲と、その番組の中での削除・予約は
      * [syncProgram] と同じ（[SnapshotScope.Program] で取り込み、その番組だけを [synchronize]）。消失の判断はしない。
-     * 数えた変化は、全走査の結果に足す。
+     * 数えた変化は、全走査の結果に足す。[excluded]（再生中の回）は番組ごとに読み直す（長い走査の途中で再生を始めた回を消さない）。
+     * 予約した数は、その場で [onEnqueued] にも流す。
      */
     private inner class ProgramByProgram(
-        private val excluded: Set<EpisodeId>,
+        private val excluded: () -> Set<EpisodeId>,
         private val onProgress: (ScanProgress) -> Unit,
+        private val onEnqueued: (Int) -> Unit,
     ) : ScanListener {
         var newEpisodes = 0
         var enqueued = 0
@@ -90,8 +96,9 @@ class RoomLibraryRefreshRepository @Inject constructor(
             val snapshot = SourceSnapshot(programs = listOf(program), episodes = episodes, scope = SnapshotScope.Program(program.sourceId))
             newEpisodes += apply(snapshot).newEpisodes
             val programId = db.programDao().findBySourceItemId(program.sourceId.value)?.id ?: return
-            val outcome = synchronize(snapshot, excluded, onlyProgramId = ProgramId(programId))
+            val outcome = synchronize(snapshot, excluded(), onlyProgramId = ProgramId(programId))
             enqueued += outcome.enqueued
+            if (outcome.enqueued > 0) onEnqueued(outcome.enqueued)
             deleted += outcome.deleted
             removed += outcome.removed
         }
