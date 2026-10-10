@@ -77,7 +77,7 @@ class DeviceFolderViewModel @Inject constructor(
                 // （アプリのスコープで走り、画面が消えても最後まで走る。結果の文言は一覧側に出る）
                 refresher.launchRefresh()
                 _uiState.update { it.copy(isSubmitting = false) }
-                // 同期の制約は取得元で変わる（端末のフォルダには「Wi-Fi のみ」をかけない）ので、定期同期を組み直す。
+                // 同期の制約は取得元で変わる（端末のフォルダにはネットワークの条件をかけない）ので、定期同期を組み直す。
                 // 取り消されても次にアプリが前面に出たとき（onAppStart）に組み直される
                 try {
                     syncScheduler.reschedule()
@@ -89,8 +89,9 @@ class DeviceFolderViewModel @Inject constructor(
             } catch (e: UnsupportedFolderException) {
                 _uiState.update { it.copy(isSubmitting = false, error = UiText.Res(R.string.device_folder_error_not_device)) }
             } catch (e: ServerException) {
+                // 例外の文言（英語の内部の文言と URI）は画面に出さず、logcat に残す。SMB の認証の失敗と同じく固定の文言にする
                 Log.w(TAG, "pick the device folder failed", e)
-                _uiState.update { it.copy(isSubmitting = false, error = UiText.Res(R.string.device_folder_error_failed, e.message.orEmpty())) }
+                _uiState.update { it.copy(isSubmitting = false, error = UiText.Res(R.string.device_folder_error_failed)) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

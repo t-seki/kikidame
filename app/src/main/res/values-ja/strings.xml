@@ -53,7 +53,7 @@
     <string name="device_folder_pick">フォルダを選ぶ</string>
     <string name="device_folder_lost">フォルダ「%1$s」につながっていません。フォルダを選び直してください</string>
     <string name="device_folder_error_not_device">端末のフォルダではありません。内部ストレージか SD カードのフォルダを選び直してください</string>
-    <string name="device_folder_error_failed">フォルダを読めませんでした: %1$s</string>
+    <string name="device_folder_error_failed">フォルダを読めませんでした。フォルダを選び直してください</string>
 
     <!-- smb_connect -->
     <string name="smb_connect_title">共有フォルダに接続</string>

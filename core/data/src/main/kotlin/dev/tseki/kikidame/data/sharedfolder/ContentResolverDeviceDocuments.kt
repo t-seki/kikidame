@@ -8,6 +8,7 @@ import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import java.io.FileInputStream
 import java.io.FileNotFoundException
+import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 
@@ -23,11 +24,16 @@ class ContentResolverDeviceDocuments(private val resolver: ContentResolver) : De
 
     override fun rootDocumentId(treeUri: String): String = DocumentsContract.getTreeDocumentId(Uri.parse(treeUri))
 
+    /**
+     * 行の無い cursor が返ったら「無い」（null）。cursor そのものが null のときは失敗（[IOException]）にする。
+     * `ContentResolver.query` の仕様は、null を「provider が null を返したか、provider が落ちたとき」としており、
+     * 無いのか落ちたのかを見分けられないため（AOSP の `DocumentsProvider.query` がファイルの無いときに null を返すかは、
+     * ソースを読んで確かめていない。未確認）。
+     */
     override fun query(treeUri: String, documentId: String): DeviceDocument? {
         val uri = DocumentsContract.buildDocumentUriUsingTree(Uri.parse(treeUri), documentId)
-        return resolver.query(uri, COLUMNS, null, null, null)?.use { cursor ->
-            if (cursor.moveToFirst()) cursor.toDocument() else null
-        }
+        val cursor = resolver.query(uri, COLUMNS, null, null, null) ?: throw IOException("provider returned no cursor: $documentId")
+        return cursor.use { if (it.moveToFirst()) it.toDocument() else null }
     }
 
     override fun children(treeUri: String, documentId: String): List<DeviceDocument> {

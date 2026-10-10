@@ -48,7 +48,7 @@ class SyncSchedulerTest {
         assertTrue(SyncScheduler.isStale(ready(lastSuccess, now - 60.minutes), now))
     }
 
-    /** 端末のフォルダには「Wi-Fi のみ」をかけない。Jellyfin と SMB は設定どおり（#199 の決定 4）。 */
+    /** 端末のフォルダにはネットワークの条件をかけない。Jellyfin と SMB は設定どおり（#199 の決定 4 と「決定の追記」）。 */
     @Test
     fun wifiOnlyDoesNotApplyToADeviceFolder() {
         val device = SessionState.Ready(
@@ -58,11 +58,11 @@ class SyncSchedulerTest {
         val smb = SessionState.Ready(ConnectedSource.Smb(SmbConnection("nas", "share", "", "u", "p")), null)
         val jellyfin = ready(null, null)
 
-        assertEquals(NetworkType.CONNECTED, SyncScheduler.requiredNetworkType(wifiOnly = true, device))
+        assertEquals(NetworkType.NOT_REQUIRED, SyncScheduler.requiredNetworkType(wifiOnly = true, device))
         assertEquals(NetworkType.UNMETERED, SyncScheduler.requiredNetworkType(wifiOnly = true, smb))
         assertEquals(NetworkType.UNMETERED, SyncScheduler.requiredNetworkType(wifiOnly = true, jellyfin))
         assertEquals(NetworkType.CONNECTED, SyncScheduler.requiredNetworkType(wifiOnly = false, smb))
-        assertEquals(NetworkType.CONNECTED, SyncScheduler.requiredNetworkType(wifiOnly = false, device))
+        assertEquals(NetworkType.NOT_REQUIRED, SyncScheduler.requiredNetworkType(wifiOnly = false, device))
         assertFalse(SyncScheduler.wifiOnlyApplies(wifiOnly = true, device))
         assertTrue(SyncScheduler.wifiOnlyApplies(wifiOnly = true, jellyfin))
     }

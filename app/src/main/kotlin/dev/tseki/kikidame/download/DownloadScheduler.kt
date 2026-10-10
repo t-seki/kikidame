@@ -50,7 +50,7 @@ class DownloadScheduler @Inject constructor(
 
     /**
      * PENDING が残っていれば Worker を起動する（アプリ起動時・設定変更時・同期の後にも呼ぶ）。
-     * 取得元が端末のフォルダなら「Wi-Fi のみ」をかけない（#199 の決定 4。[SyncScheduler.requiredNetworkType]）。
+     * 取得元が端末のフォルダならネットワークの条件をかけない（#199 の決定 4 と「決定の追記」。[SyncScheduler.requiredNetworkType]）。
      */
     override suspend fun kick() {
         val constraints = Constraints.Builder()

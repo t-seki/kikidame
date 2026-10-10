@@ -6,7 +6,8 @@ import java.io.FileNotFoundException
  * メモリ上の端末のフォルダ（SAF、#199）。1 つのツリー [treeUri] だけを持つ。文書 ID は `doc:<根からの相対パス>` の形にして、
  * 木（[DeviceFolderTree]）が ID の形に頼らないことを見えるようにする。
  *
- * [folder] / [file] で中身を作る。[rootGone] で根を消し、[securityFailure] で権限の失敗を投げさせる。
+ * [folder] / [file] で中身を作る。[rootGone] で根を消し（provider が「無い」と答える）、[queryFailure] で問い合わせを例外で失敗させ
+ * （無いのか一時的な失敗なのか分からない）、[securityFailure] で権限の失敗を投げさせる。
  * 権限は [takePermission] で取り、[releasePermission] で手放す（[granted] で初めから持たせる）。
  */
 class MemoryDeviceDocuments(
@@ -17,6 +18,7 @@ class MemoryDeviceDocuments(
     private val permissions = LinkedHashSet<String>()
     var rootGone = false
     var securityFailure = false
+    var queryFailure: Exception? = null
 
     /** 呼ばれた [children] の文書 ID（同じフォルダを何度も一覧していないかを見る）。 */
     val listed = ArrayList<String>()
@@ -51,6 +53,7 @@ class MemoryDeviceDocuments(
 
     override fun query(treeUri: String, documentId: String): DeviceDocument? {
         check()
+        queryFailure?.let { throw it }
         if (rootGone) return null
         return documents[documentId]?.first
     }

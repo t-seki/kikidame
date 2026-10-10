@@ -77,8 +77,8 @@
     <!-- Shown while signed out from a folder on this device (access was lost, or the user signed out). %1$s = folder name -->
     <string name="device_folder_lost">Not connected to the folder “%1$s”. Pick the folder again</string>
     <string name="device_folder_error_not_device">This is not a folder on this device. Pick a folder in internal storage or on an SD card</string>
-    <!-- %1$s = reason -->
-    <string name="device_folder_error_failed">Could not read the folder: %1$s</string>
+    <!-- Picking failed (no access, or the folder could not be read). The details go to logcat, not to the screen -->
+    <string name="device_folder_error_failed">Could not read the folder. Pick the folder again</string>
 
     <!-- ===== smb_connect: connect to an SMB shared folder ===== -->
     <string name="smb_connect_title">Connect to a shared folder</string>

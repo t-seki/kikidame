@@ -112,10 +112,13 @@ data class LibraryView(
 
 /** 取得元とのやり取りの失敗。UI はこれで文言を決める。 */
 sealed class ServerException(message: String, cause: Throwable? = null) : Exception(message, cause) {
-    /** 認証情報が無効（Jellyfin の 401/403、SMB の認証の失敗）。接続をやり直させる。 */
+    /**
+     * 認証情報が無効（Jellyfin の 401/403、SMB の認証の失敗）、または端末のフォルダの永続権限が無い・取り消された、選んだフォルダ（根）が
+     * 無いと分かった（#199 の決定 5）。接続をやり直させる（ログアウトし、端末のフォルダは選び直させる）。
+     */
     class Unauthorized(cause: Throwable? = null) : ServerException("unauthorized", cause)
 
-    /** 到達できない（DNS・接続・タイムアウト）。 */
+    /** 到達できない（DNS・接続・タイムアウト。共有フォルダの読み取りがやり直しても失敗したときも。端末のフォルダの一時的な失敗を含む）。 */
     class Unreachable(cause: Throwable? = null) : ServerException("unreachable", cause)
 
     /** それ以外（5xx、想定外のレスポンス）。 */

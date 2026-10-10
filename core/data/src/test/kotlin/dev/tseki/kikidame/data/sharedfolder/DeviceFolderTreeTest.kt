@@ -70,6 +70,26 @@ class DeviceFolderTreeTest {
         assertFailsWith<ServerException.Unauthorized> { tree().list("TBS/Junk") }
     }
 
+    /**
+     * 根を問い合わせて例外になったときは、無いと分かったわけではない（provider が落ちた、SD カードが一時的に外れたなども同じ形で来うる）ので、
+     * ログアウトにせず通常の失敗にする（PR #214 1 周目 #2）。cursor が null のときも、実装（`ContentResolverDeviceDocuments`）が例外にするので同じ
+     */
+    @Test
+    fun failingToQueryTheRootIsAnOrdinaryFailureNotUnauthorized() {
+        documents.queryFailure = IllegalArgumentException("Failed during query")
+        val error = assertFailsWith<IllegalArgumentException> { tree().list("") }
+        assertEquals("Failed during query", error.message)
+    }
+
+    @Test
+    fun rootThatIsNotAFolderIsUnauthorized() {
+        val files = MemoryDeviceDocuments()
+        val tree = DeviceFolderTree(object : DeviceDocuments by files {
+            override fun query(treeUri: String, documentId: String) = files.query(treeUri, documentId)?.copy(isDirectory = false)
+        }, files.treeUri)
+        assertFailsWith<ServerException.Unauthorized> { tree.list("") }
+    }
+
     @Test
     fun noPersistedPermissionIsUnauthorized() {
         val tree = DeviceFolderTree(MemoryDeviceDocuments(granted = false), MemoryDeviceDocuments.TREE_URI)
@@ -124,6 +144,15 @@ class DeviceFolderTreeTest {
         assertEquals(listOf(SourceItemId("TBS/Junk")), snapshot.programs.map { it.sourceId })
         assertEquals(listOf(SourceItemId("TBS/Junk/2026-10-01.m4a")), snapshot.episodes.map { it.sourceId })
         assertEquals("TBS", snapshot.programs.single().publisherName)
+    }
+
+    /** 根の問い合わせが失敗し続けたら、ログアウトせずに到達不能（判断保留）で終わる。手元のデータは消えない。 */
+    @Test
+    fun failingRootQueryDuringAScanIsUnreachable() = runTest {
+        documents.queryFailure = IllegalArgumentException("Failed during query")
+        val source = SharedFolderSource(tree(), { _, _, _ -> AudioTags() }, { emptyMap() })
+        assertFailsWith<ServerException.Unreachable> { source.fetchAll() }
+        assertFailsWith<ServerException.Unreachable> { source.fetchProgram(SourceItemId("TBS/Junk")) }
     }
 
     @Test
