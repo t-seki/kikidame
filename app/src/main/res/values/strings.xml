@@ -71,6 +71,8 @@
     <string name="device_folder_example">Radio/&lt;publisher&gt;/&lt;program&gt;/&lt;episode&gt;.m4a</string>
     <string name="device_folder_pick_hint">In this example, pick Radio. Android does not let apps use the top of the internal storage or the Download folder itself, so make a folder below them and pick that.</string>
     <string name="device_folder_copy_hint">Episodes are copied into the app before you listen, just like the other sources. Kikidame never changes or deletes files in the folder.</string>
+    <string name="device_folder_storage_hint">Each copied episode takes space twice on this device: the file in the folder and the copy in the app. Use the per-program sync and keep rules to limit how many episodes are copied.</string>
+    <string name="device_folder_keep_hint">Keep the files in the folder. If you delete a file from the folder, Kikidame treats that episode as gone from the source and deletes its copy too, even if it is pinned.</string>
     <string name="device_folder_pick">Pick a folder</string>
     <!-- Shown while signed out from a folder on this device (access was lost, or the user signed out). %1$s = folder name -->
     <string name="device_folder_lost">Not connected to the folder “%1$s”. Pick the folder again</string>

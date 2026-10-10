@@ -51,7 +51,7 @@ Requires Android 12 (API 31) or later. Store descriptions and screenshots live i
 
 ## Source prerequisites
 
-The app connects to **Jellyfin** or a **shared folder on a NAS (SMB)**, one at a time. Earlier release builds offer only Jellyfin (SMB was in the debug build only).
+The app connects to **Jellyfin**, a **shared folder on a NAS (SMB)** or a **folder on this device**, one at a time. Earlier release builds offer only Jellyfin (SMB was in the debug build only), and the folder on this device is new in the build after #199.
 
 ### Jellyfin
 
@@ -88,6 +88,16 @@ The app connects to **Jellyfin** or a **shared folder on a NAS (SMB)**, one at a
 - If a read fails, the app reconnects and tries the same file again, and ends the sync as unreachable after three failures in a row. Whether reconnecting actually lets a scan continue (for example after a short network glitch) has not been seen on a real device yet
 - Renaming an episode file makes it unlinked and it is matched again by title (then by published day and duration) within the same program. Renaming a program folder makes the program Gone (On Hold), because the publisher and program name no longer match
 - Whether this works on your NAS and network (name resolution, guest access, how long the first import takes) is verified only on the developer's NAS and device; see "実機で試す（#198: SMB の共有フォルダ）" and its checklists in [docs/development.md](./docs/development.md) (Japanese)
+
+### Folder on this device
+
+- Pick a folder in internal storage or on an SD card with Android's folder picker (Storage Access Framework). Folders from other providers (Google Drive, SMB through a documents provider, and the like) are refused; pick a folder on this device instead. The app only reads the folder and never writes to or deletes anything in it. It does not need the "Local network" permission
+- The layout inside the folder is the same as for the SMB shared folder above: exactly **`<publisher>/<program>/<episode files>`**, three levels, for example `Radio/<publisher>/<program>/<episode>.m4a` where you pick `Radio`. Android does not let apps pick the top of the internal storage or the `Download` folder itself, so make a folder below them and pick that. Whether a folder inside `Download` can be picked is unverified
+- Episodes are copied into the app before you listen, just like the other sources. **Each copied episode takes space twice on the device** (the file in the folder and the copy in the app). Use the per-program sync setting and retention rule to limit how many episodes are copied
+- **Keep the files in the folder.** If you delete a file from the folder, the next sync treats that episode as gone from the source and deletes the app's copy too, even if it is Pinned. This is meant for recordings you sync into the folder from a PC (Syncthing, FolderSync and the like): keep them there
+- "Wi-Fi only" does not apply to a folder on this device (the copy stays inside the device)
+- If the app loses access to the folder (the permission was revoked, or the folder was moved or deleted), it signs out and asks you to pick the folder again. Programs, episodes and files on the device are kept, and they link up again if the folder you pick has the same layout
+- Verified only with unit tests so far; whether it works on real devices (SD cards, large folders) is unverified. See "実機で試す（#199: 端末のフォルダ）" in [docs/development.md](./docs/development.md) (Japanese)
 
 ## How it works
 

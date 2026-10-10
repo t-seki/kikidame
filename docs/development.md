@@ -604,6 +604,56 @@ SMB の取得元（epic #195 の C、#198）は、worker の環境に NAS も実
 - [ ] まとめ読み（`BlockReader`）を通しても、タグが今までどおり読める。末尾の近くまで読む m4a（#209 の計測の「パンサー向井 2021-10-11」）と mp3 で、タイトル・日付・尺が入る（計測に使った APK はまとめ読みを入れる前のもので、まとめ読みを通した `MediaMetadataRetriever` は実機で確かめていない）
 - [ ] まとめ読み（256 KB）で、1 本あたりのタグの読み取りが #209 のまとめ読みの前の計測（m4a で 1 本 0.9〜1.3 秒。#209 のコメント 6099069211 の表）より短くなるか（未確認。logcat には時間を出していないので、全走査の時間で見る）
 
+## 実機で試す（#199: 端末のフォルダ）
+
+端末のフォルダの取得元（epic #195 の D、#199）は、worker の環境に実機が無いため、**実機では何も確かめていない**。単体テストと CI が見ているのは、受け付けるツリーの URI の判定、SAF 版の木（`DeviceFolderTree`）のパスの解決と null・例外の使い分け（文書はメモリ上の `MemoryDeviceDocuments`）、セッションの型と DataStore の読み書き、取得元の振り分け、「Wi-Fi のみ」の分岐まで。`ContentResolver` と `DocumentsContract` を通す部分（`ContentResolverDeviceDocuments`）は単体テストしていない。マージ前の検証で、Supervisor と人が debug 版の実機で次を確かめる。
+
+### 準備
+
+- debug 版は `dev.tseki.kikidame.debug`（「マージ前の検証」の手順 3）。`$ADB` は「実機で試す（M1）」の接続の節のとおり
+- 端末の内部ストレージに、試験用の 3 段のフォルダを `adb push` で置く。`SRC` は手元の m4a と mp3（タグの付いたものと無いもの）を置いたフォルダに読み替える。`@eaDir` のような無視する名前のフォルダと、音声でないファイルも混ぜる:
+  ```bash
+  SRC=~/kikidame-test-audio
+  $ADB shell mkdir -p /sdcard/KikidameTest/Radio/TBS/Junk /sdcard/KikidameTest/Radio/TBS/Empty /sdcard/KikidameTest/Radio/@eaDir
+  $ADB push "$SRC/tagged.m4a" /sdcard/KikidameTest/Radio/TBS/Junk/2026-10-01.m4a
+  $ADB push "$SRC/untagged.mp3" /sdcard/KikidameTest/Radio/TBS/Junk/2026-10-08.mp3
+  $ADB push "$SRC/tagged.m4a" /sdcard/KikidameTest/Radio/@eaDir/ignored.m4a
+  $ADB shell 'echo memo > /sdcard/KikidameTest/Radio/TBS/Junk/notes.txt'
+  ```
+  OS のフォルダ選択では `KikidameTest/Radio` を選ぶ（`Radio` の下が `<配信元>/<番組>/<各回>`）
+- 失敗の原因は logcat に出る。選ぶ画面で失敗したときは `DeviceFolder` タグ、同期・ダウンロードで失敗したときは `SessionSourceGateway` タグ:
+  ```bash
+  $ADB logcat -d | grep -E "DeviceFolder|SessionSourceGateway|LibraryRefresher|AndroidRuntime" | tail -50
+  ```
+- 片付け（試験用のフォルダを消す）:
+  ```bash
+  $ADB shell rm -r /sdcard/KikidameTest
+  ```
+
+この節のコマンドは、worker の環境に実機が無いため流していない（未確認）。
+
+### 実機チェックリスト（#199）
+
+未確認（2026-10-11 時点でどれも実機で試していない）。
+
+- [ ] 取得元の選択に「端末のフォルダ」が出る。押すと説明の画面（3 段の構成の例、内部ストレージの直下や Download そのものは選べないこと、容量が二重になること、フォルダのファイルを消すと手元のコピーも消えること）が出て、「フォルダを選ぶ」で OS のフォルダ選択が開く
+- [ ] `KikidameTest/Radio` を選ぶと、番組一覧に TBS の Junk と Empty（音声が 0 本でも番組）が出る。`@eaDir` と `notes.txt` は出ない。タグの無い mp3 は、ファイル名のタイトルと更新日時の公開日で入る
+- [ ] Junk を同期対象にすると各回がアプリの領域にコピーされ、再生できる（`adb push` で置いた元のファイルは残っている）
+- [ ] 設定の「Wi-Fi のみ」が ON のまま、Wi-Fi を切ってモバイルデータ（従量制）にしても、手動の同期が「Wi-Fi に接続していないため更新しません」にならず通り、ダウンロードが「Wi-Fi 待ち」にならずに進む。Jellyfin・SMB では今までどおり止まる（`requiredNetworkType` は「Wi-Fi のみ」をかけないとき CONNECTED なので、機内モード（ネットワークが無い）では裏の同期とダウンロードは待つ。#199 の文面どおり。ネットワークが無くても走らせるかは #199 では決めていない）
+- [ ] 内部ストレージの直下・`Download` そのものが OS のフォルダ選択で選べない。`Download` の下に作ったフォルダは選べるか（未確認。#199 の背景の「`Download` の下のサブフォルダを選べるかは未確認」）
+- [ ] Google ドライブなど、端末のストレージ以外のフォルダを選ぶと「端末のフォルダではありません。…選び直してください」が出て、保存されない
+- [ ] SD カードのフォルダを選べ、取り込める（SD カードのある端末だけ。ツリーの URI の authority が `com.android.externalstorage.documents` かは未確認）
+- [ ] 取り込んだ後に、端末で選んだフォルダを消す（または名前を変える）:
+  ```bash
+  $ADB shell mv /sdcard/KikidameTest/Radio /sdcard/KikidameTest/Radio-moved
+  ```
+  手動の同期で「フォルダを読めなくなりました。フォルダを選び直してください」が出てログアウトし、説明の画面（「フォルダ「Radio」につながっていません…」）に移る。手元の番組・各回・コピーしたファイルは残り、番組が消失（判断保留）にならない。`Radio-moved` を選び直すと、番組と各回がそのまま結び直る
+- [ ] アプリ情報の画面などから権限を取り消したとき（取り消す方法は未確認）も、上と同じくログアウトして選び直せる
+- [ ] フォルダからファイルを 1 本消して同期すると、その回が消え、手元のコピーも消える（固定していても消える。今の同期の決まりのとおり）
+- [ ] 設定の取得元が「端末のフォルダ」とフォルダ名で出る。「取得元を変える」で手元が全部消えて取得元の選択に戻り、永続権限が手放される（`$ADB shell dumpsys activity permissions` などで確かめられるかは未確認）
+- [ ] Android 17 の端末で、端末のフォルダの人には「ローカルネットワーク」の権限のダイアログが出ない。取得元の選択で Jellyfin か SMB のカードを押すと出る。既に Jellyfin・SMB を使っている人には、今までどおり起動時に出る
+- [ ] ファイルの多いフォルダ（数千本）での最初の取り込みの時間（未確認。Android Developers の documents-files のページは、ファイルが多いと遅くなると書いている）
+
 ## 手元のファイルと DB の突き合わせ（#50）
 
 `files/episodes/` にあるのに `local_files` のどの行の `path` でもないファイル（行の無いファイル）は、アプリからは二度と到達できず、容量の表示（#42）にも数えられない。

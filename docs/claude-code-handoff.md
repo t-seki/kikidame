@@ -20,7 +20,7 @@ Android 向けの Jellyfin クライアントを新規に作ります。以下�
   2. **フォルダ同期**: 番組単位でルールを決めて自動的にダウンロード／削除する
 - 既存クライアント（Findroid・公式アプリ）は映像中心で、番組単位の自動同期とオフライン自立が弱い。
   そこが差別化点なので、この 2 点の品質を最優先する。
-- 利用形態は **取得元は同時に 1 つ（Jellyfin は 1 サーバ・1 ユーザー・1 ライブラリ、SMB は 1 つの共有）**。聴くのはこのアプリだけ（他端末・Web との併用は想定しない）。
+- 利用形態は **取得元は同時に 1 つ（Jellyfin は 1 サーバ・1 ユーザー・1 ライブラリ、SMB は 1 つの共有、端末のフォルダは 1 つのフォルダ）**。聴くのはこのアプリだけ（他端末・Web との併用は想定しない）。
 
 ## 技術スタック
 
@@ -258,7 +258,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 運用パラメータ:
 
 - 定期同期: `PeriodicWorkRequest` 6 時間ごと、`Constraints` は `DownloadWorker` と同じ（Wi-Fi のみなら UNMETERED、
-  そうでなければ CONNECTED）。充電中の条件は課さない（同期自体の通信は一覧の JSON だけで軽く、転送は `DownloadWorker` の制約で守られる）
+  そうでなければ CONNECTED。取得元が端末のフォルダなら「Wi-Fi のみ」をかけない（#199。`SyncScheduler.requiredNetworkType`））。充電中の条件は課さない（同期自体の通信は一覧の JSON だけで軽く、転送は `DownloadWorker` の制約で守られる）
 - アプリ起動時: 前回同期から 1 時間以上経っていれば実行（同じ制約で待つ。#135 で「前回同期（`lastFetchedAt`）と前回の試み（`lastAttemptedAt`。失敗した全走査も数える）の新しい方から 1 時間」に）。番組一覧の手動プルは同期そのもの（M3-b の範囲を参照）
 - ダウンロード: Worker 内で HTTP ストリームを `.part` ファイルへ書き、完了後にリネーム。
   再開は `Range` ヘッダ。進捗は `setProgress` で UI へ
@@ -318,7 +318,8 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
   - **Android 17+（targetSdk 37）の `ACCESS_LOCAL_NETWORK` ランタイム権限**（M2 で判明）。無いと LAN 内の
     サーバ宛の TCP が黙って落ちる（DNS だけ通るので名前解決は成功し、接続がタイムアウトする）。
     `adb shell` や古い targetSdk のアプリは対象外なので、切り分けでは `run-as <pkg> nc -z <host> <port>` で
-    アプリの UID から試すこと
+    アプリの UID から試すこと。#199 から、要求するのは取得元が Jellyfin か SMB のとき（ログアウト中で前回の取得元が Jellyfin か SMB のときを含む）の起動時と、
+    取得元の選択で Jellyfin か SMB のカードを押したときだけ（`MainActivity` の `usesLocalNetwork`、`SourcePickScreen`）。端末のフォルダの人には要求しない
 - **モジュール**: 上記 3 モジュールを最初から切る。`applicationId` は `dev.tseki.kikidame`、`minSdk` 31
 - **Room**: `exportSchema = true` で `core/data/schemas/` を git 管理する
 - **CI**: GitHub Actions で PR ごとに `./gradlew test`
@@ -339,6 +340,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
   - **共有フォルダの全走査（#209、ADR 0010 の末尾の注記）**: `SharedFolderSource.fetchAll(listener)` は、一覧を先に全部取ってから番組ごとにタグを読み、タグを読んだ番組をその番組を読み終えるたびに `ScanListener.onProgramScanned` に流す。`RoomLibraryRefreshRepository.refresh` はそれを受けて 1 番組ずつ取り込み（`SnapshotScope.Program`）、その番組の中で削除・予約する（`syncProgram` と同じ範囲）。全部を読み終えたら、全体を取り込み直して消失を判断し、最終同期の時刻を記録する。途中で止まっても取り込み済みの番組は残り、次の同期ではそのタグを読まない（DB の大きさ・更新日時で判定）。木の操作が失敗したら `FolderTree.reset`（SMB は接続を閉じる）してやり直し、続けて 3 回（`SharedFolderSource.MAX_CONSECUTIVE_FAILURES`）失敗したら到達不能（画面が消えて裏に回ると、しばらくして Android が TCP の接続を壊し、張り直しも効かずに到達不能で終わる。壊されるまでの時間は、観測した 2 回で約 6 秒（01:14:48 → 01:14:53.938）と 2 分以上（01:34:13 → 01:36:15）で、一定ではない（何で決まるかは未確認）。張り直しで続けられた場面は実機でまだ見ていない。2026-10-11 の PR #210 の検証）。タグの読み取りは `BlockReader` が 256 KB ずつまとめて読み（位置ごとの塊を 4 つまで持つ）、往復を減らす。進み具合は `ScanListener.onTagProgress` → `LibraryRefreshRepository.refresh(onProgress)` → `LibraryRefresher.tagProgress` で番組一覧の `BackgroundSyncBar` に出す（文言 `sync_reading_tags`）。再生中の回（削除から外す回）は `refresh(excluded = { … })` で番組ごとに読み直す。番組ごとに予約した数は `onEnqueued` で流れ、`LibraryRefresher` は全走査が途中で失敗してもそれが 1 以上なら Worker を起こす（取り消し・認証の失敗では起こさない。取得元を変えるときは `SourceChanger` が Worker を止めてから走査を取り消し、手元を消すため）
   - **セッションの型（#198）**: `SessionState` は `SignedOut`（`lastServerUrl`・`lastUserName`・`lastSmb`。直前の取得元の入力補助）／`NeedsLibrary`（Jellyfin だけ）／`Ready`。`Ready` は `source: ConnectedSource`（`Jellyfin(session, library)` か `Smb(connection)`）と `lastFetchedAt`・`lastAttemptedAt` を持つ。SMB の設定は `SmbConnection`（ホスト・共有名・共有の中のパス・ユーザー名・パスワード・ゲスト）。`SessionRepository.connectSharedFolder` は共有の直下が読めたら保存する（失敗は `ServerException`: 認証の失敗は `Unauthorized`、届かないは `Unreachable`、読めないは `Failed`）。DataStore（`SessionStore`）の Jellyfin のキーは変えていない。SMB は `smb_host`・`smb_share`・`smb_path`・`smb_user`・`smb_password`（暗号化）・`smb_guest` を足し、`smb_host` があれば SMB、無ければ Jellyfin とみなす。取得元に触る入口は `SessionSourceGateway`（`SourceGateway` の bind）で、今の接続の種類で `JellyfinSource` か `SharedFolderSource`（`SmbFolderTree`）に振り分ける
   - SMB の認証の失敗は 401 と同じく接続をやり直させる（ログアウトして SMB の接続画面へ）。名前が引けない・タイムアウトは到達不能（判断保留）
+  - **端末のフォルダ（#199、ADR 0010 の末尾の注記）**: `ConnectedSource.Device(DeviceFolder(treeUri, name))`、ログアウト中は `SignedOut.lastDeviceFolder`。DataStore のキーは `device_tree_uri`・`device_name`・`device_signed_out`（`device_tree_uri` があれば端末のフォルダ）。`SessionRepository.connectDeviceFolder(treeUri)` は authority が `com.android.externalstorage.documents` でなければ `UnsupportedFolderException`、そうなら永続権限（読み取り）を取り、直下が読めたら保存し、ほかに持っている永続権限を手放す（失敗したら取った権限を手放す）。木は `DeviceFolderTree`（`FolderTree` の SAF 版。`DocumentsContract` の窓口 `DeviceDocuments` を `ContentResolverDeviceDocuments` が実装し、テストは `MemoryDeviceDocuments`）で、相対パスから文書 ID への対応は親を一覧して名前で引く。最初の操作で永続権限と根があることを確かめ、無ければ `ServerException.Unauthorized`（`LibraryRefresher`・`DownloadWorker` がログアウトし、`DeviceFolderRoute` へ。文言 `sync_error_device_folder_lost`）。根が無いのを null で返さない（全番組が消失扱いになるため）。`FolderTreeFactory` は SMB と端末のフォルダの 2 つの `open` を持つ。「取得元を変える」（`SourceChanger`）は持っている永続権限を全部手放す。文言は `source_pick_device*`・`device_folder_*`・`settings_source_device`・`settings_device_folder`
 - **認証情報**: `Client="Kikidame"`, `Version=versionName`。`Device` / `DeviceId` は jellyfin-sdk-kotlin の Android 既定
   （端末のモデル名 / `ANDROID_ID` 由来）に任せ、自前の UUID は持たない（実装時に変更。保存する値が 1 つ減る）。
   トークンは Keystore の鍵で AES-GCM 暗号化して Preferences DataStore に保存（`EncryptedSharedPreferences` は使わない）。
@@ -375,7 +377,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 - **Worker**: WorkManager のユニーク Worker（`download-queue`、`KEEP`）が `LocalFile.state = PENDING` の行を**キューに入れた順（FIFO、
   `enqueuedAt`。実機確認で「タップした順に落ちてほしい」と決定）**に **1 本ずつ**処理する。再試行は列の末尾へ。M3-b の同期が積む分の優先順位はそこで決める。`<配信元>/<番組>/<タイトル>.<container>.part` に追記し、完了でリネーム。既存の `.part` は `Range: bytes=<size>-` で再開。
   進捗は `setProgress`。通知は出さない（フォアグラウンドサービスにしない）
-- **条件**: 設定の「Wi-Fi のみ」（既定 ON、`AppSettings` DataStore。倍速（#35）も同じ DataStore）。ON なら `UNMETERED`、OFF なら `CONNECTED`。待ちの間は「Wi-Fi 待ち」表示
+- **条件**: 設定の「Wi-Fi のみ」（既定 ON、`AppSettings` DataStore。倍速（#35）も同じ DataStore）。ON なら `UNMETERED`、OFF なら `CONNECTED`。待ちの間は「Wi-Fi 待ち」表示。取得元が端末のフォルダなら「Wi-Fi のみ」をかけない（#199。`CONNECTED`）
 - **失敗**: 1 本失敗しても次へ。`attemptCount` +1、`lastAttemptAt`、`FAILED`。同一実行内では再試行しない。次の起動で
   `attemptCount < 3` を PENDING に戻す。3 回超えは手動の再試行だけ。401 は `LibraryRefresher` と同じくログアウト
 - **キャンセル**: DONE 以外の行を消し `.part` も消す。Worker は約 1 MB ごとに DB を見てスキップする
@@ -406,7 +408,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   （空 → 消失 = 判断保留。#97 で `/Items/{id}` から変更）、その番組の各回一覧を取り、取り込み → `planSync`（この番組だけ）→ 除去・削除・予約。全走査（約 45 秒）を待たずに
   1〜2 秒で終わる。他の番組には触れず、最終同期の時刻も更新しない（ADR 0004 の追記）。設定画面の「最終取得」は「最終同期」（値は `lastFetchedAt`。番組単位取得は更新しない）。
   ログイン直後の初回取得も同期になるが、全番組が同期対象 OFF なので何も落ちず何も消えない
-- **「Wi-Fi のみ」は同期にも効く**（手動を含む）。`SyncWorker` の制約は `DownloadWorker` と同じ（UNMETERED / CONNECTED、充電中は課さない）。
+- **「Wi-Fi のみ」は同期にも効く**（手動を含む。取得元が端末のフォルダなら効かせない。#199 の `SyncScheduler.wifiOnlyApplies`）。`SyncWorker` の制約は `DownloadWorker` と同じ（UNMETERED / CONNECTED、充電中は課さない）。
   手動は `LibraryRefresher` で `ConnectivityManager.isActiveNetworkMetered` を見て、従量制ならスナックバー
   「Wi-Fi に接続していないため更新しません」で終える（裏で待たせない）。判定は全走査・番組単位・起動時・定期のすべてが通るが、
   **ゲートは取得元への取得だけを包む**: 先頭の `reconcileMissingFiles()`（#5、ローカル I/O のみ）は従量制でも走らせる
