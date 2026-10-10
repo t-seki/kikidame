@@ -17,7 +17,6 @@ import dev.tseki.kikidame.data.db.KikidameDatabase
 import dev.tseki.kikidame.data.db.LocalFileDao
 import dev.tseki.kikidame.data.db.ProgramDao
 import dev.tseki.kikidame.data.jellyfin.JellyfinGateway
-import dev.tseki.kikidame.data.jellyfin.JellyfinSource
 import dev.tseki.kikidame.data.jellyfin.SdkJellyfinGateway
 import dev.tseki.kikidame.data.repository.DataStoreSessionRepository
 import dev.tseki.kikidame.data.repository.RoomDownloadRepository
@@ -26,6 +25,13 @@ import dev.tseki.kikidame.data.repository.RoomLibraryRepository
 import dev.tseki.kikidame.data.repository.RoomLocalDataReset
 import dev.tseki.kikidame.data.repository.RoomPlaybackStateRepository
 import dev.tseki.kikidame.data.session.KeystoreTokenCipher
+import dev.tseki.kikidame.data.session.SessionSourceGateway
+import dev.tseki.kikidame.data.sharedfolder.RetrieverTagReader
+import dev.tseki.kikidame.data.sharedfolder.RoomScannedFiles
+import dev.tseki.kikidame.data.sharedfolder.ScannedFiles
+import dev.tseki.kikidame.data.sharedfolder.TagReader
+import dev.tseki.kikidame.data.smb.FolderTreeFactory
+import dev.tseki.kikidame.data.smb.SmbFolderTree
 import dev.tseki.kikidame.data.settings.DataStoreAppSettings
 import dev.tseki.kikidame.data.session.SessionStore
 import dev.tseki.kikidame.data.session.TokenCipher
@@ -58,6 +64,18 @@ object DatabaseModule {
 
     @Provides
     fun provideLocalFileDao(db: KikidameDatabase): LocalFileDao = db.localFileDao()
+
+    @Provides
+    @Singleton
+    fun provideFolderTreeFactory(): FolderTreeFactory = FolderTreeFactory { SmbFolderTree(it) }
+
+    @Provides
+    @Singleton
+    fun provideTagReader(): TagReader = RetrieverTagReader()
+
+    @Provides
+    @Singleton
+    fun provideScannedFiles(dao: EpisodeDao): ScannedFiles = RoomScannedFiles(dao)
 
     @Provides
     @Singleton
@@ -111,9 +129,9 @@ abstract class RepositoryModule {
     @Binds
     abstract fun bindJellyfinGateway(impl: SdkJellyfinGateway): JellyfinGateway
 
-    /** 取得元は今は Jellyfin だけ（ADR 0010）。 */
+    /** 取得元は Jellyfin か共有フォルダ（ADR 0010）。今の接続の種類で振り分ける。 */
     @Binds
-    abstract fun bindSourceGateway(impl: JellyfinSource): SourceGateway
+    abstract fun bindSourceGateway(impl: SessionSourceGateway): SourceGateway
 
     @Binds
     abstract fun bindTokenCipher(impl: KeystoreTokenCipher): TokenCipher

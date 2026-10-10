@@ -54,8 +54,9 @@
 | 各回一覧 | 番組の回を選ぶ・ダウンロード／固定／再生済みを操作する。右端のアイコンは状態表示＋最も自然な 1 操作。補足行は `公開日 · 出演者 · 尺 · 状態`（タイトルが公開日と同じ回は公開日を省く #66。出演者は #70 で足した。長い名前は折り返す） | 固定・再生中の小アイコンはタイトル前のまま、印の無い行にも同じ幅の枠を確保して開始位置を揃える（#56。補足行へ移す案は実機で「情報が増えて読みにくい」と却下）。タイトルは 1 行 |
 | 再生画面 | 聴いている回の操作。左右スワイプでシーク（#29）。タイトルの下に `配信元 · 出演者`（#70。無い回も 1 行分の場所は確保する） | 倍速・再生済み・スリープをシークバー下の中央 3 列に（#57）。TopAppBar から再生済みを降ろす |
 | ミニプレイヤー | 一覧の下で「聴いている回」を示し、再生画面へ戻る入口 | 上端に再生位置の線、面をアンバー系に（#59） |
-| 設定 | サーバ・ダウンロード・表示（テーマ）の設定と、アカウント（ログアウト・別のサーバへ） | 表示専用の行を「ラベル上（overline）・値下（headline）」に揃える（#58）。#43 の詳細画面と同じ向き |
-| 接続・ライブラリ選択 | 初回と切替のときだけ通る | 色以外は変えない |
+| 設定 | 取得元・ダウンロード・表示（テーマ）の設定と、アカウント（ログアウト・取得元を変える） | 表示専用の行を「ラベル上（overline）・値下（headline）」に揃える（#58）。#43 の詳細画面と同じ向き。「取得元」の節（#198）は今の取得元の種類（Jellyfin / 共有フォルダ（SMB））を出し、Jellyfin なら URL・ユーザー・ライブラリ（タップで選び直す）、SMB ならホスト・共有名・フォルダ（空なら「共有の直下」）・ユーザー（ゲストなら「ゲスト」）を出す。「別のサーバに接続」は「取得元を変える」に改めた（中身は同じ。手元のデータを全部消して取得元の選択へ） |
+| 各回の詳細 | 回の情報と技術情報の行 | 技術情報の「サーバ ID」の行を「取得元 ID」に改めた（#198）。Jellyfin では Jellyfin の id、共有フォルダでは共有フォルダの中の相対パス（`<配信元>/<番組>/<ファイル名>`）。取得元を種類で出し分けない |
+| 取得元の選択・接続・ライブラリ選択 | 初回と切替のときだけ通る | 色以外は変えない。#198 で取得元の選択（「Jellyfin に接続」「NAS の共有フォルダ（SMB）」の 2 枚のカード。端末のフォルダは #199 で足す）と SMB の接続（ホスト・共有名・共有の中のフォルダ（省略可）・ゲストのスイッチ・ユーザー名・パスワード）を足した。ログアウトした後は、直前に使っていた取得元の接続画面から始め（入力済み、パスワードは空）、一度も接続していなければ取得元の選択から。接続の画面は取得元の選択から来たときだけ戻るボタンを出す |
 
 ### 共通の規則
 
@@ -72,7 +73,7 @@
 UI の文言は英語と日本語の 2 言語で、OS の「アプリの言語」（Android 13+）で切り替わる。既定は英語（日英以外の端末には英語が出る）。
 
 - 文言は `app/src/main/res/values/strings.xml`（英語、既定）と `values-ja/strings.xml`（日本語）の**両方**に足す。片方だけだと lint の `MissingTranslation` でビルドが落ちる。`values/` には英語だけでは文脈が分からないキー（書式引数の意味、どの画面のどこか、CONTEXT.md の用語）に翻訳者向けの短いコメント、書式引数は `%1$s` のように番号付き、数+単位（「3 回」「15 分」）は `<plurals>`
-- キーは `<area>_<what>` の snake_case。area は `common` / `connect` / `library_pick` / `program_list` / `episode_list` / `episode_details` / `player` / `settings` / `sync` / `playback` / `auto`。英語の用語は CONTEXT.md の英語名（Program / Episode / Publisher / Pinned / Starred / Played …）に揃える
+- キーは `<area>_<what>` の snake_case。area は `common` / `connect` / `source_pick` / `smb_connect` / `library_pick` / `program_list` / `episode_list` / `episode_details` / `player` / `settings` / `sync` / `playback` / `auto`。英語の用語は CONTEXT.md の英語名（Program / Episode / Publisher / Pinned / Starred / Played …）に揃える
 - **文字列に解決するのは Composable だけ。** Composable では `stringResource` / `pluralStringResource`。Composable の外（ViewModel・`LibraryRefresher`・`NowPlaying`・`EpisodeDetails`）は `String` ではなく `ui/UiText.kt` の `UiText`（`Res(R.string.x, args)` / `Plural(R.plurals.x, n)` / `Plain(サーバから来た名前)` / `Joined(parts, separator)`）を返し、表示側で `.resolve()`（`LaunchedEffect` の中でスナックバーに渡すときは `.resolve(LocalContext.current)`）。`Context.getString` を Composable の外に書かない。例外は `PlaybackService`（通知・Android Auto にはプロセスの外へ `String` を渡すしかない）
 - 日付（`2026-08-02`）・尺（`1:02:03`）・容量（`12.3 MB`）の書式は言語に依らず固定。言語で変わるのは区切り（`common_list_separator`「、」/ ", "）と単位だけ
 - テスト: `UiText` を返す関数は `assertEquals(UiText.Plural(R.plurals.sync_new_episodes, 5), actual)` の形で「どの文言がどの引数で選ばれたか」を比べる。並びや省略を見たいテスト（行の補足など）は Robolectric に `@Config(qualifiers = "ja")` を付け、`resolve(context)` した日本語で比べる

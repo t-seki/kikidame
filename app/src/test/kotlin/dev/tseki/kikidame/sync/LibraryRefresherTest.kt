@@ -16,9 +16,11 @@ import dev.tseki.kikidame.ui.UiText
 import dev.tseki.kikidame.domain.SelectedLibrary
 import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.SourceItemId
+import dev.tseki.kikidame.domain.ConnectedSource
 import dev.tseki.kikidame.domain.Session
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
+import dev.tseki.kikidame.domain.SmbConnection
 import dev.tseki.kikidame.download.DownloadKicker
 import dev.tseki.kikidame.playback.NowPlaying
 import dev.tseki.kikidame.playback.NowPlayingState
@@ -90,7 +92,7 @@ class LibraryRefresherTest {
     private class FakeSessionRepository(ready: Boolean = true) : SessionRepository {
         val stateFlow = MutableStateFlow<SessionState>(
             if (ready) {
-                SessionState.Ready(Session("https://s", "alice", "u", "t"), SelectedLibrary(SourceItemId("lib"), "Radio"), null)
+                SessionState.Ready(ConnectedSource.Jellyfin(Session("https://s", "alice", "u", "t"), SelectedLibrary(SourceItemId("lib"), "Radio")), null)
             } else {
                 SessionState.SignedOut(null, null)
             },
@@ -98,6 +100,7 @@ class LibraryRefresherTest {
         var signedOut = false
         override val state: Flow<SessionState> = stateFlow
         override suspend fun signIn(serverUrl: String, userName: String, password: String) = Unit
+        override suspend fun connectSharedFolder(connection: SmbConnection) = Unit
         override suspend fun listLibraries(): List<LibraryView> = emptyList()
         override suspend fun selectLibrary(library: LibraryView) = Unit
         override suspend fun signOut() {

@@ -33,7 +33,7 @@ import kotlin.time.Instant
  * - 木の操作が例外を投げたら [ServerException.Unreachable]（今の Jellyfin と同じく到達不能、判断保留）。
  *   番組のフォルダが無ければ [fetchProgram] が null（消失）
  *
- * 接続の情報は [tree] の側で持つ。Hilt の bind はまだしない（取得元を選ぶ画面と合わせて #198 で行う）。
+ * 接続の情報は [tree] の側で持つ。取得元の種類による切り替えは `SessionSourceGateway`（#198）が行う。
  */
 class SharedFolderSource(
     private val tree: FolderTree,
@@ -108,7 +108,7 @@ class SharedFolderSource(
 
     private fun episodeOf(programId: SourceItemId, file: FolderEntry, previous: Map<SourceItemId, ScannedFile>): SourceEpisode {
         val id = SourceItemId("${programId.value}/${file.name}")
-        // Room には ms で入るので、ms に揃えてから比べる（ms より細かい更新日時が来ても同じとみなす。SMB の実装から何が来るかは #198 で確かめる。未確認）
+        // Room には ms で入るので、ms に揃えてから比べる（ms より細かい更新日時が来ても同じとみなす。SMB の実装（smbj）が実機で何の精度を返すかは未確認。docs/development.md の実機の確認項目）
         val modifiedAt = file.modifiedAt.truncatedToMillis()
         val cached = previous[id]?.takeIf { it.sizeBytes == file.sizeBytes && it.modifiedAt == modifiedAt }
         val values = cached?.let { TagValues(it.title, it.publishedAt, it.runtime, it.performers) }

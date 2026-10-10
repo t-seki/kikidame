@@ -2,7 +2,7 @@
 
 日本語: [README.ja.md](./README.ja.md)
 
-An Android app for **episodic audio** (radio recordings and podcasts) kept in a Jellyfin music library. It downloads and deletes episodes automatically by per-program rules, and keeps playing when the server is unreachable. Kikidame is an unofficial client with no affiliation to the Jellyfin project.
+An Android app for **episodic audio** (radio recordings and podcasts) kept in a Jellyfin music library or in a shared folder on a NAS (SMB). It downloads and deletes episodes automatically by per-program rules, and keeps playing when the server or NAS is unreachable. Kikidame is an unofficial client with no affiliation to the Jellyfin project.
 
 https://github.com/user-attachments/assets/23b4710a-9410-4d2f-aa2b-c8faac1184e3
 
@@ -24,7 +24,7 @@ Existing Jellyfin clients (the official app, Findroid, Finamp) are built around 
 - **Offline first** — playback always uses the files on the device. Playback position and played state live on the device only and are never sent to the server
 - **Retention rules** — per program, choose "Keep latest N" and "Delete after played"; sync then downloads what is missing and removes what is no longer needed
 
-It assumes one server, one user, one library, and that this app is the only place you listen. Sharing with other devices or the web player is not a goal.
+It assumes one source at a time (one Jellyfin server, user and library, or one SMB shared folder) and that this app is the only place you listen. Changing the source deletes the programs, episodes, playback positions and files on the device and starts over. Sharing with other devices or the web player is not a goal.
 
 ## What it does
 
@@ -49,7 +49,11 @@ Not distributed on Google Play ([ADR 0008](./docs/adr/0008-open-source-distribut
 
 Requires Android 12 (API 31) or later. Store descriptions and screenshots live in [fastlane/metadata/android/](./fastlane/metadata/android/) (Obtainium does not read them, but `fdroidserver` for the self-hosted repository mentioned above reads exactly this layout, so they are kept).
 
-## Server-side prerequisites
+## Source prerequisites
+
+Pick one source on first launch: **Jellyfin** or a **shared folder on a NAS (SMB)**. The sections below cover each.
+
+### Jellyfin
 
 - Jellyfin **10.10 or later** (10.10.7 and 12.0.0 verified with containers and the integration test, 10.11 on a real server; see `scripts/jellyfin-testserver.sh` and "テスト用 Jellyfin サーバ" in `docs/development.md`, Japanese. Legacy authentication is not used)
 - The audio must be in a **music library**. The app maps it like this:
@@ -66,11 +70,27 @@ Requires Android 12 (API 31) or later. Store descriptions and screenshots live i
   - For radio recordings, set the tags `album` = program, `albumartist` = station, and the date (`©day` in M4A) = broadcast date, using a general-purpose tag editor such as Mp3tag
   - For podcasts, tag the files you fetched from the feed with `album` = program name, `albumartist` = the publisher or network, and the date = release date, then put them in the music library. One folder per program helps Jellyfin group them into a MusicAlbum
 
+### Shared folder on a NAS (SMB)
+
+- SMB2/3 only (SMB1 is not supported). Enter the host (a name or an IP address), the share name, an optional folder inside the share, and a username and password, or connect as a guest. The password is stored encrypted on the device. The app only reads the share and never writes to or deletes anything on it
+- Inside the share (or the folder you entered) the layout is exactly **`<publisher>/<program>/<episode files>`**, three levels:
+
+  | Folder level | In the app |
+  | --- | --- |
+  | 1st level folder | Publisher |
+  | 2nd level folder | Program (even if it has no audio yet) |
+  | Audio files in a 2nd level folder | Episodes (by extension: m4a, mp3, aac, ogg, opus, flac, wav) |
+
+  Other files (non-audio files, files at other levels) are silently ignored. Folders and files whose names start with `.`, `@` or `#` (`@eaDir`, `#recycle`, `._foo.m4a` and the like, made by NAS units and operating systems) are ignored at every level
+- Publisher and program come from the folder names; the tags are not used for them. For each episode the app reads the tags: title (the file name without the extension if missing), date (the file's modified time if there is no full date), duration, and artist (performers). The tags are read again only when a file's path, size or modified time changes
+- Renaming an episode file makes it unlinked and it is matched again by title (then by published day and duration) within the same program. Renaming a program folder makes the program Gone (On Hold), because the publisher and program name no longer match
+- Whether this works on your NAS and network (name resolution, guest access, how long the first full scan takes) is not verified on real devices yet; see "実機の確認項目" in [docs/development.md](./docs/development.md) (Japanese)
+
 ## How it works
 
-- **The server is the source of truth for which episodes exist; the device is a cache.** Sync deletes only when it has obtained the server's full listing ([ADR 0004](./docs/adr/0004-sync-deletes-only-from-full-listing.md), Japanese). If it cannot, the program is On Hold: nothing is downloaded and nothing is deleted
+- **The source (the Jellyfin server or the shared folder) is the source of truth for which episodes exist; the device is a cache.** Sync deletes only when it has obtained the source's full listing ([ADR 0004](./docs/adr/0004-sync-deletes-only-from-full-listing.md), Japanese). If it cannot, the program is On Hold: nothing is downloaded and nothing is deleted
 - **Playback position and played state are owned by the device.** They are never sent to the server, and the server's values are never used ([ADR 0002](./docs/adr/0002-playback-position-local-authority.md), [ADR 0007](./docs/adr/0007-playback-state-stays-local.md), Japanese)
-- **Identity in the app does not depend on server IDs.** If the library is rebuilt on the server and IDs change, programs and episodes are matched again by publisher, program name, and title, keeping files and playback positions ([ADR 0001](./docs/adr/0001-local-surrogate-key.md), [ADR 0005](./docs/adr/0005-rematch-unlinked-rows-before-sync-deletes.md), Japanese)
+- **Identity in the app does not depend on source IDs** (a Jellyfin id, or the relative path inside a shared folder). If the library is rebuilt on the server and IDs change, or a file is renamed in a shared folder, programs and episodes are matched again by publisher, program name, and title, keeping files and playback positions ([ADR 0001](./docs/adr/0001-local-surrogate-key.md), [ADR 0005](./docs/adr/0005-rematch-unlinked-rows-before-sync-deletes.md), Japanese)
 - **Retention rules apply only at sync time.** Nothing is deleted the moment you mark an episode played or change a setting
 
 ## Build and run

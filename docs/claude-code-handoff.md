@@ -334,6 +334,9 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
     （後で「ダウンロード」節が増え、M3-a で「Wi-Fi のみ」、#42 で「手元のファイル」の合計容量が入った）
     デバッグ用シードはここに移す（接続画面にもデバッグ節として置く。M3-c で削除）
   - 401 はログアウトと同じ処理をして接続画面へ（URL とユーザー名は入力済み）
+  - **取得元の選択と SMB（#198、ADR 0010）**: 取得元は同時に 1 つ。一度も接続していなければ取得元の選択（「Jellyfin に接続」「NAS の共有フォルダ（SMB）」）から始まり、ログアウトした後は直前の取得元の接続画面へ戻る。設定の「別のサーバに接続」は「取得元を変える」（中身は同じ）。文言は `source_pick_*`・`smb_connect_*`・`smb_error_*`・`settings_source*`・`settings_smb_*`、各回の詳細の「サーバ ID」は「取得元 ID」（`episode_details_source_id`）
+  - **セッションの型（#198）**: `SessionState` は `SignedOut`（`lastServerUrl`・`lastUserName`・`lastSmb`。直前の取得元の入力補助）／`NeedsLibrary`（Jellyfin だけ）／`Ready`。`Ready` は `source: ConnectedSource`（`Jellyfin(session, library)` か `Smb(connection)`）と `lastFetchedAt`・`lastAttemptedAt` を持つ。SMB の設定は `SmbConnection`（ホスト・共有名・共有の中のパス・ユーザー名・パスワード・ゲスト）。`SessionRepository.connectSharedFolder` は共有の直下が読めたら保存する（失敗は `ServerException`: 認証の失敗は `Unauthorized`、届かないは `Unreachable`、読めないは `Failed`）。DataStore（`SessionStore`）の Jellyfin のキーは変えていない。SMB は `smb_host`・`smb_share`・`smb_path`・`smb_user`・`smb_password`（暗号化）・`smb_guest` を足し、`smb_host` があれば SMB、無ければ Jellyfin とみなす。取得元に触る入口は `SessionSourceGateway`（`SourceGateway` の bind）で、今の接続の種類で `JellyfinSource` か `SharedFolderSource`（`SmbFolderTree`）に振り分ける
+  - SMB の認証の失敗は 401 と同じく接続をやり直させる（ログアウトして SMB の接続画面へ）。名前が引けない・タイムアウトは到達不能（判断保留）
 - **認証情報**: `Client="Kikidame"`, `Version=versionName`。`Device` / `DeviceId` は jellyfin-sdk-kotlin の Android 既定
   （端末のモデル名 / `ANDROID_ID` 由来）に任せ、自前の UUID は持たない（実装時に変更。保存する値が 1 つ減る）。
   トークンは Keystore の鍵で AES-GCM 暗号化して Preferences DataStore に保存（`EncryptedSharedPreferences` は使わない）。

@@ -3,24 +3,43 @@ package dev.tseki.kikidame.domain
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
 
-/** サーバに対する現在の接続状態。1 サーバ・1 ユーザー・1 ライブラリ。 */
+/**
+ * 取得元（CONTEXT.md）に対する現在の接続状態。取得元は同時に 1 つ（epic #195 の決定 2）。
+ * Jellyfin は 1 サーバ・1 ユーザー・1 ライブラリ、共有フォルダ（SMB）は 1 つの共有。
+ */
 sealed interface SessionState {
-    /** 一度も接続していない、またはログアウト済み。手元のデータは残っている。 */
-    data class SignedOut(val lastServerUrl: String?, val lastUserName: String?) : SessionState
+    /**
+     * 一度も接続していない、またはログアウト済み。手元のデータは残っている。
+     * 直前に使っていた取得元の入力補助として、Jellyfin なら [lastServerUrl]・[lastUserName]、SMB なら [lastSmb]（パスワードは空）を持つ。
+     * どちらも無ければ初回（取得元の選択画面から始める）。
+     */
+    data class SignedOut(
+        val lastServerUrl: String?,
+        val lastUserName: String?,
+        val lastSmb: SmbConnection? = null,
+    ) : SessionState
 
-    /** ログイン済みだがライブラリ未選択。 */
+    /** Jellyfin にログイン済みだがライブラリ未選択。 */
     data class NeedsLibrary(val session: Session) : SessionState
 
     /**
+     * 取得元に接続済みで、同期できる。[source] が取得元の種類ごとの接続の情報。
      * [lastFetchedAt] は最後に全走査が成功した時刻、[lastAttemptedAt] は最後に全走査を試みた時刻（成功・失敗を問わない。#135）。
      * 起動時同期は両方の新しい方から間をあける。
      */
     data class Ready(
-        val session: Session,
-        val library: SelectedLibrary,
+        val source: ConnectedSource,
         val lastFetchedAt: Instant?,
         val lastAttemptedAt: Instant? = null,
     ) : SessionState
+}
+
+/** 接続済みの取得元。取得元の種類ごとに持つ情報が違う。 */
+sealed interface ConnectedSource {
+    data class Jellyfin(val session: Session, val library: SelectedLibrary) : ConnectedSource
+
+    /** NAS の共有フォルダ（SMB）。 */
+    data class Smb(val connection: SmbConnection) : ConnectedSource
 }
 
 data class Session(
@@ -29,6 +48,21 @@ data class Session(
     val userId: String,
     val accessToken: String,
 )
+
+/**
+ * SMB の共有への接続の設定（#198）。[host] は名前か IP、[share] は共有名、[path] は共有の中のパス（空なら共有の直下）。
+ * [guest] ならゲスト（匿名）接続で、[userName]・[password] は使わない。[password] は保存するとき暗号化する。
+ */
+data class SmbConnection(
+    val host: String,
+    val share: String,
+    val path: String,
+    val userName: String,
+    val password: String,
+    val guest: Boolean = false,
+) {
+    override fun toString(): String = "SmbConnection(host=$host, share=$share, path=$path, userName=$userName, guest=$guest)"
+}
 
 data class SelectedLibrary(val id: SourceItemId, val name: String)
 
@@ -41,9 +75,9 @@ data class LibraryView(
     val isMusic: Boolean,
 )
 
-/** サーバとのやり取りの失敗。UI はこれで文言を決める。 */
+/** 取得元とのやり取りの失敗。UI はこれで文言を決める。 */
 sealed class ServerException(message: String, cause: Throwable? = null) : Exception(message, cause) {
-    /** 認証情報が無効（401）。 */
+    /** 認証情報が無効（Jellyfin の 401/403、SMB の認証の失敗）。接続をやり直させる。 */
     class Unauthorized(cause: Throwable? = null) : ServerException("unauthorized", cause)
 
     /** 到達できない（DNS・接続・タイムアウト）。 */
@@ -56,14 +90,21 @@ sealed class ServerException(message: String, cause: Throwable? = null) : Except
 interface SessionRepository {
     val state: Flow<SessionState>
 
-    /** ログインしてセッションを保存する。失敗は [ServerException]。 */
+    /** Jellyfin にログインしてセッションを保存する。失敗は [ServerException]。 */
     suspend fun signIn(serverUrl: String, userName: String, password: String)
+
+    /**
+     * SMB の共有に接続できるか（共有の直下が読めるか）を確かめ、読めたら保存する（#198）。失敗は [ServerException]:
+     * 認証の失敗は [ServerException.Unauthorized]、届かない・共有が読めないのは [ServerException.Unreachable] / [ServerException.Failed]。
+     * 保存すると [SessionState.Ready] になる（初回の全走査は呼び出し側が始める）。Jellyfin の接続は消える。
+     */
+    suspend fun connectSharedFolder(connection: SmbConnection)
 
     suspend fun listLibraries(): List<LibraryView>
 
     suspend fun selectLibrary(library: LibraryView)
 
-    /** 認証情報だけを消す。手元のデータは残す。 */
+    /** 認証情報だけを消す（Jellyfin のトークン、SMB のパスワード）。手元のデータは残す。 */
     suspend fun signOut()
 }
 
@@ -116,7 +157,7 @@ data class RefreshResult(
     val hasChanges: Boolean get() = newEpisodes > 0 || enqueued > 0 || deleted + removed > 0
 }
 
-/** 「別のサーバに接続」。手元の番組・各回・再生位置・セッションを全部消し、音声ファイルも消す（#50）。 */
+/** 「取得元を変える」（#50 の「別のサーバに接続」を改めたもの）。手元の番組・各回・再生位置・セッションを全部消し、音声ファイルも消す（#50）。 */
 interface LocalDataReset {
     suspend fun resetAll()
 }

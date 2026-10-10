@@ -2670,6 +2670,52 @@
             ]
         },
         {
+            "uniqueId": "com.hierynomus:asn-one",
+            "artifactVersion": "0.6.0",
+            "name": "asn-one",
+            "description": "ASN.1 serialization and parsing library",
+            "website": "https://github.com/hierynomus/asn-one",
+            "developers": [
+                {
+                    "name": "Jeroen van Erp"
+                }
+            ],
+            "scm": {
+                "connection": "scm:git@github.com:hierynomus/asn-one.git",
+                "developerConnection": "scm:git@github.com:hierynomus/asn-one.git",
+                "url": "https://github.com/hierynomus/asn-one"
+            },
+            "licenses": [
+                "Apache-2.0"
+            ],
+            "funding": [
+                
+            ]
+        },
+        {
+            "uniqueId": "com.hierynomus:smbj",
+            "artifactVersion": "0.15.0",
+            "name": "smbj",
+            "description": "SMB2 protocol library for communication with Windows servers",
+            "website": "https://github.com/hierynomus/smbj",
+            "developers": [
+                {
+                    "name": "Jeroen van Erp"
+                }
+            ],
+            "scm": {
+                "connection": "scm:git@github.com:hierynomus/smbj.git",
+                "developerConnection": "scm:git@github.com:hierynomus/smbj.git",
+                "url": "https://github.com/hierynomus/smbj"
+            },
+            "licenses": [
+                "Apache-2.0"
+            ],
+            "funding": [
+                
+            ]
+        },
+        {
             "uniqueId": "com.mikepenz:aboutlibraries-compose-core",
             "artifactVersion": "15.2.0",
             "name": "AboutLibraries Compose UI Library",
@@ -2858,6 +2904,50 @@
             },
             "licenses": [
                 "Apache-2.0"
+            ],
+            "funding": [
+                
+            ]
+        },
+        {
+            "uniqueId": "net.engio:mbassador",
+            "artifactVersion": "1.3.2",
+            "name": "mbassador",
+            "description": "Mbassador is a fast and flexible event bus system following the publish subscribe pattern.\n        It is designed for ease of use and aims to be feature rich and extensible while preserving resource efficiency\n        and performance.\n        It provides non-blocking iterators and minimal write contention with low memory footprint.\n\n        Some features:\n        declarative handler definition via annotations,\n        sync and/or async event delivery,\n        weak or strong references,\n        configurable event filters,",
+            "website": "https://github.com/bennidi/mbassador",
+            "developers": [
+                {
+                    "name": "Benjamin Diedrichsen"
+                }
+            ],
+            "scm": {
+                "connection": "scm:git:git@github.com:bennidi/mbassador.git",
+                "developerConnection": "scm:git:git@github.com:bennidi/mbassador.git",
+                "url": "git@github.com:bennidi/mbassador.git"
+            },
+            "licenses": [
+                "MIT"
+            ],
+            "funding": [
+                
+            ]
+        },
+        {
+            "uniqueId": "org.bouncycastle:bcprov-jdk18on",
+            "artifactVersion": "1.85.2",
+            "name": "Bouncy Castle Provider",
+            "description": "The Bouncy Castle Crypto package is a Java implementation of cryptographic algorithms. This jar contains the  JCA/JCE provider and low-level API for the BC Java version 1.85.2 for Java 1.8 and later.",
+            "website": "https://www.bouncycastle.org/download/bouncy-castle-java/",
+            "developers": [
+                {
+                    "name": "The Legion of the Bouncy Castle Inc."
+                }
+            ],
+            "scm": {
+                "url": "https://github.com/bcgit/bc-java"
+            },
+            "licenses": [
+                "73252b46f36df25ef51a7994de439aea"
             ],
             "funding": [
                 
@@ -3960,6 +4050,11 @@
         }
     ],
     "licenses": {
+        "73252b46f36df25ef51a7994de439aea": {
+            "name": "Bouncy Castle Licence",
+            "url": "https://www.bouncycastle.org/licence.html",
+            "hash": "73252b46f36df25ef51a7994de439aea"
+        },
         "Apache-2.0": {
             "name": "Apache License 2.0",
             "url": "https://spdx.org/licenses/Apache-2.0.html",

@@ -3,6 +3,7 @@ package dev.tseki.kikidame.ui.library
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.tseki.kikidame.domain.ConnectedSource
 import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.SourceItemId
@@ -46,7 +47,7 @@ class LibraryPickViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val libraries = sessionRepository.listLibraries()
-                val current = (sessionRepository.state.first() as? SessionState.Ready)?.library?.id
+                val current = ((sessionRepository.state.first() as? SessionState.Ready)?.source as? ConnectedSource.Jellyfin)?.library?.id
                 val music = libraries.filter { it.isMusic }
                 // 音楽ライブラリが 1 つならそれを選択済みにする。画面自体は常に出す
                 val preselected = current?.takeIf { id -> music.any { it.id == id } }

@@ -54,6 +54,29 @@
     <!-- Appended to an "unreachable" error on Android 17+ when the local-network permission is denied. Starts with a line break -->
     <string name="connect_hint_local_network_permission">\nThe “Local network” permission is not granted. Allow it under Settings → Apps → Kikidame → Permissions</string>
 
+    <!-- ===== source_pick: first screen, choose where programs come from ===== -->
+    <string name="source_pick_title">Choose a source</string>
+    <string name="source_pick_description">Where do your programs come from? You can change this later in Settings</string>
+    <string name="source_pick_jellyfin">Connect to Jellyfin</string>
+    <string name="source_pick_jellyfin_description">Use a music library on a Jellyfin server</string>
+    <string name="source_pick_smb">Shared folder on a NAS (SMB)</string>
+    <string name="source_pick_smb_description">Read recordings straight from a shared folder. Folders are laid out as publisher / program / episode files</string>
+
+    <!-- ===== smb_connect: connect to an SMB shared folder ===== -->
+    <string name="smb_connect_title">Connect to a shared folder</string>
+    <string name="smb_connect_host">Host</string>
+    <string name="smb_connect_host_hint">Name or IP address, e.g. 192.168.1.10. The name must be resolvable from this device</string>
+    <string name="smb_connect_share">Share name</string>
+    <string name="smb_connect_path">Folder in the share (optional)</string>
+    <string name="smb_connect_path_hint">Leave empty to use the top of the share. Below it: publisher / program / episode files</string>
+    <string name="smb_connect_guest">Connect as guest</string>
+    <string name="smb_connect_error_invalid">Check the host and the share name</string>
+    <!-- Wrong credentials, or the account has no access to the share -->
+    <string name="smb_error_unauthorized">Wrong username or password, or no access to this share</string>
+    <string name="smb_error_unreachable">Cannot reach the NAS. Check the host and your network</string>
+    <!-- %1$s = reason reported by the share -->
+    <string name="smb_error_failed">Could not read the shared folder: %1$s</string>
+
     <!-- ===== library_pick: choose which Jellyfin library to use ===== -->
     <string name="library_pick_title">Choose a library</string>
     <string name="library_pick_no_music">There is no music library. Add your recordings to Jellyfin as a music library, then reload</string>
@@ -216,8 +239,8 @@
     <string name="episode_details_position">Position</string>
     <string name="episode_details_no_record">No record</string>
     <!-- Technical rows -->
-    <string name="episode_details_server_id">Server ID</string>
-    <string name="episode_details_server_id_none">None (device-only episode)</string>
+    <string name="episode_details_source_id">Source ID</string>
+    <string name="episode_details_source_id_none">None (device-only episode)</string>
     <string name="episode_details_app_id">ID (in app)</string>
     <string name="episode_details_published_raw">Published (raw value, UTC)</string>
     <string name="episode_details_added_at">Added</string>
@@ -263,7 +286,15 @@
 
     <!-- ===== settings ===== -->
     <string name="settings_title">Settings</string>
-    <string name="settings_section_server">Server</string>
+    <string name="settings_section_source">Source</string>
+    <string name="settings_source">Source</string>
+    <string name="settings_source_jellyfin">Jellyfin</string>
+    <string name="settings_source_smb">Shared folder (SMB)</string>
+    <string name="settings_smb_host">Host</string>
+    <string name="settings_smb_share">Share</string>
+    <string name="settings_smb_path">Folder</string>
+    <string name="settings_smb_path_root">Top of the share</string>
+    <string name="settings_smb_guest">Guest</string>
     <string name="settings_not_connected">Not connected</string>
     <string name="settings_user">User</string>
     <string name="settings_library">Library</string>
@@ -285,8 +316,8 @@
     <string name="settings_section_account">Account</string>
     <string name="settings_sign_out">Sign out</string>
     <string name="settings_sign_out_description">Removes only the credentials. Programs, episodes and playback positions on the device are kept</string>
-    <string name="settings_connect_elsewhere">Connect to another server</string>
-    <string name="settings_connect_elsewhere_description">Deletes all programs, episodes, playback positions and audio files on the device, then returns to the connect screen</string>
+    <string name="settings_connect_elsewhere">Change source</string>
+    <string name="settings_connect_elsewhere_description">Deletes all programs, episodes, playback positions and audio files on the device, then returns to the source selection screen</string>
     <string name="settings_section_about">About</string>
     <string name="settings_version">Version</string>
     <string name="settings_license">License</string>
@@ -295,7 +326,7 @@
     <string name="settings_open_source_licenses_description">Libraries in use and their licenses</string>
     <string name="settings_sign_out_title">Sign out?</string>
     <string name="settings_sign_out_text">Data on the device is kept. You will need to sign in again next time.</string>
-    <string name="settings_reset_title">Delete the data on the device and connect to another server?</string>
+    <string name="settings_reset_title">Delete the data on the device and change the source?</string>
     <string name="settings_reset_text">All programs, episodes, playback positions, played marks and audio files will be deleted. This cannot be undone.</string>
     <string name="settings_reset_confirm">Delete and continue</string>
 

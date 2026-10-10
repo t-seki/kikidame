@@ -9,6 +9,8 @@ android {
     compileSdk = 37
     defaultConfig {
         minSdk = 31
+        // smbj が参照する Android に無いクラスの R8 の警告を抑える（#198）
+        consumerProguardFiles("consumer-rules.pro")
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -39,6 +41,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.jellyfin.core)
     implementation(libs.okhttp)
+    implementation(libs.smbj)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

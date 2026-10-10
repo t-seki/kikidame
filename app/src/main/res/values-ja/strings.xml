@@ -32,6 +32,27 @@
     <string name="connect_error_save_failed">保存に失敗しました: %1$s</string>
     <string name="connect_hint_local_network_permission">\n「ローカルネットワーク」の権限が許可されていません。設定 → アプリ → Kikidame → 権限 から許可してください</string>
 
+    <!-- source_pick -->
+    <string name="source_pick_title">取得元を選ぶ</string>
+    <string name="source_pick_description">番組をどこから取ってきますか？ あとで設定から変えられます</string>
+    <string name="source_pick_jellyfin">Jellyfin に接続</string>
+    <string name="source_pick_jellyfin_description">Jellyfin サーバの音楽ライブラリを使う</string>
+    <string name="source_pick_smb">NAS の共有フォルダ（SMB）</string>
+    <string name="source_pick_smb_description">共有フォルダの録音を直接読む。フォルダは 配信元 / 番組 / 各回のファイル の構成</string>
+
+    <!-- smb_connect -->
+    <string name="smb_connect_title">共有フォルダに接続</string>
+    <string name="smb_connect_host">ホスト</string>
+    <string name="smb_connect_host_hint">名前か IP アドレス（例: 192.168.1.10）。名前はこの端末から引けるものだけ</string>
+    <string name="smb_connect_share">共有名</string>
+    <string name="smb_connect_path">共有の中のフォルダ（省略可）</string>
+    <string name="smb_connect_path_hint">空なら共有の直下。その下に 配信元 / 番組 / 各回のファイル</string>
+    <string name="smb_connect_guest">ゲストとして接続</string>
+    <string name="smb_connect_error_invalid">ホストと共有名を確認してください</string>
+    <string name="smb_error_unauthorized">ユーザー名かパスワードが違うか、この共有に入る権限がありません</string>
+    <string name="smb_error_unreachable">NAS に接続できません。ホストとネットワークを確認してください</string>
+    <string name="smb_error_failed">共有フォルダを読めませんでした: %1$s</string>
+
     <!-- library_pick -->
     <string name="library_pick_title">ライブラリを選ぶ</string>
     <string name="library_pick_no_music">音楽ライブラリがありません。Jellyfin 側でラジオ録音を音楽ライブラリとして追加してから再読み込みしてください</string>
@@ -149,8 +170,8 @@
     <string name="episode_details_section_playback">再生</string>
     <string name="episode_details_position">再生位置</string>
     <string name="episode_details_no_record">記録なし</string>
-    <string name="episode_details_server_id">サーバ ID</string>
-    <string name="episode_details_server_id_none">なし（手元だけの各回）</string>
+    <string name="episode_details_source_id">取得元 ID</string>
+    <string name="episode_details_source_id_none">なし（手元だけの各回）</string>
     <string name="episode_details_app_id">ID（アプリ内）</string>
     <string name="episode_details_published_raw">公開日（記録の瞬間、UTC）</string>
     <string name="episode_details_added_at">取り込み日時</string>
@@ -189,7 +210,15 @@
 
     <!-- settings -->
     <string name="settings_title">設定</string>
-    <string name="settings_section_server">サーバ</string>
+    <string name="settings_section_source">取得元</string>
+    <string name="settings_source">種類</string>
+    <string name="settings_source_jellyfin">Jellyfin</string>
+    <string name="settings_source_smb">共有フォルダ（SMB）</string>
+    <string name="settings_smb_host">ホスト</string>
+    <string name="settings_smb_share">共有名</string>
+    <string name="settings_smb_path">フォルダ</string>
+    <string name="settings_smb_path_root">共有の直下</string>
+    <string name="settings_smb_guest">ゲスト</string>
     <string name="settings_not_connected">未接続</string>
     <string name="settings_user">ユーザー</string>
     <string name="settings_library">ライブラリ</string>
@@ -210,8 +239,8 @@
     <string name="settings_section_account">アカウント</string>
     <string name="settings_sign_out">ログアウト</string>
     <string name="settings_sign_out_description">認証情報だけを消します。手元の番組・各回・再生位置は残ります</string>
-    <string name="settings_connect_elsewhere">別のサーバに接続</string>
-    <string name="settings_connect_elsewhere_description">手元の番組・各回・再生位置・音声ファイルをすべて消してから接続画面へ</string>
+    <string name="settings_connect_elsewhere">取得元を変える</string>
+    <string name="settings_connect_elsewhere_description">手元の番組・各回・再生位置・音声ファイルをすべて消してから取得元の選択画面へ</string>
     <string name="settings_section_about">このアプリについて</string>
     <string name="settings_version">バージョン</string>
     <string name="settings_license">ライセンス</string>
@@ -220,9 +249,9 @@
     <string name="settings_open_source_licenses_description">使っているライブラリとそのライセンス</string>
     <string name="settings_sign_out_title">ログアウトしますか？</string>
     <string name="settings_sign_out_text">手元のデータは残ります。次回はもう一度ログインが必要です。</string>
-    <string name="settings_reset_title">手元のデータを消して別のサーバに接続しますか？</string>
+    <string name="settings_reset_title">手元のデータを消して取得元を変えますか？</string>
     <string name="settings_reset_text">番組・各回・再生位置・再生済み・音声ファイルがすべて消えます。この操作は取り消せません。</string>
-    <string name="settings_reset_confirm">消して接続画面へ</string>
+    <string name="settings_reset_confirm">消して取得元の選択へ</string>
 
     <!-- sync: 同期中の表示（トップバーの下） -->
     <string name="sync_in_background">バックグラウンドで同期中…</string>
