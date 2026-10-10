@@ -19,7 +19,7 @@ class DownloadsTest {
     )
 
     @Test
-    fun `server episodes lose only the file, seeded ones lose the row`() {
+    fun `episodes with a source id lose only the file, seeded ones lose the row`() {
         assertEquals(LocalDeletionScope.FILE_ONLY, deletionScopeFor(episode("abc")))
         assertEquals(LocalDeletionScope.EPISODE, deletionScopeFor(episode(null)))
     }

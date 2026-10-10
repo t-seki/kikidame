@@ -24,7 +24,7 @@ date: 2026-10-10
 - **ローカルネットワークへの接続**: LAN 内のサーバへの接続に要る `ACCESS_LOCAL_NETWORK`（Android 17+）は、Jellyfin のために宣言済み（`app/src/main/AndroidManifest.xml`）で、実行時の要求も実装済み（`MainActivity.kt`）。SMB の接続がこの権限だけで足りるかは未確認（#198 で確かめる）
 - 決定 2・3・5〜10 の理由は、epic #195 に書かれていない（決定だけが記されている）。この ADR でも理由を補わない
 
-この決定の最初の一歩（#196）では、Jellyfin の挙動を変えずに次を行った:
+この決定の最初の一歩（#196）では、Jellyfin の挙動を変えない方針（#196 のスコープ）で次を行った:
 
 - 同期とダウンロードは、取得元の種類に依存しない境界（`core/data` の `data.source.SourceGateway`）だけを通して取得元に触る。Jellyfin はその実装の 1 つ（`JellyfinSource`）で、認証の情報は実装の側で持つ。接続の手順（サインイン、ライブラリの一覧）は Jellyfin 側（`JellyfinGateway`）に残す
 - 名前は破壊的に改め、データは移行で残す（epic #195 の決定 12、人の決定 2026-10-10）。`ServerItemId` / `serverItemId` を `SourceItemId` / `sourceItemId`、`ServerProgram` / `ServerEpisode` / `ServerSnapshot` を `SourceProgram` / `SourceEpisode` / `SourceSnapshot` に改めた。Room は版 7 の自動移行（`@RenameColumn` / `@DeleteColumn`）で、列 `serverItemId` を `sourceItemId`（programs・episodes）、`stationName` を `publisherName`、`airedAt` を `publishedAt` に改め、`@ColumnInfo` で旧い列名を残す形をやめた。ADR 0007 で使わないまま残していた `playback_states.syncedAt` は、この版で削除した（domain の `PlaybackState.syncedAt` も消した）。DB は作り直さない

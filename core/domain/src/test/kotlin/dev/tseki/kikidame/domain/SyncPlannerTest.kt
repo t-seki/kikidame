@@ -154,7 +154,7 @@ class SyncPlannerTest {
     }
 
     @Test
-    fun `episodes without a server id are never removed`() {
+    fun `episodes without a source id are never removed`() {
         val seed = ep(1, "2026-09-01", server = null, pinned = true, local = true)
         val plan = SyncPlanner.planProgram(input(seed, source = SourceEpisodes.Known(emptySet())))
         assertTrue(plan.remove.isEmpty())
@@ -162,7 +162,7 @@ class SyncPlannerTest {
     }
 
     @Test
-    fun `an unpinned episode without a server id is deleted by the rule`() {
+    fun `an unpinned episode without a source id is deleted by the rule`() {
         val seed = ep(1, "2026-09-01", server = null, pinned = false, local = true)
         val plan = SyncPlanner.planProgram(input(seed, ep(2, "2026-09-02"), source = SourceEpisodes.Known(setOf(SourceItemId("s2")))))
         assertEquals(ids(1), plan.delete)

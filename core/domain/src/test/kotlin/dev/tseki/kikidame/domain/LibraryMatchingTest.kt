@@ -78,7 +78,7 @@ class LibraryMatchingTest {
     }
 
     @Test
-    fun `rows that already have a server id are left alone`() {
+    fun `rows that already have a source id are left alone`() {
         val match = LibraryMatching.match(
             localPrograms = listOf(lp(1, "ふらっと", server = "P")),
             localEpisodes = listOf(le(10, 1, "x", server = "E1"), le(11, 1, "y")),
@@ -130,7 +130,7 @@ class LibraryMatchingTest {
 
     // --- 未結合の結び直し（ADR 0005） ---
     @Test
-    fun `a program whose server id vanished is relinked by name and its episodes by title`() {
+    fun `a program whose source id vanished is relinked by name and its episodes by title`() {
         val match = LibraryMatching.match(
             localPrograms = listOf(lp(1, "ふらっと", server = "OLD-P")),
             localEpisodes = listOf(le(10, 1, "2026-09-14 (1)", server = "OLD-E1"), le(11, 1, "gone for real", server = "OLD-E2")),

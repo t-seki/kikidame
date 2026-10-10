@@ -51,7 +51,7 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
     private val program = "パンサー向井のふらっと"
     private val publisher = "TBSラジオ"
 
-    private fun serverEpisode(id: String, title: String, published: String, runtime: Int = 90) = SourceEpisode(
+    private fun sourceEpisode(id: String, title: String, published: String, runtime: Int = 90) = SourceEpisode(
         sourceId = SourceItemId(id),
         programSourceId = SourceItemId("album-1"),
         title = title,
@@ -65,9 +65,9 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
     private val snapshot = SourceSnapshot(
         programs = listOf(SourceProgram(SourceItemId("album-1"), program, publisher)),
         episodes = listOf(
-            serverEpisode("audio-1", "$program 2026-09-14-1", "2026-09-13T15:00:00Z"),
-            serverEpisode("audio-2", "$program 2026-09-14-2", "2026-09-13T15:00:00Z", runtime = 60),
-            serverEpisode("audio-3", "$program 2026-09-17-1", "2026-09-16T15:00:00Z"),
+            sourceEpisode("audio-1", "$program 2026-09-14-1", "2026-09-13T15:00:00Z"),
+            sourceEpisode("audio-2", "$program 2026-09-14-2", "2026-09-13T15:00:00Z", runtime = 60),
+            sourceEpisode("audio-3", "$program 2026-09-17-1", "2026-09-16T15:00:00Z"),
         ),
     )
 
@@ -194,7 +194,7 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
         assertEquals(3, repo.refresh().newEpisodes)
         assertEquals(0, repo.refresh().newEpisodes)
 
-        gateway.snapshot = snapshot.copy(episodes = snapshot.episodes + serverEpisode("audio-4", "$program 2026-09-21-1", "2026-09-20T15:00:00Z"))
+        gateway.snapshot = snapshot.copy(episodes = snapshot.episodes + sourceEpisode("audio-4", "$program 2026-09-21-1", "2026-09-20T15:00:00Z"))
         val result = repo.refresh()
         assertEquals(1, result.newEpisodes)
         assertTrue(result.hasChanges)
@@ -208,11 +208,11 @@ class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
         repo.refresh()
         val programId = library.observePrograms().first().single().program.id
 
-        gateway.snapshot = snapshot.copy(episodes = snapshot.episodes + serverEpisode("audio-4", "$program 2026-09-21-1", "2026-09-20T15:00:00Z"))
+        gateway.snapshot = snapshot.copy(episodes = snapshot.episodes + sourceEpisode("audio-4", "$program 2026-09-21-1", "2026-09-20T15:00:00Z"))
         assertEquals(1, repo.refreshProgram(programId)?.newEpisodes)
         assertEquals(0, repo.syncProgram(programId)?.newEpisodes)
 
-        gateway.snapshot = snapshot.copy(episodes = snapshot.episodes + serverEpisode("audio-5", "$program 2026-09-24-1", "2026-09-23T15:00:00Z"))
+        gateway.snapshot = snapshot.copy(episodes = snapshot.episodes + sourceEpisode("audio-5", "$program 2026-09-24-1", "2026-09-23T15:00:00Z"))
         assertEquals(1, repo.syncProgram(programId)?.newEpisodes)
     }
 
