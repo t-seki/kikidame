@@ -6,6 +6,7 @@ import dev.tseki.kikidame.data.db.KikidameDatabase
 import dev.tseki.kikidame.data.db.ProgramEntity
 import dev.tseki.kikidame.data.db.toDomain
 import dev.tseki.kikidame.data.session.SessionStore
+import dev.tseki.kikidame.data.source.ScanListener
 import dev.tseki.kikidame.data.source.SourceGateway
 import dev.tseki.kikidame.domain.DownloadRepository
 import dev.tseki.kikidame.domain.EpisodeId
@@ -14,10 +15,12 @@ import dev.tseki.kikidame.domain.LibraryRefreshRepository
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.RefreshResult
 import dev.tseki.kikidame.domain.RetentionRule
+import dev.tseki.kikidame.domain.ScanProgress
 import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceEpisodes
 import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.SourceItemId
+import dev.tseki.kikidame.domain.SourceProgram
 import dev.tseki.kikidame.domain.SourceSnapshot
 import dev.tseki.kikidame.domain.SnapshotScope
 import dev.tseki.kikidame.domain.SessionState
@@ -36,6 +39,8 @@ import kotlin.time.Clock
  *
  * 全走査（[refresh]）は同期そのもの: 取り込んだ後に [SyncPlanner] を回し、保持ルールによる削除・取得元から消えた各回の除去・
  * ダウンロードの予約まで行う（ADR 0004）。番組単位（[refreshProgram]）は取り込みだけで、削除はしない。
+ * 共有フォルダの全走査では、取得元がタグを読み終えた番組から先に 1 番組ずつ取り込んで同期し（[syncProgram] と同じ範囲）、
+ * 全部を読み終えたら全体を取り込み直して消失を判断する（#209 の決定 1）。どの取り込みも、それぞれ 1 トランザクション。
  */
 @Singleton
 class RoomLibraryRefreshRepository @Inject constructor(
@@ -46,20 +51,50 @@ class RoomLibraryRefreshRepository @Inject constructor(
     private val clock: Clock,
 ) : LibraryRefreshRepository {
 
-    override suspend fun refresh(excluded: Set<EpisodeId>): RefreshResult {
+    override suspend fun refresh(excluded: Set<EpisodeId>, onProgress: (ScanProgress) -> Unit): RefreshResult {
         requireReady()
         // 失敗しても記録する。到達できない間、起動時同期が前面に出るたびに積まれないように（#135）
         store.saveLastAttemptedAt(clock.now())
-        val snapshot = source.fetchAll()
+        val scanned = ProgramByProgram(excluded, onProgress)
+        val snapshot = source.fetchAll(scanned)
+        // 番組ごとに取り込み済みの回は、ここでは変化にならない（予約・削除も済んでいる）。消失の判断と結び直しはここで全体を相手に行う
         val result = apply(snapshot)
         val outcome = synchronize(snapshot, excluded)
         store.saveLastFetchedAt(result.fetchedAt)
         return result.copy(
-            enqueued = outcome.enqueued,
-            deleted = outcome.deleted,
-            removed = outcome.removed,
+            enqueued = outcome.enqueued + scanned.enqueued,
+            deleted = outcome.deleted + scanned.deleted,
+            removed = outcome.removed + scanned.removed,
             onHold = outcome.onHold,
+            newEpisodes = result.newEpisodes + scanned.newEpisodes,
         )
+    }
+
+    /**
+     * 全走査の途中で、読み終えた番組を 1 つずつ取り込む（#209 の決定 1）。取り込みの範囲と、その番組の中での削除・予約は
+     * [syncProgram] と同じ（[SnapshotScope.Program] で取り込み、その番組だけを [synchronize]）。消失の判断はしない。
+     * 数えた変化は、全走査の結果に足す。
+     */
+    private inner class ProgramByProgram(
+        private val excluded: Set<EpisodeId>,
+        private val onProgress: (ScanProgress) -> Unit,
+    ) : ScanListener {
+        var newEpisodes = 0
+        var enqueued = 0
+        var deleted = 0
+        var removed = 0
+
+        override fun onTagProgress(read: Int, total: Int) = onProgress(ScanProgress(read, total))
+
+        override suspend fun onProgramScanned(program: SourceProgram, episodes: List<SourceEpisode>) {
+            val snapshot = SourceSnapshot(programs = listOf(program), episodes = episodes, scope = SnapshotScope.Program(program.sourceId))
+            newEpisodes += apply(snapshot).newEpisodes
+            val programId = db.programDao().findBySourceItemId(program.sourceId.value)?.id ?: return
+            val outcome = synchronize(snapshot, excluded, onlyProgramId = ProgramId(programId))
+            enqueued += outcome.enqueued
+            deleted += outcome.deleted
+            removed += outcome.removed
+        }
     }
 
     override suspend fun refreshProgram(programId: ProgramId): RefreshResult? {

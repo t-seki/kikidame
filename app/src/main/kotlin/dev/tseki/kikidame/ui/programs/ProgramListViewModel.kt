@@ -9,6 +9,7 @@ import dev.tseki.kikidame.domain.LibraryRepository
 import dev.tseki.kikidame.domain.ProgramListTab
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.ProgramSummary
+import dev.tseki.kikidame.domain.ScanProgress
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.playback.NowPlaying
@@ -100,6 +101,8 @@ class ProgramListViewModel @Inject constructor(
     val isRefreshing: StateFlow<Boolean> = refresher.isRefreshing
     /** 裏の同期（定期・起動時）のうち、手動が合流していない間だけ true。トップバーの下に細いバーを出す（#138）。 */
     val isSyncingInBackground: StateFlow<Boolean> = refresher.isSyncingInBackground
+    /** 全走査でタグを読んでいる数（#209）。タグを読む回がある間だけ null でない。トップバーの下に件数を出す。 */
+    val tagProgress: StateFlow<ScanProgress?> = refresher.tagProgress
     /** 更新の結果と、ミニプレイヤーが消えた理由をスナックバーへ。 */
     val messages: Flow<UiText> = merge(refresher.messages, nowPlaying.messages)
 

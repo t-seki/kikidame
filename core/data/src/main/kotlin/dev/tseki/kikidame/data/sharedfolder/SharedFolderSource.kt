@@ -1,6 +1,7 @@
 package dev.tseki.kikidame.data.sharedfolder
 
 import dev.tseki.kikidame.data.source.DownloadStream
+import dev.tseki.kikidame.data.source.ScanListener
 import dev.tseki.kikidame.data.source.SourceGateway
 import dev.tseki.kikidame.domain.PublishedAt
 import dev.tseki.kikidame.domain.ServerException
@@ -11,6 +12,8 @@ import dev.tseki.kikidame.domain.SourceSnapshot
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
@@ -19,6 +22,7 @@ import kotlinx.datetime.toLocalDateTime
 import java.io.FileNotFoundException
 import java.io.IOException
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 /**
@@ -32,7 +36,10 @@ import kotlin.time.Instant
  * - 取得元 ID は相対パス（決定 7）。番組は `<配信元>/<番組>`、各回は `<配信元>/<番組>/<ファイル名>`
  * - 回の情報はタグから読む（決定 8・9）。取得元 ID・サイズ・更新日時がどれも前の走査（[ScannedFiles]）と同じ回は、
  *   タグを読み直さずに前の値を使う
- * - 木の操作が例外を投げたら [ServerException.Unreachable]（今の Jellyfin と同じく到達不能、判断保留）。
+ * - 全走査は一覧を先に全部取ってから番組ごとにタグを読み、読み終えた番組を [ScanListener] に流す（#209 の決定 1。epic #195 の決定 8 の
+ *   「全部読んでからまとめて取り込む」を改めた）。取り込み済みの回は DB に大きさと更新日時を持つので、途中で止まっても次の走査は
+ *   その回のタグを読まない（#209 の決定 2）。木の操作の失敗は、接続を張り直して続けて 3 回までやり直す（#209 の決定 4）
+ * - 木の操作が例外を投げたら（全走査ではやり直しても失敗したら）[ServerException.Unreachable]（今の Jellyfin と同じく到達不能、判断保留）。
  *   番組のフォルダが無ければ [fetchProgram] が null（消失）
  *
  * 接続の情報は [tree] の側で持つ。取得元の種類による切り替えは `SessionSourceGateway`（#198）が行う。
@@ -42,30 +49,101 @@ class SharedFolderSource(
     private val tags: TagReader,
     private val scanned: ScannedFiles,
     private val io: CoroutineDispatcher = Dispatchers.IO,
+    private val retryDelay: Duration = RETRY_DELAY,
 ) : SourceGateway {
 
-    /** 全走査。返す一覧は完全な一覧（ADR 0004）。共有フォルダの根が無ければ到達不能。 */
-    override suspend fun fetchAll(): SourceSnapshot {
+    /** 全走査。途中経過は流さない（[fetchAll] の `listener` 版を [ScanListener.None] で呼ぶ）。 */
+    override suspend fun fetchAll(): SourceSnapshot = fetchAll(ScanListener.None)
+
+    /**
+     * 全走査（#209 の決定 1・4）。返す一覧は完全な一覧（ADR 0004）。共有フォルダの根が無ければ到達不能。
+     *
+     * 1. 一覧（名前・大きさ・更新日時）を先に全部取り、タグを読む回の数を数える
+     * 2. 番組ごとにタグを読む（前の走査と同じ回は読まない）。1 本読むごとに [ScanListener.onTagProgress]、
+     *    タグを読んだ番組は読み終えるたびに [ScanListener.onProgramScanned] に流す
+     *
+     * 木の操作（一覧・タグの読み取り）が失敗したら、[FolderTree.reset] で接続を捨ててから同じ操作をやり直す（タグは同じファイルの頭から）。
+     * 続けて [MAX_CONSECUTIVE_FAILURES] 回失敗したら到達不能で終わる。成功を挟めば数え直す。
+     * [ServerException]（認証・権限など、やり直しても変わらない失敗）と、ファイルが無い（[FileNotFoundException]）は、やり直さずに今までどおり投げる。
+     */
+    override suspend fun fetchAll(listener: ScanListener): SourceSnapshot {
         val previous = scanned.load()
-        return onTree { checkActive ->
-            val root = tree.list(ROOT) ?: throw IOException("shared folder root not found")
-            val programs = ArrayList<SourceProgram>()
-            val episodes = ArrayList<SourceEpisode>()
-            for (publisher in root.directories()) {
-                checkActive()
-                val publisherPath = publisher.name
-                // 走査の途中で消えたフォルダは、無いものとして扱う
-                val programDirs = tree.list(publisherPath)?.directories() ?: continue
-                for (program in programDirs) {
-                    checkActive()
-                    val programPath = "$publisherPath/${program.name}"
-                    val files = tree.list(programPath) ?: continue
-                    val programId = SourceItemId(programPath)
-                    programs += SourceProgram(sourceId = programId, name = program.name, publisherName = publisher.name)
-                    episodes += episodesIn(programId, files, previous, checkActive)
+        val retry = Retry()
+        val listed = listLibrary(retry)
+        val total = listed.sumOf { (program, files) -> files.count { cachedValues(program.sourceId, it, previous) == null } }
+        var read = 0
+        if (total > 0) listener.onTagProgress(0, total)
+        val episodes = ArrayList<SourceEpisode>()
+        for ((program, files) in listed) {
+            val programEpisodes = ArrayList<SourceEpisode>(files.size)
+            var readHere = false
+            for (file in files) {
+                // タグの読み取り（ファイルごとに 1〜2 秒。#209 の計測）の合間に、取り消されていれば止まる
+                currentCoroutineContext().ensureActive()
+                val id = episodeIdOf(program.sourceId, file)
+                val values = cachedValues(program.sourceId, file, previous) ?: run {
+                    val tags = retry { tags.read(tree, id.value, file.sizeBytes) }
+                    read++
+                    readHere = true
+                    listener.onTagProgress(read, total)
+                    tagValues(tags, file.name, file.modifiedAt.truncatedToMillis())
                 }
+                programEpisodes += episodeOf(program.sourceId, file, values)
             }
-            SourceSnapshot(programs, episodes)
+            if (readHere) listener.onProgramScanned(program, programEpisodes)
+            episodes += programEpisodes
+        }
+        return SourceSnapshot(listed.map { it.first }, episodes)
+    }
+
+    /** 全走査の 1 段目: 番組と、その各回のファイル（並べ替え・絞り込み済み）の一覧。 */
+    private suspend fun listLibrary(retry: Retry): List<Pair<SourceProgram, List<FolderEntry>>> {
+        val root = retry { tree.list(ROOT) }
+            ?: throw ServerException.Unreachable(IOException("shared folder root not found"))
+        val listed = ArrayList<Pair<SourceProgram, List<FolderEntry>>>()
+        for (publisher in root.directories()) {
+            currentCoroutineContext().ensureActive()
+            val publisherPath = publisher.name
+            // 走査の途中で消えたフォルダは、無いものとして扱う
+            val programDirs = retry { tree.list(publisherPath) }?.directories() ?: continue
+            for (program in programDirs) {
+                currentCoroutineContext().ensureActive()
+                val programPath = "$publisherPath/${program.name}"
+                val files = retry { tree.list(programPath) } ?: continue
+                val sourceProgram = SourceProgram(sourceId = SourceItemId(programPath), name = program.name, publisherName = publisher.name)
+                listed += sourceProgram to files.audioFiles()
+            }
+        }
+        return listed
+    }
+
+    /**
+     * 全走査の 1 回分の、木の操作のやり直し（#209 の決定 4）。続けて失敗した数を持つ。
+     * [op] は blocking なので IO のスレッドで呼ぶ。
+     */
+    private inner class Retry {
+        private var failures = 0
+
+        suspend operator fun <T> invoke(op: () -> T): T {
+            while (true) {
+                val error = try {
+                    val result = withContext(io) { op() }
+                    failures = 0
+                    return result
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: ServerException) {
+                    throw e
+                } catch (e: FileNotFoundException) {
+                    throw ServerException.Unreachable(e)
+                } catch (e: Exception) {
+                    e
+                }
+                failures++
+                if (failures >= MAX_CONSECUTIVE_FAILURES) throw ServerException.Unreachable(error)
+                withContext(io) { tree.reset() }
+                delay(retryDelay)
+            }
         }
     }
 
@@ -111,23 +189,30 @@ class SharedFolderSource(
         previous: Map<SourceItemId, ScannedFile>,
         checkActive: () -> Unit,
     ): List<SourceEpisode> =
-        entries.filter { !it.isDirectory && !isIgnoredName(it.name) && extensionOf(it.name) in AUDIO_EXTENSIONS }
-            .sortedBy { it.name }
-            .map {
-                // タグの読み取り（ファイルごとに数秒）の合間に、取り消されていれば止まる
-                checkActive()
-                episodeOf(programId, it, previous)
-            }
+        entries.audioFiles().map {
+            // タグの読み取り（ファイルごとに数秒）の合間に、取り消されていれば止まる
+            checkActive()
+            val values = cachedValues(programId, it, previous)
+                ?: tagValues(tags.read(tree, episodeIdOf(programId, it).value, it.sizeBytes), it.name, it.modifiedAt.truncatedToMillis())
+            episodeOf(programId, it, values)
+        }
 
-    private fun episodeOf(programId: SourceItemId, file: FolderEntry, previous: Map<SourceItemId, ScannedFile>): SourceEpisode {
-        val id = SourceItemId("${programId.value}/${file.name}")
-        // Room には ms で入るので、ms に揃えてから比べる（ms より細かい更新日時が来ても同じとみなす。SMB の実装（smbj）が実機で何の精度を返すかは未確認。docs/development.md の実機の確認項目）
+    private fun episodeIdOf(programId: SourceItemId, file: FolderEntry) = SourceItemId("${programId.value}/${file.name}")
+
+    /**
+     * 取得元 ID・サイズ・更新日時がどれも前の走査と同じなら、その回の前の値（タグを読み直さない。epic #195 の決定 8）。違えば null。
+     * Room には ms で入るので、ms に揃えてから比べる（ms より細かい更新日時が来ても同じとみなす。SMB の実装（smbj）が実機で何の精度を返すかは未確認。docs/development.md の実機の確認項目）
+     */
+    private fun cachedValues(programId: SourceItemId, file: FolderEntry, previous: Map<SourceItemId, ScannedFile>): TagValues? {
         val modifiedAt = file.modifiedAt.truncatedToMillis()
-        val cached = previous[id]?.takeIf { it.sizeBytes == file.sizeBytes && it.modifiedAt == modifiedAt }
-        val values = cached?.let { TagValues(it.title, it.publishedAt, it.runtime, it.performers) }
-            ?: tagValues(tags.read(tree, id.value, file.sizeBytes), file.name, modifiedAt)
+        val cached = previous[episodeIdOf(programId, file)]?.takeIf { it.sizeBytes == file.sizeBytes && it.modifiedAt == modifiedAt }
+        return cached?.let { TagValues(it.title, it.publishedAt, it.runtime, it.performers) }
+    }
+
+    private fun episodeOf(programId: SourceItemId, file: FolderEntry, values: TagValues): SourceEpisode {
+        val modifiedAt = file.modifiedAt.truncatedToMillis()
         return SourceEpisode(
-            sourceId = id,
+            sourceId = episodeIdOf(programId, file),
             programSourceId = programId,
             title = values.title,
             publishedAt = values.publishedAt,
@@ -175,6 +260,12 @@ class SharedFolderSource(
     companion object {
         private const val ROOT = ""
 
+        /** 全走査で、木の操作が続けてこの回数だけ失敗したら到達不能で終わる（#209 の決定 4）。 */
+        const val MAX_CONSECUTIVE_FAILURES: Int = 3
+
+        /** やり直す前に待つ時間（#209）。切れた直後にすぐ張り直して同じ失敗を重ねないため。長さに根拠は無い（測っていない）。 */
+        val RETRY_DELAY: Duration = 2.seconds
+
         /** 各回とみなす拡張子（小文字で比べる）。 */
         val AUDIO_EXTENSIONS: Set<String> = setOf("m4a", "mp3", "aac", "ogg", "opus", "flac", "wav")
 
@@ -186,6 +277,10 @@ class SharedFolderSource(
 
         /** 名前が `.`・`@`・`#` で始まるフォルダとファイルは、どの段でも無視する（#197 の追加の決定）。 */
         fun isIgnoredName(name: String): Boolean = name.firstOrNull()?.let { it in IGNORED_PREFIXES } ?: true
+
+        /** 各回とみなすファイル（3 段目の音声ファイル）を名前の順に。 */
+        private fun List<FolderEntry>.audioFiles(): List<FolderEntry> =
+            filter { !it.isDirectory && !isIgnoredName(it.name) && extensionOf(it.name) in AUDIO_EXTENSIONS }.sortedBy { it.name }
 
         private fun List<FolderEntry>.directories(): List<FolderEntry> =
             filter { it.isDirectory && !isIgnoredName(it.name) }.sortedBy { it.name }

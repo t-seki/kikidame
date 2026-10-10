@@ -8,6 +8,7 @@ import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.LibraryRefreshRepository
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.RefreshResult
+import dev.tseki.kikidame.domain.ScanProgress
 import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
@@ -41,6 +42,7 @@ import javax.inject.Singleton
  * - 定期・起動時の silent な同期ではクルクルを出さない。その最中に手動の操作が来たら、走っている同期に合流する（#134）
  * - 結果の文言は手元の変化（新しい回・予約・削除）だけを並べる。手動は変化が無ければ「最新の状態です」、silent は変化があったときだけ出す（#142）
  * - silent な同期の間は [isSyncingInBackground] を立てる（画面は細いバーを出す。#138）。合流したらクルクルに切り替える
+ * - 全走査でタグを読む回がある間は、読んだ数を [tagProgress] に流す（silent でも手動でも。#209）
  */
 @Singleton
 class LibraryRefresher @Inject constructor(
@@ -67,6 +69,14 @@ class LibraryRefresher @Inject constructor(
 
     /** silent な実行の間だけ true。手動が合流したら false に戻し、[isRefreshing] に譲る（両方は立てない。#138）。 */
     val isSyncingInBackground: StateFlow<Boolean> = _isSyncingInBackground
+
+    private val _tagProgress = MutableStateFlow<ScanProgress?>(null)
+
+    /**
+     * 全走査でタグを読んでいる回の数と、読み終えた数（#209 の決定 6）。タグを読む回が無い間（全走査でないとき、
+     * 2 回目以降で変化の無い同期）は null。実行が終われば（成功・失敗・取り消しのどれでも）null に戻る。
+     */
+    val tagProgress: StateFlow<ScanProgress?> = _tagProgress
 
     // 連続した更新の結果を取りこぼさないよう少し余裕を持ち、溢れたら古い方を捨てる
     private val _messages = MutableSharedFlow<UiText>(extraBufferCapacity = 4, onBufferOverflow = BufferOverflow.DROP_OLDEST)
@@ -96,7 +106,8 @@ class LibraryRefresher @Inject constructor(
 
     /** 全走査して結果の文言を出す。手元に変化があれば silent でも出す（#142）。 */
     private suspend fun Run.sync(): RefreshResult =
-        refreshRepository.refresh(excluded = excluded()).also { report(it.toSyncMessage(), evenIfSilent = it.hasChanges) }
+        refreshRepository.refresh(excluded = excluded()) { _tagProgress.value = it }
+            .also { report(it.toSyncMessage(), evenIfSilent = it.hasChanges) }
 
     /** 聴いている回は削除から外す。ただし聴き終えて止まっている回は「再生済みなら削除」に任せる（#27）。 */
     private fun excluded(): Set<EpisodeId> = setOfNotNull(nowPlaying.excludedFromSync)
@@ -189,6 +200,7 @@ class LibraryRefresher @Inject constructor(
                 running = null
                 _isRefreshing.value = false
                 _isSyncingInBackground.value = false
+                _tagProgress.value = null
             }
             run.result.complete(result)
         }

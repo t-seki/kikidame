@@ -119,8 +119,12 @@ interface LibraryRefreshRepository {
      * [excluded] の各回（再生中の回）は今回は削除しない。
      * 401 は [ServerException.Unauthorized] を投げる（呼び出し側がログアウトへ導く）。
      * 取得元に問い合わせる前に試みた時刻（[SessionState.Ready.lastAttemptedAt]）を記録する。失敗しても残る。
+     *
+     * 共有フォルダでは、タグを読んだ番組をその番組を読み終えるたびに取り込み、その番組の中で削除・予約する（[syncProgram] と同じ範囲。#209）。
+     * 途中で失敗・取り消しになっても、取り込み済みの番組は残る。番組の消失の判断と最終同期の時刻の記録は、全部を読み終えたときだけ行う。
+     * タグを読む回がある間は、読んだ数を [onProgress] に流す（タグを読む回が無ければ呼ばない）。
      */
-    suspend fun refresh(excluded: Set<EpisodeId> = emptySet()): RefreshResult
+    suspend fun refresh(excluded: Set<EpisodeId> = emptySet(), onProgress: (ScanProgress) -> Unit = {}): RefreshResult
 
     /**
      * 1 番組の各回だけを取得して取り込む（#12）。削除も予約もせず、最終同期の時刻も更新しない。
@@ -135,6 +139,9 @@ interface LibraryRefreshRepository {
      */
     suspend fun syncProgram(programId: ProgramId, excluded: Set<EpisodeId> = emptySet()): RefreshResult?
 }
+
+/** 全走査でタグを読む回の数 [total] のうち、読み終えた数 [read]（#209）。 */
+data class ScanProgress(val read: Int, val total: Int)
 
 data class RefreshResult(
     val programs: Int,

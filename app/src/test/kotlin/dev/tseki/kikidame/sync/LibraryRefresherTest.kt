@@ -12,6 +12,7 @@ import dev.tseki.kikidame.domain.LocalDeletionScope
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.RefreshResult
+import dev.tseki.kikidame.domain.ScanProgress
 import dev.tseki.kikidame.ui.UiText
 import dev.tseki.kikidame.domain.SelectedLibrary
 import dev.tseki.kikidame.domain.ServerException
@@ -52,9 +53,12 @@ class LibraryRefresherTest {
         var calls = 0
         var programCalls = 0
         var lastExcluded: Set<EpisodeId> = emptySet()
-        override suspend fun refresh(excluded: Set<EpisodeId>): RefreshResult {
+        /** 全走査の途中で流す進み具合（#209）。[gate] の前に流す。 */
+        var progress: List<ScanProgress> = emptyList()
+        override suspend fun refresh(excluded: Set<EpisodeId>, onProgress: (ScanProgress) -> Unit): RefreshResult {
             calls++
             lastExcluded = excluded
+            progress.forEach(onProgress)
             gate?.await()
             error?.let { throw it }
             return result!!
@@ -620,6 +624,61 @@ class LibraryRefresherTest {
         assertFalse(refresher.isRefreshing.value)
         repo.gate = null
         assertEquals(3, refresher.refresh()?.programs, "a refresh right after the change is not dropped")
+    }
+
+    /** タグを読んでいる間は件数が流れ、終われば消える（#209 の決定 6）。silent な同期でも出す。 */
+    @Test
+    fun tagProgressFlowsWhileScanningAndClearsAfterwards() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply {
+            result = RefreshResult(3, 40, 0, 0, now)
+            progress = listOf(ScanProgress(0, 6090), ScanProgress(1234, 6090))
+            gate = CompletableDeferred()
+        }
+        val refresher = refresher(repo)
+
+        val run = async { refresher.refresh(silent = true) }
+        runCurrent()
+        assertEquals(ScanProgress(1234, 6090), refresher.tagProgress.value)
+
+        repo.gate!!.complete(Unit)
+        run.await()
+        assertNull(refresher.tagProgress.value)
+    }
+
+    /** 失敗や取り消しで終わっても、件数は残らない。 */
+    @Test
+    fun tagProgressClearsWhenTheScanFailsOrIsCancelled() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply {
+            result = RefreshResult(3, 40, 0, 0, now)
+            progress = listOf(ScanProgress(5, 10))
+            gate = CompletableDeferred()
+        }
+        val refresher = refresher(repo)
+
+        val first = async { refresher.refresh() }
+        runCurrent()
+        assertEquals(ScanProgress(5, 10), refresher.tagProgress.value)
+        refresher.cancelAndAwait()
+        assertTrue(first.isCancelled)
+        assertNull(refresher.tagProgress.value)
+
+        repo.gate = null
+        repo.error = ServerException.Unreachable(java.io.IOException("abort"))
+        assertNull(refresher.refresh())
+        assertNull(refresher.tagProgress.value)
+    }
+
+    /** タグを読む回が無い同期では、件数を出さない。 */
+    @Test
+    fun noTagProgressWithoutTagReads() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { result = RefreshResult(3, 40, 0, 0, now) }
+        val refresher = refresher(repo)
+
+        refresher.tagProgress.test {
+            assertNull(awaitItem())
+            refresher.refresh()
+            expectNoEvents()
+        }
     }
 
     /** Run を作った直後、取得元に問い合わせる前（手元の整合の最中）に来ても、取り消せる（job は Run を running に入れるのと同時に入る）。 */

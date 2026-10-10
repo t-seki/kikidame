@@ -20,17 +20,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import dev.tseki.kikidame.BuildConfig
 import dev.tseki.kikidame.R
 
 /**
- * SMB の選択肢を出すか。走査の作り直しが終わるまで（#198 の追加の決定）、debug 版だけで出し、release 版では Jellyfin だけを出す。
- * 出し分けを外すのは、大きな共有で初回の全走査が実機で通ると確かめたとき。
- */
-internal fun isSmbSelectable(debugBuild: Boolean): Boolean = debugBuild
-
-/**
- * 初回の取得元の選択画面（#198、epic #195 の決定 3）。「Jellyfin に接続」と「NAS の共有フォルダ（SMB）」。SMB は debug 版だけ（[isSmbSelectable]）。
+ * 初回の取得元の選択画面（#198、epic #195 の決定 3）。「Jellyfin に接続」と「NAS の共有フォルダ（SMB）」。
+ * SMB は、走査を作り直すまで debug 版だけで出していた（#198 の追加の決定）。#209 で作り直したので、release 版でも出す。
  * 端末のフォルダ（SAF）は #199 で足す。選ぶだけで何も保存せず、次の接続画面へ進む。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,7 +32,6 @@ internal fun isSmbSelectable(debugBuild: Boolean): Boolean = debugBuild
 fun SourcePickScreen(
     onPickJellyfin: () -> Unit,
     onPickSmb: () -> Unit,
-    showSmb: Boolean = isSmbSelectable(BuildConfig.DEBUG),
 ) {
     Scaffold(
         topBar = { TopAppBar(title = { Text(stringResource(R.string.source_pick_title)) }) },
@@ -58,13 +51,11 @@ fun SourcePickScreen(
                 description = stringResource(R.string.source_pick_jellyfin_description),
                 onClick = onPickJellyfin,
             )
-            if (showSmb) {
-                SourceCard(
-                    title = stringResource(R.string.source_pick_smb),
-                    description = stringResource(R.string.source_pick_smb_description),
-                    onClick = onPickSmb,
-                )
-            }
+            SourceCard(
+                title = stringResource(R.string.source_pick_smb),
+                description = stringResource(R.string.source_pick_smb_description),
+                onClick = onPickSmb,
+            )
         }
     }
 }
