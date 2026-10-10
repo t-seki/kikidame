@@ -13,6 +13,8 @@ import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceProgram
 import dev.tseki.kikidame.domain.SourceSnapshot
+import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -55,6 +57,7 @@ class SessionSourceGateway @Inject constructor(
             // inner は作り直す。body は新しい DownloadStream が閉じ、続けて木（接続）を閉じる
             return DownloadStream(inner.resumedFrom, inner.totalBytes, inner.body) { tree.close() }
         } catch (e: Throwable) {
+            logFailure(e)
             withContext(NonCancellable + io) { tree.close() }
             throw e
         }
@@ -65,9 +68,21 @@ class SessionSourceGateway @Inject constructor(
         val tree = trees.open(smb.connection)
         try {
             return block(SharedFolderSource(tree, tags, scanned, io))
+        } catch (e: Throwable) {
+            logFailure(e)
+            throw e
         } finally {
             withContext(NonCancellable + io) { tree.close() }
         }
+    }
+
+    /** 共有フォルダへの接続・読み取りの失敗を原因の連鎖付きで残す（画面に出る文言には原因が出ないため）。取り消しは失敗でない。 */
+    private fun logFailure(e: Throwable) {
+        if (e !is CancellationException) Log.w(TAG, "shared folder access failed", e)
+    }
+
+    private companion object {
+        const val TAG = "SessionSourceGateway"
     }
 
     private suspend fun smbOrNull(): ConnectedSource.Smb? =

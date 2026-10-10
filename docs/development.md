@@ -557,9 +557,9 @@ SMB の取得元（epic #195 の C、#198）は、worker の環境に NAS も実
 
 - 共有に `<配信元>/<番組>/<各回のファイル>` の 3 段で、m4a と mp3 を置く（タグの付いたものと、タグの無いものの両方）。`@eaDir` や `#recycle` のような名前が `.`・`@`・`#` で始まるフォルダも混ぜておく
 - debug 版は `dev.tseki.kikidame.debug`（「マージ前の検証」の手順 3）。`$ADB` と `$PKG` は「実機で試す（M1）」の接続の節のとおり
-- 失敗の原因は logcat に出る（接続・認証の例外は `SharedFolderSource` が `ServerException.Unreachable` に包むので、`Caused by` の連鎖を見る）:
+- 失敗の原因は logcat に出る。接続画面で失敗したときは `SmbConnect` タグ、同期・ダウンロードで共有フォルダに触って失敗したときは `SessionSourceGateway` タグに、原因の連鎖付きで出る（認証の失敗は `ServerException.Unauthorized`、届かないは `Unreachable`）。クラッシュは `AndroidRuntime`:
   ```bash
-  $ADB logcat -d | grep -E "LibraryRefresher|AndroidRuntime|NoClassDefFoundError|bouncycastle|smbj" | tail -50
+  $ADB logcat -d | grep -E "SmbConnect|SessionSourceGateway|AndroidRuntime" | tail -50
   ```
 
 ### 実機チェックリスト（#198）
@@ -580,12 +580,12 @@ SMB の取得元（epic #195 の C、#198）は、worker の環境に NAS も実
 - [ ] SMB の各回をダウンロードして再生できる（アプリの領域にコピーしてから再生）。ダウンロードの途中で機内モードにして戻すと、続きから再開する（`.part`）
 - [ ] 設定に取得元（共有フォルダ（SMB））・ホスト・共有名・フォルダ・ユーザーが出る。ログアウトすると SMB の接続画面から始まる。「取得元を変える」で手元のデータが全部消え、取得元の選択に戻る
 - [ ] 各回の詳細の「取得元 ID」が、共有フォルダの中の相対パスになっている
-- [ ] **更新の後も Jellyfin の接続が残る**: main の debug 版（または前のリリース）で Jellyfin にログインして同期してから、アンインストールせずに今回のビルドを入れる:
+- [ ] **更新の後も Jellyfin の接続が残る**: main の head から作った debug 版（`dev.tseki.kikidame.debug`。release 版は別のアプリなので、これで上書きの更新は確かめられない）で Jellyfin にログインして同期してから、アンインストールせずに今回のビルドを入れる:
   ```bash
   $ADB install -r app/build/outputs/apk/debug/app-debug.apk
   ```
   起動して、ログイン画面や取得元の選択を挟まずに番組一覧が出て、同期とダウンロードが通る（DataStore の Jellyfin のキーを変えていないことの実機での確認。単体テストでは `DataStoreSessionRepositoryTest` が、前のバージョンのキーだけの DataStore を読めることを見ている）
-- [ ] **release ビルド（R8）で SMB が動く**: `./gradlew :app:assembleRelease`（署名なし）は CI の `release-build` で通る。ただし R8 が smbj と BouncyCastle の何を消したかは実機で確かめていない。release 版（署名したもの）で、接続・全走査・ダウンロードが通る。通らなければ `NoClassDefFoundError`・`NoSuchAlgorithmException`（NTLM の MD4 や HMAC-MD5）が logcat に出る。**BouncyCastle まわり（Android 標準の BouncyCastle との衝突）で落ちたら、直し方を決めずに報告する**（Material Files は BouncyCastle を `bcprov-jdk15to18` に差し替えている。差し替えが要る理由は未確認）
+- [ ] **release ビルド（R8）で SMB が動く**: `./gradlew :app:assembleRelease`（署名なし）は CI の `release-build` で通る。ただし R8 が smbj と BouncyCastle の何を消したかは実機で確かめていない。release 版（署名したもの）で、接続・全走査・ダウンロードが通る（`core/data/consumer-rules.pro` は R8 の「Missing class」の警告を抑えるだけで、R8 が smbj の何を消したかは確かめていない。smbj は mbassador の `@Handler` 付きメソッドをリフレクションで呼ぶので、消されていると接続の後始末の通知が働かない可能性がある）。通らなければ `NoClassDefFoundError`・`NoSuchAlgorithmException`（NTLM の MD4 や HMAC-MD5）が logcat に出る。**BouncyCastle まわり（Android 標準の BouncyCastle との衝突）で落ちたら、直し方を決めずに報告する**（Material Files は BouncyCastle を `bcprov-jdk15to18` に差し替えている。差し替えが要る理由は未確認）
 
 ## 手元のファイルと DB の突き合わせ（#50）
 

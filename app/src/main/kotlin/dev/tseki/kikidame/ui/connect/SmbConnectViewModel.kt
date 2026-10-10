@@ -1,6 +1,7 @@
 package dev.tseki.kikidame.ui.connect
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -42,6 +43,10 @@ class SmbConnectViewModel @Inject constructor(
     private val sessionRepository: SessionRepository,
     private val refresher: LibraryRefresher,
 ) : ViewModel() {
+    private companion object {
+        const val TAG = "SmbConnect"
+    }
+
     private val _uiState = MutableStateFlow(SmbConnectUiState())
     val uiState: StateFlow<SmbConnectUiState> = _uiState
 
@@ -82,6 +87,7 @@ class SmbConnectViewModel @Inject constructor(
                 // 画面が消えても最後まで走らせる（結果の文言は一覧側に出る）
                 refresher.launchRefresh()
             } catch (e: ServerException) {
+                Log.w(TAG, "connect to the shared folder failed", e)
                 val hint = if (e is ServerException.Unreachable && LocalNetworkPermission.isRequiredAndMissing(context)) {
                     UiText.Res(R.string.connect_hint_local_network_permission)
                 } else {

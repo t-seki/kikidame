@@ -23,7 +23,7 @@ class SmbErrorsTest {
         assertTrue(SmbErrors.isNotFound(NtStatus.STATUS_OBJECT_NAME_NOT_FOUND))
         assertTrue(SmbErrors.isNotFound(NtStatus.STATUS_OBJECT_PATH_NOT_FOUND))
         assertTrue(SmbErrors.isNotFound(NtStatus.STATUS_NOT_A_DIRECTORY))
-        // 認証・権限・共有名の失敗は「無い」ではない。null で返すと全番組が消失と判断される（PR #202 の 1 周目 #3）
+        // 認証・権限・共有名の失敗は「無い」ではない。null で返すと全番組が消失と判断される（PR #202（#197）1 周目 #3）
         assertFalse(SmbErrors.isNotFound(NtStatus.STATUS_LOGON_FAILURE))
         assertFalse(SmbErrors.isNotFound(NtStatus.STATUS_ACCESS_DENIED))
         assertFalse(SmbErrors.isNotFound(NtStatus.STATUS_BAD_NETWORK_NAME))

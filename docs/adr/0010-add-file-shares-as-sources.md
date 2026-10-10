@@ -39,4 +39,4 @@ date: 2026-10-10
 
 - ADR 0001・0003・0004 は Jellyfin を前提に書いている（0001 のサーバ ID、0003 の `/Items/{id}/Download` と `Range`、0004 の全走査 `fetchLibrary`）。それぞれの末尾に、この ADR を指す注記を足した。本文は書き換えていない
 - 共有フォルダの走査・SMB・SAF は #197・#198・#199 で行う
-- SMB の取得元（#198）: 接続は取得元の種類ごとの型にした（`SessionState.Ready` が `ConnectedSource.Jellyfin` か `ConnectedSource.Smb` を持つ）。DataStore の Jellyfin のキーは変えず、SMB のキー（`smb_*`）を足したので、DataStore の移行は要らない（更新の後も Jellyfin の接続が残る）。取得元の種類による切り替えは `SessionSourceGateway`。SMB の接続は 1 回の操作ごとに張って閉じる。依存は smbj（Apache-2.0）と、推移的な asn-one（Apache-2.0）・mbassador（MIT）・bcprov-jdk18on（Bouncy Castle Licence）で、MPL-2.0 で公開する方針（ADR 0008）とは食い違わない（どれも寛容なライセンス。ライセンスは各 POM の記述による）
+- SMB の取得元（#198）: 接続は取得元の種類ごとの型にした（`SessionState.Ready` が `ConnectedSource.Jellyfin` か `ConnectedSource.Smb` を持つ）。DataStore の Jellyfin のキーは変えず、SMB のキー（`smb_*`）を足したので、DataStore の移行は要らない（更新の後も Jellyfin の接続が残ることは単体テストで見た。実機での確認は `docs/development.md` の「実機で試す（#198）」の項目）。取得元の種類による切り替えは `SessionSourceGateway`。SMB の接続は 1 回の操作ごとに張って閉じる。依存は smbj（Apache-2.0）と、推移的な asn-one（Apache-2.0）・mbassador（MIT）・bcprov-jdk18on（Bouncy Castle Licence）で、MPL-2.0 で公開する方針（ADR 0008）とは食い違わない（どれも寛容なライセンス。ライセンスは各 POM の記述による）

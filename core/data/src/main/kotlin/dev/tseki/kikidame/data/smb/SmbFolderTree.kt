@@ -37,7 +37,7 @@ fun interface FolderTreeFactory {
  * 接続は最初に木を使うときに張り、[close] で閉じる。読むだけで、書き込み・削除はしない。
  *
  * - 接続・認証・権限の失敗は必ず例外にする。[list] が null を返すのは、そのパスが無いときだけ（[SmbErrors]）。
- *   null で返すと、共有が外れたときに `fetchProgram` が全番組を消失と判断する（PR #202 の 1 周目 #3）
+ *   null で返すと、共有が外れたときに `fetchProgram` が全番組を消失と判断する（PR #202（#197）1 周目 #3）
  * - ゲスト接続は smbj の [AuthenticationContext.guest]。NAS ごとに通るかは実機で確かめる（未確認）
  * - 単体テストしない（ネットワークに出るため）。パスの組み立てと失敗の分類は [SmbPaths] と [SmbErrors] で試す
  *
