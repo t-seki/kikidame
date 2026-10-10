@@ -30,11 +30,11 @@ data class Session(
     val accessToken: String,
 )
 
-data class SelectedLibrary(val id: ServerItemId, val name: String)
+data class SelectedLibrary(val id: SourceItemId, val name: String)
 
 /** サーバ上のライブラリ（`/UserViews` の 1 件）。音楽ライブラリだけが選べる。 */
 data class LibraryView(
-    val id: ServerItemId,
+    val id: SourceItemId,
     val name: String,
     /** 表示用の種別名（"music" / "movies" など）。不明なら null。 */
     val collectionType: String?,
@@ -68,29 +68,29 @@ interface SessionRepository {
 }
 
 /**
- * サーバの一覧を取り込み、同期する。
+ * 取得元の一覧を取り込み、同期する。
  * 全走査は同期そのもの（ADR 0004）、番組単位の取得は取り込みだけで削除しない。
  */
 interface LibraryRefreshRepository {
     /**
      * ライブラリ全体を取得し、突合して Room に取り込み、[SyncPlanner] の結論を実行する
-     * （保持ルールによる削除、サーバから消えた各回の除去、ダウンロードの予約）。
+     * （保持ルールによる削除、取得元から消えた各回の除去、ダウンロードの予約）。
      * [excluded] の各回（再生中の回）は今回は削除しない。
      * 401 は [ServerException.Unauthorized] を投げる（呼び出し側がログアウトへ導く）。
-     * サーバに問い合わせる前に試みた時刻（[SessionState.Ready.lastAttemptedAt]）を記録する。失敗しても残る。
+     * 取得元に問い合わせる前に試みた時刻（[SessionState.Ready.lastAttemptedAt]）を記録する。失敗しても残る。
      */
     suspend fun refresh(excluded: Set<EpisodeId> = emptySet()): RefreshResult
 
     /**
      * 1 番組の各回だけを取得して取り込む（#12）。削除も予約もせず、最終同期の時刻も更新しない。
-     * 番組がサーバ ID を持たなければ null（呼び出し側は全体の [refresh] にフォールバックする）。
+     * 番組が取得元 ID を持たなければ null（呼び出し側は全体の [refresh] にフォールバックする）。
      */
     suspend fun refreshProgram(programId: ProgramId): RefreshResult?
 
     /**
      * 1 番組だけ同期する。番組の存在を確かめてから（無ければ消失 = 判断保留）その番組の各回一覧を取り、
      * 取り込み → [SyncPlanner] → 除去・削除・予約をこの番組に限って行う。その番組についての一覧は完全なので
-     * 削除の権限を持つ（ADR 0004）。最終同期の時刻は更新しない。サーバ ID を持たなければ null。
+     * 削除の権限を持つ（ADR 0004）。最終同期の時刻は更新しない。取得元 ID を持たなければ null。
      */
     suspend fun syncProgram(programId: ProgramId, excluded: Set<EpisodeId> = emptySet()): RefreshResult?
 }
@@ -105,7 +105,7 @@ data class RefreshResult(
     val enqueued: Int = 0,
     /** 保持ルールで消したファイルの数。 */
     val deleted: Int = 0,
-    /** サーバの一覧から消えたため除去した各回の数。 */
+    /** 取得元の一覧から消えたため除去した各回の数。 */
     val removed: Int = 0,
     /** 判断保留になった番組の数。 */
     val onHold: Int = 0,

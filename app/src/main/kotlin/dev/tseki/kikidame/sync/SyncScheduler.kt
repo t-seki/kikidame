@@ -80,7 +80,7 @@ class SyncScheduler @Inject constructor(
 
         /**
          * 起動時同期を積むか。前回同期（成功）と前回の試み（失敗を含む）の新しい方から [STALE_AFTER] たっていれば積む。
-         * どちらも無ければ積む。失敗した直後に前面に出ても、到達できないサーバに接続し直さない（#135）。
+         * どちらも無ければ積む。失敗した直後に前面に出ても、到達できない取得元に接続し直さない（#135）。
          */
         internal fun isStale(ready: SessionState.Ready, now: Instant): Boolean {
             val last = listOfNotNull(ready.lastFetchedAt, ready.lastAttemptedAt).maxOrNull() ?: return true

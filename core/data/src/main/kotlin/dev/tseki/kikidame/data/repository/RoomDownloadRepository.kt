@@ -24,7 +24,7 @@ import kotlin.time.Clock
 
 /**
  * ダウンロードの状態（`local_files`）と手元のファイルをまとめて扱う。
- * 削除の規則は [deletionScopeFor]: サーバ ID がある回はファイルと行だけ、無い回は各回ごと。
+ * 削除の規則は [deletionScopeFor]: 取得元 ID がある回はファイルと行だけ、無い回は各回ごと。
  */
 @Singleton
 class RoomDownloadRepository @Inject constructor(
@@ -54,11 +54,11 @@ class RoomDownloadRepository @Inject constructor(
         inserted
     }
 
-    /** トランザクション内で呼ぶ。サーバ ID の無い回は落とせないので何もしない（false）。 */
+    /** トランザクション内で呼ぶ。取得元 ID の無い回は落とせないので何もしない（false）。 */
     private suspend fun insertPending(episodeId: EpisodeId, pinned: Boolean): Boolean {
         val row = db.episodeDao().findById(episodeId.value) ?: return false
         val episode = row.episode
-        if (episode.serverItemId == null) return false
+        if (episode.sourceItemId == null) return false
         val program = db.programDao().findById(episode.programId) ?: return false
         val path = uniqueTarget(EpisodeFileName.relativePath(program.publisherName, program.name, episode.title, episode.container))
         db.localFileDao().upsert(
@@ -131,12 +131,12 @@ class RoomDownloadRepository @Inject constructor(
         for (p in paths) deleteFiles(p)
     }
 
-    /** トランザクション内で呼ぶ。`local_files` / `playback_states` は cascade。各回が 0 になったサーバ ID 無しの番組も消す。 */
+    /** トランザクション内で呼ぶ。`local_files` / `playback_states` は cascade。各回が 0 になった取得元 ID 無しの番組も消す。 */
     private suspend fun deleteEpisodeRow(episode: EpisodeEntity) {
         val programId = episode.programId
         db.episodeDao().deleteById(episode.id)
         val program = db.programDao().findById(programId)
-        if (program != null && program.serverItemId == null && db.episodeDao().countByProgram(programId) == 0) {
+        if (program != null && program.sourceItemId == null && db.episodeDao().countByProgram(programId) == 0) {
             db.programDao().deleteById(programId)
         }
     }

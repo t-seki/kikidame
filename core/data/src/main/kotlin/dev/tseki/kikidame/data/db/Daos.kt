@@ -19,12 +19,12 @@ data class ProgramSummaryRow(
 )
 data class LocalUsageRow(val totalBytes: Long, val episodeCount: Int)
 /** 突合に必要な列だけ。 */
-data class ProgramKeyRow(val id: Long, val serverItemId: String?, val publisherName: String?, val name: String)
-data class EpisodeKeyRow(val id: Long, val serverItemId: String?, val programId: Long, val title: String, val publishedAt: Instant, val runtimeTicks: Long)
+data class ProgramKeyRow(val id: Long, val sourceItemId: String?, val publisherName: String?, val name: String)
+data class EpisodeKeyRow(val id: Long, val sourceItemId: String?, val programId: Long, val title: String, val publishedAt: Instant, val runtimeTicks: Long)
 /** 同期の判断に必要な列だけ（`SyncPlanner` の入力）。`local_files` / `playback_states` が無ければ null。 */
 data class EpisodeSyncRow(
     val id: Long,
-    val serverItemId: String?,
+    val sourceItemId: String?,
     val programId: Long,
     val publishedAt: Instant,
     val title: String,
@@ -39,7 +39,7 @@ interface ProgramDao {
         SELECT p.*, COUNT(e.id) AS episodeCount,
                SUM(CASE WHEN lf.state = 'DONE' AND lf.path IS NOT NULL THEN 1 ELSE 0 END) AS localEpisodeCount,
                SUM(CASE WHEN lf.state = 'DONE' AND lf.path IS NOT NULL AND COALESCE(ps.played, 0) = 0 THEN 1 ELSE 0 END) AS unplayedLocalCount,
-               MAX(e.airedAt) AS latestPublishedAt
+               MAX(e.publishedAt) AS latestPublishedAt
         FROM programs p
           LEFT JOIN episodes e ON e.programId = p.id
           LEFT JOIN local_files lf ON lf.episodeId = e.id
@@ -52,15 +52,15 @@ interface ProgramDao {
     @Query("SELECT * FROM programs WHERE id = :id")
     fun observeById(id: Long): Flow<ProgramEntity?>
     /** (配信元, 番組名) で探す。一意ではない。本体の突合は [listKeys] を [dev.tseki.kikidame.domain.LibraryMatching] に渡す方式で、これは使わない（テストの下ごしらえ用）。 */
-    @Query("SELECT * FROM programs WHERE stationName IS :publisherName AND name = :name ORDER BY id LIMIT 1")
+    @Query("SELECT * FROM programs WHERE publisherName IS :publisherName AND name = :name ORDER BY id LIMIT 1")
     suspend fun findByPublisherAndName(publisherName: String?, name: String): ProgramEntity?
-    @Query("SELECT * FROM programs WHERE serverItemId = :serverItemId")
-    suspend fun findByServerItemId(serverItemId: String): ProgramEntity?
-    @Query("SELECT id, serverItemId, stationName AS publisherName, name FROM programs")
+    @Query("SELECT * FROM programs WHERE sourceItemId = :sourceItemId")
+    suspend fun findBySourceItemId(sourceItemId: String): ProgramEntity?
+    @Query("SELECT id, sourceItemId, publisherName, name FROM programs")
     suspend fun listKeys(): List<ProgramKeyRow>
-    @Query("UPDATE programs SET serverItemId = :serverItemId WHERE id = :id")
-    suspend fun setServerItemId(id: Long, serverItemId: String)
-    @Query("UPDATE programs SET name = :name, stationName = :publisherName WHERE id = :id")
+    @Query("UPDATE programs SET sourceItemId = :sourceItemId WHERE id = :id")
+    suspend fun setSourceItemId(id: Long, sourceItemId: String)
+    @Query("UPDATE programs SET name = :name, publisherName = :publisherName WHERE id = :id")
     suspend fun updateNames(id: Long, name: String, publisherName: String?)
     @Query("UPDATE programs SET syncEnabled = :syncEnabled, keepLatest = :keepLatest, deleteAfterPlayed = :deleteAfterPlayed WHERE id = :id")
     suspend fun updateSync(id: Long, syncEnabled: Boolean, keepLatest: Int?, deleteAfterPlayed: Boolean)
@@ -116,14 +116,14 @@ interface EpisodeDao {
     @Transaction
     @Query(RECENTLY_LISTENED)
     fun observeRecentlyListened(notStartedTicks: Long): Flow<List<EpisodeRow>>
-    @Query("SELECT * FROM episodes WHERE serverItemId = :serverItemId")
-    suspend fun findByServerItemId(serverItemId: String): EpisodeEntity?
-    @Query("SELECT id, serverItemId, programId, title, airedAt AS publishedAt, runtimeTicks FROM episodes")
+    @Query("SELECT * FROM episodes WHERE sourceItemId = :sourceItemId")
+    suspend fun findBySourceItemId(sourceItemId: String): EpisodeEntity?
+    @Query("SELECT id, sourceItemId, programId, title, publishedAt, runtimeTicks FROM episodes")
     suspend fun listKeys(): List<EpisodeKeyRow>
     /** 全各回を 1 クエリで（番組ごとに @Relation を引かない）。 */
     @Query(
         """
-        SELECT e.id, e.serverItemId, e.programId, e.airedAt AS publishedAt, e.title,
+        SELECT e.id, e.sourceItemId, e.programId, e.publishedAt, e.title,
                lf.pinned AS pinned, (lf.episodeId IS NOT NULL) AS hasLocalFile, ps.played AS played
         FROM episodes e
           LEFT JOIN local_files lf ON lf.episodeId = e.id
@@ -131,8 +131,8 @@ interface EpisodeDao {
         """,
     )
     suspend fun listSyncRows(): List<EpisodeSyncRow>
-    @Query("UPDATE episodes SET serverItemId = :serverItemId WHERE id = :id")
-    suspend fun setServerItemId(id: Long, serverItemId: String)
+    @Query("UPDATE episodes SET sourceItemId = :sourceItemId WHERE id = :id")
+    suspend fun setSourceItemId(id: Long, sourceItemId: String)
     @Insert
     suspend fun insert(episode: EpisodeEntity): Long
     @Update
@@ -172,7 +172,7 @@ interface LocalFileDao {
         """
         SELECT lf.* FROM local_files lf JOIN episodes e ON e.id = lf.episodeId
         WHERE lf.state = 'PENDING'
-        ORDER BY lf.pinned DESC, lf.enqueuedAt IS NULL, lf.enqueuedAt ASC, e.airedAt DESC, e.title ASC, e.id ASC LIMIT 1
+        ORDER BY lf.pinned DESC, lf.enqueuedAt IS NULL, lf.enqueuedAt ASC, e.publishedAt DESC, e.title ASC, e.id ASC LIMIT 1
         """,
     )
     suspend fun nextPending(): LocalFileEntity?

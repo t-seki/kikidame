@@ -13,11 +13,11 @@ class LibraryMatchingTest {
     private val now = Instant.parse("2026-09-17T00:00:00Z")
 
     private fun sp(id: String, name: String, publisher: String? = "TBSラジオ") =
-        ServerProgram(ServerItemId(id), name, publisher)
+        SourceProgram(SourceItemId(id), name, publisher)
 
-    private fun se(id: String, program: String, title: String, published: Instant = now, runtime: Duration = 30.minutes) = ServerEpisode(
-        serverId = ServerItemId(id),
-        programServerId = ServerItemId(program),
+    private fun se(id: String, program: String, title: String, published: Instant = now, runtime: Duration = 30.minutes) = SourceEpisode(
+        sourceId = SourceItemId(id),
+        programSourceId = SourceItemId(program),
         title = title,
         publishedAt = published,
         addedAt = now,
@@ -33,37 +33,37 @@ class LibraryMatchingTest {
         val match = LibraryMatching.match(
             localPrograms = listOf(lp(1, "dup", server = "P1"), lp(2, "dup")),
             localEpisodes = listOf(le(20, 2, "x"), le(10, 1, "x", server = "E1")),
-            server = ServerSnapshot(
+            source = SourceSnapshot(
                 programs = listOf(sp("P1", "dup"), sp("P2", "dup")),
                 episodes = listOf(se("E1", "P1", "x"), se("E2", "P2", "x")),
             ),
         )
-        assertEquals(mapOf(ProgramId(2) to ServerItemId("P2")), match.programLinks)
-        assertEquals(mapOf(EpisodeId(20) to ServerItemId("E2")), match.episodeLinks)
+        assertEquals(mapOf(ProgramId(2) to SourceItemId("P2")), match.programLinks)
+        assertEquals(mapOf(EpisodeId(20) to SourceItemId("E2")), match.episodeLinks)
         assertTrue(match.newPrograms.isEmpty() && match.newEpisodes.isEmpty())
     }
 
     private fun lp(id: Long, name: String, publisher: String? = "TBSラジオ", server: String? = null) =
-        LocalProgramKey(ProgramId(id), server?.let(::ServerItemId), publisher, name)
+        LocalProgramKey(ProgramId(id), server?.let(::SourceItemId), publisher, name)
 
     private fun le(id: Long, program: Long, title: String, server: String? = null, published: Instant = now, runtime: Duration = Duration.ZERO) =
-        LocalEpisodeKey(EpisodeId(id), server?.let(::ServerItemId), ProgramId(program), title, published, runtime)
+        LocalEpisodeKey(EpisodeId(id), server?.let(::SourceItemId), ProgramId(program), title, published, runtime)
 
     @Test
     fun `links seeded program and episodes by name`() {
         val match = LibraryMatching.match(
             localPrograms = listOf(lp(1, "ふらっと")),
             localEpisodes = listOf(le(10, 1, "ふらっと 2026-09-14-1"), le(11, 1, "ふらっと 2026-09-14-2")),
-            server = ServerSnapshot(
+            source = SourceSnapshot(
                 programs = listOf(sp("P", "ふらっと")),
                 episodes = listOf(se("E1", "P", "ふらっと 2026-09-14-1"), se("E3", "P", "ふらっと 2026-09-15-1")),
             ),
         )
 
-        assertEquals(mapOf(ProgramId(1) to ServerItemId("P")), match.programLinks)
+        assertEquals(mapOf(ProgramId(1) to SourceItemId("P")), match.programLinks)
         assertTrue(match.newPrograms.isEmpty())
-        assertEquals(mapOf(EpisodeId(10) to ServerItemId("E1")), match.episodeLinks)
-        assertEquals(listOf("E3"), match.newEpisodes.map { it.serverId.value })
+        assertEquals(mapOf(EpisodeId(10) to SourceItemId("E1")), match.episodeLinks)
+        assertEquals(listOf("E3"), match.newEpisodes.map { it.sourceId.value })
     }
 
     @Test
@@ -71,22 +71,22 @@ class LibraryMatchingTest {
         val match = LibraryMatching.match(
             localPrograms = listOf(lp(1, "ふらっと", publisher = "J-WAVE")),
             localEpisodes = emptyList(),
-            server = ServerSnapshot(listOf(sp("P", "ふらっと", publisher = "TBSラジオ")), emptyList()),
+            source = SourceSnapshot(listOf(sp("P", "ふらっと", publisher = "TBSラジオ")), emptyList()),
         )
         assertTrue(match.programLinks.isEmpty())
-        assertEquals(listOf("P"), match.newPrograms.map { it.serverId.value })
+        assertEquals(listOf("P"), match.newPrograms.map { it.sourceId.value })
     }
 
     @Test
-    fun `rows that already have a server id are left alone`() {
+    fun `rows that already have a source id are left alone`() {
         val match = LibraryMatching.match(
             localPrograms = listOf(lp(1, "ふらっと", server = "P")),
             localEpisodes = listOf(le(10, 1, "x", server = "E1"), le(11, 1, "y")),
-            server = ServerSnapshot(listOf(sp("P", "ふらっと")), listOf(se("E1", "P", "renamed"), se("E2", "P", "y"))),
+            source = SourceSnapshot(listOf(sp("P", "ふらっと")), listOf(se("E1", "P", "renamed"), se("E2", "P", "y"))),
         )
         assertTrue(match.programLinks.isEmpty())
         assertTrue(match.newPrograms.isEmpty())
-        assertEquals(mapOf(EpisodeId(11) to ServerItemId("E2")), match.episodeLinks, "episodes of a known program still match")
+        assertEquals(mapOf(EpisodeId(11) to SourceItemId("E2")), match.episodeLinks, "episodes of a known program still match")
         assertTrue(match.newEpisodes.isEmpty())
     }
 
@@ -95,15 +95,15 @@ class LibraryMatchingTest {
         val match = LibraryMatching.match(
             localPrograms = listOf(lp(1, "dup"), lp(2, "dup"), lp(3, "solo")),
             localEpisodes = listOf(le(30, 3, "same"), le(31, 3, "same")),
-            server = ServerSnapshot(
+            source = SourceSnapshot(
                 programs = listOf(sp("P1", "dup"), sp("S1", "solo"), sp("S2", "solo")),
                 episodes = listOf(se("E1", "S1", "same")),
             ),
         )
         assertTrue(match.programLinks.isEmpty(), "two local 'dup' and two server 'solo' are both ambiguous")
-        assertEquals(listOf("P1", "S1", "S2"), match.newPrograms.map { it.serverId.value })
+        assertEquals(listOf("P1", "S1", "S2"), match.newPrograms.map { it.sourceId.value })
         assertTrue(match.episodeLinks.isEmpty())
-        assertEquals(listOf("E1"), match.newEpisodes.map { it.serverId.value })
+        assertEquals(listOf("E1"), match.newEpisodes.map { it.sourceId.value })
     }
 
     @Test
@@ -111,11 +111,11 @@ class LibraryMatchingTest {
         val match = LibraryMatching.match(
             localPrograms = listOf(lp(1, "other")),
             localEpisodes = listOf(le(10, 1, "2026-09-14")),
-            server = ServerSnapshot(listOf(sp("P", "fresh")), listOf(se("E1", "P", "2026-09-14"))),
+            source = SourceSnapshot(listOf(sp("P", "fresh")), listOf(se("E1", "P", "2026-09-14"))),
         )
-        assertEquals(listOf("P"), match.newPrograms.map { it.serverId.value })
+        assertEquals(listOf("P"), match.newPrograms.map { it.sourceId.value })
         assertTrue(match.episodeLinks.isEmpty())
-        assertEquals(listOf("E1"), match.newEpisodes.map { it.serverId.value })
+        assertEquals(listOf("E1"), match.newEpisodes.map { it.sourceId.value })
     }
 
     @Test
@@ -123,23 +123,23 @@ class LibraryMatchingTest {
         val match = LibraryMatching.match(
             localPrograms = listOf(lp(1, "SONYSONPO QUEST")),
             localEpisodes = emptyList(),
-            server = ServerSnapshot(listOf(sp("P", "SONY SONPO QUEST")), emptyList()),
+            source = SourceSnapshot(listOf(sp("P", "SONY SONPO QUEST")), emptyList()),
         )
         assertTrue(match.programLinks.isEmpty())
     }
 
     // --- 未結合の結び直し（ADR 0005） ---
     @Test
-    fun `a program whose server id vanished is relinked by name and its episodes by title`() {
+    fun `a program whose source id vanished is relinked by name and its episodes by title`() {
         val match = LibraryMatching.match(
             localPrograms = listOf(lp(1, "ふらっと", server = "OLD-P")),
             localEpisodes = listOf(le(10, 1, "2026-09-14 (1)", server = "OLD-E1"), le(11, 1, "gone for real", server = "OLD-E2")),
-            server = ServerSnapshot(listOf(sp("NEW-P", "ふらっと")), listOf(se("NEW-E1", "NEW-P", "2026-09-14 (1)"), se("NEW-E3", "NEW-P", "2026-09-15 (1)"))),
+            source = SourceSnapshot(listOf(sp("NEW-P", "ふらっと")), listOf(se("NEW-E1", "NEW-P", "2026-09-14 (1)"), se("NEW-E3", "NEW-P", "2026-09-15 (1)"))),
         )
-        assertEquals(mapOf(ProgramId(1) to ServerItemId("NEW-P")), match.programLinks)
+        assertEquals(mapOf(ProgramId(1) to SourceItemId("NEW-P")), match.programLinks)
         assertTrue(match.newPrograms.isEmpty(), "no duplicate program row")
-        assertEquals(mapOf(EpisodeId(10) to ServerItemId("NEW-E1")), match.episodeLinks)
-        assertEquals(listOf("NEW-E3"), match.newEpisodes.map { it.serverId.value })
+        assertEquals(mapOf(EpisodeId(10) to SourceItemId("NEW-E1")), match.episodeLinks)
+        assertEquals(listOf("NEW-E3"), match.newEpisodes.map { it.sourceId.value })
         // OLD-E2 は結び直せないので、そのまま同期で「サーバから消えた」として扱われる
     }
     @Test
@@ -147,10 +147,10 @@ class LibraryMatchingTest {
         val match = LibraryMatching.match(
             localPrograms = listOf(lp(1, "ふらっと", server = "P")),
             localEpisodes = listOf(le(10, 1, "a", server = "OLD-A"), le(11, 1, "b", server = "OLD-B")),
-            server = ServerSnapshot(listOf(sp("P", "ふらっと")), listOf(se("NEW-A", "P", "a"), se("NEW-B", "P", "b"))),
+            source = SourceSnapshot(listOf(sp("P", "ふらっと")), listOf(se("NEW-A", "P", "a"), se("NEW-B", "P", "b"))),
         )
         assertTrue(match.programLinks.isEmpty())
-        assertEquals(mapOf(EpisodeId(10) to ServerItemId("NEW-A"), EpisodeId(11) to ServerItemId("NEW-B")), match.episodeLinks)
+        assertEquals(mapOf(EpisodeId(10) to SourceItemId("NEW-A"), EpisodeId(11) to SourceItemId("NEW-B")), match.episodeLinks)
         assertTrue(match.newEpisodes.isEmpty())
     }
     @Test
@@ -158,10 +158,10 @@ class LibraryMatchingTest {
         val match = LibraryMatching.match(
             localPrograms = listOf(lp(1, "dup", server = "OLD-1"), lp(2, "dup", server = "OLD-2")),
             localEpisodes = emptyList(),
-            server = ServerSnapshot(listOf(sp("NEW", "dup")), emptyList()),
+            source = SourceSnapshot(listOf(sp("NEW", "dup")), emptyList()),
         )
         assertTrue(match.programLinks.isEmpty())
-        assertEquals(listOf("NEW"), match.newPrograms.map { it.serverId.value })
+        assertEquals(listOf("NEW"), match.newPrograms.map { it.sourceId.value })
     }
     @Test
     fun `a stale id that is still on the server is not a candidate`() {
@@ -169,30 +169,30 @@ class LibraryMatchingTest {
         val match = LibraryMatching.match(
             localPrograms = listOf(lp(1, "dup", server = "P"), lp(2, "dup")),
             localEpisodes = emptyList(),
-            server = ServerSnapshot(listOf(sp("P", "dup"), sp("NEW", "dup")), emptyList()),
+            source = SourceSnapshot(listOf(sp("P", "dup"), sp("NEW", "dup")), emptyList()),
         )
-        assertEquals(mapOf(ProgramId(2) to ServerItemId("NEW")), match.programLinks)
+        assertEquals(mapOf(ProgramId(2) to SourceItemId("NEW")), match.programLinks)
     }
     @Test
     fun `a program-scoped snapshot relinks only that program's episodes`() {
         val match = LibraryMatching.match(
             localPrograms = listOf(lp(1, "ふらっと", server = "P"), lp(2, "other", server = "OLD-Q")),
             localEpisodes = listOf(le(10, 1, "a", server = "OLD-A"), le(20, 2, "a", server = "OLD-QA")),
-            server = ServerSnapshot(listOf(sp("P", "ふらっと")), listOf(se("NEW-A", "P", "a")), scope = SnapshotScope.Program(ServerItemId("P"))),
+            source = SourceSnapshot(listOf(sp("P", "ふらっと")), listOf(se("NEW-A", "P", "a")), scope = SnapshotScope.Program(SourceItemId("P"))),
         )
         assertTrue(match.programLinks.isEmpty(), "programs are not relinked without the program list")
         assertTrue(match.newPrograms.isEmpty(), "program 2 is not declared new either")
-        assertEquals(mapOf(EpisodeId(10) to ServerItemId("NEW-A")), match.episodeLinks)
+        assertEquals(mapOf(EpisodeId(10) to SourceItemId("NEW-A")), match.episodeLinks)
     }
     @Test
     fun `a program-scoped snapshot does not relink a stale program by name`() {
         val match = LibraryMatching.match(
             localPrograms = listOf(lp(1, "ふらっと", server = "OLD-P")),
             localEpisodes = emptyList(),
-            server = ServerSnapshot(listOf(sp("NEW-P", "ふらっと")), emptyList(), scope = SnapshotScope.Program(ServerItemId("NEW-P"))),
+            source = SourceSnapshot(listOf(sp("NEW-P", "ふらっと")), emptyList(), scope = SnapshotScope.Program(SourceItemId("NEW-P"))),
         )
         assertTrue(match.programLinks.isEmpty())
-        assertEquals(listOf("NEW-P"), match.newPrograms.map { it.serverId.value })
+        assertEquals(listOf("NEW-P"), match.newPrograms.map { it.sourceId.value })
     }
     // --- 第二段: 公開日 ＋ 尺（#9） ---
     @Test
@@ -204,7 +204,7 @@ class LibraryMatchingTest {
                 le(11, 1, "ふらっと 2026-09-16-2", published = day2, runtime = 60.minutes + 5.seconds),
                 le(12, 1, "ふらっと 2026-09-15-1", published = day1, runtime = 90.minutes),
             ),
-            server = ServerSnapshot(
+            source = SourceSnapshot(
                 listOf(sp("P", "ふらっと")),
                 listOf(
                     se("E1", "P", "2026-09-16 (1)", published = day2, runtime = 90.minutes),
@@ -214,7 +214,7 @@ class LibraryMatchingTest {
             ),
         )
         assertEquals(
-            mapOf(EpisodeId(10) to ServerItemId("E1"), EpisodeId(11) to ServerItemId("E2"), EpisodeId(12) to ServerItemId("E3")),
+            mapOf(EpisodeId(10) to SourceItemId("E1"), EpisodeId(11) to SourceItemId("E2"), EpisodeId(12) to SourceItemId("E3")),
             match.episodeLinks,
         )
         assertTrue(match.newEpisodes.isEmpty())
@@ -224,7 +224,7 @@ class LibraryMatchingTest {
         val match = LibraryMatching.match(
             localPrograms = listOf(lp(1, "ふらっと", server = "P")),
             localEpisodes = listOf(le(10, 1, "x-1", published = day2, runtime = 60.minutes), le(11, 1, "x-2", published = day2, runtime = 60.minutes + 2.seconds)),
-            server = ServerSnapshot(
+            source = SourceSnapshot(
                 listOf(sp("P", "ふらっと")),
                 listOf(se("E1", "P", "(1)", published = day2, runtime = 60.minutes), se("E2", "P", "(2)", published = day2, runtime = 60.minutes + 1.seconds)),
             ),
@@ -237,7 +237,7 @@ class LibraryMatchingTest {
         val match = LibraryMatching.match(
             localPrograms = listOf(lp(1, "ふらっと", server = "P")),
             localEpisodes = listOf(le(10, 1, "far", published = day1, runtime = 60.minutes), le(11, 1, "unknown", published = day2)),
-            server = ServerSnapshot(
+            source = SourceSnapshot(
                 listOf(sp("P", "ふらっと")),
                 listOf(se("E1", "P", "(1)", published = day1, runtime = 60.minutes + 6.seconds), se("E2", "P", "(2)", published = day2, runtime = 30.minutes)),
             ),
@@ -250,12 +250,12 @@ class LibraryMatchingTest {
         val match = LibraryMatching.match(
             localPrograms = listOf(lp(1, "ふらっと", server = "P")),
             localEpisodes = listOf(le(10, 1, "(1)", published = day2, runtime = 60.minutes)),
-            server = ServerSnapshot(
+            source = SourceSnapshot(
                 listOf(sp("P", "ふらっと")),
                 listOf(se("E1", "P", "(1)", published = day1, runtime = 60.minutes), se("E2", "P", "(2)", published = day2, runtime = 60.minutes)),
             ),
         )
-        assertEquals(mapOf(EpisodeId(10) to ServerItemId("E1")), match.episodeLinks)
-        assertEquals(listOf("E2"), match.newEpisodes.map { it.serverId.value })
+        assertEquals(mapOf(EpisodeId(10) to SourceItemId("E1")), match.episodeLinks)
+        assertEquals(listOf("E2"), match.newEpisodes.map { it.sourceId.value })
     }
 }

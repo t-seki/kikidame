@@ -3,16 +3,16 @@ package dev.tseki.kikidame.data.jellyfin
 import android.content.Context
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.tseki.kikidame.data.source.DownloadStream
 import dev.tseki.kikidame.domain.LibraryView
-import dev.tseki.kikidame.domain.ServerEpisode
+import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.ServerException
-import dev.tseki.kikidame.domain.ServerItemId
-import dev.tseki.kikidame.domain.ServerProgram
-import dev.tseki.kikidame.domain.ServerSnapshot
+import dev.tseki.kikidame.domain.SourceItemId
+import dev.tseki.kikidame.domain.SourceProgram
+import dev.tseki.kikidame.domain.SourceSnapshot
 import dev.tseki.kikidame.domain.Session
 import dev.tseki.kikidame.domain.PublishedAt
 import dev.tseki.kikidame.domain.Ticks
-import dev.tseki.kikidame.domain.serverPublishedAt
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.toLocalDateTime
 import org.jellyfin.sdk.Jellyfin
@@ -88,7 +88,7 @@ class SdkJellyfinGateway @Inject constructor(
         val views by api.userViewApi.getUserViews()
         views.items.map { view ->
             LibraryView(
-                id = ServerItemId(view.id.toString()),
+                id = SourceItemId(view.id.toString()),
                 name = view.name ?: view.id.toString(),
                 collectionType = view.collectionType?.serialName,
                 isMusic = view.collectionType == CollectionType.MUSIC,
@@ -96,7 +96,7 @@ class SdkJellyfinGateway @Inject constructor(
         }
     }
 
-    override suspend fun fetchLibrary(credentials: ServerCredentials, libraryId: ServerItemId): ServerSnapshot = call {
+    override suspend fun fetchLibrary(credentials: ServerCredentials, libraryId: SourceItemId): SourceSnapshot = call {
         val api = api(credentials.serverUrl, credentials.accessToken)
         val parent = UUID.fromString(libraryId.value)
 
@@ -107,15 +107,15 @@ class SdkJellyfinGateway @Inject constructor(
                 includeItemTypes = listOf(BaseItemKind.MUSIC_ALBUM),
             ),
         )
-        val programs = albums.items.map { it.toServerProgram() }
-        val programIds = programs.map { it.serverId }.toSet()
+        val programs = albums.items.map { it.toSourceProgram() }
+        val programIds = programs.map { it.sourceId }.toSet()
         // 取得した番組のどれにも属さない各回は取り込まない
-        ServerSnapshot(programs, fetchAudio(api, parent).filter { it.programServerId in programIds })
+        SourceSnapshot(programs, fetchAudio(api, parent).filter { it.programSourceId in programIds })
     }
 
-    override suspend fun fetchProgramEpisodes(credentials: ServerCredentials, programServerId: ServerItemId): List<ServerEpisode> = call {
+    override suspend fun fetchProgramEpisodes(credentials: ServerCredentials, programSourceId: SourceItemId): List<SourceEpisode> = call {
         val api = api(credentials.serverUrl, credentials.accessToken)
-        fetchAudio(api, UUID.fromString(programServerId.value)).filter { it.programServerId == programServerId }
+        fetchAudio(api, UUID.fromString(programSourceId.value)).filter { it.programSourceId == programSourceId }
     }
 
     /**
@@ -123,26 +123,26 @@ class SdkJellyfinGateway @Inject constructor(
      * 番組 ID が各回（Audio）を指していたとき 10.10 では `MediaStream.IsOriginal` 欠落でデコードに失敗する（#97）。
      * `getItems` は [fetchAudio] と同じ基本フィールドだけを返し、無い ID・番組でない ID は空の一覧になる。
      */
-    override suspend fun fetchProgram(credentials: ServerCredentials, programServerId: ServerItemId): ServerProgram? = call {
+    override suspend fun fetchProgram(credentials: ServerCredentials, programSourceId: SourceItemId): SourceProgram? = call {
         val api = api(credentials.serverUrl, credentials.accessToken)
         val result by api.libraryApi.getItems(
             GetItemsRequest(
-                ids = listOf(UUID.fromString(programServerId.value)),
+                ids = listOf(UUID.fromString(programSourceId.value)),
                 includeItemTypes = listOf(BaseItemKind.MUSIC_ALBUM),
             ),
         )
-        result.items.firstOrNull { it.type == BaseItemKind.MUSIC_ALBUM }?.toServerProgram()
+        result.items.firstOrNull { it.type == BaseItemKind.MUSIC_ALBUM }?.toSourceProgram()
     }
 
-    private fun BaseItemDto.toServerProgram() = ServerProgram(
-        serverId = ServerItemId(id.toString()),
+    private fun BaseItemDto.toSourceProgram() = SourceProgram(
+        sourceId = SourceItemId(id.toString()),
         name = name.orEmpty(),
         publisherName = albumArtist ?: albumArtists?.firstOrNull()?.name,
     )
 
     /** `parent` 配下の Audio を 500 件ずつ全部。ライブラリでも番組（MusicAlbum）でも同じ形。 */
-    private suspend fun fetchAudio(api: ApiClient, parent: UUID): List<ServerEpisode> {
-        val episodes = ArrayList<ServerEpisode>()
+    private suspend fun fetchAudio(api: ApiClient, parent: UUID): List<SourceEpisode> {
+        val episodes = ArrayList<SourceEpisode>()
         var start = 0
         while (true) {
             val page by api.libraryApi.getItems(
@@ -159,7 +159,7 @@ class SdkJellyfinGateway @Inject constructor(
                     limit = PAGE_SIZE,
                 ),
             )
-            for (item in page.items) episodes += item.toServerEpisode() ?: continue
+            for (item in page.items) episodes += item.toSourceEpisode() ?: continue
             start += page.items.size
             if (page.items.isEmpty() || start >= page.totalRecordCount) break
         }
@@ -172,11 +172,11 @@ class SdkJellyfinGateway @Inject constructor(
      */
     override suspend fun openDownload(
         credentials: ServerCredentials,
-        episodeServerId: ServerItemId,
+        episodeSourceId: SourceItemId,
         rangeStart: Long,
     ): DownloadStream = call {
         val api = api(credentials.serverUrl, credentials.accessToken)
-        val url = api.libraryApi.getDownloadUrl(UUID.fromString(episodeServerId.value))
+        val url = api.libraryApi.getDownloadUrl(UUID.fromString(episodeSourceId.value))
         val authorization = AuthorizationHeaderBuilder.buildHeader(
             clientName = api.clientInfo.name,
             clientVersion = api.clientInfo.version,
@@ -207,7 +207,7 @@ class SdkJellyfinGateway @Inject constructor(
             throw ServerException.Failed("empty body")
         }
         val contentRange = response.header("Content-Range")
-        Log.i(TAG, "download ${episodeServerId.value} from $rangeStart -> HTTP ${response.code} Content-Range=$contentRange")
+        Log.i(TAG, "download ${episodeSourceId.value} from $rangeStart -> HTTP ${response.code} Content-Range=$contentRange")
         val resumedFrom = if (response.code == 206) parseContentRangeStart(contentRange) ?: rangeStart else null
         val totalBytes = when {
             // 206 で Content-Range が無い／読めないときは、残りの長さから全体を求めて完全性チェックを生かす
@@ -226,14 +226,14 @@ class SdkJellyfinGateway @Inject constructor(
             .build()
     }
 
-    private fun BaseItemDto.toServerEpisode(): ServerEpisode? {
+    private fun BaseItemDto.toSourceEpisode(): SourceEpisode? {
         val albumId = albumId ?: return null
         val created = dateCreated ?: return null
-        return ServerEpisode(
-            serverId = ServerItemId(id.toString()),
-            programServerId = ServerItemId(albumId.toString()),
+        return SourceEpisode(
+            sourceId = SourceItemId(id.toString()),
+            programSourceId = SourceItemId(albumId.toString()),
             title = name.orEmpty(),
-            publishedAt = serverPublishedAt(premiereDate?.toKotlinLocalDate(), created.toKotlinLocalDate()),
+            publishedAt = jellyfinPublishedAt(premiereDate?.toKotlinLocalDate(), created.toKotlinLocalDate()),
             addedAt = created.toInstantUtc(),
             runtime = runTimeTicks?.let(Ticks::toDuration) ?: Duration.ZERO,
             // ファイルサイズは基本フィールドに無い（MediaSources を避けるため）。M3 のダウンロードで確定する

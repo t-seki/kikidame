@@ -4,7 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tseki.kikidame.data.session.SessionStore
 import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.ServerException
-import dev.tseki.kikidame.domain.ServerItemId
+import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SessionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,8 +34,8 @@ class DataStoreSessionRepositoryTest {
     private val dataStore by lazy { testDataStore(tmp.root, scope) }
     private val store by lazy { SessionStore(dataStore, FakeTokenCipher()) }
     private val repo by lazy { DataStoreSessionRepository(store, gateway) }
-    private val music = LibraryView(ServerItemId("lib-music"), "Radio", "music", isMusic = true)
-    private val movies = LibraryView(ServerItemId("lib-movies"), "Movies", "movies", isMusic = false)
+    private val music = LibraryView(SourceItemId("lib-music"), "Radio", "music", isMusic = true)
+    private val movies = LibraryView(SourceItemId("lib-movies"), "Movies", "movies", isMusic = false)
 
     @After
     fun tearDown() = scope.cancel()

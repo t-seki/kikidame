@@ -2,6 +2,7 @@ package dev.tseki.kikidame.data.repository
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.tseki.kikidame.data.jellyfin.JellyfinSource
 import dev.tseki.kikidame.data.db.LocalFileEntity
 import dev.tseki.kikidame.data.files.EpisodesDirectory
 import dev.tseki.kikidame.domain.DownloadState
@@ -10,10 +11,10 @@ import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.PlaybackRules
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.RetentionRule
-import dev.tseki.kikidame.domain.ServerEpisode
-import dev.tseki.kikidame.domain.ServerItemId
-import dev.tseki.kikidame.domain.ServerProgram
-import dev.tseki.kikidame.domain.ServerSnapshot
+import dev.tseki.kikidame.domain.SourceEpisode
+import dev.tseki.kikidame.domain.SourceItemId
+import dev.tseki.kikidame.domain.SourceProgram
+import dev.tseki.kikidame.domain.SourceSnapshot
 import dev.tseki.kikidame.domain.SessionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -50,11 +51,11 @@ class RoomSyncTest : RoomTestBase() {
     private val playback by lazy { RoomPlaybackStateRepository(db, clock) }
     private val directory by lazy { EpisodesDirectory(ApplicationProvider.getApplicationContext()) }
     private val downloads by lazy { RoomDownloadRepository(db, directory, clock) }
-    private val repo by lazy { RoomLibraryRefreshRepository(db, store, gateway, downloads, clock) }
+    private val repo by lazy { RoomLibraryRefreshRepository(db, store, JellyfinSource(gateway, store), downloads, clock) }
 
-    private fun se(id: String, published: String, program: String = "album-1") = ServerEpisode(
-        serverId = ServerItemId(id),
-        programServerId = ServerItemId(program),
+    private fun se(id: String, published: String, program: String = "album-1") = SourceEpisode(
+        sourceId = SourceItemId(id),
+        programSourceId = SourceItemId(program),
         title = published,
         publishedAt = Instant.parse("${published}T00:00:00Z"),
         addedAt = Instant.parse("2026-09-16T02:00:00Z"),
@@ -63,31 +64,31 @@ class RoomSyncTest : RoomTestBase() {
         container = "m4a",
     )
 
-    private val albumA = ServerProgram(ServerItemId("album-1"), "番組 A", "TBSラジオ")
-    private val albumB = ServerProgram(ServerItemId("album-2"), "番組 B", "TBSラジオ")
+    private val albumA = SourceProgram(SourceItemId("album-1"), "番組 A", "TBSラジオ")
+    private val albumB = SourceProgram(SourceItemId("album-2"), "番組 B", "TBSラジオ")
 
-    private val threeEpisodes = ServerSnapshot(
+    private val threeEpisodes = SourceSnapshot(
         programs = listOf(albumA),
         episodes = listOf(se("a1", "2026-09-01"), se("a2", "2026-09-02"), se("a3", "2026-09-03")),
     )
 
     private suspend fun signInAndSelect() {
         session.signIn("jellyfin.lab.example", "alice", "secret")
-        session.selectLibrary(LibraryView(ServerItemId("lib-1"), "Radio", "music", isMusic = true))
+        session.selectLibrary(LibraryView(SourceItemId("lib-1"), "Radio", "music", isMusic = true))
     }
 
     private suspend fun programId(): ProgramId = library.observePrograms().first().single().program.id
 
     private suspend fun episodes(): List<EpisodeWithState> = library.observeEpisodes(programId()).first()
 
-    private suspend fun episode(serverId: String): EpisodeWithState =
+    private suspend fun episode(sourceId: String): EpisodeWithState =
         library.observePrograms().first().flatMap { library.observeEpisodes(it.program.id).first() }
-            .first { it.episode.serverItemId?.value == serverId }
+            .first { it.episode.sourceItemId?.value == sourceId }
 
     /** ファイルを作って DONE にする（ダウンロード完了の代わり）。 */
-    private suspend fun markDone(serverId: String, pinned: Boolean): File {
-        val e = episode(serverId)
-        val file = File(directory.root, "$serverId-${e.episode.title}.m4a").apply { parentFile?.mkdirs(); writeBytes(ByteArray(8)) }
+    private suspend fun markDone(sourceId: String, pinned: Boolean): File {
+        val e = episode(sourceId)
+        val file = File(directory.root, "$sourceId-${e.episode.title}.m4a").apply { parentFile?.mkdirs(); writeBytes(ByteArray(8)) }
         db.localFileDao().upsert(
             LocalFileEntity(e.episode.id.value, DownloadState.DONE, file.absolutePath, pinned = pinned, downloadedAt = now),
         )
@@ -212,7 +213,7 @@ class RoomSyncTest : RoomTestBase() {
         library.updateSync(programId(), syncEnabled = true, RetentionRule(keepLatest = 1))
         val file = markDone("a1", pinned = false)
 
-        gateway.snapshot = ServerSnapshot(listOf(albumB), listOf(se("b1", "2026-09-05", program = "album-2")))
+        gateway.snapshot = SourceSnapshot(listOf(albumB), listOf(se("b1", "2026-09-05", program = "album-2")))
         val result = repo.refresh()
 
         assertEquals(1, result.onHold)
@@ -256,7 +257,7 @@ class RoomSyncTest : RoomTestBase() {
     @Test
     fun downloadsAreEnqueuedNewestFirstAcrossPrograms() = runTest {
         signInAndSelect()
-        gateway.snapshot = ServerSnapshot(
+        gateway.snapshot = SourceSnapshot(
             programs = listOf(albumA, albumB),
             episodes = listOf(se("a1", "2026-09-01"), se("b2", "2026-09-02", "album-2"), se("a3", "2026-09-03"), se("b4", "2026-09-04", "album-2")),
         )
@@ -315,7 +316,7 @@ class RoomSyncTest : RoomTestBase() {
 
         val result = assertNotNull(repo.refreshProgram(programId()))
 
-        assertEquals(listOf(ServerItemId("album-1")), gateway.fetchedPrograms)
+        assertEquals(listOf(SourceItemId("album-1")), gateway.fetchedPrograms)
         assertEquals(1, result.episodes)
         assertEquals(0, result.enqueued)
         assertEquals(0, result.deleted)
@@ -328,7 +329,7 @@ class RoomSyncTest : RoomTestBase() {
     @Test
     fun duplicateTitlesInOneBatchGetDistinctPaths() = runTest {
         signInAndSelect()
-        gateway.snapshot = ServerSnapshot(
+        gateway.snapshot = SourceSnapshot(
             programs = listOf(albumA),
             episodes = listOf(se("a1", "2026-09-01"), se("a2", "2026-09-02").copy(title = "2026-09-01"), se("a3", "2026-09-03").copy(title = "2026-09:01")),
         )
@@ -346,7 +347,7 @@ class RoomSyncTest : RoomTestBase() {
     @Test
     fun syncProgramAppliesTheRuleToThatProgramOnly() = runTest {
         signInAndSelect()
-        gateway.snapshot = ServerSnapshot(
+        gateway.snapshot = SourceSnapshot(
             programs = listOf(albumA, albumB),
             episodes = listOf(se("a1", "2026-09-01"), se("a2", "2026-09-02"), se("b1", "2026-09-01", "album-2"), se("b2", "2026-09-02", "album-2")),
         )
@@ -359,14 +360,14 @@ class RoomSyncTest : RoomTestBase() {
         val fetchedAt = assertIs<SessionState.Ready>(session.state.first()).lastFetchedAt
         now += 5.minutes
         // サーバ側で a1 が消え、a3 が増えた
-        gateway.snapshot = ServerSnapshot(
+        gateway.snapshot = SourceSnapshot(
             programs = listOf(albumA, albumB),
             episodes = listOf(se("a2", "2026-09-02"), se("a3", "2026-09-03"), se("b1", "2026-09-01", "album-2"), se("b2", "2026-09-02", "album-2")),
         )
 
         val result = assertNotNull(repo.syncProgram(a))
 
-        assertEquals(listOf(ServerItemId("album-1")), gateway.fetchedPrograms)
+        assertEquals(listOf(SourceItemId("album-1")), gateway.fetchedPrograms)
         assertEquals(1, result.removed, "a1 vanished from the server")
         assertEquals(1, result.enqueued, "a3 is the latest")
         assertEquals(0, result.onHold)
@@ -384,7 +385,7 @@ class RoomSyncTest : RoomTestBase() {
         repo.refresh()
         library.updateSync(programId(), true, RetentionRule(keepLatest = 1))
         val file = markDone("a1", pinned = false)
-        gateway.snapshot = ServerSnapshot(emptyList(), emptyList())
+        gateway.snapshot = SourceSnapshot(emptyList(), emptyList())
 
         val result = assertNotNull(repo.syncProgram(programId()))
 
@@ -402,7 +403,7 @@ class RoomSyncTest : RoomTestBase() {
         repo.refresh()
         val id = programId()
         assertNull(library.observeProgram(id).first()?.goneSince)
-        gateway.snapshot = ServerSnapshot(listOf(albumB), listOf(se("b1", "2026-09-05", program = "album-2")))
+        gateway.snapshot = SourceSnapshot(listOf(albumB), listOf(se("b1", "2026-09-05", program = "album-2")))
         repo.refresh()
         assertEquals(now, library.observeProgram(id).first()?.goneSince)
         now += 5.minutes
@@ -418,7 +419,7 @@ class RoomSyncTest : RoomTestBase() {
         gateway.snapshot = threeEpisodes
         repo.refresh()
         val id = programId()
-        gateway.snapshot = ServerSnapshot(emptyList(), emptyList())
+        gateway.snapshot = SourceSnapshot(emptyList(), emptyList())
         repo.syncProgram(id)
         assertEquals(now, library.observeProgram(id).first()?.goneSince)
         gateway.snapshot = threeEpisodes
@@ -433,7 +434,7 @@ class RoomSyncTest : RoomTestBase() {
         val id = programId()
         val file = markDone("a1", pinned = false)
 
-        gateway.snapshot = ServerSnapshot(emptyList(), emptyList())
+        gateway.snapshot = SourceSnapshot(emptyList(), emptyList())
         val onHold = assertNotNull(repo.refreshProgram(id))
         assertEquals(1, onHold.onHold)
         assertEquals(now, library.observeProgram(id).first()?.goneSince)
@@ -464,7 +465,7 @@ class RoomSyncTest : RoomTestBase() {
     @Test
     fun refreshProgramReturnsNullForAProgramWithoutServerId() = runTest {
         signInAndSelect()
-        val id = ProgramId(db.programDao().insert(dev.tseki.kikidame.data.db.ProgramEntity(serverItemId = null, name = "seed", publisherName = null)))
+        val id = ProgramId(db.programDao().insert(dev.tseki.kikidame.data.db.ProgramEntity(sourceItemId = null, name = "seed", publisherName = null)))
 
         assertNull(repo.refreshProgram(id))
         assertTrue(gateway.fetchedPrograms.isEmpty())

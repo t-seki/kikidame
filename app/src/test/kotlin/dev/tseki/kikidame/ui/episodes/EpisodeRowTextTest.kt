@@ -13,7 +13,7 @@ import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.EpisodeWithState
 import dev.tseki.kikidame.domain.LocalFile
 import dev.tseki.kikidame.domain.ProgramId
-import dev.tseki.kikidame.domain.ServerItemId
+import dev.tseki.kikidame.domain.SourceItemId
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.hours
@@ -81,7 +81,7 @@ class EpisodeRowTextTest {
     private fun item(title: String, publishedAt: Instant = published, state: DownloadState? = null, performers: List<String> = emptyList()): EpisodeWithState {
         val episode = Episode(
             id = EpisodeId(1),
-            serverItemId = ServerItemId("abc"),
+            sourceItemId = SourceItemId("abc"),
             programId = ProgramId(1),
             title = title,
             publishedAt = publishedAt,

@@ -7,3 +7,4 @@ date: 2026-09-19
 - ADR 0002 の「ローカルが正」「サーバの `UserData` は手元に行が無いときの初期値としてのみ読む」は残るが、送っていないので読める値も無く、取得側も実装しない
 - `PlaybackStateEntity.syncedAt` は使わないまま残す（スキーマは触らない）。`PlaybackRules` が null に戻す挙動もそのまま
 - 将来、別端末や Web で続きを聴きたくなったら、このときに ADR 0002 の送信を復活させる
+- 2026-10-10: `syncedAt` は ADR 0010（版 7）で削除した（`playback_states.syncedAt` と domain の `PlaybackState.syncedAt`、それを null に戻す処理）

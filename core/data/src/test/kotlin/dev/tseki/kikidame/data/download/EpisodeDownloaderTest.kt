@@ -2,6 +2,8 @@ package dev.tseki.kikidame.data.download
 
 import dev.tseki.kikidame.data.jellyfin.ServerCredentials
 import dev.tseki.kikidame.data.repository.FakeJellyfinGateway
+import dev.tseki.kikidame.data.source.DownloadStream
+import dev.tseki.kikidame.data.source.SourceGateway
 import dev.tseki.kikidame.domain.DownloadQueue
 import dev.tseki.kikidame.domain.DownloadState
 import dev.tseki.kikidame.domain.Episode
@@ -10,7 +12,7 @@ import dev.tseki.kikidame.domain.EpisodeWithState
 import dev.tseki.kikidame.domain.LocalFile
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.ServerException
-import dev.tseki.kikidame.domain.ServerItemId
+import dev.tseki.kikidame.domain.SourceItemId
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -47,15 +49,24 @@ class EpisodeDownloaderTest {
 
     private val gateway = FakeJellyfinGateway()
     private val queue = FakeQueue()
-    private val downloader = EpisodeDownloader(gateway, queue)
     private val credentials = ServerCredentials("https://x/", "t", "u")
-    private val serverId = ServerItemId("a1")
+
+    /** ダウンロードだけを [gateway] に渡す取得元。 */
+    private val source = object : SourceGateway {
+        override suspend fun fetchAll() = error("unused")
+        override suspend fun fetchProgramEpisodes(programId: SourceItemId) = error("unused")
+        override suspend fun fetchProgram(programId: SourceItemId) = error("unused")
+        override suspend fun openDownload(episodeId: SourceItemId, rangeStart: Long): DownloadStream =
+            gateway.openDownload(credentials, episodeId, rangeStart)
+    }
+    private val downloader = EpisodeDownloader(source, queue)
+    private val sourceId = SourceItemId("a1")
     private val payload = ByteArray(3 * 1024 * 1024 + 123) { (it % 251).toByte() }
 
     private fun item(): EpisodeWithState {
         val target = File(tmp.root, "TBSラジオ/番組/2026-09-16.m4a")
         return EpisodeWithState(
-            episode = Episode(EpisodeId(1), serverId, ProgramId(1), "2026-09-16", Instant.parse("2026-09-15T15:00:00Z"), null, 90.minutes, 0, "m4a"),
+            episode = Episode(EpisodeId(1), sourceId, ProgramId(1), "2026-09-16", Instant.parse("2026-09-15T15:00:00Z"), null, 90.minutes, 0, "m4a"),
             localFile = LocalFile(EpisodeId(1), DownloadState.PENDING, target.absolutePath, pinned = true),
             playback = null,
         )
@@ -63,10 +74,10 @@ class EpisodeDownloaderTest {
 
     @Test
     fun downloadsIntoPartThenRenames() = runTest {
-        gateway.files[serverId] = payload
+        gateway.files[sourceId] = payload
         val progress = ArrayList<Pair<Long, Long?>>()
 
-        val outcome = downloader.download(item(), credentials) { d, t -> progress += d to t }
+        val outcome = downloader.download(item()) { d, t -> progress += d to t }
 
         val done = assertIs<DownloadOutcome.Done>(outcome)
         assertEquals(payload.size.toLong(), done.sizeBytes)
@@ -80,11 +91,11 @@ class EpisodeDownloaderTest {
 
     @Test
     fun resumesFromExistingPartWhenServerHonoursRange() = runTest {
-        gateway.files[serverId] = payload
+        gateway.files[sourceId] = payload
         val it = item()
         val part = File(it.localFile!!.path!! + ".part").apply { parentFile!!.mkdirs(); writeBytes(payload.copyOf(1000)) }
 
-        val outcome = downloader.download(it, credentials)
+        val outcome = downloader.download(it)
 
         assertIs<DownloadOutcome.Done>(outcome)
         assertEquals(listOf(1000L), gateway.openedRanges)
@@ -94,12 +105,12 @@ class EpisodeDownloaderTest {
 
     @Test
     fun rewritesFromScratchWhenServerIgnoresRange() = runTest {
-        gateway.files[serverId] = payload
+        gateway.files[sourceId] = payload
         gateway.honorRange = false
         val it = item()
         File(it.localFile!!.path!! + ".part").apply { parentFile!!.mkdirs(); writeBytes(ByteArray(1000) { 9 }) }
 
-        val outcome = downloader.download(it, credentials)
+        val outcome = downloader.download(it)
 
         assertIs<DownloadOutcome.Done>(outcome)
         assertEquals(listOf(1000L), gateway.openedRanges, "we asked for a range")
@@ -108,10 +119,10 @@ class EpisodeDownloaderTest {
 
     @Test
     fun cancellationMidwayDeletesPartAndDoesNotMarkFailed() = runTest {
-        gateway.files[serverId] = payload
+        gateway.files[sourceId] = payload
         val it = item()
         var calls = 0
-        val outcome = downloader.download(it, credentials) { _, _ -> if (++calls == 1) queue.wanted = false }
+        val outcome = downloader.download(it) { _, _ -> if (++calls == 1) queue.wanted = false }
 
         assertIs<DownloadOutcome.Cancelled>(outcome)
         assertFalse(File(it.localFile!!.path!! + ".part").exists())
@@ -121,7 +132,7 @@ class EpisodeDownloaderTest {
 
     @Test
     fun missingFileOnServerIsFailed() = runTest {
-        val outcome = downloader.download(item(), credentials)
+        val outcome = downloader.download(item())
         assertIs<DownloadOutcome.Failed>(outcome)
         assertEquals(DownloadState.FAILED, queue.state)
         assertEquals(1, queue.failures)
@@ -130,7 +141,7 @@ class EpisodeDownloaderTest {
     @Test
     fun unauthorizedPropagatesAndRowGoesBackToPending() = runTest {
         gateway.failWith = ServerException.Unauthorized()
-        assertFailsWith<ServerException.Unauthorized> { downloader.download(item(), credentials) }
+        assertFailsWith<ServerException.Unauthorized> { downloader.download(item()) }
         assertEquals(DownloadState.PENDING, queue.state)
         assertEquals(0, queue.failures)
     }

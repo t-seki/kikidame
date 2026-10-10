@@ -101,7 +101,7 @@ class PositionPersister(
             repository.update(episodeId) { state ->
                 if (runtime == null) {
                     // 尺が分からなければ再生済み判定はできない。位置だけ進める
-                    state.copy(position = position, updatedAt = clock.now(), syncedAt = null)
+                    state.copy(position = position, updatedAt = clock.now())
                 } else {
                     PlaybackRules.advance(state, position, runtime, clock.now())
                 }

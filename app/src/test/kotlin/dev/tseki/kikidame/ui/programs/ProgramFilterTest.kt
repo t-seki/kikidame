@@ -102,7 +102,7 @@ class ProgramFilterTest {
         assertEquals(emptyList(), ProgramFilter.publishers(emptyList()))
     }
     private fun summary(id: Long, name: String, publisher: String?) = ProgramSummary(
-        program = Program(id = ProgramId(id), serverItemId = null, name = name, publisherName = publisher),
+        program = Program(id = ProgramId(id), sourceItemId = null, name = name, publisherName = publisher),
         episodeCount = 0,
         localEpisodeCount = 0,
         unplayedLocalCount = 0,

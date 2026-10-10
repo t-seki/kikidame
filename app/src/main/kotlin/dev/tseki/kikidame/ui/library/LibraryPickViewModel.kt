@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.ServerException
-import dev.tseki.kikidame.domain.ServerItemId
+import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.sync.LibraryRefresher
@@ -20,7 +20,7 @@ import javax.inject.Inject
 
 data class LibraryPickUiState(
     val libraries: List<LibraryView>? = null,
-    val selectedId: ServerItemId? = null,
+    val selectedId: SourceItemId? = null,
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
     val error: UiText? = null,

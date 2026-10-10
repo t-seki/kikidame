@@ -55,8 +55,8 @@ class ContinueListeningViewModelTest {
     private val playbackStates = InMemoryPlaybackStateRepository(clock)
     private val downloads = FakeDownloads()
     private val nowPlaying = NowPlaying()
-    private val harai = Program(id = ProgramId(1), serverItemId = null, name = "ハライチのターン！", publisherName = "TBSラジオ", syncEnabled = true)
-    private val ann = Program(id = ProgramId(2), serverItemId = null, name = "ANN", publisherName = "ニッポン放送")
+    private val harai = Program(id = ProgramId(1), sourceItemId = null, name = "ハライチのターン！", publisherName = "TBSラジオ", syncEnabled = true)
+    private val ann = Program(id = ProgramId(2), sourceItemId = null, name = "ANN", publisherName = "ニッポン放送")
 
     @Before
     fun setMain() = Dispatchers.setMain(dispatcher)
@@ -75,7 +75,7 @@ class ContinueListeningViewModelTest {
         runtime: Duration = 60.minutes,
     ) = EpisodeWithState(
         episode = Episode(
-            id = EpisodeId(id), serverItemId = null, programId = program.id, title = "回 $id",
+            id = EpisodeId(id), sourceItemId = null, programId = program.id, title = "回 $id",
             publishedAt = Instant.parse("2026-09-01T15:00:00Z"), addedAt = null, runtime = runtime, sizeBytes = 1, container = "m4a",
         ),
         localFile = LocalFile(EpisodeId(id), DownloadState.DONE, "/tmp/$id.m4a", pinned = false),

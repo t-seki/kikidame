@@ -462,7 +462,7 @@ $ADB logcat -d | grep -E "SyncWorker|LibraryRefresher"
 ```bash
 $ADB shell am force-stop $PKG
 $ADB shell "run-as $PKG sh -c 'cat databases/kikidame.db'" > dev.db   # -wal も取り、python の sqlite3 で checkpoint
-# programs の 1 行を UPDATE: serverItemId を偽の UUID に、name に「（旧）」を付ける（同名だと突合で結び直される）
+# programs の 1 行を UPDATE: sourceItemId を偽の UUID に、name に「（旧）」を付ける（同名だと突合で結び直される）
 $ADB push dev.db /data/local/tmp/ && $ADB shell "run-as $PKG sh -c 'rm -f databases/kikidame.db-wal databases/kikidame.db-shm; cat /data/local/tmp/dev.db > databases/kikidame.db'"
 ```
 

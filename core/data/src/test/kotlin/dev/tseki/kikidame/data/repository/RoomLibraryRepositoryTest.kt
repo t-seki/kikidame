@@ -137,7 +137,7 @@ class RoomLibraryRepositoryTest : RoomTestBase() {
         // 聴き始めていない（位置が閾値未満）回は出ない。X 2026-06-12 (1) は記録なし
         val notStarted = db.episodeDao().insert(
             EpisodeEntity(
-                serverItemId = null, programId = programId.value, title = "X 2026-06-26",
+                sourceItemId = null, programId = programId.value, title = "X 2026-06-26",
                 publishedAt = Instant.parse("2026-06-25T15:00:00Z"), addedAt = null,
                 runtimeTicks = Ticks.fromDuration(30.minutes), sizeBytes = 1024, container = "m4a",
             ),

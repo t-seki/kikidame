@@ -76,7 +76,7 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 | `AlbumArtist` | 配信元 (Publisher) — ラジオ録音なら配信元（Airshelf が albumartist に書く）、ポッドキャストなら配信者やネットワーク |
 | `PremiereDate` → `DateCreated` → ファイル更新日時 | 公開日 (Published At) — 並び順・「最新 N 回」の基準。この順でフォールバック |
 | `DateCreated` | 取り込み日時 (Added At) — 保存するが新しさの判定には使わない。公開日の代用として並び順に効くのは上の行の経路（差分取得は ADR 0004 で見送り） |
-| `Id` | サーバ ID — アプリ内の主キーではない（ADR 0001） |
+| `Id` | 取得元 ID（`sourceItemId`）— アプリ内の主キーではない（ADR 0001・0010） |
 
 主に使う取得パス（SDK 経由で呼ぶ）:
 
@@ -100,31 +100,36 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 
 ## Room スキーマ（この形で作る）
 
-主キーはすべてローカル代理キー。サーバ ID は nullable unique（ADR 0001）。
-サーバ ID を持たない行（未結合）は正規の状態（ADR 0001）。M1〜M3-b にあったシード（手元フォルダの走査）は M3-c で削除した（#21）。
+主キーはすべてローカル代理キー。取得元 ID は nullable unique（ADR 0001）。
+取得元 ID を持たない行（未結合）は正規の状態（ADR 0001）。M1〜M3-b にあったシード（手元フォルダの走査）は M3-c で削除した（#21）。
+
+版 7（#196、ADR 0010）で、列 `serverItemId` を `sourceItemId` に、`stationName` / `airedAt` を `publisherName` / `publishedAt` に改め、`playback_states.syncedAt` を削除した。
 
 ```kotlin
-@Entity(indices = [Index("serverItemId", unique = true), Index("stationName", "name")])
-data class ProgramEntity(          // 番組 = MusicAlbum。(配信元, 番組名) は突合のキーだが一意ではない（v2）
+@Entity(indices = [Index("sourceItemId", unique = true), Index("publisherName", "name")])
+data class ProgramEntity(          // 番組（Jellyfin では MusicAlbum）。(配信元, 番組名) は突合のキーだが一意ではない（v2）
   @PrimaryKey(autoGenerate = true) val id: Long = 0,
-  val serverItemId: String?,
+  val sourceItemId: String?,       // 取得元 ID（ADR 0001・0010）
   val name: String,
-  @ColumnInfo(name = "stationName") val publisherName: String?,  // 配信元（MusicAlbum.AlbumArtist）。カラム名は改名前のまま（#92）
+  val publisherName: String?,      // 配信元（Jellyfin では MusicAlbum.AlbumArtist）
   val syncEnabled: Boolean,        // 同期対象か（既定 false）
   val keepLatest: Int?,            // 最新 N 回まで保持（null = 上限なし）
-  val deleteAfterPlayed: Boolean
+  val deleteAfterPlayed: Boolean,
+  val goneSince: Instant?,         // 消失した日時（v4、#3）
+  val starred: Boolean             // よく聴く（v5、#16）
 )
 
-@Entity(indices = [Index("serverItemId", unique = true), Index("programId")])
-data class EpisodeEntity(          // 各回 = Audio
+@Entity(indices = [Index("sourceItemId", unique = true), Index("programId")])
+data class EpisodeEntity(          // 各回（Jellyfin では Audio）
   @PrimaryKey(autoGenerate = true) val id: Long = 0,
-  val serverItemId: String?,
+  val sourceItemId: String?,       // 取得元 ID
   val programId: Long,
   val title: String,
-  @ColumnInfo(name = "airedAt") val publishedAt: Instant,  // 公開日（PremiereDate、無ければ DateCreated）。カラム名は改名前のまま（#92）
-  val addedAt: Instant?,           // 取り込み日時（DateCreated）
+  val publishedAt: Instant,        // 公開日（Jellyfin では PremiereDate、無ければ DateCreated）
+  val addedAt: Instant?,           // 取り込み日時（Jellyfin では DateCreated）
   val runtimeTicks: Long, val sizeBytes: Long,
-  val container: String
+  val container: String,
+  val performers: List<String>     // 出演者（v6、#70）
 )
 
 @Entity
@@ -135,7 +140,8 @@ data class LocalFileEntity(        // ダウンロード状態の唯一の正（
   val pinned: Boolean,             // 固定。保持ルールの対象外（手動ダウンロード）
   val attemptCount: Int,           // FAILED の再試行判断用。WorkManager の backoff は request 単位で各回単位ではない
   val lastAttemptAt: Instant?,
-  val downloadedAt: Instant?
+  val downloadedAt: Instant?,
+  val enqueuedAt: Instant?         // キューに入れた時刻（v3）
 )
 
 @Entity
@@ -143,22 +149,21 @@ data class PlaybackStateEntity(    // ローカル正（ADR 0002）
   @PrimaryKey val episodeId: Long,
   val positionTicks: Long,         // 1 tick = 100ns
   val played: Boolean,
-  val updatedAt: Instant,
-  val syncedAt: Instant?           // null = 未送信 (dirty)
+  val updatedAt: Instant
 )
 ```
 
 - `wifiOnly` は `Program` から外し、アプリ全体の設定（DataStore）にする
 - `PlaybackStateEntity` は `LocalFileEntity` が削除されても残す。`EpisodeEntity` と同じライフサイクル
-  （サーバに各回が存在する限り）で生存させる
-- ticks は Entity とサーバ境界にだけ現れる。ドメイン型は `Duration`
+  （取得元に各回が存在する限り）で生存させる
+- ticks は Entity と取得元の境界にだけ現れる。ドメイン型は `Duration`
 
 ### 再生位置と再生済み（重要、ADR 0002）
 
 - `PlaybackState` を**ローカル正**とする。ローカルに行があればローカルが常に勝つ。
   サーバの `UserData` は再インストール・初回取得で行が無いときの初期値としてのみ読む
 - ~~`syncedAt` が null のレコードだけを、オンライン復帰時に `POST /UserItems/{itemId}/UserData` へ送る~~ —
-  **送らない**（ADR 0007、2026-09-19）。`syncedAt` は使わないまま残す
+  **送らない**（ADR 0007、2026-09-19）。`syncedAt` は使わないまま残し、版 7 で削除した（ADR 0010）
 - **再生済み**の判定（`:core:domain` の純粋関数）:
   - 再生位置が **末尾から残り 2 分以内**に達したら自動で `played = true`。ただし位置 0 では判定しない
     （尺が 2 分以下の回は「再生が少しでも進んだら再生済み」。閾値を尺でスケールさせない）
@@ -177,8 +182,8 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 
 ```
 入力:  番組ごとの { 保持ルール, 同期対象か,
-                    サーバ上の各回一覧: Known(list) | Unavailable | Gone,
-                    手元の各回集合（サーバ ID・固定フラグ・再生済み含む） }
+                    取得元の各回一覧: Known(list) | Unavailable | Gone,
+                    手元の各回集合（取得元 ID・固定フラグ・再生済み含む） }
 出力:  番組ごとの { ダウンロード対象, 削除対象 }
 ```
 
@@ -186,18 +191,18 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 
 - `Unavailable`（その番組の一覧が取得できなかった）→ その番組は**判断保留**。ダウンロードも削除も出さない。
   「一覧が空」とは型で区別する
-- `Gone`（サーバの番組一覧に、その番組のサーバ ID が無い）→ 同じく**判断保留**。「番組が無い」は
+- `Gone`（取得元の番組一覧に、その番組の取得元 ID が無い）→ 同じく**判断保留**。「番組が無い」は
   再取り込み・整理であって「各回を消した」ではない（ADR 0001 の守りたいシナリオ）。UI では
-  「サーバ上で見つかりません」と表示し、新しいサーバ ID への突合は ADR 0001 の未決事項（M3）に委ねる
+  「サーバ上で見つかりません」と表示し、新しい取得元 ID への突合は ADR 0001 の未決事項（M3）に委ねる（ADR 0005 で決定）
 - 同期対象でない番組 → 保持ルールを適用しない。固定された各回だけが手元に残る
 - **保持ルールは独立した削除理由**。「最新 N 回まで保持」と「再生済みなら削除」のどちらかに該当すれば
   手元に置かない（保持は AND）。「最新 N 回」は再生済み・未再生を問わず公開日の新しい順、
   同着（公開日は日単位なので同日パートで起きる）は各回のタイトルの辞書順 → ローカル ID で安定ソート。
   この順序は各回一覧・連続再生と共通
-- **固定**された各回は保持ルールの対象外。利用者が固定を外すか手動削除するまで残る（例外はサーバの一覧から消えた回。次項）
-- サーバの一覧（`Known`）から消えた各回は手元からも削除する。サーバが各回の存在の正、手元はキャッシュ。
-  ただしこの規則が届くのは **`Known` の番組に属し、かつ `serverItemId != null` の各回だけ**。
-  サーバ ID を持たない各回は「サーバに在る」と主張したことがないので対象外
+- **固定**された各回は保持ルールの対象外。利用者が固定を外すか手動削除するまで残る（例外は取得元の一覧から消えた回。次項）
+- 取得元の一覧（`Known`）から消えた各回は手元からも削除する。取得元が各回の存在の正、手元はキャッシュ。
+  ただしこの規則が届くのは **`Known` の番組に属し、かつ `sourceItemId != null` の各回だけ**。
+  取得元 ID を持たない各回は「取得元に在る」と主張したことがないので対象外
 - 保持すべき集合 − 手元の集合 → ダウンロード対象（再生済みの回は保持すべき集合に入らないので落ちない）
 
 運用パラメータ:
@@ -285,16 +290,18 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
   パスワードは保存しない。`SessionStore`（`:core:data`）が持つ
 - **取得の起点**（M2 時点）: ログイン直後と、番組一覧・各回一覧の「引っ張って更新」だけ。M3-b で番組一覧の更新は同期、各回一覧の更新は番組単位取得になり、定期・起動時の同期が加わった（「M3-b の範囲」）。
   失敗はスナックバーで、一覧は Room のまま
-- **突合（CONTEXT.md「突合」）**: `serverItemId = NULL` の行にだけ行う。番組は (配信元, 番組名) = (`AlbumArtist`, `Name`)、
+- **突合（CONTEXT.md「突合」）**: `sourceItemId = NULL` の行にだけ行う（M3-c で未結合に広げた）。番組は (配信元, 番組名) = (`AlbumArtist`, `Name`)、
   各回は同じ番組内の `Name` 完全一致。候補が複数なら結ばない（新規行）。表記ゆれは吸収しない（Airshelf の alias の責務）
-- **取り込み**: サーバ由来の各回はサーバの値で上書き（タイトル・公開日・取り込み日時・尺・サイズ・コンテナ）。
-  `LocalFile` と `PlaybackState` は触らない。サーバの一覧に無い番組・各回は M2 では何もしない（削除・判断保留は M3）
+- **取り込み**: 取得元由来の各回は取得元の値で上書き（タイトル・公開日・取り込み日時・尺・サイズ・コンテナ）。
+  `LocalFile` と `PlaybackState` は触らない。取得元の一覧に無い番組・各回は M2 では何もしない（削除・判断保留は M3）
 - **手元に無い各回**: 一覧に同じ並びで出すが薄く表示し、タップしても再生画面へ行かない。右端は雲アイコン（M3 でダウンロードボタンになる）。
   番組一覧は「手元 M / 全 N 回」（#41 で「配信元 · 未再生 N / 手元 L · 全 E 回 · 最新 MM-DD」に）。連続再生のキューは手元にある回だけ（手元に無い回は飛ばす）
 - **ライブラリ切替**: 同じサーバなので手元の行は触らない。旧ライブラリの番組は M3 の判断保留と同じ扱いになる
-- **コードの置き場**: `:core:domain` にサーバのスナップショット型（`ServerProgram` / `ServerEpisode`）と突合の純粋関数
+- **コードの置き場**: `:core:domain` に取得元のスナップショット型（`SourceProgram` / `SourceEpisode` / `SourceSnapshot`）と突合の純粋関数
   `LibraryMatching.match`（JUnit 5）。`:core:data` に `JellyfinGateway` インターフェース（`signIn` / `listLibraries` / `fetchLibrary`）と
   jellyfin-sdk-kotlin 実装、`SessionStore`。Repository が突合結果を 1 トランザクションで Room に適用。テストはフェイクのゲートウェイ。
+  #196（ADR 0010）から、同期とダウンロードは取得元の境界 `SourceGateway`（`fetchAll` / `fetchProgram` / `fetchProgramEpisodes` / `openDownload`、`:core:data` の `data.source`）だけを通す。
+  Jellyfin の実装は `JellyfinSource` で、`SessionStore` から認証の情報を読んで `JellyfinGateway` を呼ぶ
   モジュールは 3 つのまま
 
 ### M3 の分割（2026-09-17 の grilling で確定）
@@ -305,7 +312,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 
 ### M3-a の範囲
 
-- **転送**: `JellyfinGateway.openDownload(episodeServerId, rangeStart)`。SDK にはストリーミング取得の API が無い
+- **転送**: `SourceGateway.openDownload(episodeId, rangeStart)`（Jellyfin の実装は `JellyfinGateway.openDownload(credentials, episodeSourceId, rangeStart)`）。SDK にはストリーミング取得の API が無い
   （`getDownload` / `request` は本文を `byte[]` に全部読む）ので、**URL は SDK の `getDownloadUrl`、`Authorization` ヘッダは SDK の
   `AuthorizationHeaderBuilder` に作らせ、転送だけ OkHttp（SDK の依存に同梱）で行う**。エンドポイントと認証形式は手書きしない。
   戻り値は `resumedFrom`（206 で `Range` が効いたか）・`totalBytes`・本文ストリーム。サーバが `Range` を無視して 200 を返したら
@@ -322,10 +329,10 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   長押しでボトムシート（固定を外す／ファイルを削除／再生済み切替／ダウンロード。#43 で「詳細」が加わった）。固定中はタイトルの前にピン。
   同期対象でない番組では「固定を外す」を出さない（外すと次の同期で消えるため）
 - **削除の規則**（手動削除・保持ルール・消えたファイルの整合で共通）:
-  - `serverItemId` がある回: ファイルと `LocalFile` 行だけ消す。`Episode` / `PlaybackState` は残る（ADR 0002。落とし直せば続きから）。
-    ただし**サーバの一覧から消えた回**は落とし直せないので `Episode` ごと消す（M3-b の `remove`。固定でも。M3-c 以降は突合で結び直せなかった回に限る）
-  - `serverItemId` が無い回（サーバを経由していない回。シード削除後は通常存在しない）: 二度と手に入らないので `Episode` ごと消す（`PlaybackState` は cascade）。
-    各回が 0 になった `serverItemId` 無しの番組も消す
+  - `sourceItemId` がある回: ファイルと `LocalFile` 行だけ消す。`Episode` / `PlaybackState` は残る（ADR 0002。落とし直せば続きから）。
+    ただし**取得元の一覧から消えた回**は落とし直せないので `Episode` ごと消す（M3-b の `remove`。固定でも。M3-c 以降は突合で結び直せなかった回に限る）
+  - `sourceItemId` が無い回（取得元を経由していない回。シード削除後は通常存在しない）: 二度と手に入らないので `Episode` ごと消す（`PlaybackState` は cascade）。
+    各回が 0 になった `sourceItemId` 無しの番組も消す
 - **消えたファイルの整合（#5）**: 同期・更新の開始時に `DONE` 行を全走査し、再生開始時にも存在を確認する。無ければ上記の削除規則を
   自動で適用し、スナックバー「ファイルが見つかりません」
 - **完了時**: `LocalFile(DONE, path, pinned = true, downloadedAt)`、`Episode.sizeBytes` を実バイト数で更新（M2 で保留した値をここで確定）。
@@ -335,7 +342,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 
 ### M3-b の範囲（2026-09-17 の grilling で確定）
 
-- **同期の 1 回** = 全走査（`fetchLibrary`）→ 取り込み（M2 の突合・上書き）→ `planSync` → 削除の実行 → ダウンロード対象を
+- **同期の 1 回** = 全走査（`SourceGateway.fetchAll`。Jellyfin では `fetchLibrary`）→ 取り込み（M2 の突合・上書き）→ `planSync` → 削除の実行 → ダウンロード対象を
   `PENDING`（`pinned = false`）で enqueue → `DownloadScheduler.kick()`。転送は `DownloadWorker` に任せ、同期は自分でファイルを落とさない。
   **削除の権限を持つ入力は全走査だけ**（ADR 0004）。差分取得は作らない
 - **入口は `LibraryRefresher` に一本化**（mutex 共有）。定期 `SyncWorker`・起動時・番組一覧の手動プル・ボトムシートの「この番組を今すぐ同期」が
@@ -347,28 +354,28 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 - **「Wi-Fi のみ」は同期にも効く**（手動を含む）。`SyncWorker` の制約は `DownloadWorker` と同じ（UNMETERED / CONNECTED、充電中は課さない）。
   手動は `LibraryRefresher` で `ConnectivityManager.isActiveNetworkMetered` を見て、従量制ならスナックバー
   「Wi-Fi に接続していないため更新しません」で終える（裏で待たせない）。判定は全走査・番組単位・起動時・定期のすべてが通るが、
-  **ゲートはサーバへの取得だけを包む**: 先頭の `reconcileMissingFiles()`（#5、ローカル I/O のみ）は従量制でも走らせる
+  **ゲートは取得元への取得だけを包む**: 先頭の `reconcileMissingFiles()`（#5、ローカル I/O のみ）は従量制でも走らせる
 - **起点**: 定期は `PeriodicWorkRequest` 6 時間（`UPDATE` で起動時に登録し直す）。起動時は `ProcessLifecycleOwner` の `ON_START` で
-  前回同期から 1 時間以上（#135 で `lastFetchedAt` と `lastAttemptedAt` の新しい方から 1 時間に。`lastAttemptedAt` は全走査がサーバに問い合わせる直前に成功・失敗を問わず記録）なら `OneTimeWorkRequest`（ユニーク `sync-once`、`KEEP`）。定期・起動時の失敗は `Result.success()` で終え次回を待つ
+  前回同期から 1 時間以上（#135 で `lastFetchedAt` と `lastAttemptedAt` の新しい方から 1 時間に。`lastAttemptedAt` は全走査が取得元に問い合わせる直前に成功・失敗を問わず記録）なら `OneTimeWorkRequest`（ユニーク `sync-once`、`KEEP`）。定期・起動時の失敗は `Result.success()` で終え次回を待つ
   （スナックバー無し、Log のみ）。成功したときは、手元に変化があったときだけ手動と同じ文言をスナックバーに出し、変化が無ければ出さない（#142）。走っている間は番組の画面（#151 からはタブの下）・各回一覧のトップバーの下に細いバーと「バックグラウンドで同期中…」を出し、
   手動の操作が合流したらクルクルに切り替える（#134・#138。`LibraryRefresher.isSyncingInBackground`）。401 は `DownloadWorker` と同じくログアウト
-- **`planSync`**（`:core:domain`、純粋、JUnit 5）: 入力は番組ごとの `{ syncEnabled, retentionRule, server: Known(list) | Unavailable | Gone,
-  local: List<LocalEpisodeState(episodeId, serverItemId?, airedAt, title, pinned, played, hasLocalFile)> }`。`hasLocalFile` は
+- **`planSync`**（`:core:domain`、純粋、JUnit 5）: 入力は番組ごとの `{ syncEnabled, retentionRule, source: Known(list) | Unavailable | Gone,
+  local: List<LocalEpisodeState(episodeId, sourceItemId?, publishedAt, title, pinned, played, hasLocalFile)> }`。`hasLocalFile` は
   PENDING / RUNNING / DONE / FAILED のいずれかの行があること（**FAILED も「手元にある」**。再試行は M3-a の規則のまま Worker 起動時に
   `attemptCount < 3` を PENDING に戻す。3 回超は手動のみ）。出力は `{ download: List<EpisodeId>, delete: List<EpisodeId>, remove: List<EpisodeId>, onHold: Boolean }`
-  - **`syncEnabled = false` でも関数は動く**: `download` は空、`delete` は非固定の手元ファイル全部、`remove` はサーバから消えた
-    `serverItemId != null` の回（固定含む）。`syncEnabled` が効くのは保持ルールの適用（何を `download` し、固定でない何を `delete` するか）だけ。
+  - **`syncEnabled = false` でも関数は動く**: `download` は空、`delete` は非固定の手元ファイル全部、`remove` は取得元から消えた
+    `sourceItemId != null` の回（固定含む）。`syncEnabled` が効くのは保持ルールの適用（何を `download` し、固定でない何を `delete` するか）だけ。
     `Unavailable` / `Gone` は `syncEnabled` に関わらず全部空 + `onHold`
   - **固定は N に数えない**（別枠）。`keepLatest` は固定を除いた公開日の新しい順で数える（同着は `EpisodeOrder`）
-  - **サーバの一覧から消えた `serverItemId != null` の各回は固定でも `Episode` 行ごと消す**（`remove`。`LocalFile` / `PlaybackState` は cascade、
-    ファイルも消す）。保持ルールによる削除（`delete`）は M3-a の削除の規則に従う: `serverItemId` がある回は `FILE_ONLY`（`PlaybackState` は残す、ADR 0002）、
-    無い回（サーバを経由していない回）は落とし直せないので `Episode` ごと。`Known` の番組で各回が 0 になっても番組は残す
+  - **取得元の一覧から消えた `sourceItemId != null` の各回は固定でも `Episode` 行ごと消す**（`remove`。`LocalFile` / `PlaybackState` は cascade、
+    ファイルも消す）。保持ルールによる削除（`delete`）は M3-a の削除の規則に従う: `sourceItemId` がある回は `FILE_ONLY`（`PlaybackState` は残す、ADR 0002）、
+    無い回（取得元を経由していない回）は落とし直せないので `Episode` ごと。`Known` の番組で各回が 0 になっても番組は残す
   - `Unavailable` / `Gone` は `onHold`。M3-b では保存も表示もしない（M3-c、#3 で `goneSince` として保存）。全走査なので番組ごとの `Unavailable` になる経路は無い
 - **実行側の例外**（`planSync` の外）: 削除対象が PENDING / RUNNING / FAILED なら `cancel` 相当。**聴いている回（現在の `MediaItem`）は今回は削除しない**
   （次回に持ち越し。ただし最後まで聴き終えて止まっている回は除外しない — #27。消された後に ▶ を押すと再生に失敗し、キューを空にして理由をスナックバーに出す）。聴いている回は `PlaybackService` が `Player.Listener` で `@Singleton` の `NowPlaying`（`StateFlow<NowPlayingState?>`、`:app`）に
   書き、同期の実行側はそれを読む（Worker と Service は同一プロセス。MediaController を Worker から結ばない）。
   実行順は削除 → enqueue。同期分の enqueue 順は **番組をまたいで公開日の新しい順**
-- **キューの優先順位**（M3-a から持ち越し）: `nextPending()` を `pinned DESC, enqueuedAt IS NULL, enqueuedAt ASC, airedAt DESC` に変える（手動が常に先。
+- **キューの優先順位**（M3-a から持ち越し）: `nextPending()` を `pinned DESC, enqueuedAt IS NULL, enqueuedAt ASC, publishedAt DESC` に変える（手動が常に先。
   `enqueuedAt` は v3 で足した nullable なので NULL を先頭に来させない）。
   同期分（`pinned = false`）の行に利用者が「ダウンロード」を選んだら `pinned = true` にする（既存の `enqueue` の「行があれば何もしない」を変える）
 - **手動削除と同期の往復は仕様として受け入れる**: 同期対象の番組で保持すべき回のファイルを手で消しても、次の同期で落とし直される。
@@ -380,15 +387,15 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   同期していない番組のアイコンは `SyncDisabled`（斜線入り）で形で区別する（filled / outlined の `Sync` は同じ形）。
   ON に切り替えるたび `keepLatest` が null なら **既定 3** を入れる（「上限なし」にしたい場合は ON にした後で選ぶ。OFF → ON を往復すると 3 に戻る。
   「未設定」と「上限なし」を区別する列は足さない）。ON にしても即同期はしない。
-  `serverItemId` の無い番組はスイッチ無効 + 「サーバ上で見つかっていないため同期できません」。番組一覧の行に同期対象の印
+  `sourceItemId` の無い番組はスイッチ無効 + 「サーバ上で見つかっていないため同期できません」。番組一覧の行に同期対象の印
 - **結果の文言**: 手動は「番組 X / 各回 Y を取得。Z 回をダウンロード予約、W 回を削除」（0 は省く）+ 判断保留があれば
   「N 番組はサーバ上で見つからず、そのままにしました」。`RefreshResult` に `enqueued` / `deleted` / `onHold` を足す。通知は出さない。
   #142（2026-09-24）で取得件数をやめ、変化だけを出すようにした:「新しい回 N 件。Z 回をダウンロード予約、W 回を削除」（新しい回 = 取り込みで
   手元に新しく増えた各回。突合で結び直した回は数えない。`RefreshResult.newEpisodes`）。手動は変化が無ければ「最新の状態です」、
   裏の同期（定期・起動時）は変化があったときだけ同じ文言を出す（`messages` を collect している番組一覧・各回一覧を開いているときだけ。それ以外の画面にいる間や、閉じている間の結果は後から出さない）
-- **#12 番組単位の更新**: `JellyfinGateway.fetchProgramEpisodes(credentials, programServerId)`、
+- **#12 番組単位の更新**: `SourceGateway.fetchProgramEpisodes(programId)`（Jellyfin では `JellyfinGateway.fetchProgramEpisodes(credentials, programSourceId)`）、
   `LibraryRefreshRepository.refreshProgram(programId)`（突合は「番組 1 つ + その各回」のスナップショットで `LibraryMatching.match`、削除なし）。
-  `serverItemId` の無い番組は手動同期にフォールバック
+  `sourceItemId` の無い番組は手動同期にフォールバック
 - Room のスキーマ変更は無し（`syncEnabled` / `keepLatest` / `deleteAfterPlayed` は v1 から在る）。`Episode.addedAt` は差分取得を見送ったことで
   読み手が無くなるが、列は残す（取り込み日時の表示や #9 の補助に使える。消すならスキーマ変更が要る）
 
@@ -397,20 +404,20 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 3 本の PR に分ける。**PR 1 = #2（突合の拡張、ADR 0005。第二段も含む）** → **PR 2 = #21（シード機能の削除）** → **PR 3 = #3（消失の記録と UI）**。
 #9 は「シードは実運用で使わない」と判断して close（2026-09-18）。第二段の突合は再取り込みと同時にタイトルを付け直したケースの保険として残す。
 
-- **突合の対象を「未結合」に広げる**（CONTEXT.md「未結合」「突合」、ADR 0005）: サーバ ID を持たない行に加えて、**持っているサーバ ID が今回の完全な一覧に無い行**も
-  対象にする。`LibraryMatching.match` の「`serverItemId == null` だけ」を「未結合」に変え、キーは従来どおり（番組は (配信元, 番組名)、各回は同じ番組内のタイトル完全一致、双方 1 対 1）。
-  結び付けたら `serverItemId` を書き換えるだけで `LocalFile` / `PlaybackState` は触らない。突合は `newPrograms` の挿入より前（今の順序）なので、再取り込み後に番組が二重になることは無い
+- **突合の対象を「未結合」に広げる**（CONTEXT.md「未結合」「突合」、ADR 0005）: 取得元 ID を持たない行に加えて、**持っている取得元 ID が今回の完全な一覧に無い行**も
+  対象にする。`LibraryMatching.match` の「`sourceItemId == null` だけ」を「未結合」に変え、キーは従来どおり（番組は (配信元, 番組名)、各回は同じ番組内のタイトル完全一致、双方 1 対 1）。
+  結び付けたら `sourceItemId` を書き換えるだけで `LocalFile` / `PlaybackState` は触らない。突合は `newPrograms` の挿入より前（今の順序）なので、再取り込み後に番組が二重になることは無い
 - **第二段（元 #9）**: タイトルで結べなかった未結合の各回に対し、同じ番組内で **公開日（日単位）が同じ ＋ 尺の差が 5 秒以内** の候補が双方 1 対 1 なら結ぶ。
   尺 0（不明）は対象外。同日に複数本あって尺で絞れなければ結ばない。古い ID の行にも同じ第二段を適用する。
-  結んだ後はサーバの値で上書き（タイトルは `2026-09-16 (1)` になる）。`EpisodeKeyRow` / `LocalEpisodeKey` に `airedAt` と `runtime` を足す
+  結んだ後は取得元の値で上書き（タイトルは `2026-09-16 (1)` になる）。`EpisodeKeyRow` / `LocalEpisodeKey` に `publishedAt` と `runtime` を足す
 - **同期との順序**: 全体同期（`refresh`）も 1 番組の同期（`syncProgram`）も、取り込み（突合を含む）→ `planSync` の順は今のまま。結び直せなかった古い ID の各回だけが
-  `remove` に落ちる（本当にサーバから消えた回）。1 番組の同期で番組が見つからない（`ids=` 検索が空）ときは番組一覧が無いので結び直さず判断保留
+  `remove` に落ちる（本当に取得元から消えた回）。1 番組の同期で番組が見つからない（`ids=` 検索が空）ときは番組一覧が無いので結び直さず判断保留
 - **確度の境界**: 「双方 1 対 1 でなければ結ばない」だけ。閾値付きの自動結合も利用者の確認 UI も作らない（ADR 0005）
 - **消失の記録（#3）**: `programs` に `goneSince: Instant?` を足す（スキーマ v4、`AutoMigration(3, 4)`）。全体同期で「番組一覧に無く突合でも結べなかった」番組に立て、
   見つかれば（結び直しを含めて）null に戻す。1 番組の同期で番組が見つからなければ立てる。`ProgramSummary` / `Program` に載せる
 - **消失の表示**: 番組一覧の行に「サーバ上で見つかりません」と `CloudOff` アイコン、並び順は変えない。各回一覧の同期シートはスイッチを無効化して
   「サーバ上で見つかりません（M/d から）。同期は止まっています。手元の回はそのまま聴けます」。その下に **「この番組を手元から消す」**（確認 → 番組・各回・ファイル・
-  再生位置をすべて消す）。この操作は**消失した番組とサーバ ID の無い番組だけ**に出す（サーバに在る番組を消しても次の同期で戻り、再生位置だけ失うため）
+  再生位置をすべて消す）。この操作は**消失した番組と取得元 ID の無い番組だけ**に出す（取得元に在る番組を消しても次の同期で戻り、再生位置だけ失うため）
 - **到達不能の表示は無し**: 全走査しかないので番組単位の到達不能は起きない。ライブラリ全体の到達不能は今のスナックバーのまま。通知も出さない
 - **実機確認**: #2 の再取り込みは自宅ライブラリを作り直す必要があるため **Robolectric のみ**（`FakeJellyfinGateway` で番組 ID・各回 ID の変更を模す）。
   シードの再現データは端末に残っておらず、シード自体を削除する（#21）ので第二段の実機確認はしない
@@ -444,7 +451,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 ## 参照
 
 - `CONTEXT.md` — 用語集（番組／各回／公開日／同期対象／保持ルール／固定／判断保留／再生済み）
-- `docs/adr/0001-local-surrogate-key.md` — 主キーはサーバ ID ではなく代理キー
+- `docs/adr/0001-local-surrogate-key.md` — 主キーは取得元 ID（当時の呼び名はサーバ ID）ではなく代理キー
 - `docs/adr/0002-playback-position-local-authority.md` — 再生位置・再生済みはローカル正
 - `docs/adr/0003-download-without-media3-downloadmanager.md` — DownloadManager を使わない
 - `docs/adr/0004-sync-deletes-only-from-full-listing.md` — 同期の削除の権限は全走査の一覧だけ
@@ -453,6 +460,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 - `docs/adr/0007-playback-state-stays-local.md` — 再生位置と再生済みはサーバへ送らない
 - `docs/adr/0008-open-source-distributed-outside-play.md` — MPL-2.0 の OSS として Play を通さず配布する
 - `docs/adr/0009-ui-text-resolved-only-in-compose.md` — UI の文言は strings.xml、文字列に解決するのは Compose だけ（`UiText`）。既定は英語
+- `docs/adr/0010-add-file-shares-as-sources.md` — ファイル共有（SMB・端末のフォルダ）を取得元に加える。サーバ ID を取得元 ID に改めた
 - Jellyfin 12 認証仕様: https://gist.github.com/nielsvanvelzen/ea047d9028f676185832e51ffaf12a6f
 - jellyfin-sdk-kotlin Releases: https://github.com/jellyfin/jellyfin-sdk-kotlin/releases
 - Jellyfin OpenAPI (stable): https://api.jellyfin.org/openapi/jellyfin-openapi-stable.json

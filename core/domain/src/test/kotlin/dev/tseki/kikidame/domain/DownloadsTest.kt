@@ -8,7 +8,7 @@ import kotlin.time.Instant
 class DownloadsTest {
     private fun episode(server: String?) = Episode(
         id = EpisodeId(1),
-        serverItemId = server?.let(::ServerItemId),
+        sourceItemId = server?.let(::SourceItemId),
         programId = ProgramId(1),
         title = "x",
         publishedAt = Instant.parse("2026-09-16T15:00:00Z"),
@@ -19,7 +19,7 @@ class DownloadsTest {
     )
 
     @Test
-    fun `server episodes lose only the file, seeded ones lose the row`() {
+    fun `episodes with a source id lose only the file, seeded ones lose the row`() {
         assertEquals(LocalDeletionScope.FILE_ONLY, deletionScopeFor(episode("abc")))
         assertEquals(LocalDeletionScope.EPISODE, deletionScopeFor(episode(null)))
     }

@@ -6,7 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dev.tseki.kikidame.domain.SelectedLibrary
-import dev.tseki.kikidame.domain.ServerItemId
+import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.Session
 import dev.tseki.kikidame.domain.SessionState
 import kotlinx.coroutines.flow.Flow
@@ -86,7 +86,7 @@ class SessionStore(
         if (libraryId == null || libraryName == null) return SessionState.NeedsLibrary(session)
         return SessionState.Ready(
             session = session,
-            library = SelectedLibrary(ServerItemId(libraryId), libraryName),
+            library = SelectedLibrary(SourceItemId(libraryId), libraryName),
             lastFetchedAt = this[LAST_FETCHED_AT]?.let(Instant::fromEpochMilliseconds),
             lastAttemptedAt = this[LAST_ATTEMPTED_AT]?.let(Instant::fromEpochMilliseconds),
         )

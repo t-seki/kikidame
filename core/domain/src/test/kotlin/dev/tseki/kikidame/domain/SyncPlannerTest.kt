@@ -17,7 +17,7 @@ class SyncPlannerTest {
         title: String = "回 $id",
     ) = LocalEpisodeState(
         id = EpisodeId(id),
-        serverItemId = server?.let(::ServerItemId),
+        sourceItemId = server?.let(::SourceItemId),
         publishedAt = Instant.parse("${published}T00:00:00Z"),
         title = title,
         pinned = pinned,
@@ -26,19 +26,19 @@ class SyncPlannerTest {
     )
 
     private fun known(vararg episodes: LocalEpisodeState) =
-        ServerEpisodes.Known(episodes.mapNotNull { it.serverItemId }.toSet())
+        SourceEpisodes.Known(episodes.mapNotNull { it.sourceItemId }.toSet())
 
     private fun input(
         vararg episodes: LocalEpisodeState,
         syncEnabled: Boolean = true,
         keepLatest: Int? = 3,
         deleteAfterPlayed: Boolean = false,
-        server: ServerEpisodes = known(*episodes),
+        source: SourceEpisodes = known(*episodes),
     ) = SyncProgramInput(
         programId = ProgramId(1),
         syncEnabled = syncEnabled,
         retentionRule = RetentionRule(keepLatest, deleteAfterPlayed),
-        server = server,
+        source = source,
         local = episodes.toList(),
     )
 
@@ -140,7 +140,7 @@ class SyncPlannerTest {
         val e1 = ep(1, "2026-09-01", pinned = true, local = true)
         val e2 = ep(2, "2026-09-02", local = true)
         val e3 = ep(3, "2026-09-03")
-        val plan = SyncPlanner.planProgram(input(e1, e2, e3, server = known(e3)))
+        val plan = SyncPlanner.planProgram(input(e1, e2, e3, source = known(e3)))
         assertEquals(ids(1, 2), plan.remove)
         assertEquals(ids(3), plan.download)
         assertTrue(plan.delete.isEmpty())
@@ -149,22 +149,22 @@ class SyncPlannerTest {
     @Test
     fun `removal also applies when sync is disabled`() {
         val e1 = ep(1, "2026-09-01", pinned = true, local = true)
-        val plan = SyncPlanner.planProgram(input(e1, syncEnabled = false, server = ServerEpisodes.Known(emptySet())))
+        val plan = SyncPlanner.planProgram(input(e1, syncEnabled = false, source = SourceEpisodes.Known(emptySet())))
         assertEquals(ids(1), plan.remove)
     }
 
     @Test
-    fun `episodes without a server id are never removed`() {
+    fun `episodes without a source id are never removed`() {
         val seed = ep(1, "2026-09-01", server = null, pinned = true, local = true)
-        val plan = SyncPlanner.planProgram(input(seed, server = ServerEpisodes.Known(emptySet())))
+        val plan = SyncPlanner.planProgram(input(seed, source = SourceEpisodes.Known(emptySet())))
         assertTrue(plan.remove.isEmpty())
         assertTrue(plan.delete.isEmpty())
     }
 
     @Test
-    fun `an unpinned episode without a server id is deleted by the rule`() {
+    fun `an unpinned episode without a source id is deleted by the rule`() {
         val seed = ep(1, "2026-09-01", server = null, pinned = false, local = true)
-        val plan = SyncPlanner.planProgram(input(seed, ep(2, "2026-09-02"), server = ServerEpisodes.Known(setOf(ServerItemId("s2")))))
+        val plan = SyncPlanner.planProgram(input(seed, ep(2, "2026-09-02"), source = SourceEpisodes.Known(setOf(SourceItemId("s2")))))
         assertEquals(ids(1), plan.delete)
         assertEquals(ids(2), plan.download)
     }
@@ -178,7 +178,7 @@ class SyncPlannerTest {
     @Test
     fun `unavailable puts the program on hold`() {
         val plan = SyncPlanner.planProgram(
-            input(ep(1, "2026-09-01", local = true), ep(2, "2026-09-02"), server = ServerEpisodes.Unavailable),
+            input(ep(1, "2026-09-01", local = true), ep(2, "2026-09-02"), source = SourceEpisodes.Unavailable),
         )
         assertTrue(plan.onHold)
         assertTrue(plan.download.isEmpty() && plan.delete.isEmpty() && plan.remove.isEmpty())
@@ -187,7 +187,7 @@ class SyncPlannerTest {
     @Test
     fun `gone puts the program on hold even with sync disabled`() {
         val plan = SyncPlanner.planProgram(
-            input(ep(1, "2026-09-01", local = true), syncEnabled = false, server = ServerEpisodes.Gone),
+            input(ep(1, "2026-09-01", local = true), syncEnabled = false, source = SourceEpisodes.Gone),
         )
         assertTrue(plan.onHold)
         assertTrue(plan.delete.isEmpty() && plan.remove.isEmpty())
@@ -195,7 +195,7 @@ class SyncPlannerTest {
 
     @Test
     fun `empty known list is not on hold`() {
-        val plan = SyncPlanner.planProgram(input(ep(1, "2026-09-01", local = true), server = ServerEpisodes.Known(emptySet())))
+        val plan = SyncPlanner.planProgram(input(ep(1, "2026-09-01", local = true), source = SourceEpisodes.Known(emptySet())))
         assertFalse(plan.onHold)
         assertEquals(ids(1), plan.remove)
     }
@@ -204,12 +204,12 @@ class SyncPlannerTest {
     fun `downloads across programs are ordered newest first`() {
         val a = SyncProgramInput(
             ProgramId(1), true, RetentionRule(),
-            ServerEpisodes.Known(setOf(ServerItemId("s1"), ServerItemId("s3"))),
+            SourceEpisodes.Known(setOf(SourceItemId("s1"), SourceItemId("s3"))),
             listOf(ep(1, "2026-09-01"), ep(3, "2026-09-03")),
         )
         val b = SyncProgramInput(
             ProgramId(2), true, RetentionRule(),
-            ServerEpisodes.Known(setOf(ServerItemId("s2"), ServerItemId("s4"))),
+            SourceEpisodes.Known(setOf(SourceItemId("s2"), SourceItemId("s4"))),
             listOf(ep(2, "2026-09-02"), ep(4, "2026-09-04")),
         )
         val plan = SyncPlanner.plan(listOf(a, b))
