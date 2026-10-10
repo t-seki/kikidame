@@ -501,7 +501,7 @@ private fun NoMatch(query: String, publisher: PublisherKey?) {
 /**
  * 行の補足（#41）: `配信元 · 未再生 N / 手元 L · 全 E 回 · 最新 MM-DD`。
  * 未再生 0 なら「未再生 N /」を省き、手元 = 全なら「全 E 回」を「回」に畳む（「/」が 2 つ並ばないよう「全」の前は「·」）。
- * 配信元が無い・各回が無い（最新なし）ならその部分を省き、消失なら末尾に「サーバ上で見つかりません」を足す。
+ * 配信元が無い・各回が無い（最新なし）ならその部分を省き、消失なら末尾に「取得元に見つかりません」を足す。
  */
 internal fun ProgramSummary.toSupportingText(today: LocalDate = Clock.System.todayIn(PublishedAt.ZONE)): UiText {
     val unplayed = unplayedLocalCount > 0
