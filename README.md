@@ -97,7 +97,7 @@ The app connects to **Jellyfin**, a **shared folder on a NAS (SMB)** or a **fold
 - **Keep the files in the folder.** If you delete a file from the folder, the next sync treats that episode as gone from the source and deletes the app's copy too, even if it is Pinned. This is meant for recordings you sync into the folder from a PC (Syncthing, FolderSync and the like): keep them there
 - Downloads and syncs from a folder on this device need no network at all, so "Wi-Fi only" does not apply to it (the copy stays inside the device)
 - If the app loses access to the folder (the permission was revoked, or the folder was moved or deleted), it signs out and asks you to pick the folder again. Programs, episodes and files on the device are kept, and they link up again if the folder you pick has the same layout
-- Verified only with unit tests so far; whether it works on real devices (SD cards, large folders) is unverified. See "実機で試す（#199: 端末のフォルダ）" in [docs/development.md](./docs/development.md) (Japanese)
+- Folders in internal storage have been verified on a real device (Android 17): import, copying, playback, and re-selecting the folder after it was moved. Whether it works on SD cards and large folders is unverified. See "実機で試す（#199: 端末のフォルダ）" in [docs/development.md](./docs/development.md) (Japanese)
 
 ## How it works
 
