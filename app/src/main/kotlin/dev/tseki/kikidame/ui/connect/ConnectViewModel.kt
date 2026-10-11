@@ -1,14 +1,10 @@
 package dev.tseki.kikidame.ui.connect
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
-import dev.tseki.kikidame.LocalNetworkPermission
 import dev.tseki.kikidame.R
 import dev.tseki.kikidame.ui.UiText
-import dev.tseki.kikidame.ui.source.SourceChanger
 import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
@@ -33,9 +29,8 @@ data class ConnectUiState(
 
 @HiltViewModel
 class ConnectViewModel @Inject constructor(
-    @ApplicationContext private val context: Context,
     private val sessionRepository: SessionRepository,
-    private val sourceChanger: SourceChanger,
+    private val localNetworkPermission: LocalNetworkPermissionCheck,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ConnectUiState())
     val uiState: StateFlow<ConnectUiState> = _uiState
@@ -55,14 +50,6 @@ class ConnectViewModel @Inject constructor(
     fun onUserNameChange(value: String) = _uiState.update { it.copy(userName = value, error = null) }
     fun onPasswordChange(value: String) = _uiState.update { it.copy(password = value, error = null) }
 
-    /** 「取得元を変える」。手元を全部消した後に [onDone]（初回の取得元の選択画面へ戻る）を呼ぶ。 */
-    fun changeSource(onDone: () -> Unit) {
-        viewModelScope.launch {
-            sourceChanger.changeSource()
-            onDone()
-        }
-    }
-
     fun submit() {
         val s = _uiState.value
         if (!s.canSubmit) return
@@ -72,12 +59,7 @@ class ConnectViewModel @Inject constructor(
                 sessionRepository.signIn(s.serverUrl, s.userName, s.password)
                 _uiState.update { it.copy(isSubmitting = false, password = "") }
             } catch (e: ServerException) {
-                val hint = if (e is ServerException.Unreachable && LocalNetworkPermission.isRequiredAndMissing(context)) {
-                    UiText.Res(R.string.connect_hint_local_network_permission)
-                } else {
-                    null
-                }
-                _uiState.update { it.copy(isSubmitting = false, error = UiText.Joined(listOfNotNull(e.toUserMessage(), hint))) }
+                _uiState.update { it.copy(isSubmitting = false, error = e.connectErrorText(e.toUserMessage(), localNetworkPermission)) }
             } catch (e: IllegalArgumentException) {
                 _uiState.update { it.copy(isSubmitting = false, error = UiText.Res(R.string.connect_error_https_only)) }
             } catch (e: CancellationException) {

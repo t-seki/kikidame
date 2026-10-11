@@ -13,7 +13,6 @@ import dev.tseki.kikidame.domain.UnsupportedFolderException
 import dev.tseki.kikidame.sync.LibraryRefresher
 import dev.tseki.kikidame.sync.SyncScheduler
 import dev.tseki.kikidame.ui.UiText
-import dev.tseki.kikidame.ui.source.SourceChanger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,7 +35,6 @@ data class DeviceFolderUiState(
 @HiltViewModel
 class DeviceFolderViewModel @Inject constructor(
     private val sessionRepository: SessionRepository,
-    private val sourceChanger: SourceChanger,
     private val refresher: LibraryRefresher,
     private val syncScheduler: SyncScheduler,
 ) : ViewModel() {
@@ -51,14 +49,6 @@ class DeviceFolderViewModel @Inject constructor(
         viewModelScope.launch {
             val lost = (sessionRepository.state.first() as? SessionState.SignedOut)?.lastDeviceFolder ?: return@launch
             _uiState.update { it.copy(lostFolder = lost.displayPath()) }
-        }
-    }
-
-    /** 「取得元を変える」。手元を全部消した後に [onDone]（初回の取得元の選択画面へ戻る）を呼ぶ。 */
-    fun changeSource(onDone: () -> Unit) {
-        viewModelScope.launch {
-            sourceChanger.changeSource()
-            onDone()
         }
     }
 
