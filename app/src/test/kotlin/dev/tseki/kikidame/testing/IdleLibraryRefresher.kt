@@ -16,8 +16,10 @@ import kotlinx.coroutines.CoroutineScope
 
 /**
  * 画面の ViewModel に渡すための [LibraryRefresher]。取得元には問い合わせず、ダウンロードも起こさない。
- * 番組単位の更新・同期（`refreshProgram` / `syncProgram`）は null を返す。全走査（`refresh`）は使わない前提で、
+ * 中のリポジトリの番組単位の更新・同期（`refreshProgram` / `syncProgram`）は null を返す。全走査（`refresh`）は使わない前提で、
  * 呼ぶと例外を投げ、[LibraryRefresher] がそれを拾って取り込み失敗の文言（`sync_error_import_failed`）を出す。
+ * [LibraryRefresher.syncProgram] は null を返して終わるが、[LibraryRefresher.refreshProgram] はリポジトリが null を返すと
+ * 全走査に落ちるので、同じく取り込み失敗の文言になる。
  * 更新・同期そのものは `LibraryRefresherTest` で確かめる。
  */
 fun idleLibraryRefresher(
