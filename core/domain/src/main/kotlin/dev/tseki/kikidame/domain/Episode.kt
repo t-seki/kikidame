@@ -23,6 +23,9 @@ data class Episode(
  */
 object EpisodeOrder : Comparator<Episode> by compareBy<Episode>({ it.publishedAt }, { it.title }, { it.id.value }) {
     /** 公開日の新しい順。同じ公開日の中はタイトルの辞書順 → ローカル ID（正規の順と同じ）。 */
-    val newestFirst: Comparator<Episode> =
-        compareByDescending<Episode> { it.publishedAt }.thenBy { it.title }.thenBy { it.id.value }
+    val newestFirst: Comparator<Episode> = newestFirstBy({ it.publishedAt }, { it.title }, { it.id.value })
+
+    /** [newestFirst] と同じ順の比較器を、公開日・タイトル・ローカル ID を取り出す関数から作る。[Episode] 以外の型（同期の入力など）で同じ順に並べるときに使う。 */
+    fun <T> newestFirstBy(publishedAt: (T) -> Instant, title: (T) -> String, id: (T) -> Long): Comparator<T> =
+        compareByDescending(publishedAt).thenBy(title).thenBy(id)
 }
