@@ -1,7 +1,5 @@
 package dev.tseki.kikidame.playback
 import androidx.annotation.OptIn
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import dev.tseki.kikidame.domain.EpisodeId
@@ -62,7 +60,7 @@ class PositionPersister(
         val oldEpisode = EpisodeMediaItems.episodeId(oldPosition.mediaItem) ?: return
         if (oldPosition.mediaItemIndex == newPosition.mediaItemIndex) return
         // 前の回の位置。再生し切って自動遷移したなら位置 = 尺として保存する
-        val runtime = runtimeOf(oldPosition.mediaItem)
+        val runtime = EpisodeMediaItems.runtimeOf(oldPosition.mediaItem)
         val position = if (reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION && runtime != null) {
             runtime
         } else {
@@ -109,12 +107,8 @@ class PositionPersister(
         }
     }
     private fun currentRuntime(): Duration? {
-        val duration = player.duration
-        if (duration != C.TIME_UNSET && duration > 0) return duration.milliseconds
-        return runtimeOf(player.currentMediaItem)
+        return player.knownRuntime()
     }
-    private fun runtimeOf(mediaItem: MediaItem?): Duration? =
-        mediaItem?.mediaMetadata?.durationMs?.takeIf { it > 0 }?.milliseconds
     companion object {
         val SAVE_INTERVAL: Duration = 10.seconds
     }
