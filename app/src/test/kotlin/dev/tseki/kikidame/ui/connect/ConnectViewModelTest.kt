@@ -1,7 +1,7 @@
 package dev.tseki.kikidame.ui.connect
 
 import dev.tseki.kikidame.R
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.testing.FakeSessionRepository
 import dev.tseki.kikidame.ui.UiText
@@ -40,7 +40,7 @@ class ConnectViewModelTest {
         }
     }
 
-    private fun submitFailingWith(error: ServerException, permission: LocalNetworkPermissionCheck): UiText? {
+    private fun submitFailingWith(error: SourceException, permission: LocalNetworkPermissionCheck): UiText? {
         session.signInError = error
         val vm = ConnectViewModel(session, permission)
         vm.onServerUrlChange("https://jellyfin.example.net")
@@ -55,7 +55,7 @@ class ConnectViewModelTest {
         val permission = Permission(missing = true)
         assertEquals(
             UiText.Joined(listOf(UiText.Res(R.string.sync_error_unreachable_connect), UiText.Res(R.string.connect_hint_local_network_permission))),
-            submitFailingWith(ServerException.Unreachable(), permission),
+            submitFailingWith(SourceException.Unreachable(), permission),
         )
         assertEquals(1, permission.checks)
     }
@@ -65,7 +65,7 @@ class ConnectViewModelTest {
         val permission = Permission(missing = false)
         assertEquals(
             UiText.Joined(listOf(UiText.Res(R.string.sync_error_unreachable_connect))),
-            submitFailingWith(ServerException.Unreachable(), permission),
+            submitFailingWith(SourceException.Unreachable(), permission),
         )
         assertEquals(1, permission.checks)
     }
@@ -76,7 +76,7 @@ class ConnectViewModelTest {
         val permission = Permission(missing = true)
         assertEquals(
             UiText.Joined(listOf(UiText.Res(R.string.sync_error_unauthorized))),
-            submitFailingWith(ServerException.Unauthorized(), permission),
+            submitFailingWith(SourceException.Unauthorized(), permission),
         )
         assertEquals(0, permission.checks)
     }

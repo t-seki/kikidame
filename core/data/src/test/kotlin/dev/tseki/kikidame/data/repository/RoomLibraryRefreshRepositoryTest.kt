@@ -5,7 +5,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tseki.kikidame.data.files.EpisodesDirectory
 import dev.tseki.kikidame.domain.EpisodeWithState
 import dev.tseki.kikidame.domain.PlaybackRules
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SourceProgram
 import dev.tseki.kikidame.domain.SourceSnapshot
@@ -39,9 +39,9 @@ class RoomLibraryRefreshRepositoryTest : JellyfinRefreshTestBase() {
 
     @Test
     fun refreshRequiresASelectedLibrary() = runTest {
-        assertFailsWith<ServerException.Unauthorized> { repo.refresh() }
+        assertFailsWith<SourceException.Unauthorized> { repo.refresh() }
         session.signIn("jellyfin.lab.example", "alice", "secret")
-        assertFailsWith<ServerException.Unauthorized> { repo.refresh() }
+        assertFailsWith<SourceException.Unauthorized> { repo.refresh() }
     }
 
     @Test
@@ -192,9 +192,9 @@ class RoomLibraryRefreshRepositoryTest : JellyfinRefreshTestBase() {
         signInAndSelect()
         gateway.snapshot = snapshot
         repo.refresh()
-        gateway.failWith = ServerException.Unauthorized()
+        gateway.failWith = SourceException.Unauthorized()
 
-        assertFailsWith<ServerException.Unauthorized> { repo.refresh() }
+        assertFailsWith<SourceException.Unauthorized> { repo.refresh() }
         assertEquals(1, library.observePrograms().first().size)
     }
 
@@ -206,9 +206,9 @@ class RoomLibraryRefreshRepositoryTest : JellyfinRefreshTestBase() {
         repo.refresh()
         val fetchedAt = now
         now += 90.minutes
-        gateway.failWith = ServerException.Unreachable()
+        gateway.failWith = SourceException.Unreachable()
 
-        assertFailsWith<ServerException.Unreachable> { repo.refresh() }
+        assertFailsWith<SourceException.Unreachable> { repo.refresh() }
 
         val ready = assertIs<SessionState.Ready>(session.state.first())
         assertEquals(now, ready.lastAttemptedAt)

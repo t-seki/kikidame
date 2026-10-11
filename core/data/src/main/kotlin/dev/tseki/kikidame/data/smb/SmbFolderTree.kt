@@ -20,7 +20,7 @@ import dev.tseki.kikidame.data.sharedfolder.FolderTree
 import dev.tseki.kikidame.data.sharedfolder.LastOpened
 import dev.tseki.kikidame.data.sharedfolder.PositionalInputStream
 import dev.tseki.kikidame.data.sharedfolder.closeQuietly
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SmbConnection
 import java.io.IOException
 import java.util.EnumSet
@@ -143,7 +143,7 @@ class SmbFolderTree(private val connection: SmbConnection) : CloseableFolderTree
             val newSession = newConnection.authenticate(authenticationContext())
             session = newSession
             val newShare = newSession.connectShare(connection.share) as? DiskShare
-                ?: throw ServerException.Failed("not a disk share: ${connection.share}")
+                ?: throw SourceException.Failed("not a disk share: ${connection.share}")
             share = newShare
             return newShare
         } catch (e: Exception) {

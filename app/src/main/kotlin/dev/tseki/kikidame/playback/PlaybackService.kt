@@ -190,7 +190,7 @@ class PlaybackService : MediaLibraryService() {
         }
         /**
          * 再開（#108）: プレイヤーが空のとき（プロセス死後の通知の ▶、Auto の「最近」、端末の再起動後）に
-         * 最後に聴いていた回を復元する。最近聴いた各回（[dev.tseki.kikidame.domain.LibraryRepository.getRecentlyListened]）の
+         * 最後に聴いていた回を復元する。「続きから」の各回（[dev.tseki.kikidame.domain.LibraryRepository.getContinueListening]）の
          * 先頭から、[onSetMediaItems] と同じ番組のキューを組む。無ければ空のリスト（Media3 の既定と同じ扱い）。
          * 「聴いている回」（ADR 0006）はこの結果がプレイヤーに載った時点で立つ。
          */
@@ -198,7 +198,7 @@ class PlaybackService : MediaLibraryService() {
             mediaSession: MediaSession,
             controller: MediaSession.ControllerInfo,
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> = scope.future {
-            val recent = libraryRepository.getRecentlyListened(1).firstOrNull()
+            val recent = libraryRepository.getContinueListening(1).firstOrNull()
                 ?: return@future MediaSession.MediaItemsWithStartPosition(emptyList(), C.INDEX_UNSET, C.TIME_UNSET)
             programQueueStartingAt(recent)
         }

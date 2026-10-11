@@ -28,7 +28,7 @@ import kotlin.time.Clock
 
 /**
  * 番組の画面の「続きから」タブ（#151）。途中まで聴いた各回を番組をまたいで最後に聴いた順に、件数の上限なしで出す
- * （条件は Android Auto の「続きから」と同じ [LibraryRepository.observeRecentlyListened]）。
+ * （条件は Android Auto の「続きから」と同じ [LibraryRepository.observeContinueListening]）。
  * 行の操作は各回一覧と同じ（右端で再生済みの切り替え、長押しで固定を外す・ファイルの削除・詳細）。
  * 再生済みにしたときだけ［元に戻す］を出すので、その合図を [markedPlayed] で画面へ渡す。
  *
@@ -47,7 +47,7 @@ class ContinueListeningViewModel @Inject constructor(
     data class Item(val episode: EpisodeWithState, val program: Program?)
 
     /** null は読み込み前。再生位置の保存・再生済み・ファイルの削除・同期に追従する。 */
-    val items: StateFlow<List<Item>?> = combine(library.observeRecentlyListened(), library.observePrograms()) { episodes, programs ->
+    val items: StateFlow<List<Item>?> = combine(library.observeContinueListening(), library.observePrograms()) { episodes, programs ->
         val byId = programs.associate { it.program.id to it.program }
         episodes.map { Item(it, byId[it.episode.programId]) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)

@@ -7,7 +7,7 @@ import dev.tseki.kikidame.data.source.ScanListener
 import dev.tseki.kikidame.domain.DownloadState
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.ScanProgress
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.domain.SmbConnection
 import dev.tseki.kikidame.domain.SourceEpisode
@@ -151,7 +151,7 @@ class SharedFolderScanTest : RefreshTestBase() {
             tags.read(tree, path, size)
         }
 
-        assertFailsWith<ServerException.Unreachable> { repo(source(brokenB)).refresh() }
+        assertFailsWith<SourceException.Unreachable> { repo(source(brokenB)).refresh() }
 
         assertEquals(true, hasEpisode("P/A/2.m4a"), "A was imported before B failed")
         assertEquals(false, hasEpisode("P/B/1.m4a"))
@@ -256,7 +256,7 @@ class SharedFolderScanTest : RefreshTestBase() {
         }
         val enqueued = ArrayList<Int>()
 
-        assertFailsWith<ServerException.Unreachable> { repo(source(brokenB)).refresh(onEnqueued = { enqueued += it }) }
+        assertFailsWith<SourceException.Unreachable> { repo(source(brokenB)).refresh(onEnqueued = { enqueued += it }) }
 
         assertEquals(listOf(2), enqueued)
     }
@@ -282,7 +282,7 @@ class SharedFolderScanTest : RefreshTestBase() {
         folder.put("P/A/1.m4a")
         failReads = 3
 
-        assertFailsWith<ServerException.Unreachable> { source().fetchAll() }
+        assertFailsWith<SourceException.Unreachable> { source().fetchAll() }
 
         assertEquals(3, tags.calls.size)
         assertEquals(2, resets)
@@ -324,10 +324,10 @@ class SharedFolderScanTest : RefreshTestBase() {
         var calls = 0
         val reader = TagReader { _, _, _ ->
             calls++
-            throw ServerException.Unauthorized()
+            throw SourceException.Unauthorized()
         }
 
-        assertFailsWith<ServerException.Unauthorized> { source(reader).fetchAll() }
+        assertFailsWith<SourceException.Unauthorized> { source(reader).fetchAll() }
         assertEquals(1, calls)
         assertEquals(0, resets)
     }

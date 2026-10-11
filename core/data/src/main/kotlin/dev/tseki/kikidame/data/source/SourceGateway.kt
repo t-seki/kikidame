@@ -1,6 +1,6 @@
 package dev.tseki.kikidame.data.source
 
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SourceProgram
@@ -10,9 +10,9 @@ import java.io.InputStream
 /**
  * 取得元（CONTEXT.md）との境界（ADR 0010）。同期とダウンロードは、これだけを通して取得元に触る。
  * 取得元の種類（Jellyfin など）に依存しない。認証などの接続の情報は実装の側で持つ。
- * 失敗はすべて [ServerException] に正規化する。接続していなければ [ServerException.Unauthorized]。認証の失敗（Jellyfin の 401/403、
- * SMB の認証の失敗）と、端末のフォルダ（#199）の永続権限が無い・取り消された・選んだフォルダが無いと分かったときも [ServerException.Unauthorized]
- * （呼び出し側がログアウトへ導く）。届かない・読めないは [ServerException.Unreachable]（判断保留）。
+ * 失敗はすべて [SourceException] に正規化する。接続していなければ [SourceException.Unauthorized]。認証の失敗（Jellyfin の 401/403、
+ * SMB の認証の失敗）と、端末のフォルダ（#199）の永続権限が無い・取り消された・選んだフォルダが無いと分かったときも [SourceException.Unauthorized]
+ * （呼び出し側がログアウトへ導く）。届かない・読めないは [SourceException.Unreachable]（判断保留）。
  */
 interface SourceGateway {
     /**

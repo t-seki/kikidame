@@ -19,7 +19,7 @@ import dev.tseki.kikidame.domain.EpisodeWithState
 import dev.tseki.kikidame.domain.LocalFile
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.SourceEpisode
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SourceProgram
 import dev.tseki.kikidame.domain.SourceSnapshot
@@ -65,8 +65,8 @@ class DownloadWorkerTest {
         override suspend fun fetchProgramEpisodes(programId: SourceItemId): List<SourceEpisode> = error("unused")
         override suspend fun fetchProgram(programId: SourceItemId): SourceProgram? = error("unused")
         override suspend fun openDownload(episodeId: SourceItemId, rangeStart: Long): DownloadStream {
-            if (unauthorized) throw ServerException.Unauthorized()
-            val bytes = files[episodeId] ?: throw ServerException.Failed("HTTP 404")
+            if (unauthorized) throw SourceException.Unauthorized()
+            val bytes = files[episodeId] ?: throw SourceException.Failed("HTTP 404")
             return DownloadStream(null, bytes.size.toLong(), bytes.inputStream())
         }
     }

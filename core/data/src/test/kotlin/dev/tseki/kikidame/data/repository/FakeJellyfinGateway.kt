@@ -5,7 +5,7 @@ import dev.tseki.kikidame.data.jellyfin.ServerCredentials
 import dev.tseki.kikidame.data.source.DownloadStream
 import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.SourceEpisode
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SourceProgram
 import dev.tseki.kikidame.domain.SourceSnapshot
@@ -14,7 +14,7 @@ import dev.tseki.kikidame.domain.Session
 class FakeJellyfinGateway : JellyfinGateway {
     var snapshot: SourceSnapshot = SourceSnapshot(emptyList(), emptyList())
     var libraries: List<LibraryView> = emptyList()
-    var failWith: ServerException? = null
+    var failWith: SourceException? = null
     var acceptedPassword: String = "secret"
     val fetchedLibraries = ArrayList<SourceItemId>()
     /** 番組・各回の取得とダウンロードに渡された認証の情報（呼ばれた順）。 */
@@ -22,7 +22,7 @@ class FakeJellyfinGateway : JellyfinGateway {
 
     override suspend fun signIn(serverUrl: String, userName: String, password: String): Session {
         failWith?.let { throw it }
-        if (password != acceptedPassword) throw ServerException.Unauthorized()
+        if (password != acceptedPassword) throw SourceException.Unauthorized()
         return Session(serverUrl, userName, userId = "user-$userName", accessToken = "token-$userName")
     }
 
@@ -61,7 +61,7 @@ class FakeJellyfinGateway : JellyfinGateway {
     override suspend fun openDownload(credentials: ServerCredentials, episodeSourceId: SourceItemId, rangeStart: Long): DownloadStream {
         failWith?.let { throw it }
         usedCredentials += credentials
-        val bytes = files[episodeSourceId] ?: throw ServerException.Failed("HTTP 404")
+        val bytes = files[episodeSourceId] ?: throw SourceException.Failed("HTTP 404")
         openedRanges += rangeStart
         return if (honorRange && rangeStart > 0) {
             DownloadStream(resumedFrom = rangeStart, totalBytes = bytes.size.toLong(), body = bytes.inputStream().also { it.skip(rangeStart) })

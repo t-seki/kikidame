@@ -3,7 +3,7 @@ package dev.tseki.kikidame.data.smb
 import com.hierynomus.mserref.NtStatus
 import com.hierynomus.mssmb2.SMB2MessageCommandCode
 import com.hierynomus.mssmb2.SMBApiException
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import org.junit.Test
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -33,22 +33,22 @@ class SmbErrorsTest {
     @Test
     fun badCredentialsAreUnauthorizedEverywhere() {
         for (status in listOf(NtStatus.STATUS_LOGON_FAILURE, NtStatus.STATUS_PASSWORD_EXPIRED, NtStatus.STATUS_ACCOUNT_DISABLED)) {
-            assertIs<ServerException.Unauthorized>(SmbErrors.classify(status, connecting = true, path = ""))
-            assertIs<ServerException.Unauthorized>(SmbErrors.classify(status, connecting = false, path = "a"))
+            assertIs<SourceException.Unauthorized>(SmbErrors.classify(status, connecting = true, path = ""))
+            assertIs<SourceException.Unauthorized>(SmbErrors.classify(status, connecting = false, path = "a"))
         }
     }
 
     /** 共有につなぐ段階の「アクセス拒否」は共有の権利が無いこと。つないだ後の個別のパスでは、そのパスだけの問題。 */
     @Test
     fun accessDeniedDependsOnWhetherWeAreConnecting() {
-        assertIs<ServerException.Unauthorized>(SmbErrors.classify(NtStatus.STATUS_ACCESS_DENIED, connecting = true, path = ""))
-        val failed = assertIs<ServerException.Failed>(SmbErrors.classify(NtStatus.STATUS_ACCESS_DENIED, connecting = false, path = "A/B"))
+        assertIs<SourceException.Unauthorized>(SmbErrors.classify(NtStatus.STATUS_ACCESS_DENIED, connecting = true, path = ""))
+        val failed = assertIs<SourceException.Failed>(SmbErrors.classify(NtStatus.STATUS_ACCESS_DENIED, connecting = false, path = "A/B"))
         assertEquals("access denied: A/B", failed.message)
     }
 
     @Test
     fun missingShareIsFailedNotUnauthorized() {
-        assertIs<ServerException.Failed>(SmbErrors.classify(NtStatus.STATUS_BAD_NETWORK_NAME, connecting = true, path = ""))
+        assertIs<SourceException.Failed>(SmbErrors.classify(NtStatus.STATUS_BAD_NETWORK_NAME, connecting = true, path = ""))
     }
 
     @Test
@@ -59,12 +59,12 @@ class SmbErrorsTest {
     @Test
     fun translateClassifiesSmbApiExceptionsAndLeavesTheRestAlone() {
         val logon = SMBApiException(NtStatus.STATUS_LOGON_FAILURE.value, SMB2MessageCommandCode.SMB2_SESSION_SETUP, null)
-        assertIs<ServerException.Unauthorized>(SmbErrors.translate(logon, connecting = true))
+        assertIs<SourceException.Unauthorized>(SmbErrors.translate(logon, connecting = true))
 
         // 届かない（名前が引けない、タイムアウト）は IOException のまま。SharedFolderSource が Unreachable にする
         val io = IOException("unknown host")
         assertSame(io, SmbErrors.translate(io, connecting = true))
-        val failed = ServerException.Failed("x")
+        val failed = SourceException.Failed("x")
         assertSame(failed, SmbErrors.translate(failed, connecting = false))
     }
 

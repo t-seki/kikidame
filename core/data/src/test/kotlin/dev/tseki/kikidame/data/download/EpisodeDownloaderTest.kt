@@ -12,7 +12,7 @@ import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.EpisodeWithState
 import dev.tseki.kikidame.domain.LocalFile
 import dev.tseki.kikidame.domain.ProgramId
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceItemId
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
@@ -141,8 +141,8 @@ class EpisodeDownloaderTest {
 
     @Test
     fun unauthorizedPropagatesAndRowGoesBackToPending() = runTest {
-        gateway.failWith = ServerException.Unauthorized()
-        assertFailsWith<ServerException.Unauthorized> { downloader.download(item()) }
+        gateway.failWith = SourceException.Unauthorized()
+        assertFailsWith<SourceException.Unauthorized> { downloader.download(item()) }
         assertEquals(DownloadState.PENDING, queue.state)
         assertEquals(0, queue.failures)
     }

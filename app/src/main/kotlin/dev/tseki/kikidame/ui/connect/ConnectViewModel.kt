@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.tseki.kikidame.R
 import dev.tseki.kikidame.ui.UiText
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.sync.toUserMessage
@@ -58,7 +58,7 @@ class ConnectViewModel @Inject constructor(
             try {
                 sessionRepository.signIn(s.serverUrl, s.userName, s.password)
                 _uiState.update { it.copy(isSubmitting = false, password = "") }
-            } catch (e: ServerException) {
+            } catch (e: SourceException) {
                 _uiState.update { it.copy(isSubmitting = false, error = e.connectErrorText(e.toUserMessage(), localNetworkPermission)) }
             } catch (e: IllegalArgumentException) {
                 _uiState.update { it.copy(isSubmitting = false, error = UiText.Res(R.string.connect_error_https_only)) }

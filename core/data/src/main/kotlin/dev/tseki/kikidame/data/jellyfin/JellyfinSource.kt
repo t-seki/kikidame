@@ -5,7 +5,7 @@ import dev.tseki.kikidame.data.source.DownloadStream
 import dev.tseki.kikidame.data.source.ScanListener
 import dev.tseki.kikidame.data.source.SourceGateway
 import dev.tseki.kikidame.domain.ConnectedSource
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceItemId
@@ -24,9 +24,9 @@ class JellyfinSource @Inject constructor(
     private val store: SessionStore,
 ) : SourceGateway {
 
-    /** 選んだライブラリの全体。ライブラリを選んでいなければ [ServerException.Unauthorized]。一覧が一度に返るので [listener] は使わない。 */
+    /** 選んだライブラリの全体。ライブラリを選んでいなければ [SourceException.Unauthorized]。一覧が一度に返るので [listener] は使わない。 */
     override suspend fun fetchAll(listener: ScanListener): SourceSnapshot {
-        val ready = (store.current() as? SessionState.Ready)?.source as? ConnectedSource.Jellyfin ?: throw ServerException.Unauthorized()
+        val ready = (store.current() as? SessionState.Ready)?.source as? ConnectedSource.Jellyfin ?: throw SourceException.Unauthorized()
         return gateway.fetchLibrary(ready.session.credentials(), ready.library.id)
     }
 
@@ -41,8 +41,8 @@ class JellyfinSource @Inject constructor(
 
     /** ダウンロードはライブラリを選ぶ前（[SessionState.NeedsLibrary]）でも行う（`DownloadWorker` の挙動）。 */
     private suspend fun credentials(): ServerCredentials = when (val s = store.current()) {
-        is SessionState.Ready -> (s.source as? ConnectedSource.Jellyfin)?.session?.credentials() ?: throw ServerException.Unauthorized()
+        is SessionState.Ready -> (s.source as? ConnectedSource.Jellyfin)?.session?.credentials() ?: throw SourceException.Unauthorized()
         is SessionState.NeedsLibrary -> s.session.credentials()
-        is SessionState.SignedOut -> throw ServerException.Unauthorized()
+        is SessionState.SignedOut -> throw SourceException.Unauthorized()
     }
 }

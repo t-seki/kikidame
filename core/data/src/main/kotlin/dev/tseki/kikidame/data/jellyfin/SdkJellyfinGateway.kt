@@ -6,7 +6,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.tseki.kikidame.data.source.DownloadStream
 import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.SourceEpisode
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SourceProgram
 import dev.tseki.kikidame.domain.SourceSnapshot
@@ -74,8 +74,8 @@ class SdkJellyfinGateway @Inject constructor(
     override suspend fun signIn(serverUrl: String, userName: String, password: String): Session = call {
         val api = api(serverUrl)
         val result by api.authenticationApi.authenticateUserByName(username = userName, password = password)
-        val token = result.accessToken ?: throw ServerException.Failed("no access token in response")
-        val user = result.user ?: throw ServerException.Failed("no user in response")
+        val token = result.accessToken ?: throw SourceException.Failed("no access token in response")
+        val user = result.user ?: throw SourceException.Failed("no user in response")
         Session(
             serverUrl = serverUrl,
             userName = user.name ?: userName,
@@ -195,17 +195,17 @@ class SdkJellyfinGateway @Inject constructor(
             200, 206 -> Unit
             401, 403 -> {
                 response.close()
-                throw ServerException.Unauthorized()
+                throw SourceException.Unauthorized()
             }
             else -> {
                 val code = response.code
                 response.close()
-                throw ServerException.Failed("HTTP $code")
+                throw SourceException.Failed("HTTP $code")
             }
         }
         val body = response.body ?: run {
             response.close()
-            throw ServerException.Failed("empty body")
+            throw SourceException.Failed("empty body")
         }
         val contentRange = response.header("Content-Range")
         Log.i(TAG, "download ${episodeSourceId.value} from $rangeStart -> HTTP ${response.code} Content-Range=$contentRange")
@@ -245,10 +245,10 @@ class SdkJellyfinGateway @Inject constructor(
         )
     }
 
-    /** SDK の例外を [ServerException] に正規化する（コルーチンの取り消しは包まずに通す。SDK が取り消しをそのまま投げるかは未確認）。原因の連鎖はログに残す（トークンは含まれない）。 */
+    /** SDK の例外を [SourceException] に正規化する（コルーチンの取り消しは包まずに通す。SDK が取り消しをそのまま投げるかは未確認）。原因の連鎖はログに残す（トークンは含まれない）。 */
     internal suspend fun <T> call(block: suspend () -> T): T = try {
         block()
-    } catch (e: ServerException) {
+    } catch (e: SourceException) {
         throw e
     } catch (e: CancellationException) {
         // コルーチンの取り消しは失敗ではない。Failed に包むと、取り消された同期が失敗の文言になり、取り消しが伝わらない
@@ -257,11 +257,11 @@ class SdkJellyfinGateway @Inject constructor(
         Log.w(TAG, "server call failed: ${e.causeChain()}")
         throw when (e) {
             is InvalidStatusException ->
-                if (e.status == 401 || e.status == 403) ServerException.Unauthorized(e) else ServerException.Failed("HTTP ${e.status}", e)
-            is TimeoutException, is SecureConnectionException, is IOException -> ServerException.Unreachable(e)
+                if (e.status == 401 || e.status == 403) SourceException.Unauthorized(e) else SourceException.Failed("HTTP ${e.status}", e)
+            is TimeoutException, is SecureConnectionException, is IOException -> SourceException.Unreachable(e)
             is ApiClientException ->
-                if (e.cause is IOException) ServerException.Unreachable(e) else ServerException.Failed(e.message ?: "api error", e)
-            else -> ServerException.Failed(e.message ?: e::class.simpleName ?: "error", e)
+                if (e.cause is IOException) SourceException.Unreachable(e) else SourceException.Failed(e.message ?: "api error", e)
+            else -> SourceException.Failed(e.message ?: e::class.simpleName ?: "error", e)
         }
     }
 

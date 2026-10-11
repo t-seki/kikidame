@@ -59,3 +59,5 @@ date: 2026-10-10
   8. 選ぶときは、取得元の選択の「端末のフォルダ」から説明の画面（3 段の構成の例と、内部ストレージの直下や Download そのものは選べないこと）を経て、OS のフォルダ選択（`ACTION_OPEN_DOCUMENT_TREE`）を開く。選んだ後は SMB と同じく直下が読めるかだけを確かめて保存する
   - 接続の型は `ConnectedSource.Device`、DataStore のキーは `device_*` を足した（既存のキーは変えていないので、移行は要らない）。依存は足していない（`DocumentsContract` と `ContentResolver` は SDK の標準）
   - SAF の実機の挙動（`Download` の下のサブフォルダを選べるか、SD カードのツリーの URI の形と authority、フォルダの中のファイルが多いときの遅さ）は確かめていない（未確認。`docs/development.md` の「実機で試す（#199）」の確認項目）
+
+改名の注記（#239）: 上の本文の `ServerException` は、その後 `SourceException` に改めた（この ADR の最初の一歩では `Server*` の改名に含めていなかった）。本文は当時の記述のまま残している。

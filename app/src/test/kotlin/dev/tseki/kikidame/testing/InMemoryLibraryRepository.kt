@@ -39,9 +39,9 @@ class InMemoryLibraryRepository : LibraryRepository {
     override suspend fun getEpisode(episodeId: EpisodeId): EpisodeWithState? = episodes.value.firstOrNull { it.episode.id == episodeId }
     override suspend fun getPlayableEpisodes(programId: ProgramId): List<EpisodeWithState> =
         episodes.value.filter { it.episode.programId == programId && it.isPlayable }.sortedWith(compareBy(EpisodeOrder) { it.episode })
-    override suspend fun getRecentlyListened(limit: Int): List<EpisodeWithState> = recentlyListened(episodes.value).take(limit)
-    override fun observeRecentlyListened(): Flow<List<EpisodeWithState>> = episodes.map(::recentlyListened)
-    private fun recentlyListened(list: List<EpisodeWithState>): List<EpisodeWithState> =
+    override suspend fun getContinueListening(limit: Int): List<EpisodeWithState> = continueListening(episodes.value).take(limit)
+    override fun observeContinueListening(): Flow<List<EpisodeWithState>> = episodes.map(::continueListening)
+    private fun continueListening(list: List<EpisodeWithState>): List<EpisodeWithState> =
         list
             .filter { it.isPlayable && it.playback?.let { p -> !p.played && !PlaybackRules.isNotStarted(p) } == true }
             .sortedByDescending { it.playback!!.updatedAt }

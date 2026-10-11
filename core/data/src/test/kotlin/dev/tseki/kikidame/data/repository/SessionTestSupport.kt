@@ -4,7 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import dev.tseki.kikidame.data.session.SessionStore
-import dev.tseki.kikidame.data.session.TokenCipher
+import dev.tseki.kikidame.data.session.CredentialCipher
 import dev.tseki.kikidame.data.sharedfolder.FolderEntry
 import dev.tseki.kikidame.data.sharedfolder.FolderFileStream
 import dev.tseki.kikidame.data.sharedfolder.CloseableFolderTree
@@ -16,7 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 import java.io.File
 
 /** 暗号化の代わりに印を付けるだけ。復号できたかはテストで見える。 */
-class FakeTokenCipher : TokenCipher {
+class FakeCredentialCipher : CredentialCipher {
     override fun encrypt(plain: String): String = "enc[$plain]"
     override fun decrypt(stored: String): String = stored.removePrefix("enc[").removeSuffix("]")
 }
@@ -25,7 +25,7 @@ fun testDataStore(dir: File, scope: CoroutineScope): DataStore<Preferences> =
     PreferenceDataStoreFactory.create(scope = scope) { File(dir, "session.preferences_pb") }
 
 fun testSessionStore(dir: File, scope: CoroutineScope): SessionStore =
-    SessionStore(testDataStore(dir, scope), FakeTokenCipher())
+    SessionStore(testDataStore(dir, scope), FakeCredentialCipher())
 
 /** 共有フォルダの木の代わり。[entries] は相対パス（根は空）からその直下の子へ。[failure] があれば [list] が投げる。 */
 class FakeFolderTree(

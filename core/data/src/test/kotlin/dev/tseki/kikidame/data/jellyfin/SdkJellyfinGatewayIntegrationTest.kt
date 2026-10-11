@@ -5,7 +5,7 @@ import android.provider.Settings
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tseki.kikidame.domain.PublishedAt
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceItemId
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
@@ -155,17 +155,17 @@ class SdkJellyfinGatewayIntegrationTest {
 
     @Test
     fun badCredentialsAreUnauthorized() = runTest {
-        assertFailsWith<ServerException.Unauthorized> { gateway.signIn(url!!, user, "wrong-$password") }
+        assertFailsWith<SourceException.Unauthorized> { gateway.signIn(url!!, user, "wrong-$password") }
 
         val credentials = signIn()
         val bogus = credentials.copy(accessToken = "0123456789abcdef0123456789abcdef")
-        assertFailsWith<ServerException.Unauthorized> { gateway.listLibraries(bogus) }
+        assertFailsWith<SourceException.Unauthorized> { gateway.listLibraries(bogus) }
         val episode = gateway.fetchLibrary(credentials, radio(credentials)).episodes.first()
-        assertFailsWith<ServerException.Unauthorized> { gateway.openDownload(bogus, episode.sourceId, 0) }
+        assertFailsWith<SourceException.Unauthorized> { gateway.openDownload(bogus, episode.sourceId, 0) }
     }
 
     @Test
     fun closedPortIsUnreachable() = runTest {
-        assertFailsWith<ServerException.Unreachable> { gateway.signIn("http://127.0.0.1:1", user, password) }
+        assertFailsWith<SourceException.Unreachable> { gateway.signIn("http://127.0.0.1:1", user, password) }
     }
 }

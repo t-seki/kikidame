@@ -3,7 +3,7 @@ package dev.tseki.kikidame.data.device
 import dev.tseki.kikidame.data.sharedfolder.AudioTags
 import dev.tseki.kikidame.data.sharedfolder.FolderEntry
 import dev.tseki.kikidame.data.sharedfolder.SharedFolderSource
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceItemId
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -71,8 +71,8 @@ class DeviceFolderTreeTest {
     fun missingRootIsUnauthorizedNotNull() {
         // 根が無いのを null で返すと、全走査が到達不能で終わるか、番組ごとの取得が全番組を消失と判断する（#199 の決定 5）
         documents.rootGone = true
-        assertFailsWith<ServerException.Unauthorized> { tree().list("") }
-        assertFailsWith<ServerException.Unauthorized> { tree().list("TBS/Junk") }
+        assertFailsWith<SourceException.Unauthorized> { tree().list("") }
+        assertFailsWith<SourceException.Unauthorized> { tree().list("TBS/Junk") }
     }
 
     /**
@@ -92,13 +92,13 @@ class DeviceFolderTreeTest {
         val tree = DeviceFolderTree(object : DeviceDocuments by files {
             override fun query(treeUri: String, documentId: String) = files.query(treeUri, documentId)?.copy(isDirectory = false)
         }, files.treeUri)
-        assertFailsWith<ServerException.Unauthorized> { tree.list("") }
+        assertFailsWith<SourceException.Unauthorized> { tree.list("") }
     }
 
     @Test
     fun noPersistedPermissionIsUnauthorized() {
         val tree = DeviceFolderTree(MemoryDeviceDocuments(granted = false), MemoryDeviceDocuments.TREE_URI)
-        assertFailsWith<ServerException.Unauthorized> { tree.list("") }
+        assertFailsWith<SourceException.Unauthorized> { tree.list("") }
     }
 
     @Test
@@ -106,8 +106,8 @@ class DeviceFolderTreeTest {
         val tree = tree()
         tree.list("")
         documents.securityFailure = true
-        assertFailsWith<ServerException.Unauthorized> { tree.list("TBS") }
-        assertFailsWith<ServerException.Unauthorized> { tree.open("TBS/Junk/2026-10-01.m4a", 0) }
+        assertFailsWith<SourceException.Unauthorized> { tree.list("TBS") }
+        assertFailsWith<SourceException.Unauthorized> { tree.open("TBS/Junk/2026-10-01.m4a", 0) }
     }
 
     @Test
@@ -178,8 +178,8 @@ class DeviceFolderTreeTest {
     fun failingRootQueryDuringAScanIsUnreachable() = runTest {
         documents.queryFailure = IllegalArgumentException("Failed during query")
         val source = SharedFolderSource(tree(), { _, _, _ -> AudioTags() }, { emptyMap() })
-        assertFailsWith<ServerException.Unreachable> { source.fetchAll() }
-        assertFailsWith<ServerException.Unreachable> { source.fetchProgram(SourceItemId("TBS/Junk")) }
+        assertFailsWith<SourceException.Unreachable> { source.fetchAll() }
+        assertFailsWith<SourceException.Unreachable> { source.fetchProgram(SourceItemId("TBS/Junk")) }
     }
 
     @Test
@@ -187,7 +187,7 @@ class DeviceFolderTreeTest {
         // アクセスが切れたらやり直さずにログアウトへ（到達不能にしない。#199 の決定 5）
         documents.rootGone = true
         val source = SharedFolderSource(tree(), { _, _, _ -> AudioTags() }, { emptyMap() })
-        assertFailsWith<ServerException.Unauthorized> { source.fetchAll() }
-        assertFailsWith<ServerException.Unauthorized> { source.fetchProgram(SourceItemId("TBS/Junk")) }
+        assertFailsWith<SourceException.Unauthorized> { source.fetchAll() }
+        assertFailsWith<SourceException.Unauthorized> { source.fetchProgram(SourceItemId("TBS/Junk")) }
     }
 }

@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.tseki.kikidame.R
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.domain.SmbConnection
@@ -83,7 +83,7 @@ class SmbConnectViewModel @Inject constructor(
                 _uiState.update { it.copy(isSubmitting = false, password = "") }
                 // 画面が消えても最後まで走らせる（結果の文言は一覧側に出る）
                 refresher.launchRefresh()
-            } catch (e: ServerException) {
+            } catch (e: SourceException) {
                 Log.w(TAG, "connect to the shared folder failed", e)
                 _uiState.update { it.copy(isSubmitting = false, error = e.connectErrorText(e.toSmbUserMessage(), localNetworkPermission)) }
             } catch (e: IllegalArgumentException) {
@@ -99,8 +99,8 @@ class SmbConnectViewModel @Inject constructor(
 }
 
 /** SMB の接続画面の文言（Jellyfin の [dev.tseki.kikidame.sync.toUserMessage] は URL やサーバの文言なので別にする）。 */
-internal fun ServerException.toSmbUserMessage(): UiText = when (this) {
-    is ServerException.Unauthorized -> UiText.Res(R.string.smb_error_unauthorized)
-    is ServerException.Unreachable -> UiText.Res(R.string.smb_error_unreachable)
-    is ServerException.Failed -> UiText.Res(R.string.smb_error_failed, message.orEmpty())
+internal fun SourceException.toSmbUserMessage(): UiText = when (this) {
+    is SourceException.Unauthorized -> UiText.Res(R.string.smb_error_unauthorized)
+    is SourceException.Unreachable -> UiText.Res(R.string.smb_error_unreachable)
+    is SourceException.Failed -> UiText.Res(R.string.smb_error_failed, message.orEmpty())
 }

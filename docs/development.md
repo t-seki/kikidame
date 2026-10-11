@@ -567,7 +567,7 @@ SMB の取得元（epic #195 の C、#198）は、worker の環境に NAS も実
 
 - 共有に `<配信元>/<番組>/<各回のファイル>` の 3 段で、m4a と mp3 を置く（タグの付いたものと、タグの無いものの両方）。`@eaDir` や `#recycle` のような名前が `.`・`@`・`#` で始まるフォルダも混ぜておく
 - debug 版は `dev.tseki.kikidame.debug`（「マージ前の検証」の手順 3）。`$ADB` と `$PKG` は「実機で試す（M1）」の接続の節のとおり
-- 失敗の原因は logcat に出る。接続画面で失敗したときは `SmbConnect` タグ、同期・ダウンロードで共有フォルダに触って失敗したときは `SessionSourceGateway` タグに、原因の連鎖付きで出る（認証の失敗は `ServerException.Unauthorized`、届かないは `Unreachable`）。クラッシュは `AndroidRuntime`:
+- 失敗の原因は logcat に出る。接続画面で失敗したときは `SmbConnect` タグ、同期・ダウンロードで共有フォルダに触って失敗したときは `SessionSourceGateway` タグに、原因の連鎖付きで出る（認証の失敗は `SourceException.Unauthorized`、届かないは `Unreachable`）。クラッシュは `AndroidRuntime`:
   ```bash
   $ADB logcat -d | grep -E "SmbConnect|SessionSourceGateway|AndroidRuntime" | tail -50
   ```

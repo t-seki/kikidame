@@ -19,10 +19,10 @@ import kotlin.time.Duration
 /**
  * Android Auto のブラウズツリー（#96）。ルートの下は「続きから」「よく聴く」「番組」のタブ → 番組 → 手元にある各回の
  * 3 階層（Auto が推奨する上限内）。手元に無い回は出さない（運転中に落とさせない）。
- * 「続きから」（#108）は最近聴いた各回（[LibraryRepository.getRecentlyListened]）を直接並べ、1 つも無ければタブごと出さない。
+ * 「続きから」（#108）は途中まで聴いた各回（[LibraryRepository.getContinueListening]）を直接並べ、1 つも無ければタブごと出さない。
  * 「よく聴く」は、印が付いていて手元に回がある番組が 1 つも無ければタブごと出さない。
  * 「最近」（`LibraryParams.isRecent`。端末の再起動直後などにシステムが出す再開の候補）は [Node.Recent] で、
- * 最近聴いた各回の先頭 1 件だけを返す。
+ * 「続きから」の各回の先頭 1 件だけを返す。
  *
  * ID の形は [Node]。各回の ID は [EpisodeMediaItems.mediaId] と同じなので、ツリーから選ばれた回は
  * 既存の `onAddMediaItems` / `onSetMediaItems` がそのまま解決できる。
@@ -48,15 +48,15 @@ class BrowseTree(
 
     fun root(): MediaItem = folder(ROOT_ID, "", MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
 
-    /** `isRecent` のルート。子は [recentlyListened] の先頭 1 件（無ければ空）。 */
+    /** `isRecent` のルート。子は [continueListening] の先頭 1 件（無ければ空）。 */
     fun recentRoot(): MediaItem = folder(RECENT_ID, "", MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
 
     /** [parentId] の子。ツリーに無い ID なら null（`RESULT_ERROR_BAD_VALUE`）。各回は葉なので空リスト。 */
     suspend fun children(parentId: String): List<MediaItem>? = when (val node = parse(parentId)) {
         null -> null
         Node.Root -> rootChildren()
-        Node.Continue -> recentlyListened(CONTINUE_LIMIT).map { (episode, program) -> episodeItem(episode, program) }
-        Node.Recent -> recentlyListened(1).map { (episode, program) -> episodeItem(episode, program) }
+        Node.Continue -> continueListening(CONTINUE_LIMIT).map { (episode, program) -> episodeItem(episode, program) }
+        Node.Recent -> continueListening(1).map { (episode, program) -> episodeItem(episode, program) }
         Node.Starred -> programsWithLocalEpisodes().filter { it.program.starred }.map(::programItem)
         Node.Programs -> programsWithLocalEpisodes().map(::programItem)
         is Node.Program -> {
@@ -84,7 +84,7 @@ class BrowseTree(
     private suspend fun rootChildren(): List<MediaItem> {
         val programs = programsWithLocalEpisodes()
         return buildList {
-            if (recentlyListened(1).isNotEmpty()) add(folder(CONTINUE_ID, labels.continueListening, MediaMetadata.MEDIA_TYPE_FOLDER_PODCASTS))
+            if (continueListening(1).isNotEmpty()) add(folder(CONTINUE_ID, labels.continueListening, MediaMetadata.MEDIA_TYPE_FOLDER_PODCASTS))
             if (programs.any { it.program.starred }) add(folder(STARRED_ID, labels.starred, MediaMetadata.MEDIA_TYPE_FOLDER_PODCASTS))
             add(folder(PROGRAMS_ID, labels.programs, MediaMetadata.MEDIA_TYPE_FOLDER_PODCASTS))
         }
@@ -94,9 +94,9 @@ class BrowseTree(
     private suspend fun programsWithLocalEpisodes(): List<ProgramSummary> =
         library.observePrograms().first().filter { it.localEpisodeCount > 0 }
 
-    /** 最近聴いた各回とその番組。番組が消えている回（無いはず）は飛ばす。 */
-    private suspend fun recentlyListened(limit: Int): List<Pair<EpisodeWithState, Program>> =
-        library.getRecentlyListened(limit).mapNotNull { episode ->
+    /** 「続きから」の各回とその番組。番組が消えている回（無いはず）は飛ばす。 */
+    private suspend fun continueListening(limit: Int): List<Pair<EpisodeWithState, Program>> =
+        library.getContinueListening(limit).mapNotNull { episode ->
             library.getProgram(episode.episode.programId)?.let { episode to it }
         }
 

@@ -4,7 +4,7 @@ import dev.tseki.kikidame.data.source.DownloadStream
 import dev.tseki.kikidame.data.source.ScanListener
 import dev.tseki.kikidame.data.source.SourceGateway
 import dev.tseki.kikidame.domain.PublishedAt
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SourceProgram
@@ -38,7 +38,7 @@ import kotlin.time.Instant
  * - 全走査は一覧を先に全部取ってから番組ごとにタグを読み、読み終えた番組を [ScanListener] に流す（#209 の決定 1。epic #195 の決定 8 の
  *   「全部読んでからまとめて取り込む」を改めた）。取り込み済みの回は DB に大きさと更新日時を持つので、途中で止まっても次の走査は
  *   その回のタグを読まない（#209 の決定 2）。木の操作が失敗したら接続を張り直してやり直し、続けて 3 回失敗したら到達不能（#209 の決定 4）
- * - 木の操作が例外を投げたら（全走査ではやり直しても失敗したら）[ServerException.Unreachable]（今の Jellyfin と同じく到達不能、判断保留）。
+ * - 木の操作が例外を投げたら（全走査ではやり直しても失敗したら）[SourceException.Unreachable]（今の Jellyfin と同じく到達不能、判断保留）。
  *   番組のフォルダが無ければ [fetchProgram] が null（消失）
  *
  * 接続の情報は [tree] の側で持つ。取得元の種類による切り替えは `SessionSourceGateway`（#198）が行う。
@@ -60,8 +60,8 @@ class SharedFolderSource(
      *
      * 木の操作（一覧・タグの読み取り）が失敗したら、[FolderTree.reset] で接続を捨ててから同じ操作をやり直す（タグは同じファイルの頭から）。
      * 続けて [MAX_CONSECUTIVE_FAILURES] 回失敗したら到達不能で終わる。成功を挟めば数え直す。
-     * [ServerException]（認証・権限など、やり直しても変わらない失敗）はやり直さずにそのまま投げる。ファイルが無い（[FileNotFoundException]）も
-     * やり直さず、今までどおり [ServerException.Unreachable] に包んで投げる。
+     * [SourceException]（認証・権限など、やり直しても変わらない失敗）はやり直さずにそのまま投げる。ファイルが無い（[FileNotFoundException]）も
+     * やり直さず、今までどおり [SourceException.Unreachable] に包んで投げる。
      */
     override suspend fun fetchAll(listener: ScanListener): SourceSnapshot {
         val previous = scanned.load()
@@ -94,7 +94,7 @@ class SharedFolderSource(
     /** 全走査の 1 段目: 番組と、その各回のファイル（並べ替え・絞り込み済み）の一覧。 */
     private suspend fun listLibrary(retry: Retry): List<Pair<SourceProgram, List<FolderEntry>>> {
         val root = retry { tree.list(ROOT) }
-            ?: throw ServerException.Unreachable(IOException("shared folder root not found"))
+            ?: throw SourceException.Unreachable(IOException("shared folder root not found"))
         val listed = ArrayList<Pair<SourceProgram, List<FolderEntry>>>()
         for (publisher in root.directories()) {
             currentCoroutineContext().ensureActive()
@@ -127,15 +127,15 @@ class SharedFolderSource(
                     return result
                 } catch (e: CancellationException) {
                     throw e
-                } catch (e: ServerException) {
+                } catch (e: SourceException) {
                     throw e
                 } catch (e: FileNotFoundException) {
-                    throw ServerException.Unreachable(e)
+                    throw SourceException.Unreachable(e)
                 } catch (e: Exception) {
                     e
                 }
                 failures++
-                if (failures >= MAX_CONSECUTIVE_FAILURES) throw ServerException.Unreachable(error)
+                if (failures >= MAX_CONSECUTIVE_FAILURES) throw SourceException.Unreachable(error)
                 withContext(io) { tree.reset() }
                 delay(retryDelay)
             }
@@ -161,14 +161,14 @@ class SharedFolderSource(
 
     /**
      * 各回のファイルを [rangeStart] から開く。木はオフセットから読めるので、[rangeStart] > 0 なら常に続きから返す。
-     * ファイルが無ければ [ServerException.Failed]、それ以外の失敗は [ServerException.Unreachable]。
+     * ファイルが無ければ [SourceException.Failed]、それ以外の失敗は [SourceException.Unreachable]。
      */
     override suspend fun openDownload(episodeId: SourceItemId, rangeStart: Long): DownloadStream {
         val file = onTree {
             try {
                 tree.open(episodeId.value, rangeStart)
             } catch (e: FileNotFoundException) {
-                throw ServerException.Failed("not found: ${episodeId.value}", e)
+                throw SourceException.Failed("not found: ${episodeId.value}", e)
             }
         }
         return DownloadStream(
@@ -261,10 +261,10 @@ class SharedFolderSource(
             block { context.ensureActive() }
         } catch (e: CancellationException) {
             throw e
-        } catch (e: ServerException) {
+        } catch (e: SourceException) {
             throw e
         } catch (e: Exception) {
-            throw ServerException.Unreachable(e)
+            throw SourceException.Unreachable(e)
         }
     }
 

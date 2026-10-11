@@ -10,7 +10,7 @@ data class ProgramSummary(
     val episodeCount: Int,
     /** 手元にファイルがある各回の数。 */
     val localEpisodeCount: Int,
-    /** 手元にファイルがあって再生済みでない各回の数（#41）。聴きかけ・聴いている回も再生済みでなければ数える。取得元にしか無い回は数えない。 */
+    /** 手元にファイルがあって再生済みでない各回の数（#41）。途中まで聴いた回・聴いている回も再生済みでなければ数える。取得元にしか無い回は数えない。 */
     val unplayedLocalCount: Int,
     val latestPublishedAt: Instant?,
 )
@@ -53,16 +53,16 @@ interface LibraryRepository {
     /** 連続再生用。[EpisodeOrder] の順（古い順）で、手元にあるものだけ。 */
     suspend fun getPlayableEpisodes(programId: ProgramId): List<EpisodeWithState>
     /**
-     * 最近聴いた各回（#108）: 手元にあり（[EpisodeWithState.isPlayable]）、再生済みでなく、聴き始めている
+     * 「続きから」の各回（#108）: 手元にあり（[EpisodeWithState.isPlayable]）、再生済みでなく、聴き始めている
      * （[PlaybackRules.isNotStarted] が false）各回を、[PlaybackState.updatedAt] の新しい順に [limit] 件まで。
      * Android Auto の「続きから」と、プレイヤーが空のときの再開（`onPlaybackResumption`）が使う。
      */
-    suspend fun getRecentlyListened(limit: Int): List<EpisodeWithState>
+    suspend fun getContinueListening(limit: Int): List<EpisodeWithState>
     /**
-     * [getRecentlyListened] と同じ条件・順で件数の上限なし。再生位置の保存・再生済みの切り替え・ファイルの削除や同期に追従する。
+     * [getContinueListening] と同じ条件・順で件数の上限なし。再生位置の保存・再生済みの切り替え・ファイルの削除や同期に追従する。
      * 番組一覧の「続きから」タブ（#151）が使う。
      */
-    fun observeRecentlyListened(): Flow<List<EpisodeWithState>>
+    fun observeContinueListening(): Flow<List<EpisodeWithState>>
 
     /** 同期対象と保持ルールを保存する。適用は次の同期（保存した瞬間には何も消えない）。 */
     suspend fun updateSync(programId: ProgramId, syncEnabled: Boolean, rule: RetentionRule)

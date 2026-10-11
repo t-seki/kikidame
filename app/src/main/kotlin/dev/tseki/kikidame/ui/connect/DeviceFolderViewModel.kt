@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.DeviceFolder
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.domain.UnsupportedFolderException
@@ -78,7 +78,7 @@ class DeviceFolderViewModel @Inject constructor(
                 }
             } catch (e: UnsupportedFolderException) {
                 _uiState.update { it.copy(isSubmitting = false, error = UiText.Res(R.string.device_folder_error_not_device)) }
-            } catch (e: ServerException) {
+            } catch (e: SourceException) {
                 // 例外の文言（英語の内部の文言と URI）は画面に出さず、logcat に残す。SMB の認証の失敗と同じく固定の文言にする
                 Log.w(TAG, "pick the device folder failed", e)
                 _uiState.update { it.copy(isSubmitting = false, error = UiText.Res(R.string.device_folder_error_failed)) }

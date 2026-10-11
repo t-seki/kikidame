@@ -17,7 +17,7 @@ import dev.tseki.kikidame.domain.RefreshResult
 import dev.tseki.kikidame.domain.ScanProgress
 import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceEpisodes
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SourceProgram
 import dev.tseki.kikidame.domain.SourceSnapshot
@@ -166,7 +166,7 @@ class RoomLibraryRefreshRepository @Inject constructor(
     }
 
     private suspend fun requireReady(): SessionState.Ready =
-        store.current() as? SessionState.Ready ?: throw ServerException.Unauthorized()
+        store.current() as? SessionState.Ready ?: throw SourceException.Unauthorized()
 
     internal suspend fun apply(snapshot: SourceSnapshot): RefreshResult = db.withTransaction {
         val programDao = db.programDao()
