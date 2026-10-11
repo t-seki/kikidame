@@ -53,6 +53,7 @@ class PlaybackService : MediaLibraryService() {
     @Inject lateinit var nowPlaying: NowPlaying
     @Inject lateinit var settings: AppSettingsRepository
     @Inject lateinit var sleepTimer: SleepTimer
+    @Inject lateinit var programQueue: ProgramQueue
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var session: MediaLibrarySession? = null
     private var positionPersister: PositionPersister? = null
@@ -169,7 +170,7 @@ class PlaybackService : MediaLibraryService() {
         ): ListenableFuture<List<MediaItem>> = scope.future { resolve(mediaItems) }
         /**
          * Auto で各回を選ぶと、その 1 件だけが `setMediaItems` で来る。アプリの再生画面（`PlayerViewModel.open`）と同じく、
-         * 番組の手元にある回を古い順に全部積み、その回から、保存位置の規則（[PlaybackRules.resumePosition]）で始める。
+         * 番組の手元にある回を古い順に全部積み、その回から、保存位置の規則（[PlaybackRules.resumePosition]）で始める（[ProgramQueue]）。
          * それ以外（複数件・開始位置の指定あり）は来たものをそのまま解決する。
          */
         override fun onSetMediaItems(
@@ -202,19 +203,10 @@ class PlaybackService : MediaLibraryService() {
                 ?: return@future MediaSession.MediaItemsWithStartPosition(emptyList(), C.INDEX_UNSET, C.TIME_UNSET)
             programQueueStartingAt(recent)
         }
-        /**
-         * [target] の番組の手元にある回を古い順に全部積み、その回から、保存位置の規則（[PlaybackRules.resumePosition]）で始める
-         * （`PlayerViewModel.open` と同じ）。
-         */
+        /** [target] の番組のキュー（[ProgramQueue]。`PlayerViewModel.open` と共通）。 */
         private suspend fun programQueueStartingAt(target: EpisodeWithState): MediaSession.MediaItemsWithStartPosition {
-            val episodeId = target.episode.id
-            val program = libraryRepository.observeProgram(target.episode.programId).first()
-            val queue = libraryRepository.getPlayableEpisodes(target.episode.programId)
-            val index = queue.indexOfFirst { it.episode.id == episodeId }.coerceAtLeast(0)
-            val saved = playbackStateRepository.get(episodeId)
-            val startMs = saved?.let { PlaybackRules.resumePosition(it.position, target.episode.runtime) }
-                ?.inWholeMilliseconds ?: 0L
-            return MediaSession.MediaItemsWithStartPosition(queue.map { EpisodeMediaItems.toMediaItem(it, program) }, index, startMs)
+            val start = programQueue.startingAt(target)
+            return MediaSession.MediaItemsWithStartPosition(start.items, start.index, start.startMs)
         }
         private suspend fun resolve(mediaItems: List<MediaItem>): List<MediaItem> = mediaItems.mapNotNull { item ->
             val episodeId = EpisodeMediaItems.episodeId(item) ?: return@mapNotNull null

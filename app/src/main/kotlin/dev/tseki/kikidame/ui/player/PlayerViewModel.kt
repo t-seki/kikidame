@@ -3,7 +3,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.C
-import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.navigation.toRoute
@@ -19,6 +18,7 @@ import dev.tseki.kikidame.domain.PlaybackStateRepository
 import dev.tseki.kikidame.playback.EpisodeMediaItems
 import dev.tseki.kikidame.playback.NowPlaying
 import dev.tseki.kikidame.playback.PlayerConnection
+import dev.tseki.kikidame.playback.ProgramQueue
 import dev.tseki.kikidame.playback.SleepTimer
 import dev.tseki.kikidame.playback.SleepTimerSetting
 import dev.tseki.kikidame.ui.PlayerRoute
@@ -34,7 +34,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -70,6 +69,7 @@ class PlayerViewModel @Inject constructor(
     nowPlaying: NowPlaying,
     private val settings: AppSettingsRepository,
     private val sleepTimer: SleepTimer,
+    private val programQueue: ProgramQueue,
 ) : ViewModel() {
     private val route = savedStateHandle.toRoute<PlayerRoute>()
     private val requestedEpisodeId = EpisodeId(route.episodeId)
@@ -189,18 +189,13 @@ class PlayerViewModel @Inject constructor(
             _uiState.update { it.copy(error = UiText.Res(R.string.player_error_file_missing)) }
             return
         }
-        val program = library.observeProgram(target.episode.programId).first()
-        val queue = library.getPlayableEpisodes(target.episode.programId)
-        val index = queue.indexOfFirst { it.episode.id == episodeId }.coerceAtLeast(0)
-        val saved = playbackStates.get(episodeId)
-        val startMs = saved?.let { PlaybackRules.resumePosition(it.position, target.episode.runtime) }
-            ?.inWholeMilliseconds ?: 0L
-        val queueIds = queue.map { EpisodeMediaItems.mediaId(it.episode.id) }
+        // キューと開始位置は Auto・再開と共通（ProgramQueue）。今のキューと同じなら seekTo だけで済ます
+        val (items, index, startMs) = programQueue.startingAt(target)
+        val queueIds = items.map { it.mediaId }
         val currentIds = (0 until player.mediaItemCount).map { player.getMediaItemAt(it).mediaId }
         if (queueIds == currentIds) {
             player.seekTo(index, startMs)
         } else {
-            val items: List<MediaItem> = queue.map { EpisodeMediaItems.toMediaItem(it, program) }
             player.setMediaItems(items, index, startMs)
         }
         player.prepare()
