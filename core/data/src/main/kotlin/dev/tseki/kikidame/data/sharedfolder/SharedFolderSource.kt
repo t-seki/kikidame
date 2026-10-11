@@ -17,7 +17,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
-import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toLocalDateTime
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -243,10 +242,9 @@ class SharedFolderSource(
 
     /** タグが無いときの補い方（epic #195 の決定 9）。取り込み日時はファイルの更新日時。 */
     private fun tagValues(tags: AudioTags, fileName: String, modifiedAt: Instant): TagValues {
-        val date = TagDate.parse(tags.date) ?: modifiedAt.toLocalDateTime(PublishedAt.ZONE).date
         return TagValues(
             title = tags.title?.trim()?.takeIf { it.isNotEmpty() } ?: fileName.substringBeforeLast('.'),
-            publishedAt = date.atStartOfDayIn(PublishedAt.ZONE),
+            publishedAt = PublishedAt.of(TagDate.parse(tags.date), modifiedAt.toLocalDateTime(PublishedAt.ZONE).date),
             runtime = tags.duration?.takeIf { it.isPositive() } ?: Duration.ZERO,
             performers = listOfNotNull(tags.artist?.trim()?.takeIf { it.isNotEmpty() }),
         )
