@@ -9,6 +9,7 @@ import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import dev.tseki.kikidame.data.download.EpisodeDownloader
 import dev.tseki.kikidame.data.source.DownloadStream
+import dev.tseki.kikidame.data.source.ScanListener
 import dev.tseki.kikidame.data.source.SourceGateway
 import dev.tseki.kikidame.domain.DownloadQueue
 import dev.tseki.kikidame.domain.DownloadState
@@ -66,7 +67,7 @@ class DownloadWorkerTest {
     }
 
     private class Source(val files: Map<SourceItemId, ByteArray>, val unauthorized: Boolean = false) : SourceGateway {
-        override suspend fun fetchAll(): SourceSnapshot = error("unused")
+        override suspend fun fetchAll(listener: ScanListener): SourceSnapshot = error("unused")
         override suspend fun fetchProgramEpisodes(programId: SourceItemId): List<SourceEpisode> = error("unused")
         override suspend fun fetchProgram(programId: SourceItemId): SourceProgram? = error("unused")
         override suspend fun openDownload(episodeId: SourceItemId, rangeStart: Long): DownloadStream {
