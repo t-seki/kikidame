@@ -80,11 +80,11 @@ class DeviceFolderViewModel @Inject constructor(
                 // 同期の制約は取得元で変わる（端末のフォルダにはネットワークの条件をかけない）ので、定期同期を組み直す。
                 // 取り消されても次にアプリが前面に出たとき（onAppStart）に組み直される
                 try {
-                    syncScheduler.reschedule()
+                    syncScheduler.schedulePeriodic()
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    Log.w(TAG, "reschedule failed", e)
+                    Log.w(TAG, "schedulePeriodic failed", e)
                 }
             } catch (e: UnsupportedFolderException) {
                 _uiState.update { it.copy(isSubmitting = false, error = UiText.Res(R.string.device_folder_error_not_device)) }
