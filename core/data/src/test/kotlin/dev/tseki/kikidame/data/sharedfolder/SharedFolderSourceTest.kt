@@ -1,28 +1,15 @@
 package dev.tseki.kikidame.data.sharedfolder
 
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import dev.tseki.kikidame.data.db.LocalFileEntity
-import dev.tseki.kikidame.data.files.EpisodesDirectory
-import dev.tseki.kikidame.data.repository.RoomDownloadRepository
-import dev.tseki.kikidame.data.repository.RoomLibraryRefreshRepository
-import dev.tseki.kikidame.data.repository.RoomTestBase
-import dev.tseki.kikidame.data.repository.testSessionStore
-import dev.tseki.kikidame.domain.DownloadState
+import dev.tseki.kikidame.data.repository.RefreshTestBase
 import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SourceProgram
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.runTest
-import org.junit.After
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
+import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
@@ -37,21 +24,11 @@ import kotlin.time.Instant
  * タグの読み取りはフェイク（[FakeTagReader]）。前の走査の結果は Room の回の行から読む（[RoomScannedFiles]）。
  */
 @RunWith(AndroidJUnit4::class)
-class SharedFolderSourceTest : RoomTestBase() {
-    @get:Rule
-    val tmp = TemporaryFolder()
-
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+class SharedFolderSourceTest : RefreshTestBase() {
     private val folder = MemoryFolderTree()
     private val tags = FakeTagReader()
     private val source by lazy { SharedFolderSource(folder.tree, tags, RoomScannedFiles(db.episodeDao())) }
-    private val store by lazy { testSessionStore(tmp.root, scope) }
-    private val directory by lazy { EpisodesDirectory(ApplicationProvider.getApplicationContext()) }
-    private val downloads by lazy { RoomDownloadRepository(db, directory, clock) }
-    private val repo by lazy { RoomLibraryRefreshRepository(db, store, source, downloads, clock) }
-
-    @After
-    fun tearDown() = scope.cancel()
+    private val repo by lazy { refreshRepository(source) }
 
     /** 木を読んでからタグを返す（木の失敗はそのまま投げる。[TagReader] の約束）。読んだパスを記録する。 */
     class FakeTagReader : TagReader {
@@ -296,9 +273,7 @@ class SharedFolderSourceTest : RoomTestBase() {
 
     private suspend fun markDone(sourceId: String): String {
         val row = db.episodeDao().findBySourceItemId(sourceId)!!
-        val path = "${directory.root}/P/番組/${row.title}.m4a"
-        db.localFileDao().upsert(LocalFileEntity(row.id, DownloadState.DONE, path, pinned = true, downloadedAt = now))
-        return path
+        return markDoneAt(row.id, File(directory.root, "P/番組/${row.title}.m4a"), pinned = true, bytes = null).absolutePath
     }
 
     @Test

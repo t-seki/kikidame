@@ -44,7 +44,8 @@ class DataStoreSessionRepositoryTest {
     private val gateway = FakeJellyfinGateway()
     private val dataStore by lazy { testDataStore(tmp.root, scope) }
     private val store by lazy { SessionStore(dataStore, FakeTokenCipher()) }
-    private val trees = FakeFolderTreeFactory()
+    private val tree = FakeFolderTree()
+    private val trees = FakeFolderTreeFactory(tree)
     private val documents = MemoryDeviceDocuments(granted = false)
     private val repo by lazy { DataStoreSessionRepository(store, gateway, trees, documents) }
     private val folderUri = MemoryDeviceDocuments.TREE_URI
@@ -152,11 +153,11 @@ class DataStoreSessionRepositoryTest {
 
     @Test
     fun connectSharedFolderChecksTheRootThenReachesReady() = runTest {
-        trees.tree.entries = mapOf("" to listOf(FolderEntry("Publisher", true, 0, Instant.fromEpochMilliseconds(0))))
+        tree.entries = mapOf("" to listOf(FolderEntry("Publisher", true, 0, Instant.fromEpochMilliseconds(0))))
         repo.connectSharedFolder(SmbConnection("  smb://nas.local/ ", " recordings ", "\\radio//2026/", " alice ", "pw"))
 
         assertEquals(listOf(smb.copy(path = "radio/2026")), trees.opened)
-        assertEquals(true, trees.tree.closed, "the probe connection is closed")
+        assertEquals(1, trees.closes, "the probe connection is closed")
         val ready = assertIs<SessionState.Ready>(repo.state.first())
         assertEquals(ConnectedSource.Smb(smb.copy(path = "radio/2026")), ready.source)
         assertNull(ready.lastFetchedAt)
@@ -173,15 +174,15 @@ class DataStoreSessionRepositoryTest {
 
     @Test
     fun connectionFailuresAreNotSaved() = runTest {
-        trees.tree.failure = ServerException.Unauthorized()
+        tree.failure = ServerException.Unauthorized()
         assertFailsWith<ServerException.Unauthorized> { repo.connectSharedFolder(smb) }
-        trees.tree.failure = IOException("no route to host")
+        tree.failure = IOException("no route to host")
         assertFailsWith<ServerException.Unreachable> { repo.connectSharedFolder(smb) }
-        trees.tree.failure = null
-        trees.tree.entries = emptyMap() // 共有の中のパスが無い
+        tree.failure = null
+        tree.entries = emptyMap() // 共有の中のパスが無い
         assertFailsWith<ServerException.Failed> { repo.connectSharedFolder(smb) }
         assertIs<SessionState.SignedOut>(repo.state.first())
-        assertEquals(true, trees.tree.closed)
+        assertEquals(trees.opened.size, trees.closes, "every connection tried is closed")
     }
 
     @Test
@@ -240,7 +241,7 @@ class DataStoreSessionRepositoryTest {
         repo.connectDeviceFolder(folderUri)
 
         assertEquals(listOf(DeviceFolder(folderUri, "")), trees.openedFolders, "the root is read before saving")
-        assertEquals(true, trees.tree.closed, "the probe tree is closed")
+        assertEquals(1, trees.closes, "the probe tree is closed")
         assertTrue(documents.hasReadPermission(folderUri), "the persisted permission is taken")
         val ready = assertIs<SessionState.Ready>(repo.state.first())
         assertEquals(ConnectedSource.Device(DeviceFolder(folderUri, "Radio")), ready.source)
@@ -260,12 +261,12 @@ class DataStoreSessionRepositoryTest {
     /** 直下が読めなければ保存せず、取った権限を手放す。 */
     @Test
     fun deviceFolderFailuresAreNotSavedAndReleaseThePermission() = runTest {
-        trees.tree.entries = emptyMap() // 根が読めない
+        tree.entries = emptyMap() // 根が読めない
         assertFailsWith<ServerException.Failed> { repo.connectDeviceFolder(folderUri) }
-        trees.tree.entries = mapOf("" to emptyList())
-        trees.tree.failure = ServerException.Unauthorized()
+        tree.entries = mapOf("" to emptyList())
+        tree.failure = ServerException.Unauthorized()
         assertFailsWith<ServerException.Unauthorized> { repo.connectDeviceFolder(folderUri) }
-        trees.tree.failure = IOException("I/O error")
+        tree.failure = IOException("I/O error")
         assertFailsWith<ServerException.Failed> { repo.connectDeviceFolder(folderUri) }
 
         assertIs<SessionState.SignedOut>(repo.state.first())

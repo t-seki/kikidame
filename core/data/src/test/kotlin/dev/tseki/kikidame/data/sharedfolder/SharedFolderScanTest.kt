@@ -1,13 +1,8 @@
 package dev.tseki.kikidame.data.sharedfolder
 
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tseki.kikidame.data.db.LocalFileEntity
-import dev.tseki.kikidame.data.files.EpisodesDirectory
-import dev.tseki.kikidame.data.repository.RoomDownloadRepository
-import dev.tseki.kikidame.data.repository.RoomLibraryRefreshRepository
-import dev.tseki.kikidame.data.repository.RoomTestBase
-import dev.tseki.kikidame.data.repository.testSessionStore
+import dev.tseki.kikidame.data.repository.RefreshTestBase
 import dev.tseki.kikidame.data.source.ScanListener
 import dev.tseki.kikidame.domain.DownloadState
 import dev.tseki.kikidame.domain.EpisodeId
@@ -19,17 +14,12 @@ import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceProgram
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import org.junit.After
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
@@ -45,16 +35,9 @@ import kotlin.time.Duration.Companion.minutes
  * 進み具合が流れること（#209 の決定 1・2・4・6）。木はメモリ上のもの、タグの読み取りはフェイク。
  */
 @RunWith(AndroidJUnit4::class)
-class SharedFolderScanTest : RoomTestBase() {
-    @get:Rule
-    val tmp = TemporaryFolder()
-
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+class SharedFolderScanTest : RefreshTestBase() {
     private val folder = MemoryFolderTree()
     private val tags = SharedFolderSourceTest.FakeTagReader()
-    private val store by lazy { testSessionStore(tmp.root, scope) }
-    private val directory by lazy { EpisodesDirectory(ApplicationProvider.getApplicationContext()) }
-    private val downloads by lazy { RoomDownloadRepository(db, directory, clock) }
 
     /** 読み取り（[FolderTree.read]）を、[failReads] の回数だけ失敗させる木。張り直し（[FolderTree.reset]）を数える。 */
     private var failReads = 0
@@ -85,10 +68,7 @@ class SharedFolderScanTest : RoomTestBase() {
     private fun source(tagReader: TagReader = tags) =
         SharedFolderSource(flaky, tagReader, RoomScannedFiles(db.episodeDao()), retryDelay = Duration.ZERO)
 
-    private fun repo(source: SharedFolderSource = source()) = RoomLibraryRefreshRepository(db, store, source, downloads, clock)
-
-    @After
-    fun tearDown() = scope.cancel()
+    private fun repo(source: SharedFolderSource = source()) = refreshRepository(source)
 
     private suspend fun connect() = store.saveSmb(SmbConnection("nas.local", "recordings", "", "alice", "pw"))
 

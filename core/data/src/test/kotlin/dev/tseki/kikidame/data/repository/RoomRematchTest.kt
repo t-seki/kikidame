@@ -1,14 +1,8 @@
 package dev.tseki.kikidame.data.repository
 
-import dev.tseki.kikidame.data.device.MemoryDeviceDocuments
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import dev.tseki.kikidame.data.jellyfin.JellyfinSource
-import dev.tseki.kikidame.data.db.LocalFileEntity
-import dev.tseki.kikidame.data.files.EpisodesDirectory
 import dev.tseki.kikidame.domain.DownloadState
 import dev.tseki.kikidame.domain.EpisodeWithState
-import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.PlaybackRules
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.RetentionRule
@@ -16,65 +10,27 @@ import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SourceProgram
 import dev.tseki.kikidame.domain.SourceSnapshot
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.After
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.Instant
 
 /** 再取り込み（取得元 ID の変更）後の結び直し（ADR 0005）と、タイトルが違う未結合の各回の第二段突合（公開日 + 尺）。 */
 @RunWith(AndroidJUnit4::class)
-class RoomRematchTest : RoomTestBase() {
-    @get:Rule
-    val tmp = TemporaryFolder()
-
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val gateway = FakeJellyfinGateway()
-    private val store by lazy { testSessionStore(tmp.root, scope) }
-    private val session by lazy { DataStoreSessionRepository(store, gateway, FakeFolderTreeFactory(), MemoryDeviceDocuments()) }
-    private val library by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao(), db.localFileDao()) }
-    private val playback by lazy { RoomPlaybackStateRepository(db, clock) }
-    private val directory by lazy { EpisodesDirectory(ApplicationProvider.getApplicationContext()) }
-    private val downloads by lazy { RoomDownloadRepository(db, directory, clock) }
-    private val repo by lazy { RoomLibraryRefreshRepository(db, store, JellyfinSource(gateway, store), downloads, clock) }
-
+class RoomRematchTest : JellyfinRefreshTestBase() {
     private val publisher = "TBSラジオ"
     private val programName = "パンサー向井のふらっと"
-
-    private fun se(id: String, program: String, title: String, published: String, runtime: Duration = 90.minutes) = SourceEpisode(
-        sourceId = SourceItemId(id),
-        programSourceId = SourceItemId(program),
-        title = title,
-        publishedAt = Instant.parse(if ('T' in published) published else "${published}T00:00:00Z"),
-        addedAt = Instant.parse("2026-09-16T02:00:00Z"),
-        runtime = runtime,
-        sizeBytes = null,
-        container = "m4a",
-    )
 
     private fun snapshot(program: String, vararg episodes: SourceEpisode) =
         SourceSnapshot(listOf(SourceProgram(SourceItemId(program), programName, publisher)), episodes.toList())
 
-    private val original = snapshot("P1", se("E1", "P1", "2026-09-01", "2026-09-01"), se("E2", "P1", "2026-09-02", "2026-09-02"), se("E3", "P1", "2026-09-03", "2026-09-03"))
-
-    private suspend fun signInAndSelect() {
-        session.signIn("jellyfin.lab.example", "alice", "secret")
-        session.selectLibrary(LibraryView(SourceItemId("lib-1"), "Radio", "music", isMusic = true))
-    }
+    private val original = snapshot("P1", sourceEpisode("E1", "2026-09-01", "2026-09-01", program = "P1"), sourceEpisode("E2", "2026-09-02", "2026-09-02", program = "P1"), sourceEpisode("E3", "2026-09-03", "2026-09-03", program = "P1"))
 
     private suspend fun programs() = library.observePrograms().first()
 
@@ -85,13 +41,8 @@ class RoomRematchTest : RoomTestBase() {
 
     private suspend fun markDone(title: String, pinned: Boolean): File {
         val e = episode(title)
-        val file = File(directory.root, "${e.episode.id.value}.m4a").apply { parentFile?.mkdirs(); writeBytes(ByteArray(8)) }
-        db.localFileDao().upsert(LocalFileEntity(e.episode.id.value, DownloadState.DONE, file.absolutePath, pinned = pinned, downloadedAt = now))
-        return file
+        return markDoneAt(e.episode.id.value, File(directory.root, "${e.episode.id.value}.m4a"), pinned)
     }
-
-    @After
-    fun tearDown() = scope.cancel()
 
     @Test
     fun reimportWithNewProgramAndEpisodeIdsKeepsRowsFilesAndPlayback() = runTest {
@@ -107,8 +58,8 @@ class RoomRematchTest : RoomTestBase() {
         // ライブラリを作り直した: 番組も各回も ID が全部変わり、各回が 1 本増えた
         gateway.snapshot = snapshot(
             "P9",
-            se("N1", "P9", "2026-09-01", "2026-09-01"), se("N2", "P9", "2026-09-02", "2026-09-02"),
-            se("N3", "P9", "2026-09-03", "2026-09-03"), se("N4", "P9", "2026-09-04", "2026-09-04"),
+            sourceEpisode("N1", "2026-09-01", "2026-09-01", program = "P9"), sourceEpisode("N2", "2026-09-02", "2026-09-02", program = "P9"),
+            sourceEpisode("N3", "2026-09-03", "2026-09-03", program = "P9"), sourceEpisode("N4", "2026-09-04", "2026-09-04", program = "P9"),
         )
         val result = repo.refresh()
 
@@ -135,7 +86,7 @@ class RoomRematchTest : RoomTestBase() {
         val pinned = markDone("2026-09-01", pinned = true)
         val e1 = episode("2026-09-01").episode.id
 
-        gateway.snapshot = snapshot("P1", se("N1", "P1", "2026-09-01", "2026-09-01"), se("N2", "P1", "2026-09-02", "2026-09-02"), se("N3", "P1", "2026-09-03", "2026-09-03"))
+        gateway.snapshot = snapshot("P1", sourceEpisode("N1", "2026-09-01", "2026-09-01", program = "P1"), sourceEpisode("N2", "2026-09-02", "2026-09-02", program = "P1"), sourceEpisode("N3", "2026-09-03", "2026-09-03", program = "P1"))
         val result = repo.refresh()
 
         assertEquals(0, result.removed)
@@ -153,7 +104,7 @@ class RoomRematchTest : RoomTestBase() {
         val programId = programs().single().program.id
         val goneFile = markDone("2026-09-03", pinned = true)
 
-        gateway.snapshot = snapshot("P1", se("N1", "P1", "2026-09-01", "2026-09-01"), se("N2", "P1", "2026-09-02", "2026-09-02"))
+        gateway.snapshot = snapshot("P1", sourceEpisode("N1", "2026-09-01", "2026-09-01", program = "P1"), sourceEpisode("N2", "2026-09-02", "2026-09-02", program = "P1"))
         val result = repo.refresh()
 
         assertEquals(1, result.removed)
@@ -170,7 +121,7 @@ class RoomRematchTest : RoomTestBase() {
         library.updateSync(programId, true, RetentionRule(keepLatest = 3))
         val file = markDone("2026-09-01", pinned = false)
 
-        gateway.snapshot = snapshot("P1", se("N1", "P1", "2026-09-01", "2026-09-01"), se("N2", "P1", "2026-09-02", "2026-09-02"), se("N3", "P1", "2026-09-03", "2026-09-03"))
+        gateway.snapshot = snapshot("P1", sourceEpisode("N1", "2026-09-01", "2026-09-01", program = "P1"), sourceEpisode("N2", "2026-09-02", "2026-09-02", program = "P1"), sourceEpisode("N3", "2026-09-03", "2026-09-03", program = "P1"))
         val result = assertNotNull(repo.syncProgram(programId))
 
         assertEquals(0, result.removed)
@@ -193,8 +144,8 @@ class RoomRematchTest : RoomTestBase() {
         gateway.snapshot = snapshot(
             "P1",
             // 手元の行の公開日（JST 0 時 = 前日 15:00Z）と同じ日
-            se("E1", "P1", "2026-09-16 (1)", "2026-09-15T15:00:00Z", runtime = 90.minutes),
-            se("E2", "P1", "2026-09-16 (2)", "2026-09-15T15:00:00Z", runtime = 60.minutes + 4.seconds),
+            sourceEpisode("E1", "2026-09-16 (1)", "2026-09-15T15:00:00Z", program = "P1", runtime = 90.minutes),
+            sourceEpisode("E2", "2026-09-16 (2)", "2026-09-15T15:00:00Z", program = "P1", runtime = 60.minutes + 4.seconds),
         )
 
         val result = repo.refresh()
