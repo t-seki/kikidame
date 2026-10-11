@@ -9,6 +9,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -113,31 +114,32 @@ fun KikidameNavHost(sessionViewModel: SessionViewModel = hiltViewModel()) {
                 onPickDeviceFolder = { navController.navigate(DeviceFolderRoute) },
             )
         }
-        composable<ConnectRoute> {
+        composable<ConnectRoute> { entry ->
             ConnectScreen(
-                onBack = navController.backOrNull(),
+                onBack = navController.rememberBackOrNull(entry),
                 onSourceChanged = navController::restartFromSourcePick,
             )
         }
-        composable<SmbConnectRoute> {
+        composable<SmbConnectRoute> { entry ->
             SmbConnectScreen(
-                onBack = navController.backOrNull(),
+                onBack = navController.rememberBackOrNull(entry),
                 onSourceChanged = navController::restartFromSourcePick,
             )
         }
-        composable<DeviceFolderRoute> {
+        composable<DeviceFolderRoute> { entry ->
             DeviceFolderScreen(
-                onBack = navController.backOrNull(),
+                onBack = navController.rememberBackOrNull(entry),
                 onSourceChanged = navController::restartFromSourcePick,
             )
         }
-        composable<LibraryPickRoute> {
-            val fromSettings = navController.previousBackStackEntry != null
+        composable<LibraryPickRoute> { entry ->
+            val onBack = navController.rememberBackOrNull(entry)
+            val fromSettings = onBack != null
             LibraryPickScreen(
                 onDone = {
                     if (fromSettings) navController.popIfNotRoot() else navController.navigate(ProgramListRoute) { popUpTo(0) }
                 },
-                onBack = navController.backOrNull(),
+                onBack = onBack,
             )
         }
         composable<SettingsRoute> {
@@ -198,6 +200,16 @@ private fun SessionState.SignedOut.signedOutDestination(): Any = when {
     lastServerUrl != null -> ConnectRoute
     else -> SourcePickRoute
 }
+
+/**
+ * [backOrNull] を、その画面の back stack entry ごとに入った時点で 1 回だけ決める。
+ * ← で pop すると、出ていく画面は退場のアニメーションの間も描き直される。そのとき
+ * `previousBackStackEntry` は新しい最上位から見たものに変わっていて null になり、毎回読むと
+ * 「戻り先が無い」と判定して「取得元を変える」が一瞬出る。
+ */
+@Composable
+private fun NavHostController.rememberBackOrNull(entry: NavBackStackEntry): (() -> Unit)? =
+    remember(entry) { backOrNull() }
 
 /** 取得元を選んで接続する画面（まだ番組一覧に入っていない）。 */
 private val SIGN_IN_ROUTES: List<KClass<*>> =
