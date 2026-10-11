@@ -81,15 +81,13 @@ class SharedFolderSource(
             for (file in files) {
                 // タグの読み取り（まとめ読みの前の計測で m4a は 1 本 0.9〜1.3 秒。#209）の合間に、取り消されていれば止まる
                 currentCoroutineContext().ensureActive()
-                val id = episodeIdOf(program.sourceId, file)
-                val values = cachedValues(program.sourceId, file, previous) ?: run {
-                    val tags = retry { tags.read(tree, id.value, file.sizeBytes) }
+                programEpisodes += episodeFor(program.sourceId, file, previous) { path, size ->
+                    val tags = retry { tags.read(tree, path, size) }
                     read++
                     readHere = true
                     listener.onTagProgress(read, total)
-                    tagValues(tags, file.name, file.modifiedAt.truncatedToMillis())
+                    tags
                 }
-                programEpisodes += episodeOf(program.sourceId, file, values)
             }
             if (readHere) listener.onProgramScanned(program, programEpisodes)
             episodes += programEpisodes
@@ -193,10 +191,27 @@ class SharedFolderSource(
         entries.audioFiles().map {
             // タグの読み取り（ファイルごとに数秒）の合間に、取り消されていれば止まる
             checkActive()
-            val values = cachedValues(programId, it, previous)
-                ?: tagValues(tags.read(tree, episodeIdOf(programId, it).value, it.sizeBytes), it.name, it.modifiedAt.truncatedToMillis())
-            episodeOf(programId, it, values)
+            episodeFor(programId, it, previous) { path, size -> tags.read(tree, path, size) }
         }
+
+    /**
+     * 1 本の各回を作る。全走査（[fetchAll]）と 1 番組の取得（[episodesIn]）の両方がこれを呼ぶ（#229）。
+     * 前の走査と同じ回なら前の値（[cachedValues]、epic #195 の決定 8）、違えば [readTags] でタグを読み、無い値を補う（[tagValues]、決定 9）。
+     *
+     * タグの読み方（全走査は [Retry] を通す、1 番組は直接読む）と、読んだときの数え上げ・通知（全走査だけ）は [readTags] で渡す。
+     * [readTags] には各回の取得元 ID（相対パス）とファイルの大きさが渡る。取り消しの見方は呼び出し側で行う。
+     * 全走査の [readTags] は suspend の [Retry] を呼ぶので、inline にしてラムダを呼び出し側に展開する。
+     */
+    private inline fun episodeFor(
+        programId: SourceItemId,
+        file: FolderEntry,
+        previous: Map<SourceItemId, ScannedFile>,
+        readTags: (path: String, size: Long) -> AudioTags,
+    ): SourceEpisode {
+        val values = cachedValues(programId, file, previous)
+            ?: tagValues(readTags(episodeIdOf(programId, file).value, file.sizeBytes), file.name, file.modifiedAt.truncatedToMillis())
+        return episodeOf(programId, file, values)
+    }
 
     private fun episodeIdOf(programId: SourceItemId, file: FolderEntry) = SourceItemId("${programId.value}/${file.name}")
 
