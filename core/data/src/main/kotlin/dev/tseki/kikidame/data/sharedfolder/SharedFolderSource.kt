@@ -52,9 +52,6 @@ class SharedFolderSource(
     private val retryDelay: Duration = RETRY_DELAY,
 ) : SourceGateway {
 
-    /** 全走査。途中経過は流さない（[fetchAll] の `listener` 版を [ScanListener.None] で呼ぶ）。 */
-    override suspend fun fetchAll(): SourceSnapshot = fetchAll(ScanListener.None)
-
     /**
      * 全走査（#209 の決定 1・4）。返す一覧は完全な一覧（ADR 0004）。共有フォルダの根が無ければ到達不能。
      *

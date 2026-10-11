@@ -3,6 +3,7 @@ package dev.tseki.kikidame.data.download
 import dev.tseki.kikidame.data.jellyfin.ServerCredentials
 import dev.tseki.kikidame.data.repository.FakeJellyfinGateway
 import dev.tseki.kikidame.data.source.DownloadStream
+import dev.tseki.kikidame.data.source.ScanListener
 import dev.tseki.kikidame.data.source.SourceGateway
 import dev.tseki.kikidame.domain.DownloadQueue
 import dev.tseki.kikidame.domain.DownloadState
@@ -53,7 +54,7 @@ class EpisodeDownloaderTest {
 
     /** ダウンロードだけを [gateway] に渡す取得元。 */
     private val source = object : SourceGateway {
-        override suspend fun fetchAll() = error("unused")
+        override suspend fun fetchAll(listener: ScanListener) = error("unused")
         override suspend fun fetchProgramEpisodes(programId: SourceItemId) = error("unused")
         override suspend fun fetchProgram(programId: SourceItemId) = error("unused")
         override suspend fun openDownload(episodeId: SourceItemId, rangeStart: Long): DownloadStream =
