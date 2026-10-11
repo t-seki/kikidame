@@ -2,6 +2,7 @@ package dev.tseki.kikidame.data.jellyfin
 
 import dev.tseki.kikidame.data.session.SessionStore
 import dev.tseki.kikidame.data.source.DownloadStream
+import dev.tseki.kikidame.data.source.ScanListener
 import dev.tseki.kikidame.data.source.SourceGateway
 import dev.tseki.kikidame.domain.ConnectedSource
 import dev.tseki.kikidame.domain.ServerException
@@ -23,8 +24,8 @@ class JellyfinSource @Inject constructor(
     private val store: SessionStore,
 ) : SourceGateway {
 
-    /** 選んだライブラリの全体。ライブラリを選んでいなければ [ServerException.Unauthorized]。 */
-    override suspend fun fetchAll(): SourceSnapshot {
+    /** 選んだライブラリの全体。ライブラリを選んでいなければ [ServerException.Unauthorized]。一覧が一度に返るので [listener] は使わない。 */
+    override suspend fun fetchAll(listener: ScanListener): SourceSnapshot {
         val ready = (store.current() as? SessionState.Ready)?.source as? ConnectedSource.Jellyfin ?: throw ServerException.Unauthorized()
         return gateway.fetchLibrary(ready.session.credentials(), ready.library.id)
     }

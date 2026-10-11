@@ -18,15 +18,10 @@ interface SourceGateway {
     /**
      * 取得元の全体を取得する（全走査）。番組に属さない各回は含めない。
      * 返す一覧は完全な一覧（[dev.tseki.kikidame.domain.SnapshotScope.Library]）。
+     * 途中経過は [listener] に流す（#209）。共有フォルダ（`SharedFolderSource`）は、タグを読んだ番組をその番組を読み終えるたびに流す。
+     * Jellyfin は一覧が一度に返るので番組ごとに分けず、[listener] を無視する。
      */
-    suspend fun fetchAll(): SourceSnapshot
-
-    /**
-     * [fetchAll] と同じ全走査で、途中経過を [listener] に流す（#209）。返す一覧は [fetchAll] と同じく完全な一覧。
-     * 既定は [fetchAll] をそのまま呼び、途中経過は流さない（Jellyfin。一覧が一度に返るので番組ごとに分けない）。
-     * 共有フォルダ（`SharedFolderSource`）は、タグを読んだ番組をその番組を読み終えるたびに流す。
-     */
-    suspend fun fetchAll(listener: ScanListener): SourceSnapshot = fetchAll()
+    suspend fun fetchAll(listener: ScanListener = ScanListener.None): SourceSnapshot
 
     /** 1 番組の各回だけを取得する。他の番組に属する各回は含めない。 */
     suspend fun fetchProgramEpisodes(programId: SourceItemId): List<SourceEpisode>
