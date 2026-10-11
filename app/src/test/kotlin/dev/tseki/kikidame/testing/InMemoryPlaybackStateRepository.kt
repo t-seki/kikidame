@@ -1,4 +1,4 @@
-package dev.tseki.kikidame.playback
+package dev.tseki.kikidame.testing
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.PlaybackRules
 import dev.tseki.kikidame.domain.PlaybackState

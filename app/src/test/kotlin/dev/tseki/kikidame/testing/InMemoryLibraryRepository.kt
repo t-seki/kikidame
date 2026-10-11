@@ -1,4 +1,4 @@
-package dev.tseki.kikidame.playback
+package dev.tseki.kikidame.testing
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.EpisodeOrder
 import dev.tseki.kikidame.domain.EpisodeWithState
@@ -12,7 +12,10 @@ import dev.tseki.kikidame.domain.RetentionRule
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
-/** 番組と各回を持つだけの [LibraryRepository]。書き込み系は使わない。 */
+/**
+ * 番組と各回を持つだけの [LibraryRepository]。書き込みは同期の設定（[updateSync]）だけを [programs] に写し、呼ばれた記録を残す。
+ * 手元の固定していないファイルの数（[countUnpinnedLocalFiles]）は数えずに [unpinnedLocalFiles] を返す。
+ */
 class InMemoryLibraryRepository : LibraryRepository {
     /** [observePrograms] の順（呼び出し側が最新回の公開日順に並べておく）。 */
     val programs = MutableStateFlow<List<Program>>(emptyList())
@@ -42,7 +45,14 @@ class InMemoryLibraryRepository : LibraryRepository {
         list
             .filter { it.isPlayable && it.playback?.let { p -> !p.played && !PlaybackRules.isNotStarted(p) } == true }
             .sortedByDescending { it.playback!!.updatedAt }
-    override suspend fun updateSync(programId: ProgramId, syncEnabled: Boolean, rule: RetentionRule) = error("not used")
+    /** [updateSync] に渡されたもの（呼ばれた順）。 */
+    val syncUpdates = mutableListOf<SyncUpdate>()
+    data class SyncUpdate(val programId: ProgramId, val syncEnabled: Boolean, val rule: RetentionRule)
+    var unpinnedLocalFiles = 0
+    override suspend fun updateSync(programId: ProgramId, syncEnabled: Boolean, rule: RetentionRule) {
+        syncUpdates += SyncUpdate(programId, syncEnabled, rule)
+        programs.value = programs.value.map { if (it.id == programId) it.copy(syncEnabled = syncEnabled, retentionRule = rule) else it }
+    }
     override suspend fun setStarred(programId: ProgramId, starred: Boolean) = error("not used")
-    override suspend fun countUnpinnedLocalFiles(programId: ProgramId): Int = error("not used")
+    override suspend fun countUnpinnedLocalFiles(programId: ProgramId): Int = unpinnedLocalFiles
 }

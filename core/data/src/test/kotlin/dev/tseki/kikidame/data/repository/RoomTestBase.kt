@@ -59,7 +59,7 @@ abstract class RoomTestBase {
     /** 番組は (配信元, 番組名) で探して無ければ作り、各回は固定された DONE のファイル付きで入れる。 */
     protected suspend fun seed(rows: List<LocalRow>) {
         for (r in rows) {
-            val programId = db.programDao().findByPublisherAndName(r.publisher, r.program)?.id
+            val programId = db.programDao().listKeys().filter { it.publisherName == r.publisher && it.name == r.program }.minOfOrNull { it.id }
                 ?: db.programDao().insert(ProgramEntity(sourceItemId = null, name = r.program, publisherName = r.publisher))
             val episodeId = db.episodeDao().insert(
                 EpisodeEntity(

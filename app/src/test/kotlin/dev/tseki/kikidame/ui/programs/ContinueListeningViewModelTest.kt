@@ -4,18 +4,17 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tseki.kikidame.R
-import dev.tseki.kikidame.domain.DownloadRepository
 import dev.tseki.kikidame.domain.DownloadState
 import dev.tseki.kikidame.domain.Episode
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.EpisodeWithState
-import dev.tseki.kikidame.domain.LocalDeletionScope
 import dev.tseki.kikidame.domain.LocalFile
 import dev.tseki.kikidame.domain.PlaybackState
 import dev.tseki.kikidame.domain.Program
 import dev.tseki.kikidame.domain.ProgramId
-import dev.tseki.kikidame.playback.InMemoryLibraryRepository
-import dev.tseki.kikidame.playback.InMemoryPlaybackStateRepository
+import dev.tseki.kikidame.testing.FakeDownloadRepository
+import dev.tseki.kikidame.testing.InMemoryLibraryRepository
+import dev.tseki.kikidame.testing.InMemoryPlaybackStateRepository
 import dev.tseki.kikidame.playback.NowPlaying
 import dev.tseki.kikidame.playback.NowPlayingState
 import dev.tseki.kikidame.ui.UiText
@@ -53,7 +52,7 @@ class ContinueListeningViewModelTest {
     private val dispatcher = UnconfinedTestDispatcher()
     private val library = InMemoryLibraryRepository()
     private val playbackStates = InMemoryPlaybackStateRepository(clock)
-    private val downloads = FakeDownloads()
+    private val downloads = FakeDownloadRepository()
     private val nowPlaying = NowPlaying()
     private val harai = Program(id = ProgramId(1), sourceItemId = null, name = "ハライチのターン！", publisherName = "TBSラジオ", syncEnabled = true)
     private val ann = Program(id = ProgramId(2), sourceItemId = null, name = "ANN", publisherName = "ニッポン放送")
@@ -170,22 +169,5 @@ class ContinueListeningViewModelTest {
         // 尺より先の位置（尺の情報が古い）は末尾付近の扱いで先頭から再開するので、残りは尺いっぱい
         assertEquals("ハライチのターン！ · 残り 30 分", text(40.minutes, runtime = 30.minutes))
         assertEquals("残り 25 分", text(35.minutes, program = null))
-    }
-
-    private class FakeDownloads : DownloadRepository {
-        val deleted = mutableListOf<EpisodeId>()
-        override suspend fun enqueue(episodeId: EpisodeId) = error("not used")
-        override suspend fun enqueueForSync(episodeIds: List<EpisodeId>): Int = error("not used")
-        override suspend fun removeEpisode(episodeId: EpisodeId) = error("not used")
-        override suspend fun removeProgram(programId: ProgramId) = error("not used")
-        override suspend fun cancel(episodeId: EpisodeId) = error("not used")
-        override suspend fun retry(episodeId: EpisodeId) = error("not used")
-        override suspend fun unpin(episodeId: EpisodeId) = error("not used")
-        override suspend fun deleteLocal(episodeId: EpisodeId): LocalDeletionScope {
-            deleted += episodeId
-            return LocalDeletionScope.FILE_ONLY
-        }
-        override suspend fun reconcileMissingFiles(): Int = error("not used")
-        override suspend fun ensureFilePresent(episodeId: EpisodeId): Boolean = error("not used")
     }
 }

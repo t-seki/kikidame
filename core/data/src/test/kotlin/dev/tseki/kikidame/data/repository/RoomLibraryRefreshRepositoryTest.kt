@@ -1,29 +1,18 @@
 package dev.tseki.kikidame.data.repository
 
-import dev.tseki.kikidame.data.device.MemoryDeviceDocuments
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import dev.tseki.kikidame.data.jellyfin.JellyfinSource
 import dev.tseki.kikidame.data.files.EpisodesDirectory
 import dev.tseki.kikidame.domain.EpisodeWithState
-import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.PlaybackRules
-import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SourceProgram
 import dev.tseki.kikidame.domain.SourceSnapshot
 import dev.tseki.kikidame.domain.SessionState
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.After
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -35,50 +24,18 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 @RunWith(AndroidJUnit4::class)
-class RoomLibraryRefreshRepositoryTest : RoomTestBase() {
-    @get:Rule
-    val tmp = TemporaryFolder()
-
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val gateway = FakeJellyfinGateway()
-    private val store by lazy { testSessionStore(tmp.root, scope) }
-    private val session by lazy { DataStoreSessionRepository(store, gateway, FakeFolderTreeFactory(), MemoryDeviceDocuments()) }
-    private val library by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao(), db.localFileDao()) }
-    private val playback by lazy { RoomPlaybackStateRepository(db, clock) }
-    private val directory by lazy { EpisodesDirectory(ApplicationProvider.getApplicationContext()) }
-    private val downloads by lazy { RoomDownloadRepository(db, directory, clock) }
-    private val repo by lazy { RoomLibraryRefreshRepository(db, store, JellyfinSource(gateway, store), downloads, clock) }
-
+class RoomLibraryRefreshRepositoryTest : JellyfinRefreshTestBase() {
     private val program = "パンサー向井のふらっと"
     private val publisher = "TBSラジオ"
-
-    private fun sourceEpisode(id: String, title: String, published: String, runtime: Int = 90) = SourceEpisode(
-        sourceId = SourceItemId(id),
-        programSourceId = SourceItemId("album-1"),
-        title = title,
-        publishedAt = Instant.parse(published),
-        addedAt = Instant.parse("2026-09-16T02:00:00Z"),
-        runtime = runtime.minutes,
-        sizeBytes = null,
-        container = "m4a",
-    )
 
     private val snapshot = SourceSnapshot(
         programs = listOf(SourceProgram(SourceItemId("album-1"), program, publisher)),
         episodes = listOf(
             sourceEpisode("audio-1", "$program 2026-09-14-1", "2026-09-13T15:00:00Z"),
-            sourceEpisode("audio-2", "$program 2026-09-14-2", "2026-09-13T15:00:00Z", runtime = 60),
+            sourceEpisode("audio-2", "$program 2026-09-14-2", "2026-09-13T15:00:00Z", runtime = 60.minutes),
             sourceEpisode("audio-3", "$program 2026-09-17-1", "2026-09-16T15:00:00Z"),
         ),
     )
-
-    private suspend fun signInAndSelect() {
-        session.signIn("jellyfin.lab.example", "alice", "secret")
-        session.selectLibrary(LibraryView(SourceItemId("lib-1"), "Radio", "music", isMusic = true))
-    }
-
-    @After
-    fun tearDown() = scope.cancel()
 
     @Test
     fun refreshRequiresASelectedLibrary() = runTest {

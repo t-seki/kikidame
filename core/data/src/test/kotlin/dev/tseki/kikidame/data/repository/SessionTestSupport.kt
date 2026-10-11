@@ -8,6 +8,7 @@ import dev.tseki.kikidame.data.session.TokenCipher
 import dev.tseki.kikidame.data.sharedfolder.FolderEntry
 import dev.tseki.kikidame.data.sharedfolder.FolderFileStream
 import dev.tseki.kikidame.data.sharedfolder.CloseableFolderTree
+import dev.tseki.kikidame.data.sharedfolder.FolderTree
 import dev.tseki.kikidame.data.sharedfolder.FolderTreeFactory
 import dev.tseki.kikidame.domain.DeviceFolder
 import dev.tseki.kikidame.domain.SmbConnection
@@ -30,10 +31,7 @@ fun testSessionStore(dir: File, scope: CoroutineScope): SessionStore =
 class FakeFolderTree(
     var entries: Map<String, List<FolderEntry>> = mapOf("" to emptyList()),
     var failure: Exception? = null,
-) : CloseableFolderTree {
-    var closed = false
-        private set
-
+) : FolderTree {
     override fun list(path: String): List<FolderEntry>? {
         failure?.let { throw it }
         return entries[path]
@@ -43,23 +41,31 @@ class FakeFolderTree(
         throw UnsupportedOperationException()
 
     override fun open(path: String, offset: Long): FolderFileStream = throw UnsupportedOperationException()
-
-    override fun close() {
-        closed = true
-    }
 }
 
-class FakeFolderTreeFactory(val tree: FakeFolderTree = FakeFolderTree()) : FolderTreeFactory {
+/**
+ * [FolderTreeFactory] の代わり。開くたびに [tree] を包んだ新しい木を返し、開いた接続（[opened]）・端末のフォルダ（[openedFolders]）と、
+ * 閉じた回数（[closes]）を記録する。
+ */
+class FakeFolderTreeFactory(private val tree: FolderTree = FakeFolderTree()) : FolderTreeFactory {
     val opened = mutableListOf<SmbConnection>()
     val openedFolders = mutableListOf<DeviceFolder>()
+    var closes = 0
+        private set
 
     override fun open(connection: SmbConnection): CloseableFolderTree {
         opened += connection
-        return tree
+        return closeable()
     }
 
     override fun open(folder: DeviceFolder): CloseableFolderTree {
         openedFolders += folder
-        return tree
+        return closeable()
+    }
+
+    private fun closeable() = object : CloseableFolderTree, FolderTree by tree {
+        override fun close() {
+            closes++
+        }
     }
 }

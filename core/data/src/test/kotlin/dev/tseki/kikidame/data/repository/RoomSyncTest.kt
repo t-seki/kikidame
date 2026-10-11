@@ -1,32 +1,18 @@
 package dev.tseki.kikidame.data.repository
 
-import dev.tseki.kikidame.data.device.MemoryDeviceDocuments
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import dev.tseki.kikidame.data.jellyfin.JellyfinSource
-import dev.tseki.kikidame.data.db.LocalFileEntity
-import dev.tseki.kikidame.data.files.EpisodesDirectory
 import dev.tseki.kikidame.domain.DownloadState
 import dev.tseki.kikidame.domain.EpisodeWithState
-import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.PlaybackRules
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.RetentionRule
-import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SourceProgram
 import dev.tseki.kikidame.domain.SourceSnapshot
 import dev.tseki.kikidame.domain.SessionState
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.After
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import java.io.File
 import kotlin.test.assertEquals
@@ -36,34 +22,13 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Instant
 
 /** 全走査 = 同期（ADR 0004）の適用と、番組単位の更新（#12）が削除しないこと。 */
 @RunWith(AndroidJUnit4::class)
-class RoomSyncTest : RoomTestBase() {
-    @get:Rule
-    val tmp = TemporaryFolder()
-
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val gateway = FakeJellyfinGateway()
-    private val store by lazy { testSessionStore(tmp.root, scope) }
-    private val session by lazy { DataStoreSessionRepository(store, gateway, FakeFolderTreeFactory(), MemoryDeviceDocuments()) }
-    private val library by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao(), db.localFileDao()) }
-    private val playback by lazy { RoomPlaybackStateRepository(db, clock) }
-    private val directory by lazy { EpisodesDirectory(ApplicationProvider.getApplicationContext()) }
-    private val downloads by lazy { RoomDownloadRepository(db, directory, clock) }
-    private val repo by lazy { RoomLibraryRefreshRepository(db, store, JellyfinSource(gateway, store), downloads, clock) }
-
-    private fun se(id: String, published: String, program: String = "album-1") = SourceEpisode(
-        sourceId = SourceItemId(id),
-        programSourceId = SourceItemId(program),
-        title = published,
-        publishedAt = Instant.parse("${published}T00:00:00Z"),
-        addedAt = Instant.parse("2026-09-16T02:00:00Z"),
-        runtime = 60.minutes,
-        sizeBytes = null,
-        container = "m4a",
-    )
+class RoomSyncTest : JellyfinRefreshTestBase() {
+    /** 公開日をタイトルにした 60 分の回。 */
+    private fun se(id: String, published: String, program: String = "album-1") =
+        sourceEpisode(id, title = published, published = published, program = program, runtime = 60.minutes)
 
     private val albumA = SourceProgram(SourceItemId("album-1"), "番組 A", "TBSラジオ")
     private val albumB = SourceProgram(SourceItemId("album-2"), "番組 B", "TBSラジオ")
@@ -72,11 +37,6 @@ class RoomSyncTest : RoomTestBase() {
         programs = listOf(albumA),
         episodes = listOf(se("a1", "2026-09-01"), se("a2", "2026-09-02"), se("a3", "2026-09-03")),
     )
-
-    private suspend fun signInAndSelect() {
-        session.signIn("jellyfin.lab.example", "alice", "secret")
-        session.selectLibrary(LibraryView(SourceItemId("lib-1"), "Radio", "music", isMusic = true))
-    }
 
     private suspend fun programId(): ProgramId = library.observePrograms().first().single().program.id
 
@@ -89,15 +49,8 @@ class RoomSyncTest : RoomTestBase() {
     /** ファイルを作って DONE にする（ダウンロード完了の代わり）。 */
     private suspend fun markDone(sourceId: String, pinned: Boolean): File {
         val e = episode(sourceId)
-        val file = File(directory.root, "$sourceId-${e.episode.title}.m4a").apply { parentFile?.mkdirs(); writeBytes(ByteArray(8)) }
-        db.localFileDao().upsert(
-            LocalFileEntity(e.episode.id.value, DownloadState.DONE, file.absolutePath, pinned = pinned, downloadedAt = now),
-        )
-        return file
+        return markDoneAt(e.episode.id.value, File(directory.root, "$sourceId-${e.episode.title}.m4a"), pinned)
     }
-
-    @After
-    fun tearDown() = scope.cancel()
 
     @Test
     fun syncEnabledProgramEnqueuesTheLatestNUnpinned() = runTest {

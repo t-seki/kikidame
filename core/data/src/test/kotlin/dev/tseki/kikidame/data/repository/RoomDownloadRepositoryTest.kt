@@ -1,9 +1,6 @@
 package dev.tseki.kikidame.data.repository
 
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import dev.tseki.kikidame.data.jellyfin.JellyfinSource
-import dev.tseki.kikidame.data.files.EpisodesDirectory
 import dev.tseki.kikidame.domain.DownloadState
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.LocalDeletionScope
@@ -27,17 +24,7 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 @RunWith(AndroidJUnit4::class)
-class RoomDownloadRepositoryTest : RoomTestBase() {
-    private val directory = EpisodesDirectory(ApplicationProvider.getApplicationContext())
-    private val repo by lazy { RoomDownloadRepository(db, directory, clock) }
-    private val library by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao(), db.localFileDao()) }
-    private val refresh by lazy { testSessionStore(tmpDir(), kotlinx.coroutines.GlobalScope).let { store ->
-        RoomLibraryRefreshRepository(db, store, JellyfinSource(FakeJellyfinGateway(), store), repo, clock)
-    } }
-    private val playback by lazy { RoomPlaybackStateRepository(db, clock) }
-
-    private fun tmpDir(): File = File(directory.root, "tmp").apply { mkdirs() }
-
+class RoomDownloadRepositoryTest : JellyfinRefreshTestBase() {
     private val snapshot = SourceSnapshot(
         programs = listOf(SourceProgram(SourceItemId("album-1"), "パンサー向井のふらっと", "TBSラジオ")),
         episodes = listOf(
@@ -48,7 +35,7 @@ class RoomDownloadRepositoryTest : RoomTestBase() {
 
     @Before
     fun seedServerRows() = runTest {
-        refresh.apply(snapshot)
+        repo.apply(snapshot)
         directory.root!!.deleteRecursively()
     }
 
@@ -60,12 +47,12 @@ class RoomDownloadRepositoryTest : RoomTestBase() {
     @Test
     fun enqueueCreatesPendingPinnedRowWithTargetPath() = runTest {
         val id = episodeId("2026-09-16 (1)")
-        repo.enqueue(id)
+        downloads.enqueue(id)
         val row = db.localFileDao().findByEpisode(id.value)!!
         assertEquals(DownloadState.PENDING, row.state)
         assertTrue(row.pinned)
         assertTrue(row.path!!.endsWith("/episodes/TBSラジオ/パンサー向井のふらっと/2026-09-16 (1).m4a"), row.path)
-        repo.enqueue(id)
+        downloads.enqueue(id)
         assertEquals(DownloadState.PENDING, db.localFileDao().findByEpisode(id.value)!!.state, "idempotent")
     }
 
@@ -75,7 +62,7 @@ class RoomDownloadRepositoryTest : RoomTestBase() {
         val taken = directory.resolve("TBSラジオ/パンサー向井のふらっと/2026-09-16 (1).m4a")
         taken.parentFile!!.mkdirs()
         taken.writeText("seeded")
-        repo.enqueue(id)
+        downloads.enqueue(id)
         assertTrue(db.localFileDao().findByEpisode(id.value)!!.path!!.endsWith("2026-09-16 (1) (2).m4a"))
     }
 
@@ -83,74 +70,74 @@ class RoomDownloadRepositoryTest : RoomTestBase() {
     fun queueOrderIsFifoAndDoneUpdatesSize() = runTest {
         val newer = episodeId("2026-09-16 (1)")
         val older = episodeId("2026-09-15 (1)")
-        repo.enqueue(older)
+        downloads.enqueue(older)
         now += 1.minutes
-        repo.enqueue(newer)
-        assertEquals(older, repo.nextPending()!!.episode.id, "tapped first, downloaded first")
+        downloads.enqueue(newer)
+        assertEquals(older, downloads.nextPending()!!.episode.id, "tapped first, downloaded first")
 
-        repo.markRunning(older)
-        assertTrue(repo.isStillWanted(older))
-        assertEquals(newer, repo.nextPending()!!.episode.id)
+        downloads.markRunning(older)
+        assertTrue(downloads.isStillWanted(older))
+        assertEquals(newer, downloads.nextPending()!!.episode.id)
         val target = db.localFileDao().findByEpisode(newer.value)!!.path!!
-        repo.markDone(newer, target, 12345)
+        downloads.markDone(newer, target, 12345)
         val done = library.getEpisode(newer)!!
         assertEquals(DownloadState.DONE, done.localFile!!.state)
         assertEquals(now, done.localFile!!.downloadedAt)
         assertEquals(12345, done.episode.sizeBytes)
-        assertFalse(repo.isStillWanted(newer))
+        assertFalse(downloads.isStillWanted(newer))
     }
 
     @Test
     fun retryGoesToTheBackOfTheQueue() = runTest {
         val first = episodeId("2026-09-16 (1)")
         val second = episodeId("2026-09-15 (1)")
-        repo.enqueue(first)
+        downloads.enqueue(first)
         now += 1.minutes
-        repo.enqueue(second)
-        repo.markRunning(first)
-        repo.markFailed(first)
+        downloads.enqueue(second)
+        downloads.markRunning(first)
+        downloads.markFailed(first)
         now += 1.minutes
-        repo.retry(first)
-        assertEquals(second, repo.nextPending()!!.episode.id)
+        downloads.retry(first)
+        assertEquals(second, downloads.nextPending()!!.episode.id)
     }
 
     @Test
     fun failedRowsAreRequeuedUntilTheAttemptLimit() = runTest {
         val id = episodeId("2026-09-16 (1)")
-        repo.enqueue(id)
+        downloads.enqueue(id)
         repeat(3) {
-            repo.markRunning(id)
-            repo.markFailed(id)
-            repo.requeueFailed(maxAttempts = 3)
+            downloads.markRunning(id)
+            downloads.markFailed(id)
+            downloads.requeueFailed(maxAttempts = 3)
         }
         assertEquals(DownloadState.FAILED, db.localFileDao().findByEpisode(id.value)!!.state)
         assertEquals(3, db.localFileDao().findByEpisode(id.value)!!.attemptCount)
-        repo.retry(id)
+        downloads.retry(id)
         assertEquals(DownloadState.PENDING, db.localFileDao().findByEpisode(id.value)!!.state, "manual retry ignores the limit")
     }
 
     @Test
     fun cancelRemovesRowAndPartFile() = runTest {
         val id = episodeId("2026-09-16 (1)")
-        repo.enqueue(id)
+        downloads.enqueue(id)
         val path = db.localFileDao().findByEpisode(id.value)!!.path!!
         File("$path.part").apply { parentFile!!.mkdirs(); writeText("half") }
-        repo.cancel(id)
+        downloads.cancel(id)
         assertNull(db.localFileDao().findByEpisode(id.value))
         assertFalse(File("$path.part").exists())
-        assertFalse(repo.isStillWanted(id))
+        assertFalse(downloads.isStillWanted(id))
     }
 
     @Test
     fun deleteSourceEpisodeKeepsRowAndPlaybackState() = runTest {
         val id = episodeId("2026-09-16 (1)")
-        repo.enqueue(id)
+        downloads.enqueue(id)
         val path = db.localFileDao().findByEpisode(id.value)!!.path!!
         File(path).apply { parentFile!!.mkdirs(); writeText("audio") }
-        repo.markDone(id, path, 5)
+        downloads.markDone(id, path, 5)
         playback.update(id) { PlaybackRules.advance(it, 10.minutes, 90.minutes, now) }
 
-        assertEquals(LocalDeletionScope.FILE_ONLY, repo.deleteLocal(id))
+        assertEquals(LocalDeletionScope.FILE_ONLY, downloads.deleteLocal(id))
 
         assertFalse(File(path).exists())
         val after = library.getEpisode(id)!!
@@ -165,7 +152,7 @@ class RoomDownloadRepositoryTest : RoomTestBase() {
         val ep = library.observeEpisodes(solo.program.id).first().single()
         playback.update(ep.episode.id) { PlaybackRules.setPlayed(it, true, now) }
 
-        assertEquals(LocalDeletionScope.EPISODE, repo.deleteLocal(ep.episode.id))
+        assertEquals(LocalDeletionScope.EPISODE, downloads.deleteLocal(ep.episode.id))
 
         assertNull(library.getEpisode(ep.episode.id))
         assertNull(db.playbackStateDao().findByEpisode(ep.episode.id.value))
@@ -176,22 +163,22 @@ class RoomDownloadRepositoryTest : RoomTestBase() {
     @Test
     fun reconcileDropsDoneRowsWhoseFileIsGone() = runTest {
         val id = episodeId("2026-09-16 (1)")
-        repo.enqueue(id)
+        downloads.enqueue(id)
         val path = db.localFileDao().findByEpisode(id.value)!!.path!!
-        repo.markDone(id, path, 5) // ファイルは作らない = 消えた状態
+        downloads.markDone(id, path, 5) // ファイルは作らない = 消えた状態
         val present = episodeId("2026-09-15 (1)")
-        repo.enqueue(present)
+        downloads.enqueue(present)
         val presentPath = db.localFileDao().findByEpisode(present.value)!!.path!!
         File(presentPath).apply { parentFile!!.mkdirs(); writeText("ok") }
-        repo.markDone(present, presentPath, 2)
+        downloads.markDone(present, presentPath, 2)
 
-        assertEquals(1, repo.reconcileMissingFiles())
+        assertEquals(1, downloads.reconcileMissingFiles())
         assertNull(library.getEpisode(id)!!.localFile)
         assertTrue(library.getEpisode(present)!!.isPlayable)
 
-        assertTrue(repo.ensureFilePresent(present))
+        assertTrue(downloads.ensureFilePresent(present))
         File(presentPath).delete()
-        assertFalse(repo.ensureFilePresent(present))
+        assertFalse(downloads.ensureFilePresent(present))
         assertNull(library.getEpisode(present)!!.localFile)
     }
 }
