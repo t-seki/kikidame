@@ -5,12 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
@@ -25,6 +20,7 @@ import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.ui.UiText
 import dev.tseki.kikidame.ui.episodes.EpisodeActionsSheet
 import dev.tseki.kikidame.ui.episodes.EpisodeRow
+import dev.tseki.kikidame.ui.episodes.PlayedToggleButton
 import kotlin.math.ceil
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
@@ -57,9 +53,10 @@ internal fun ContinueListeningPage(
                     onClick = { onEpisodeClick(id) },
                     onLongClick = { sheetFor = id },
                     trailing = {
-                        ContinueListeningTrailing(
+                        // 回は必ず手元にあるので、ダウンロードの状態ではなく常に再生済みの切り替え
+                        PlayedToggleButton(
                             played = item.episode.playback?.played == true,
-                            onTogglePlayed = { viewModel.setPlayed(id, item.episode.playback?.played != true) },
+                            onToggle = { viewModel.setPlayed(id, item.episode.playback?.played != true) },
                         )
                     },
                 )
@@ -80,20 +77,6 @@ internal fun ContinueListeningPage(
             onDelete = { viewModel.deleteLocal(episode.id) },
             onDetails = { sheetFor = null; onEpisodeDetails(episode.programId, episode.id) },
         )
-    }
-}
-
-/**
- * 「続きから」の行の右端。回は必ず手元にあるので、ダウンロードの状態ではなく常に再生済みの切り替え。
- */
-@Composable
-private fun ContinueListeningTrailing(played: Boolean, onTogglePlayed: () -> Unit) {
-    IconButton(onClick = onTogglePlayed) {
-        if (played) {
-            Icon(Icons.Default.CheckCircle, contentDescription = stringResource(R.string.episode_list_played_tap))
-        } else {
-            Icon(Icons.Outlined.Circle, contentDescription = stringResource(R.string.episode_list_unplayed_tap))
-        }
     }
 }
 

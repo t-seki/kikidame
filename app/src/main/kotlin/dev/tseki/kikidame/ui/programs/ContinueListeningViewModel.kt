@@ -1,31 +1,28 @@
 package dev.tseki.kikidame.ui.programs
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.DownloadRepository
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.EpisodeWithState
 import dev.tseki.kikidame.domain.LibraryRepository
-import dev.tseki.kikidame.domain.LocalDeletionScope
 import dev.tseki.kikidame.domain.PlaybackRules
 import dev.tseki.kikidame.domain.PlaybackStateRepository
 import dev.tseki.kikidame.domain.Program
 import dev.tseki.kikidame.playback.NowPlaying
 import dev.tseki.kikidame.playback.NowPlayingState
 import dev.tseki.kikidame.ui.UiText
-import kotlinx.coroutines.CancellationException
+import dev.tseki.kikidame.ui.episodes.EpisodeActions
+import dev.tseki.kikidame.ui.episodes.forRows
+import dev.tseki.kikidame.ui.episodes.toMessage
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlin.time.Clock
 
@@ -56,13 +53,12 @@ class ContinueListeningViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** 聴いている回。行の印と背景に使う。再生位置（1 秒ごとに変わる）は行に要らないので落とす（各回一覧と同じ）。 */
-    val nowPlaying: StateFlow<NowPlayingState?> = nowPlaying.state
-        .map { it?.copy(positionMs = 0, durationMs = 0) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), nowPlaying.state.value?.copy(positionMs = 0, durationMs = 0))
+    val nowPlaying: StateFlow<NowPlayingState?> = nowPlaying.state.forRows(viewModelScope)
 
     private val _messages = MutableSharedFlow<UiText>(extraBufferCapacity = 4, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     /** この画面での操作の結果（固定を外した・ファイルを消した・失敗）。 */
     val messages: Flow<UiText> = _messages
+    private val actions = EpisodeActions(viewModelScope, downloads, _messages, TAG, "continue listening action failed")
 
     private val _markedPlayed = MutableSharedFlow<EpisodeId>(extraBufferCapacity = 4, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     /** 「続きから」で再生済みにした各回。画面は「再生済みにしました」と［元に戻す］を出す。 */
@@ -77,37 +73,16 @@ class ContinueListeningViewModel @Inject constructor(
         if (played) _markedPlayed.tryEmit(episodeId)
     }
 
-    fun unpin(episodeId: EpisodeId) = act {
-        downloads.unpin(episodeId)
-        _messages.tryEmit(UiText.Res(R.string.episode_list_msg_unpinned))
-    }
+    fun unpin(episodeId: EpisodeId) = actions.unpin(episodeId)
 
     /** 各回一覧の「ファイルを削除」と同じ。消した回は「続きから」から消える。 */
     fun deleteLocal(episodeId: EpisodeId) = act {
         val syncEnabled = items.value?.firstOrNull { it.episode.episode.id == episodeId }?.program?.syncEnabled == true
-        _messages.tryEmit(
-            when (downloads.deleteLocal(episodeId)) {
-                LocalDeletionScope.FILE_ONLY ->
-                    if (syncEnabled) UiText.Res(R.string.episode_list_msg_file_deleted_synced)
-                    else UiText.Res(R.string.episode_list_msg_file_deleted)
-                LocalDeletionScope.EPISODE -> UiText.Res(R.string.episode_list_msg_episode_removed)
-            },
-        )
+        _messages.tryEmit(downloads.deleteLocal(episodeId).toMessage(syncEnabled))
     }
 
-    /** Room / ファイル I/O の失敗で落とさず、文言にして出す（各回一覧と同じ）。 */
-    private fun act(block: suspend () -> Unit) {
-        viewModelScope.launch {
-            try {
-                block()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.e(TAG, "continue listening action failed", e)
-                _messages.tryEmit(UiText.Res(R.string.episode_list_msg_action_failed, e::class.simpleName.orEmpty()))
-            }
-        }
-    }
+    /** Room / ファイル I/O の失敗で落とさず、文言にして出す（各回一覧と同じ [EpisodeActions.launch]）。 */
+    private fun act(block: suspend () -> Unit) = actions.launch(block)
 
     private companion object {
         const val TAG = "ContinueListeningVM"
