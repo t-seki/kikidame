@@ -203,9 +203,10 @@ private fun SessionState.SignedOut.signedOutDestination(): Any = when {
 
 /**
  * [backOrNull] を、その画面の back stack entry ごとに入った時点で 1 回だけ決める。
- * ← で pop すると、出ていく画面は退場のアニメーションの間も描き直される。そのとき
- * `previousBackStackEntry` は新しい最上位から見たものに変わっていて null になり、毎回読むと
- * 「戻り先が無い」と判定して「取得元を変える」が一瞬出る。
+ * 事実: composition のたびに [backOrNull] を読むと、← で戻るとき、消えていく接続画面に
+ * 「取得元を変える」が一瞬出た（#260、実機の debug 版）。
+ * 推測（未確認）: 退場のアニメーションの間に描き直され、そのとき `previousBackStackEntry` が
+ * 新しい最上位から見たものに変わって null になるためと見ている。
  */
 @Composable
 private fun NavHostController.rememberBackOrNull(entry: NavBackStackEntry): (() -> Unit)? =
