@@ -57,6 +57,7 @@ class KeystoreCredentialCipher @Inject constructor() : CredentialCipher {
 
     private companion object {
         const val PROVIDER = "AndroidKeyStore"
+        // 旧名のまま残す。変えると既存の Keystore の鍵が引けず、保存済みの認証情報が復号できなくなる。
         const val ALIAS = "session-token"
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val TAG_BITS = 128

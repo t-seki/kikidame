@@ -319,7 +319,7 @@ class SharedFolderScanTest : RefreshTestBase() {
 
     /** 認証の失敗などはやり直さない（やり直しても変わらない）。 */
     @Test
-    fun serverExceptionsAreNotRetried() = runTest {
+    fun sourceExceptionsAreNotRetried() = runTest {
         folder.put("P/A/1.m4a")
         var calls = 0
         val reader = TagReader { _, _, _ ->
