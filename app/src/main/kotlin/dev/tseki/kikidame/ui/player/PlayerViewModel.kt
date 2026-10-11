@@ -2,7 +2,6 @@ package dev.tseki.kikidame.ui.player
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.navigation.toRoute
@@ -21,6 +20,7 @@ import dev.tseki.kikidame.playback.PlayerConnection
 import dev.tseki.kikidame.playback.ProgramQueue
 import dev.tseki.kikidame.playback.SleepTimer
 import dev.tseki.kikidame.playback.SleepTimerSetting
+import dev.tseki.kikidame.playback.knownRuntime
 import dev.tseki.kikidame.ui.PlayerRoute
 import dev.tseki.kikidame.ui.UiText
 import dev.tseki.kikidame.ui.toClockText
@@ -168,10 +168,9 @@ class PlayerViewModel @Inject constructor(
     private suspend fun open(player: Player, episodeId: EpisodeId, play: Boolean) {
         if (EpisodeMediaItems.episodeId(player.currentMediaItem) == episodeId && player.playbackState != Player.STATE_IDLE) {
             if (play && !player.isPlaying) {
-                val runtime = player.duration.takeIf { it != C.TIME_UNSET }
-                    ?: player.currentMediaItem?.mediaMetadata?.durationMs
-                if (runtime != null && runtime > 0) {
-                    val resume = PlaybackRules.resumePosition(player.currentPosition.milliseconds, runtime.milliseconds)
+                val runtime = player.knownRuntime()
+                if (runtime != null) {
+                    val resume = PlaybackRules.resumePosition(player.currentPosition.milliseconds, runtime)
                     if (resume == Duration.ZERO) player.seekTo(0)
                 }
                 player.play()
@@ -210,8 +209,7 @@ class PlayerViewModel @Inject constructor(
                 programName = item?.mediaMetadata?.artist?.toString(),
                 isPlaying = player.isPlaying,
                 positionMs = player.currentPosition.coerceAtLeast(0),
-                durationMs = player.duration.takeIf { d -> d != C.TIME_UNSET }
-                    ?: item?.mediaMetadata?.durationMs ?: 0,
+                durationMs = player.knownRuntime()?.inWholeMilliseconds ?: 0,
                 hasPrevious = player.hasPreviousMediaItem(),
                 hasNext = player.hasNextMediaItem(),
             )
