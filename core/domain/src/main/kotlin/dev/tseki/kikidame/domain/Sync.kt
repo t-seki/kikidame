@@ -111,3 +111,38 @@ object SyncPlanner {
     private val NEWEST_FIRST: Comparator<LocalEpisodeState> =
         compareByDescending<LocalEpisodeState> { it.publishedAt }.thenBy { it.title }.thenBy { it.id.value }
 }
+
+/**
+ * 同期の入力（[SyncProgramInput]）を組み立てる純粋関数。I/O はしない。
+ *
+ * - 対象の番組は [SourceSnapshot.scope] で決まる。[SnapshotScope.Library] なら全番組、
+ *   [SnapshotScope.Program] なら取得元 ID がその番組のものだけ（1 番組の同期。他の番組は一覧に無くても消失扱いにしない、ADR 0004）
+ * - 取得元 ID を持たない番組は `Known` でも `Gone` でもない（取得元に在ると主張していない）ので入力に入れない
+ * - 番組の取得元 ID が snapshot の番組一覧にあれば `Known`（その番組の取得元の各回）、無ければ `Gone`
+ */
+object SyncInputs {
+    fun of(
+        programs: List<Program>,
+        localByProgram: Map<ProgramId, List<LocalEpisodeState>>,
+        snapshot: SourceSnapshot,
+    ): List<SyncProgramInput> {
+        val sourceProgramIds = snapshot.programs.map { it.sourceId }.toSet()
+        val sourceEpisodesByProgram = snapshot.episodes.groupBy({ it.programSourceId }, { it.sourceId })
+        val scope = snapshot.scope
+        return programs.mapNotNull { p ->
+            val sourceId = p.sourceItemId ?: return@mapNotNull null
+            if (scope is SnapshotScope.Program && sourceId != scope.programSourceId) return@mapNotNull null
+            SyncProgramInput(
+                programId = p.id,
+                syncEnabled = p.syncEnabled,
+                retentionRule = p.retentionRule,
+                source = if (sourceId in sourceProgramIds) {
+                    SourceEpisodes.Known(sourceEpisodesByProgram[sourceId].orEmpty().toSet())
+                } else {
+                    SourceEpisodes.Gone
+                },
+                local = localByProgram[p.id].orEmpty(),
+            )
+        }
+    }
+}
