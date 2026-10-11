@@ -1,6 +1,5 @@
 package dev.tseki.kikidame.domain
 
-
 /** 手元のファイルを消すときの範囲。 */
 enum class LocalDeletionScope {
     /** ファイルと手元の記録だけ消す。各回と再生位置は残る（取得元から落とし直せる）。 */

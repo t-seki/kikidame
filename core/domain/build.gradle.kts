@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.animalsniffer)
+    alias(libs.plugins.kotlinter)
 }
 java {
     sourceCompatibility = JavaVersion.VERSION_17

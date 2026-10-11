@@ -19,6 +19,9 @@ jobs:
         with:
           packages: platforms;android-37.0 build-tools;36.0.0 platform-tools
       - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
+      # 未使用 import と連続した空行だけを見る ktlint（#254）。規則は .editorconfig。自動ではコミットしない
+      - name: Kotlin style (ktlint)
+        run: ./gradlew lintKotlin --no-daemon
       - name: Unit tests (JVM + Robolectric, no emulator)
         run: ./gradlew test --no-daemon
       # lint（#111）: MissingTranslation（values/ と values-ja/ の片方だけの追加）と UnsafeOptInUsageError を落とす

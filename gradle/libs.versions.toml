@@ -27,6 +27,7 @@ workManager = "2.12.0"
 okhttp = "5.5.0"
 aboutLibraries = "15.2.0"
 animalsniffer = "2.0.1"
+kotlinter = "5.7.0"
 androidApiSignature = "12_r1"
 smbj = "0.15.0"
 [libraries]
@@ -95,3 +96,4 @@ hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 room = { id = "androidx.room", version.ref = "room" }
 aboutlibraries = { id = "com.mikepenz.aboutlibraries.plugin", version.ref = "aboutLibraries" }
 animalsniffer = { id = "ru.vyarus.animalsniffer", version.ref = "animalsniffer" }
+kotlinter = { id = "org.jmailen.kotlinter", version.ref = "kotlinter" }
