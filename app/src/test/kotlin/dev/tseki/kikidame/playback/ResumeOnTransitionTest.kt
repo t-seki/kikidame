@@ -1,4 +1,5 @@
 package dev.tseki.kikidame.playback
+import dev.tseki.kikidame.testing.InMemoryPlaybackStateRepository
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.test.ext.junit.runners.AndroidJUnit4

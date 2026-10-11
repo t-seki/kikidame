@@ -61,9 +61,6 @@ interface ProgramDao {
     fun observeSummaries(): Flow<List<ProgramSummaryRow>>
     @Query("SELECT * FROM programs WHERE id = :id")
     fun observeById(id: Long): Flow<ProgramEntity?>
-    /** (配信元, 番組名) で探す。一意ではない。本体の突合は [listKeys] を [dev.tseki.kikidame.domain.LibraryMatching] に渡す方式で、これは使わない（テストの下ごしらえ用）。 */
-    @Query("SELECT * FROM programs WHERE publisherName IS :publisherName AND name = :name ORDER BY id LIMIT 1")
-    suspend fun findByPublisherAndName(publisherName: String?, name: String): ProgramEntity?
     @Query("SELECT * FROM programs WHERE sourceItemId = :sourceItemId")
     suspend fun findBySourceItemId(sourceItemId: String): ProgramEntity?
     @Query("SELECT id, sourceItemId, publisherName, name FROM programs")

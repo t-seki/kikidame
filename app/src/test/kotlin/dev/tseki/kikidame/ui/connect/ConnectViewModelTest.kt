@@ -1,16 +1,12 @@
 package dev.tseki.kikidame.ui.connect
 
 import dev.tseki.kikidame.R
-import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.ServerException
-import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
-import dev.tseki.kikidame.domain.SmbConnection
+import dev.tseki.kikidame.testing.FakeSessionRepository
 import dev.tseki.kikidame.ui.UiText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -27,7 +23,7 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConnectViewModelTest {
     private val dispatcher = UnconfinedTestDispatcher()
-    private val session = FakeSessionRepository()
+    private val session = FakeSessionRepository(SessionState.SignedOut(null, null))
 
     @Before
     fun setMain() = Dispatchers.setMain(dispatcher)
@@ -83,18 +79,5 @@ class ConnectViewModelTest {
             submitFailingWith(ServerException.Unauthorized(), permission),
         )
         assertEquals(0, permission.checks)
-    }
-
-    private class FakeSessionRepository : SessionRepository {
-        var signInError: Exception? = null
-        override val state: Flow<SessionState> = MutableStateFlow(SessionState.SignedOut(null, null))
-        override suspend fun signIn(serverUrl: String, userName: String, password: String) {
-            signInError?.let { throw it }
-        }
-        override suspend fun connectSharedFolder(connection: SmbConnection) = error("not used")
-        override suspend fun connectDeviceFolder(treeUri: String) = error("not used")
-        override suspend fun listLibraries(): List<LibraryView> = error("not used")
-        override suspend fun selectLibrary(library: LibraryView) = error("not used")
-        override suspend fun signOut() = error("not used")
     }
 }

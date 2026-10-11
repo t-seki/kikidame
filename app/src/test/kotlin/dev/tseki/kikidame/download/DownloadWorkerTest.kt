@@ -16,22 +16,16 @@ import dev.tseki.kikidame.domain.DownloadState
 import dev.tseki.kikidame.domain.Episode
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.EpisodeWithState
-import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.LocalFile
 import dev.tseki.kikidame.domain.ProgramId
-import dev.tseki.kikidame.domain.SelectedLibrary
 import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SourceProgram
 import dev.tseki.kikidame.domain.SourceSnapshot
-import dev.tseki.kikidame.domain.ConnectedSource
-import dev.tseki.kikidame.domain.Session
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
-import dev.tseki.kikidame.domain.SmbConnection
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
+import dev.tseki.kikidame.testing.FakeSessionRepository
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -77,20 +71,6 @@ class DownloadWorkerTest {
         }
     }
 
-    private class Sessions(initial: SessionState) : SessionRepository {
-        val flow = MutableStateFlow(initial)
-        var signedOut = false
-        override val state: Flow<SessionState> = flow
-        override suspend fun signIn(serverUrl: String, userName: String, password: String) = Unit
-        override suspend fun connectSharedFolder(connection: SmbConnection) = Unit
-        override suspend fun connectDeviceFolder(treeUri: String) = Unit
-        override suspend fun listLibraries(): List<LibraryView> = emptyList()
-        override suspend fun selectLibrary(library: LibraryView) = Unit
-        override suspend fun signOut() { signedOut = true; flow.value = SessionState.SignedOut(null, null) }
-    }
-
-    private val ready = SessionState.Ready(ConnectedSource.Jellyfin(Session("https://x/", "u", "uid", "tok"), SelectedLibrary(SourceItemId("lib"), "Radio")), null)
-
     private fun item(id: Long, server: String?) = EpisodeWithState(
         episode = Episode(EpisodeId(id), server?.let(::SourceItemId), ProgramId(1), "t$id", Instant.parse("2026-09-15T15:00:00Z"), null, 30.minutes, 0, "m4a"),
         localFile = LocalFile(EpisodeId(id), DownloadState.PENDING, File(tmp.root, "s/p/t$id.m4a").absolutePath, pinned = true),
@@ -110,7 +90,7 @@ class DownloadWorkerTest {
         val queue = MemoryQueue(listOf(item(1, "a1"), item(2, "missing"), item(3, "a3")))
         val source = Source(mapOf(SourceItemId("a1") to ByteArray(10) { 1 }, SourceItemId("a3") to ByteArray(20) { 3 }))
 
-        val result = build(queue, source, Sessions(ready)).doWork()
+        val result = build(queue, source, FakeSessionRepository()).doWork()
 
         assertEquals(ListenableWorker.Result.success(), result)
         assertEquals(listOf(EpisodeId(1), EpisodeId(3)), queue.done)
@@ -121,14 +101,14 @@ class DownloadWorkerTest {
     @Test
     fun signedOutSessionDoesNothing() = runTest {
         val queue = MemoryQueue(listOf(item(1, "a1")))
-        build(queue, Source(emptyMap()), Sessions(SessionState.SignedOut(null, null))).doWork()
+        build(queue, Source(emptyMap()), FakeSessionRepository(SessionState.SignedOut(null, null))).doWork()
         assertEquals(DownloadState.PENDING, queue.state[EpisodeId(1)])
     }
 
     @Test
     fun unauthorizedSignsOutAndStops() = runTest {
         val queue = MemoryQueue(listOf(item(1, "a1"), item(2, "a2")))
-        val sessions = Sessions(ready)
+        val sessions = FakeSessionRepository()
         val result = build(queue, Source(emptyMap(), unauthorized = true), sessions).doWork()
 
         assertEquals(ListenableWorker.Result.success(), result)
