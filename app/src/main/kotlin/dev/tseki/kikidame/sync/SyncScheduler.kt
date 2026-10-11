@@ -52,7 +52,6 @@ class SyncScheduler @Inject constructor(
         workManager.enqueueUniquePeriodicWork(SyncWorker.PERIODIC_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
     }
 
-
     /** 「取得元を変える」（#50）の前に、定期同期と起動時同期を止めて完了を待つ（消している最中に行を作り直さない）。 */
     suspend fun cancelAll() {
         workManager.cancelUniqueAndAwait(SyncWorker.PERIODIC_NAME)

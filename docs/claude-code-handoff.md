@@ -319,7 +319,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
     サーバ宛の TCP が黙って落ちる（DNS だけ通るので名前解決は成功し、接続がタイムアウトする）。
     `adb shell` や古い targetSdk のアプリは対象外なので、切り分けでは `run-as <pkg> nc -z <host> <port>` で
     アプリの UID から試すこと。#199 から、要求するのは取得元が Jellyfin か SMB のとき（ログアウト中で前回の取得元が Jellyfin か SMB のときを含む）の起動時と、
-    取得元の選択で Jellyfin か SMB のカードを押したときだけ（`MainActivity` の `usesLocalNetwork`、`SourcePickScreen`）。端末のフォルダの人には要求しない
+    取得元の選択で Jellyfin か SMB のカードを押したときだけ（domain の `SessionState.usesLocalNetwork`。`MainActivity` が呼ぶ、`SourcePickScreen`）。端末のフォルダの人には要求しない
 - **モジュール**: 上記 3 モジュールを最初から切る。`applicationId` は `dev.tseki.kikidame`、`minSdk` 31
 - **Room**: `exportSchema = true` で `core/data/schemas/` を git 管理する
 - **CI**: GitHub Actions で PR ごとに `./gradlew test`

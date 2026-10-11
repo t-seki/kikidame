@@ -56,7 +56,7 @@ val SessionState.isDeviceFolder: Boolean
 
 /**
  * 「Wi-Fi のみ」が効くか（#199 の決定 4）。取得元が端末のフォルダなら、端末の中から端末の中へのコピーなので効かせない。
- * Jellyfin と SMB は設定どおり。手動の同期の従量制での中止（`LibraryRefresher`）と、Worker のネットワークの制約（`requiredNetworkType`）がこれで決める。
+ * Jellyfin と SMB は設定どおり。手動の同期の従量制での中止（`LibraryRefresher`）がこれで決める。Worker のネットワークの制約（`work.requiredNetworkType`）は同じ規則（端末のフォルダには効かせない）を `isDeviceFolder` で自分で見ている。
  */
 fun wifiOnlyApplies(wifiOnly: Boolean, state: SessionState): Boolean = wifiOnly && !state.isDeviceFolder
 

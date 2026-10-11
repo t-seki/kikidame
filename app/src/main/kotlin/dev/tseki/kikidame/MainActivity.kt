@@ -17,9 +17,7 @@ import androidx.compose.runtime.produceState
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.lifecycle.lifecycleScope
 import dev.tseki.kikidame.domain.AppSettingsRepository
-import dev.tseki.kikidame.domain.ConnectedSource
 import dev.tseki.kikidame.domain.SessionRepository
-import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.domain.ThemeMode
 import dev.tseki.kikidame.domain.usesLocalNetwork
 import dev.tseki.kikidame.ui.KikidameNavHost
