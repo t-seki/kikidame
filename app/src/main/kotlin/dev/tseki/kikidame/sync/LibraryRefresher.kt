@@ -13,6 +13,7 @@ import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.domain.isDeviceFolder
+import dev.tseki.kikidame.domain.wifiOnlyApplies
 import dev.tseki.kikidame.download.DownloadKicker
 import dev.tseki.kikidame.R
 import dev.tseki.kikidame.playback.NowPlaying
@@ -41,7 +42,7 @@ import javax.inject.Singleton
  * - [syncProgram]: 1 番組の同期。シートの「この番組を今すぐ同期」が呼ぶ
  * - [refreshProgram]: 番組単位の取り込み（#12）。各回一覧の「引っ張って更新」が呼ぶ。削除しない
  * - 「Wi-Fi のみ」は手動を含めて効く。従量制なら取得元に触らず理由を出して終える。手元のファイルの整合（#5）はその前に走る。
- *   取得元が端末のフォルダなら効かせない（#199 の決定 4。[SyncScheduler.wifiOnlyApplies]）
+ *   取得元が端末のフォルダなら効かせない（#199 の決定 4。[dev.tseki.kikidame.domain.wifiOnlyApplies]）
  * - 401 はログアウトと同じ処理をする（セッション状態が変わり、画面側が接続画面へ導く）。端末のフォルダでアクセスが切れたときも同じで、
  *   文言は「フォルダを選び直して」にする（#199 の決定 5）
  * - 定期・起動時の silent な同期ではクルクルを出さない。その最中に手動の操作が来たら、走っている同期に合流する（#134）
@@ -225,7 +226,7 @@ class LibraryRefresher @Inject constructor(
             // 手元のファイルが消えていないか先に整合する（#5）。ローカル I/O なのでネットワークの条件は見ない
             val reconciled = downloads.reconcileMissingFiles()
             if (reconciled > 0) say(UiText.Plural(R.plurals.sync_reconciled, reconciled))
-            if (SyncScheduler.wifiOnlyApplies(settings.wifiOnly.first(), state) && network.isMetered()) {
+            if (wifiOnlyApplies(settings.wifiOnly.first(), state) && network.isMetered()) {
                 report(UiText.Res(R.string.sync_not_on_wifi))
                 return null
             }

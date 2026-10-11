@@ -44,7 +44,7 @@ class SettingsViewModel @Inject constructor(
             try {
                 settings.setWifiOnly(value)
                 scheduler.reschedule()
-                syncScheduler.reschedule()
+                syncScheduler.schedulePeriodic()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

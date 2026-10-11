@@ -17,10 +17,9 @@ import androidx.compose.runtime.produceState
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.lifecycle.lifecycleScope
 import dev.tseki.kikidame.domain.AppSettingsRepository
-import dev.tseki.kikidame.domain.ConnectedSource
 import dev.tseki.kikidame.domain.SessionRepository
-import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.domain.ThemeMode
+import dev.tseki.kikidame.domain.usesLocalNetwork
 import dev.tseki.kikidame.ui.KikidameNavHost
 import dev.tseki.kikidame.ui.theme.KikidameTheme
 import dev.tseki.kikidame.ui.theme.isDark
@@ -66,7 +65,7 @@ class MainActivity : ComponentActivity() {
      */
     private fun requestRuntimePermissionsIfNeeded() {
         lifecycleScope.launch {
-            val usesNetwork = sessionRepository.state.first().usesLocalNetwork()
+            val usesNetwork = sessionRepository.state.first().usesLocalNetwork
             val missing = buildList {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !granted(Manifest.permission.POST_NOTIFICATIONS)) {
                     add(Manifest.permission.POST_NOTIFICATIONS)
@@ -91,14 +90,4 @@ object LocalNetworkPermission {
     fun isRequiredAndMissing(context: android.content.Context): Boolean =
         Build.VERSION.SDK_INT >= MIN_SDK &&
             ContextCompat.checkSelfPermission(context, NAME) != PackageManager.PERMISSION_GRANTED
-}
-
-/**
- * 取得元がローカルネットワークを使うか（Jellyfin か SMB。#199 の決定 7）。ログアウト中は、前回の取得元が Jellyfin か SMB なら使う。
- * 端末のフォルダと、まだ取得元を選んでいない人は使わない。
- */
-internal fun SessionState.usesLocalNetwork(): Boolean = when (this) {
-    is SessionState.Ready -> source !is ConnectedSource.Device
-    is SessionState.NeedsLibrary -> true
-    is SessionState.SignedOut -> lastServerUrl != null || lastSmb != null
 }
