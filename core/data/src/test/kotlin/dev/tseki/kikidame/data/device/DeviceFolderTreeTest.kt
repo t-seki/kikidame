@@ -1,13 +1,18 @@
-package dev.tseki.kikidame.data.sharedfolder
+package dev.tseki.kikidame.data.device
 
+import dev.tseki.kikidame.data.sharedfolder.AudioTags
+import dev.tseki.kikidame.data.sharedfolder.FolderEntry
+import dev.tseki.kikidame.data.sharedfolder.SharedFolderSource
 import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.SourceItemId
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import java.io.FileNotFoundException
+import java.io.IOException
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.time.Instant
 
@@ -122,6 +127,28 @@ class DeviceFolderTreeTest {
         val stream = tree().open("TBS/Junk/2026-10-01.m4a", 7)
         assertEquals(10, stream.sizeBytes)
         assertContentEquals(byteArrayOf(7, 8, 9), stream.body.use { it.readBytes() })
+    }
+
+    /**
+     * [DeviceFolderTree.open] が返したストリームを読む途中の [SecurityException] は [IOException] に変える（ストリームの読み出しは
+     * [IOException] を前提にしている）。そのほかの例外はそのまま投げる。
+     */
+    @Test
+    fun securityExceptionWhileReadingTheStreamIsIOException() {
+        var failure: Exception = SecurityException("permission revoked")
+        val files = MemoryDeviceDocuments().apply { file("a.m4a", ByteArray(4)) }
+        val tree = DeviceFolderTree(object : DeviceDocuments by files {
+            override fun openFile(treeUri: String, documentId: String): DeviceFile {
+                val file = files.openFile(treeUri, documentId)
+                return object : DeviceFile by file {
+                    override fun read(position: Long, buffer: ByteArray, offset: Int, size: Int): Int = throw failure
+                }
+            }
+        }, files.treeUri)
+        val error = assertFailsWith<IOException> { tree.open("a.m4a", 0).body.read(ByteArray(4)) }
+        assertIs<SecurityException>(error.cause)
+        failure = IllegalStateException("other")
+        assertFailsWith<IllegalStateException> { tree.open("a.m4a", 0).body.read(ByteArray(4)) }
     }
 
     @Test

@@ -9,8 +9,8 @@ import dev.tseki.kikidame.data.sharedfolder.FolderTree
 import dev.tseki.kikidame.data.sharedfolder.MemoryFolderTree
 import dev.tseki.kikidame.data.sharedfolder.ScannedFiles
 import dev.tseki.kikidame.data.sharedfolder.TagReader
-import dev.tseki.kikidame.data.smb.CloseableFolderTree
-import dev.tseki.kikidame.data.smb.FolderTreeFactory
+import dev.tseki.kikidame.data.sharedfolder.CloseableFolderTree
+import dev.tseki.kikidame.data.sharedfolder.FolderTreeFactory
 import dev.tseki.kikidame.domain.DeviceFolder
 import dev.tseki.kikidame.domain.SelectedLibrary
 import dev.tseki.kikidame.domain.ServerException

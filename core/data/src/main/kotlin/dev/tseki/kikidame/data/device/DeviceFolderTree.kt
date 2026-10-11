@@ -1,64 +1,16 @@
-package dev.tseki.kikidame.data.sharedfolder
+package dev.tseki.kikidame.data.device
 
-import dev.tseki.kikidame.data.smb.CloseableFolderTree
+import dev.tseki.kikidame.data.sharedfolder.CloseableFolderTree
+import dev.tseki.kikidame.data.sharedfolder.FolderEntry
+import dev.tseki.kikidame.data.sharedfolder.FolderFileStream
+import dev.tseki.kikidame.data.sharedfolder.FolderTree
+import dev.tseki.kikidame.data.sharedfolder.LastOpened
+import dev.tseki.kikidame.data.sharedfolder.PositionalInputStream
+import dev.tseki.kikidame.data.sharedfolder.SharedFolderSource
 import dev.tseki.kikidame.domain.ServerException
 import java.io.FileNotFoundException
 import java.io.IOException
-import java.io.InputStream
 import kotlin.time.Instant
-
-/**
- * 端末のフォルダ（SAF、#199）の文書を引く窓口。[DeviceFolderTree] が使い、実装（[ContentResolverDeviceDocuments]）は
- * `ContentResolver` と `DocumentsContract` で引く。テストではメモリ上のものに差し替える。
- *
- * どのメソッドも blocking。権限が無い・取り消されたときは [SecurityException] を投げてよい（[DeviceFolderTree] が
- * [ServerException.Unauthorized] に変える）。
- */
-interface DeviceDocuments {
-    /** [treeUri] の永続的な読み取りの権限を持っているか。 */
-    fun hasReadPermission(treeUri: String): Boolean
-
-    /** 選んだフォルダ（根）の文書 ID。 */
-    fun rootDocumentId(treeUri: String): String
-
-    /** 文書の情報。provider が「その文書は無い」と答えたら（行の無い結果）null。無いのか失敗なのか分からないときは例外を投げる。 */
-    fun query(treeUri: String, documentId: String): DeviceDocument?
-
-    /** フォルダの直下の文書。 */
-    fun children(treeUri: String, documentId: String): List<DeviceDocument>
-
-    /** ファイルを読むために開く。無ければ [FileNotFoundException]。 */
-    fun openFile(treeUri: String, documentId: String): DeviceFile
-
-    /** [treeUri] の永続的な読み取りの権限を取る（`takePersistableUriPermission`）。 */
-    fun takePermission(treeUri: String)
-
-    /** [treeUri] の永続的な権限を手放す（`releasePersistableUriPermission`）。持っていなければ何もしない。 */
-    fun releasePermission(treeUri: String)
-
-    /** 持っている永続的な権限のツリーの URI。 */
-    fun persistedTreeUris(): List<String>
-}
-
-/** 文書の 1 件。[lastModifiedMillis] は provider が返さなければ null。 */
-data class DeviceDocument(
-    val documentId: String,
-    val name: String,
-    val isDirectory: Boolean,
-    val sizeBytes: Long,
-    val lastModifiedMillis: Long?,
-)
-
-/** 開いたファイル。位置を指定して読む。 */
-interface DeviceFile : AutoCloseable {
-    /** ファイル全体のサイズ。分からなければ -1。 */
-    val sizeBytes: Long
-
-    /** [position] から最大 [size] バイトを [buffer] の [offset] 以降に読み、読んだバイト数を返す。末尾以降なら -1。 */
-    fun read(position: Long, buffer: ByteArray, offset: Int, size: Int): Int
-
-    override fun close()
-}
 
 /**
  * 端末のフォルダ（SAF、#199）を [FolderTree] として見せる。[treeUri] は `ACTION_OPEN_DOCUMENT_TREE` で選んだツリー。
@@ -83,7 +35,7 @@ interface DeviceFile : AutoCloseable {
  *   [open] が返したストリーム（ダウンロードの本体）を読む途中の [SecurityException] は、[IOException] に変える（ストリームの読み出しは
  *   [IOException] を前提にしている）。そのダウンロードは失敗として扱われて後でやり直され、次の同期で根の確認がログアウトに導く
  * - 更新日時を provider が返さなければ 1970-01-01（エポック）で補う（毎回同じ値になるので、タグを読み直さない）
- * - 接続を持たないので [reset] は何もしない。[read] は同じファイルを続けて読むことが多いので、最後に開いたファイルを持ち回し、[close] で閉じる
+ * - 接続を持たないので [reset] は何もしない。[read] は同じファイルを続けて読むことが多いので、最後に開いたファイルを持ち回し（[LastOpened]）、[close] で閉じる
  */
 class DeviceFolderTree(
     private val documents: DeviceDocuments,
@@ -92,7 +44,7 @@ class DeviceFolderTree(
     /** 相対パス → 文書。根は空文字列。 */
     private val known = HashMap<String, DeviceDocument>()
     private var rootChecked = false
-    private var readHandle: Pair<String, DeviceFile>? = null
+    private val lastOpened = LastOpened<DeviceFile>()
 
     @Synchronized
     override fun list(path: String): List<FolderEntry>? = guard {
@@ -110,10 +62,7 @@ class DeviceFolderTree(
 
     @Synchronized
     override fun read(path: String, position: Long, buffer: ByteArray, offset: Int, size: Int): Int = guard {
-        val file = readHandle?.takeIf { it.first == path }?.second ?: openFile(path).also { opened ->
-            closeQuietly { readHandle?.second?.close() }
-            readHandle = path to opened
-        }
+        val file = lastOpened.get(path, ::openFile)
         file.read(position, buffer, offset, size)
     }
 
@@ -122,13 +71,12 @@ class DeviceFolderTree(
         val document = resolve(path)
         val file = openFile(path)
         val size = file.sizeBytes.takeIf { it >= 0 } ?: document?.sizeBytes ?: -1L
-        FolderFileStream(size, DeviceFileInputStream(file, offset))
+        FolderFileStream(size, fileInputStream(file, offset))
     }
 
     @Synchronized
     override fun close() {
-        closeQuietly { readHandle?.second?.close() }
-        readHandle = null
+        lastOpened.close()
     }
 
     private fun openFile(path: String): DeviceFile {
@@ -171,41 +119,21 @@ class DeviceFolderTree(
         throw ServerException.Unauthorized(e)
     }
 
-    private inline fun closeQuietly(block: () -> Unit) {
-        try {
-            block()
-        } catch (_: Exception) {
-        }
-    }
-
     private companion object {
         const val ROOT = ""
     }
 }
 
-/** [DeviceFile] を [offset] から読む [InputStream]。閉じるとファイルも閉じる。 */
-private class DeviceFileInputStream(private val file: DeviceFile, offset: Long) : InputStream() {
-    private var position = offset
-
-    override fun read(): Int {
-        val one = ByteArray(1)
-        return if (read(one, 0, 1) <= 0) -1 else one[0].toInt() and 0xff
-    }
-
-    override fun read(b: ByteArray, off: Int, len: Int): Int {
-        if (len == 0) return 0
-        val n = try {
-            file.read(position, b, off, len)
-        } catch (e: SecurityException) {
-            // ストリームの読み出しは IOException を前提にしている。ダウンロードは失敗として後でやり直され、次の同期で根の確認がログアウトに導く
-            throw IOException("device folder read failed: ${e.message}", e)
-        }
-        if (n <= 0) return -1
-        position += n
-        return n
-    }
-
-    override fun close() {
-        file.close()
-    }
-}
+/**
+ * [DeviceFile] を [offset] から読む [java.io.InputStream]。閉じるとファイルも閉じる。
+ * 読み取り中の [SecurityException] は [IOException] に変え、それ以外の例外はそのまま投げる。
+ */
+private fun fileInputStream(file: DeviceFile, offset: Long) = PositionalInputStream(
+    offset = offset,
+    readAt = { position, buffer, off, len -> file.read(position, buffer, off, len) },
+    closeSource = { file.close() },
+    mapError = { e ->
+        // ストリームの読み出しは IOException を前提にしている。ダウンロードは失敗として後でやり直され、次の同期で根の確認がログアウトに導く
+        if (e is SecurityException) IOException("device folder read failed: ${e.message}", e) else e
+    },
+)

@@ -4,8 +4,8 @@ import android.util.Log
 import dev.tseki.kikidame.data.jellyfin.JellyfinGateway
 import dev.tseki.kikidame.data.jellyfin.credentials
 import dev.tseki.kikidame.data.session.SessionStore
-import dev.tseki.kikidame.data.sharedfolder.DeviceDocuments
-import dev.tseki.kikidame.data.smb.FolderTreeFactory
+import dev.tseki.kikidame.data.device.DeviceDocuments
+import dev.tseki.kikidame.data.sharedfolder.FolderTreeFactory
 import dev.tseki.kikidame.data.smb.SmbPaths
 import dev.tseki.kikidame.domain.ConnectedSource
 import dev.tseki.kikidame.domain.DeviceFolder

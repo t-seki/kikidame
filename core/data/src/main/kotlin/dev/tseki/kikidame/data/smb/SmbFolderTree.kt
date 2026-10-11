@@ -13,31 +13,20 @@ import com.hierynomus.smbj.connection.Connection
 import com.hierynomus.smbj.session.Session
 import com.hierynomus.smbj.share.DiskShare
 import com.hierynomus.smbj.share.File
+import dev.tseki.kikidame.data.sharedfolder.CloseableFolderTree
 import dev.tseki.kikidame.data.sharedfolder.FolderEntry
 import dev.tseki.kikidame.data.sharedfolder.FolderFileStream
 import dev.tseki.kikidame.data.sharedfolder.FolderTree
-import dev.tseki.kikidame.domain.DeviceFolder
+import dev.tseki.kikidame.data.sharedfolder.LastOpened
+import dev.tseki.kikidame.data.sharedfolder.PositionalInputStream
+import dev.tseki.kikidame.data.sharedfolder.closeQuietly
 import dev.tseki.kikidame.domain.ServerException
 import dev.tseki.kikidame.domain.SmbConnection
 import java.io.IOException
-import java.io.InputStream
 import java.util.EnumSet
 import java.util.concurrent.CancellationException
 import java.util.concurrent.TimeUnit
 import kotlin.time.Instant
-
-/** 使い終わったら閉じる [FolderTree]。閉じると接続も閉じる。 */
-interface CloseableFolderTree : FolderTree, AutoCloseable
-
-/**
- * 共有フォルダの取得元から木を作る。1 回の取得元の操作ごとに作って閉じる（接続の寿命を呼び出しの外に持ち出さない）。
- * SMB（#198）と端末のフォルダ（SAF、#199）。
- */
-interface FolderTreeFactory {
-    fun open(connection: SmbConnection): CloseableFolderTree
-
-    fun open(folder: DeviceFolder): CloseableFolderTree
-}
 
 /**
  * SMB の共有を [FolderTree] として見せる（#198）。smbj の SMB2/3 を使う（SMB1 は非対応）。
@@ -50,7 +39,7 @@ interface FolderTreeFactory {
  *   切れた接続を smbj が「つながっている」と見せたまま残すかは確かめていない（未確認）ので、[share] の `isConnected` だけに頼らない
  * - 単体テストしない（ネットワークに出るため）。パスの組み立てと失敗の分類は [SmbPaths] と [SmbErrors] で試す
  *
- * [read] は同じファイルを続けて読むことが多いので、最後に開いたファイルのハンドルを持ち回す。
+ * [read] は同じファイルを続けて読むことが多いので、最後に開いたファイルのハンドルを持ち回す（[LastOpened]）。
  * 呼び出しはすべて blocking で、複数のスレッドから呼ばれても 1 つずつ処理する。
  */
 class SmbFolderTree(private val connection: SmbConnection) : CloseableFolderTree {
@@ -58,7 +47,7 @@ class SmbFolderTree(private val connection: SmbConnection) : CloseableFolderTree
     private var smbConnection: Connection? = null
     private var session: Session? = null
     private var share: DiskShare? = null
-    private var readHandle: Pair<String, File>? = null
+    private val lastOpened = LastOpened<File>()
 
     @Synchronized
     override fun list(path: String): List<FolderEntry>? {
@@ -83,10 +72,7 @@ class SmbFolderTree(private val connection: SmbConnection) : CloseableFolderTree
 
     @Synchronized
     override fun read(path: String, position: Long, buffer: ByteArray, offset: Int, size: Int): Int {
-        val file = readHandle?.takeIf { it.first == path }?.second ?: openForRead(path).also { opened ->
-            closeQuietly { readHandle?.second?.close() }
-            readHandle = path to opened
-        }
+        val file = lastOpened.get(path, ::openForRead)
         return try {
             file.read(buffer, position, offset, size.coerceAtMost(MAX_CHUNK))
         } catch (e: Exception) {
@@ -98,7 +84,7 @@ class SmbFolderTree(private val connection: SmbConnection) : CloseableFolderTree
     override fun open(path: String, offset: Long): FolderFileStream {
         val file = openForRead(path)
         return try {
-            FolderFileStream(file.length, SmbFileInputStream(file, offset))
+            FolderFileStream(file.length, fileInputStream(file, offset))
         } catch (e: Exception) {
             closeQuietly { file.close() }
             throw SmbErrors.translate(e, connecting = false, path = path)
@@ -113,8 +99,7 @@ class SmbFolderTree(private val connection: SmbConnection) : CloseableFolderTree
 
     @Synchronized
     override fun close() {
-        closeQuietly { readHandle?.second?.close() }
-        readHandle = null
+        lastOpened.close()
         closeQuietly { share?.close() }
         share = null
         closeQuietly { session?.close() }
@@ -176,13 +161,6 @@ class SmbFolderTree(private val connection: SmbConnection) : CloseableFolderTree
         return AuthenticationContext(user, connection.password.toCharArray(), domain)
     }
 
-    private inline fun closeQuietly(block: () -> Unit) {
-        try {
-            block()
-        } catch (_: Exception) {
-        }
-    }
-
     private companion object {
         const val TIMEOUT_SECONDS = 30L
 
@@ -191,38 +169,33 @@ class SmbFolderTree(private val connection: SmbConnection) : CloseableFolderTree
     }
 }
 
-/** [File] を [offset] から読む [InputStream]。閉じるとファイルのハンドルも閉じる。 */
-private class SmbFileInputStream(private val file: File, offset: Long) : InputStream() {
-    private var position = offset
+/**
+ * [File] を [offset] から読む [java.io.InputStream]。閉じるとファイルのハンドルも閉じる。
+ * 1 回に読む長さは [SMB_READ_CHUNK] までに抑える。読み取り中の例外は [smbReadError] で変える。
+ */
+private fun fileInputStream(file: File, offset: Long) = PositionalInputStream(
+    offset = offset,
+    readAt = { position, buffer, off, len -> file.read(buffer, position, off, len.coerceAtMost(SMB_READ_CHUNK)) },
+    closeSource = { file.close() },
+    mapError = ::smbReadError,
+)
 
-    override fun read(): Int {
-        val one = ByteArray(1)
-        return if (read(one, 0, 1) <= 0) -1 else one[0].toInt() and 0xff
-    }
+/** ストリームで 1 回に読む長さの上限。 */
+private const val SMB_READ_CHUNK = 512 * 1024
 
-    override fun read(b: ByteArray, off: Int, len: Int): Int {
-        if (len == 0) return 0
-        val n = try {
-            file.read(b, position, off, len.coerceAtMost(CHUNK))
-        } catch (e: SMBApiException) {
-            throw IOException("SMB read failed: ${e.status}", e)
-        } catch (e: IOException) {
-            throw e // InterruptedIOException を含む
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: RuntimeException) {
-            throw IOException("SMB read failed: ${e.message}", e)
-        }
-        if (n <= 0) return -1
-        position += n
-        return n
-    }
-
-    override fun close() {
-        file.close()
-    }
-
-    private companion object {
-        const val CHUNK = 512 * 1024
-    }
+/**
+ * SMB のファイルを読むストリームの、読み取り中の例外を変える（#233 で `SmbFileInputStream` の catch の並びから移した。順も同じ）。
+ *
+ * - [SMBApiException] は [IOException] に変える
+ * - [IOException]（`InterruptedIOException` を含む）と [CancellationException] は、そのまま投げる。
+ *   [CancellationException] は [RuntimeException] の一種なので、下の変換より先に見る
+ * - そのほかの [RuntimeException] は [IOException] に変える
+ * - それ以外はそのまま投げる
+ */
+internal fun smbReadError(e: Exception): Exception = when (e) {
+    is SMBApiException -> IOException("SMB read failed: ${e.status}", e)
+    is IOException -> e
+    is CancellationException -> e
+    is RuntimeException -> IOException("SMB read failed: ${e.message}", e)
+    else -> e
 }

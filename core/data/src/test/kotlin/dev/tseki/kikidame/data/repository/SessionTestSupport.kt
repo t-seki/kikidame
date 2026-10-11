@@ -7,8 +7,8 @@ import dev.tseki.kikidame.data.session.SessionStore
 import dev.tseki.kikidame.data.session.TokenCipher
 import dev.tseki.kikidame.data.sharedfolder.FolderEntry
 import dev.tseki.kikidame.data.sharedfolder.FolderFileStream
-import dev.tseki.kikidame.data.smb.CloseableFolderTree
-import dev.tseki.kikidame.data.smb.FolderTreeFactory
+import dev.tseki.kikidame.data.sharedfolder.CloseableFolderTree
+import dev.tseki.kikidame.data.sharedfolder.FolderTreeFactory
 import dev.tseki.kikidame.domain.DeviceFolder
 import dev.tseki.kikidame.domain.SmbConnection
 import kotlinx.coroutines.CoroutineScope

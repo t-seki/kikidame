@@ -1,6 +1,6 @@
 package dev.tseki.kikidame.data.repository
 
-import dev.tseki.kikidame.data.sharedfolder.MemoryDeviceDocuments
+import dev.tseki.kikidame.data.device.MemoryDeviceDocuments
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tseki.kikidame.data.jellyfin.JellyfinSource
