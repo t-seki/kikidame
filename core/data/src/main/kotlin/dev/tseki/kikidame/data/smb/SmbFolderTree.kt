@@ -74,7 +74,7 @@ class SmbFolderTree(private val connection: SmbConnection) : CloseableFolderTree
     override fun read(path: String, position: Long, buffer: ByteArray, offset: Int, size: Int): Int {
         val file = lastOpened.get(path, ::openForRead)
         return try {
-            file.read(buffer, position, offset, size.coerceAtMost(MAX_CHUNK))
+            file.read(buffer, position, offset, size.coerceAtMost(SMB_READ_CHUNK))
         } catch (e: Exception) {
             throw SmbErrors.translate(e, connecting = false, path = path)
         }
@@ -163,15 +163,12 @@ class SmbFolderTree(private val connection: SmbConnection) : CloseableFolderTree
 
     private companion object {
         const val TIMEOUT_SECONDS = 30L
-
-        /** 1 回の読み取りの上限。大きすぎる要求を 1 往復で出さない。 */
-        const val MAX_CHUNK = 512 * 1024
     }
 }
 
 /**
  * [File] を [offset] から読む [java.io.InputStream]。閉じるとファイルのハンドルも閉じる。
- * 1 回に読む長さは [SMB_READ_CHUNK] までに抑える。読み取り中の例外は [smbReadError] で変える。
+ * 1 回に読む長さは [SMB_READ_CHUNK] までに抑える（[SmbFolderTree.read] と同じ）。読み取り中の例外は [smbReadError] で変える。
  */
 private fun fileInputStream(file: File, offset: Long) = PositionalInputStream(
     offset = offset,
@@ -180,7 +177,7 @@ private fun fileInputStream(file: File, offset: Long) = PositionalInputStream(
     mapError = ::smbReadError,
 )
 
-/** ストリームで 1 回に読む長さの上限。 */
+/** 1 回の読み取りの上限。大きすぎる要求を 1 往復で出さない（[SmbFolderTree.read] と、[SmbFolderTree.open] のストリームの両方）。 */
 private const val SMB_READ_CHUNK = 512 * 1024
 
 /**
