@@ -52,6 +52,7 @@ import dev.tseki.kikidame.ui.SectionTitle
 import dev.tseki.kikidame.ui.ValueRow
 import dev.tseki.kikidame.ui.connect.displayPath
 import dev.tseki.kikidame.ui.resolve
+import dev.tseki.kikidame.ui.source.ChangeSourceConfirmDialog
 import dev.tseki.kikidame.ui.toDateTimeText
 import dev.tseki.kikidame.ui.toText
 
@@ -210,16 +211,9 @@ fun SettingsScreen(
         )
     }
     if (confirmReset) {
-        AlertDialog(
-            onDismissRequest = { confirmReset = false },
-            title = { Text(stringResource(R.string.settings_reset_title)) },
-            text = { Text(stringResource(R.string.settings_reset_text)) },
-            confirmButton = {
-                TextButton(onClick = { confirmReset = false; viewModel.resetAndConnectElsewhere() }) {
-                    Text(stringResource(R.string.settings_reset_confirm), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text(stringResource(R.string.common_cancel)) } },
+        ChangeSourceConfirmDialog(
+            onConfirm = { confirmReset = false; viewModel.resetAndConnectElsewhere() },
+            onDismiss = { confirmReset = false },
         )
     }
 }
