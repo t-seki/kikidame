@@ -55,6 +55,23 @@ val SessionState.isDeviceFolder: Boolean
     }
 
 /**
+ * 「Wi-Fi のみ」が効くか（#199 の決定 4）。取得元が端末のフォルダなら、端末の中から端末の中へのコピーなので効かせない。
+ * Jellyfin と SMB は設定どおり。手動の同期の従量制での中止（`LibraryRefresher`）と、Worker のネットワークの制約（`requiredNetworkType`）がこれで決める。
+ */
+fun wifiOnlyApplies(wifiOnly: Boolean, state: SessionState): Boolean = wifiOnly && !state.isDeviceFolder
+
+/**
+ * 取得元がローカルネットワークを使うか（Jellyfin か SMB。#199 の決定 7）。ログアウト中は、前回の取得元が Jellyfin か SMB なら使う。
+ * 端末のフォルダと、まだ取得元を選んでいない人は使わない。
+ */
+val SessionState.usesLocalNetwork: Boolean
+    get() = when (this) {
+        is SessionState.Ready -> source !is ConnectedSource.Device
+        is SessionState.NeedsLibrary -> true
+        is SessionState.SignedOut -> lastServerUrl != null || lastSmb != null
+    }
+
+/**
  * 端末のフォルダ（#199）。[treeUri] は `ACTION_OPEN_DOCUMENT_TREE` で選んだツリーの URI（文字列）、[name] は表示用のフォルダ名。
  * 端末のストレージ（内部ストレージと SD カード）のフォルダだけを受け付ける（[isDeviceStorage]）。
  */

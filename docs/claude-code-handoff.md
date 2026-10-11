@@ -258,7 +258,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 運用パラメータ:
 
 - 定期同期: `PeriodicWorkRequest` 6 時間ごと、`Constraints` は `DownloadWorker` と同じ（Wi-Fi のみなら UNMETERED、
-  そうでなければ CONNECTED。取得元が端末のフォルダならネットワークの条件をかけない（NOT_REQUIRED。#199。`SyncScheduler.requiredNetworkType`））。充電中の条件は課さない（同期自体の通信は一覧の JSON だけで軽く、転送は `DownloadWorker` の制約で守られる）
+  そうでなければ CONNECTED。取得元が端末のフォルダならネットワークの条件をかけない（NOT_REQUIRED。#199。`work.requiredNetworkType`））。充電中の条件は課さない（同期自体の通信は一覧の JSON だけで軽く、転送は `DownloadWorker` の制約で守られる）
 - アプリ起動時: 前回同期から 1 時間以上経っていれば実行（同じ制約で待つ。#135 で「前回同期（`lastFetchedAt`）と前回の試み（`lastAttemptedAt`。失敗した全走査も数える）の新しい方から 1 時間」に）。番組一覧の手動プルは同期そのもの（M3-b の範囲を参照）
 - ダウンロード: Worker 内で HTTP ストリームを `.part` ファイルへ書き、完了後にリネーム。
   再開は `Range` ヘッダ。進捗は `setProgress` で UI へ
@@ -408,7 +408,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   （空 → 消失 = 判断保留。#97 で `/Items/{id}` から変更）、その番組の各回一覧を取り、取り込み → `planSync`（この番組だけ）→ 除去・削除・予約。全走査（約 45 秒）を待たずに
   1〜2 秒で終わる。他の番組には触れず、最終同期の時刻も更新しない（ADR 0004 の追記）。設定画面の「最終取得」は「最終同期」（値は `lastFetchedAt`。番組単位取得は更新しない）。
   ログイン直後の初回取得も同期になるが、全番組が同期対象 OFF なので何も落ちず何も消えない
-- **「Wi-Fi のみ」は同期にも効く**（手動を含む。取得元が端末のフォルダなら効かせない。#199 の `SyncScheduler.wifiOnlyApplies`）。`SyncWorker` の制約は `DownloadWorker` と同じ（UNMETERED / CONNECTED、充電中は課さない）。
+- **「Wi-Fi のみ」は同期にも効く**（手動を含む。取得元が端末のフォルダなら効かせない。#199 の domain の `wifiOnlyApplies`）。`SyncWorker` の制約は `DownloadWorker` と同じ（UNMETERED / CONNECTED、充電中は課さない）。
   手動は `LibraryRefresher` で `ConnectivityManager.isActiveNetworkMetered` を見て、従量制ならスナックバー
   「Wi-Fi に接続していないため更新しません」で終える（裏で待たせない）。判定は全走査・番組単位・起動時・定期のすべてが通るが、
   **ゲートは取得元への取得だけを包む**: 先頭の `reconcileMissingFiles()`（#5、ローカル I/O のみ）は従量制でも走らせる
