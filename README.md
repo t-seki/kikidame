@@ -24,7 +24,7 @@ Existing Jellyfin clients (the official app, Findroid, Finamp) are built around 
 - **Offline first** — playback always uses the files on the device. Playback position and played state live on the device only and are never sent to the server
 - **Retention rules** — per program, choose "Keep latest N" and "Delete after played"; sync then downloads what is missing and removes what is no longer needed
 
-It assumes one source at a time (one Jellyfin server, user and library, or one folder (a NAS shared folder or a folder on the device)) and that this app is the only place you listen. Changing the source deletes the programs, episodes, playback positions and files on the device and starts over. Sharing with other devices or the web player is not a goal.
+It assumes one source at a time (one Jellyfin server, user and library, or one NAS shared folder or folder on the device) and that this app is the only place you listen. Changing the source deletes the programs, episodes, playback positions and files on the device and starts over. Sharing with other devices or the web player is not a goal.
 
 ## What it does
 
