@@ -1,7 +1,6 @@
 package dev.tseki.kikidame.playback
 
 import androidx.media3.common.MediaItem
-import androidx.media3.common.C
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -122,8 +121,7 @@ class NowPlaying @Inject constructor() {
                     isPlaying = player.isPlaying,
                     isEnded = player.playbackState == Player.STATE_ENDED || pausedAtEndOfItem,
                     positionMs = player.currentPosition.coerceAtLeast(0),
-                    // PositionPersister.currentRuntime と同じ判定（0 も「分からない」）
-                    durationMs = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: item.mediaMetadata.durationMs ?: 0,
+                    durationMs = player.knownRuntime()?.inWholeMilliseconds ?: 0,
                 )
             },
         )
