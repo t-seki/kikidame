@@ -47,8 +47,8 @@ interface ProgramDao {
     @Query(
         """
         SELECT p.*, COUNT(e.id) AS episodeCount,
-               SUM(CASE WHEN lf.state = 'DONE' AND lf.path IS NOT NULL THEN 1 ELSE 0 END) AS localEpisodeCount,
-               SUM(CASE WHEN lf.state = 'DONE' AND lf.path IS NOT NULL AND COALESCE(ps.played, 0) = 0 THEN 1 ELSE 0 END) AS unplayedLocalCount,
+               SUM(CASE WHEN $LOCAL_FILE_PRESENT THEN 1 ELSE 0 END) AS localEpisodeCount,
+               SUM(CASE WHEN $LOCAL_FILE_PRESENT AND COALESCE(ps.played, 0) = 0 THEN 1 ELSE 0 END) AS unplayedLocalCount,
                MAX(e.publishedAt) AS latestPublishedAt
         FROM programs p
           LEFT JOIN episodes e ON e.programId = p.id
@@ -95,12 +95,15 @@ data class EpisodeRow(
     @Relation(parentColumn = "id", entityColumn = "episodeId") val localFile: LocalFileEntity?,
     @Relation(parentColumn = "id", entityColumn = "episodeId") val playback: PlaybackStateEntity?,
 )
+/** 「手元にある」（ダウンロード完了でパスがある）の条件。`local_files` を `lf` で結合した問い合わせに埋め込む。domain の `EpisodeWithState.isPlayable` と同じ定義。 */
+private const val LOCAL_FILE_PRESENT = "lf.state = 'DONE' AND lf.path IS NOT NULL"
+
 /** 「続きから」（#108）の条件と順。Auto・再開の上限付きの読み出しと、アプリの「続きから」タブ（#151）の追従する読み出しで共有する。 */
 private const val RECENTLY_LISTENED = """
     SELECT e.* FROM episodes e
       JOIN local_files lf ON lf.episodeId = e.id
       JOIN playback_states ps ON ps.episodeId = e.id
-    WHERE lf.state = 'DONE' AND lf.path IS NOT NULL AND ps.played = 0 AND ps.positionTicks >= :notStartedTicks
+    WHERE $LOCAL_FILE_PRESENT AND ps.played = 0 AND ps.positionTicks >= :notStartedTicks
     ORDER BY ps.updatedAt DESC, e.id DESC
     """
 @Dao
@@ -173,7 +176,7 @@ interface LocalFileDao {
         """
         SELECT COALESCE(SUM(e.sizeBytes), 0) AS totalBytes, COUNT(lf.episodeId) AS episodeCount
         FROM local_files lf JOIN episodes e ON e.id = lf.episodeId
-        WHERE lf.state = 'DONE' AND lf.path IS NOT NULL
+        WHERE $LOCAL_FILE_PRESENT
         """,
     )
     fun observeUsage(): Flow<LocalUsageRow>

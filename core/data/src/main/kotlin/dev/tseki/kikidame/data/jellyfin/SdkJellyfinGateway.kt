@@ -234,7 +234,7 @@ class SdkJellyfinGateway @Inject constructor(
             sourceId = SourceItemId(id.toString()),
             programSourceId = SourceItemId(albumId.toString()),
             title = name.orEmpty(),
-            publishedAt = jellyfinPublishedAt(premiereDate?.toKotlinLocalDate(), created.toKotlinLocalDate()),
+            publishedAt = PublishedAt.of(premiereDate?.toKotlinLocalDate(), created.toKotlinLocalDate()),
             addedAt = created.toInstantUtc(),
             runtime = runTimeTicks?.let(Ticks::toDuration) ?: Duration.ZERO,
             // ファイルサイズは基本フィールドに無い（MediaSources を避けるため）。M3 のダウンロードで確定する

@@ -101,15 +101,15 @@ object SyncPlanner {
 
     fun plan(inputs: List<SyncProgramInput>): SyncPlan {
         val plans = inputs.map(::planProgram)
-        val publishedAtById = inputs.asSequence().flatMap { it.local }.associate { it.id to (it.publishedAt to it.title) }
+        val localById = inputs.asSequence().flatMap { it.local }.associateBy { it.id }
         val download = plans.flatMap { it.download }
-            .sortedWith(compareByDescending<EpisodeId> { publishedAtById.getValue(it).first }.thenBy { publishedAtById.getValue(it).second }.thenBy { it.value })
+            .sortedWith { a, b -> NEWEST_FIRST.compare(localById.getValue(a), localById.getValue(b)) }
         return SyncPlan(plans, download)
     }
 
     /** [EpisodeOrder.newestFirst] と同じ順（公開日の新しい順 → タイトル → ローカル ID）。 */
     private val NEWEST_FIRST: Comparator<LocalEpisodeState> =
-        compareByDescending<LocalEpisodeState> { it.publishedAt }.thenBy { it.title }.thenBy { it.id.value }
+        EpisodeOrder.newestFirstBy({ it.publishedAt }, { it.title }, { it.id.value })
 }
 
 /**
