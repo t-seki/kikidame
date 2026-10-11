@@ -34,16 +34,22 @@ import javax.inject.Singleton
  * 接続していなければ（Jellyfin の接続も無ければ）[JellyfinSource] が [ServerException.Unauthorized] を投げる。
  */
 @Singleton
-class SessionSourceGateway @Inject constructor(
+class SessionSourceGateway internal constructor(
     private val store: SessionStore,
     private val jellyfin: JellyfinSource,
     private val trees: FolderTreeFactory,
     private val tags: TagReader,
     private val scanned: ScannedFiles,
+    private val io: CoroutineDispatcher,
 ) : SourceGateway {
-    private val io: CoroutineDispatcher = Dispatchers.IO
-
-    override suspend fun fetchAll(): SourceSnapshot = withSource { it.fetchAll() }
+    /** DI 用。[io] は [Dispatchers.IO]（テストは上の constructor で差し替える）。 */
+    @Inject constructor(
+        store: SessionStore,
+        jellyfin: JellyfinSource,
+        trees: FolderTreeFactory,
+        tags: TagReader,
+        scanned: ScannedFiles,
+    ) : this(store, jellyfin, trees, tags, scanned, Dispatchers.IO)
 
     /** 途中経過も振り分け先に渡す（共有フォルダは番組ごとに流す。#209）。全走査は 1 本の木（接続）で行う。 */
     override suspend fun fetchAll(listener: ScanListener): SourceSnapshot = withSource { it.fetchAll(listener) }
@@ -56,21 +62,18 @@ class SessionSourceGateway @Inject constructor(
 
     override suspend fun openDownload(episodeId: SourceItemId, rangeStart: Long): DownloadStream {
         val tree = openTreeOrNull() ?: return jellyfin.openDownload(episodeId, rangeStart)
-        try {
-            val inner = SharedFolderSource(tree, tags, scanned, io).openDownload(episodeId, rangeStart)
+        // 木は成功すれば返す DownloadStream が閉じる。失敗したらここで閉じる
+        return withTreeOwnership(tree) {
+            val inner = sharedFolderSource(tree).openDownload(episodeId, rangeStart)
             // inner は作り直す。body は新しい DownloadStream が閉じ、続けて木（接続）を閉じる
-            return DownloadStream(inner.resumedFrom, inner.totalBytes, inner.body) { tree.close() }
-        } catch (e: Throwable) {
-            logFailure(e)
-            withContext(NonCancellable + io) { tree.close() }
-            throw e
+            DownloadStream(inner.resumedFrom, inner.totalBytes, inner.body) { tree.close() }
         }
     }
 
     private suspend fun <T> withSource(block: suspend (SourceGateway) -> T): T {
         val tree = openTreeOrNull() ?: return block(jellyfin)
         try {
-            return block(SharedFolderSource(tree, tags, scanned, io))
+            return block(sharedFolderSource(tree))
         } catch (e: Throwable) {
             logFailure(e)
             throw e
@@ -78,6 +81,18 @@ class SessionSourceGateway @Inject constructor(
             withContext(NonCancellable + io) { tree.close() }
         }
     }
+
+    private fun sharedFolderSource(tree: CloseableFolderTree) = SharedFolderSource(tree, tags, scanned, io)
+
+    /** [block] が失敗したらログを残して [tree] を閉じて投げ直す。成功したら木は閉じず、持ち主を [block] の結果に任せる。 */
+    private suspend fun <T> withTreeOwnership(tree: CloseableFolderTree, block: suspend () -> T): T =
+        try {
+            block()
+        } catch (e: Throwable) {
+            logFailure(e)
+            withContext(NonCancellable + io) { tree.close() }
+            throw e
+        }
 
     /** 共有フォルダへの接続・読み取りの失敗を原因の連鎖付きで残す（画面に出る文言には原因が出ないため）。取り消しは失敗でない。 */
     private fun logFailure(e: Throwable) {
