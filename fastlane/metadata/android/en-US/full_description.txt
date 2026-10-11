@@ -1,4 +1,4 @@
-Kikidame ("kiki-dame", from the Japanese for "listen to what you have saved up") is for people who run their own Jellyfin server and keep radio recordings or podcasts in a music library. It downloads the episodes you want to your phone, program by program, and plays them without needing the server.
+Kikidame ("kiki-dame", from the Japanese for "listen to what you have saved up") is for people who keep recorded radio programs on a Jellyfin server, a NAS share or a folder on their phone. It downloads the episodes you want to your phone, program by program, and plays them without needing the source. Podcast files work too.
 
 What it does:
 
@@ -11,6 +11,12 @@ What it does:
 
 Not for: music (episodes do not pile up) or audiobooks (you listen from the oldest chapter, so "keep the latest N" makes no sense).
 
-Requires: a Jellyfin server 10.10 or later with your audio in a music library (album = program, album artist = publisher), and Android 12 or later.
+Requires one of these, depending on where your recordings are:
 
-Kikidame assumes one server, one user, one library, and that this app is the only place you listen. Source and issues: https://github.com/t-seki/kikidame
+- Jellyfin 10.10 or later, with your audio in a music library (album = program, album artist = publisher)
+- A NAS shared folder (SMB2/3), with a folder per publisher, a folder per program inside it, and the episode files inside that
+- A folder on your device, organized the same way
+
+And Android 12 or later.
+
+Kikidame assumes one source at a time (one Jellyfin server, user and library, or one NAS shared folder or folder on the device), and that this app is the only place you listen. Source and issues: https://github.com/t-seki/kikidame
