@@ -45,8 +45,7 @@ class SessionStore(
             it.removeDevice()
             it.remove(LIBRARY_ID)
             it.remove(LIBRARY_NAME)
-            it.remove(LAST_FETCHED_AT)
-            it.remove(LAST_ATTEMPTED_AT)
+            it.removeSyncTimes()
         }
     }
 
@@ -63,8 +62,7 @@ class SessionStore(
             it[SMB_GUEST] = connection.guest
             it.remove(SMB_SIGNED_OUT)
             if (encrypted != null) it[SMB_PASSWORD] = encrypted else it.remove(SMB_PASSWORD)
-            it.remove(LAST_FETCHED_AT)
-            it.remove(LAST_ATTEMPTED_AT)
+            it.removeSyncTimes()
         }
     }
 
@@ -76,8 +74,7 @@ class SessionStore(
             it[DEVICE_TREE_URI] = folder.treeUri
             it[DEVICE_NAME] = folder.name
             it.remove(DEVICE_SIGNED_OUT)
-            it.remove(LAST_FETCHED_AT)
-            it.remove(LAST_ATTEMPTED_AT)
+            it.removeSyncTimes()
         }
     }
 
@@ -111,8 +108,7 @@ class SessionStore(
             if (it[DEVICE_TREE_URI] != null) it[DEVICE_SIGNED_OUT] = true
             it.remove(LIBRARY_ID)
             it.remove(LIBRARY_NAME)
-            it.remove(LAST_FETCHED_AT)
-            it.remove(LAST_ATTEMPTED_AT)
+            it.removeSyncTimes()
         }
     }
 
@@ -145,6 +141,22 @@ class SessionStore(
         remove(DEVICE_SIGNED_OUT)
     }
 
+    /** 取得元が変わったときとログアウトのときに、同期の時刻（最終同期・最終の試み）を消す。 */
+    private fun MutablePreferences.removeSyncTimes() {
+        remove(LAST_FETCHED_AT)
+        remove(LAST_ATTEMPTED_AT)
+    }
+
+    /** 接続済みの状態。同期の時刻は取得元によらず同じキーから読む。 */
+    private fun Preferences.toReady(source: ConnectedSource): SessionState.Ready = SessionState.Ready(
+        source = source,
+        lastFetchedAt = this[LAST_FETCHED_AT]?.let(Instant::fromEpochMilliseconds),
+        lastAttemptedAt = this[LAST_ATTEMPTED_AT]?.let(Instant::fromEpochMilliseconds),
+    )
+
+    /** 暗号化して置いた値を戻す。無いとき・復号できないとき（鍵が変わったなど）は null。 */
+    private fun decryptOrNull(stored: String?): String? = stored?.let { runCatching { cipher.decrypt(it) }.getOrNull() }
+
     private fun Preferences.toState(): SessionState = when {
         this[SMB_HOST] != null -> toSmbState()
         this[DEVICE_TREE_URI] != null -> toDeviceState()
@@ -154,11 +166,7 @@ class SessionStore(
     private fun Preferences.toDeviceState(): SessionState {
         val folder = DeviceFolder(treeUri = this[DEVICE_TREE_URI].orEmpty(), name = this[DEVICE_NAME].orEmpty())
         if (this[DEVICE_SIGNED_OUT] == true) return SessionState.SignedOut(null, null, lastDeviceFolder = folder)
-        return SessionState.Ready(
-            source = ConnectedSource.Device(folder),
-            lastFetchedAt = this[LAST_FETCHED_AT]?.let(Instant::fromEpochMilliseconds),
-            lastAttemptedAt = this[LAST_ATTEMPTED_AT]?.let(Instant::fromEpochMilliseconds),
-        )
+        return toReady(ConnectedSource.Device(folder))
     }
 
     private fun Preferences.toSmbState(): SessionState {
@@ -167,24 +175,20 @@ class SessionStore(
         val userName = this[SMB_USER].orEmpty()
         val path = this[SMB_PATH].orEmpty()
         val guest = this[SMB_GUEST] ?: false
-        val password = this[SMB_PASSWORD]?.let { stored -> runCatching { cipher.decrypt(stored) }.getOrNull() }
+        val password = decryptOrNull(this[SMB_PASSWORD])
         if (host == null || share == null) return SessionState.SignedOut(null, null)
         // ログアウトするとパスワードが消え、印が立つ（ゲストはパスワードが要らないので、印で見分ける）
         if (this[SMB_SIGNED_OUT] == true || (!guest && password == null)) {
             return SessionState.SignedOut(null, null, lastSmb = SmbConnection(host, share, path, userName, password = "", guest = guest))
         }
-        return SessionState.Ready(
-            source = ConnectedSource.Smb(SmbConnection(host, share, path, userName, password.orEmpty(), guest)),
-            lastFetchedAt = this[LAST_FETCHED_AT]?.let(Instant::fromEpochMilliseconds),
-            lastAttemptedAt = this[LAST_ATTEMPTED_AT]?.let(Instant::fromEpochMilliseconds),
-        )
+        return toReady(ConnectedSource.Smb(SmbConnection(host, share, path, userName, password.orEmpty(), guest)))
     }
 
     private fun Preferences.toJellyfinState(): SessionState {
         val serverUrl = this[SERVER_URL]
         val userName = this[USER_NAME]
         val userId = this[USER_ID]
-        val token = this[TOKEN]?.let { stored -> runCatching { cipher.decrypt(stored) }.getOrNull() }
+        val token = decryptOrNull(this[TOKEN])
         if (serverUrl == null || userName == null || userId == null || token == null) {
             return SessionState.SignedOut(lastServerUrl = serverUrl, lastUserName = userName)
         }
@@ -192,11 +196,7 @@ class SessionStore(
         val libraryId = this[LIBRARY_ID]
         val libraryName = this[LIBRARY_NAME]
         if (libraryId == null || libraryName == null) return SessionState.NeedsLibrary(session)
-        return SessionState.Ready(
-            source = ConnectedSource.Jellyfin(session, SelectedLibrary(SourceItemId(libraryId), libraryName)),
-            lastFetchedAt = this[LAST_FETCHED_AT]?.let(Instant::fromEpochMilliseconds),
-            lastAttemptedAt = this[LAST_ATTEMPTED_AT]?.let(Instant::fromEpochMilliseconds),
-        )
+        return toReady(ConnectedSource.Jellyfin(session, SelectedLibrary(SourceItemId(libraryId), libraryName)))
     }
 
     private companion object {

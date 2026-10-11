@@ -74,7 +74,6 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
     val speed by viewModel.speed.collectAsStateWithLifecycle()
     var showSpeedSheet by remember { mutableStateOf(false) }
     val sleepTimerLabel by viewModel.sleepTimerLabel.collectAsStateWithLifecycle()
-    val sleepTimerSet by viewModel.sleepTimerSet.collectAsStateWithLifecycle()
     var showSleepSheet by remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
@@ -167,8 +166,9 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
                 } else {
                     SubAction(Icons.Outlined.Circle, contentDescription = null, label = stringResource(R.string.common_unplayed), enabled = state.episodeId != null) { viewModel.setPlayed(true) }
                 }
-                if (sleepTimerSet) {
-                    SubAction(Icons.Filled.Bedtime, contentDescription = stringResource(R.string.player_sleep_timer), label = sleepTimerLabel?.resolve() ?: stringResource(R.string.player_sleep)) { showSleepSheet = true }
+                val sleepLabel = sleepTimerLabel
+                if (sleepLabel != null) {
+                    SubAction(Icons.Filled.Bedtime, contentDescription = stringResource(R.string.player_sleep_timer), label = sleepLabel.resolve()) { showSleepSheet = true }
                 } else {
                     SubAction(Icons.Outlined.Bedtime, contentDescription = null, label = stringResource(R.string.player_sleep)) { showSleepSheet = true }
                 }
@@ -202,7 +202,7 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
     }
     if (showSleepSheet) {
         SleepTimerSheet(
-            isSet = sleepTimerSet,
+            isSet = sleepTimerLabel != null,
             onSelectAfter = viewModel::setSleepTimer,
             onSelectEndOfEpisode = viewModel::setSleepTimerToEndOfEpisode,
             onDismiss = { showSleepSheet = false },

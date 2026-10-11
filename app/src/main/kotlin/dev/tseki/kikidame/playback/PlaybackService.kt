@@ -32,7 +32,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.guava.future
 import javax.inject.Inject
@@ -211,7 +210,7 @@ class PlaybackService : MediaLibraryService() {
         private suspend fun resolve(mediaItems: List<MediaItem>): List<MediaItem> = mediaItems.mapNotNull { item ->
             val episodeId = EpisodeMediaItems.episodeId(item) ?: return@mapNotNull null
             val episode = libraryRepository.getEpisode(episodeId)?.takeIf { it.isPlayable } ?: return@mapNotNull null
-            val program = libraryRepository.observeProgram(episode.episode.programId).first()
+            val program = libraryRepository.getProgram(episode.episode.programId)
             EpisodeMediaItems.toMediaItem(episode, program)
         }
         /** ルート。「最近」（`isRecent`。端末起動後にシステムが出す再開の候補）は [BrowseTree.recentRoot]（#108）。 */

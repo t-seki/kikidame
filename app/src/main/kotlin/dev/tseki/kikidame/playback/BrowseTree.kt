@@ -60,7 +60,7 @@ class BrowseTree(
         Node.Starred -> programsWithLocalEpisodes().filter { it.program.starred }.map(::programItem)
         Node.Programs -> programsWithLocalEpisodes().map(::programItem)
         is Node.Program -> {
-            val program = library.observeProgram(node.id).first() ?: return null
+            val program = library.getProgram(node.id) ?: return null
             library.observeEpisodes(node.id).first().filter { it.isPlayable }.map { episodeItem(it, program) }
         }
         is Node.Episode -> emptyList()
@@ -73,10 +73,10 @@ class BrowseTree(
         Node.Recent -> recentRoot()
         Node.Starred -> folder(STARRED_ID, labels.starred, MediaMetadata.MEDIA_TYPE_FOLDER_PODCASTS)
         Node.Programs -> folder(PROGRAMS_ID, labels.programs, MediaMetadata.MEDIA_TYPE_FOLDER_PODCASTS)
-        is Node.Program -> library.observeProgram(node.id).first()?.let { programItem(it) }
+        is Node.Program -> library.getProgram(node.id)?.let { programItem(it) }
         is Node.Episode -> {
             val episode = library.getEpisode(node.id)?.takeIf { it.isPlayable } ?: return null
-            val program = library.observeProgram(episode.episode.programId).first() ?: return null
+            val program = library.getProgram(episode.episode.programId) ?: return null
             episodeItem(episode, program)
         }
     }
@@ -97,7 +97,7 @@ class BrowseTree(
     /** 最近聴いた各回とその番組。番組が消えている回（無いはず）は飛ばす。 */
     private suspend fun recentlyListened(limit: Int): List<Pair<EpisodeWithState, Program>> =
         library.getRecentlyListened(limit).mapNotNull { episode ->
-            library.observeProgram(episode.episode.programId).first()?.let { episode to it }
+            library.getProgram(episode.episode.programId)?.let { episode to it }
         }
 
     private fun programItem(summary: ProgramSummary): MediaItem = programItem(summary.program)

@@ -1,5 +1,6 @@
 package dev.tseki.kikidame.domain
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlin.time.Duration
 import kotlin.time.Instant
 /** 番組一覧の 1 行。[LibraryRepository.observePrograms] は最新の各回の公開日順で返す（「よく聴く」タブはそのうちよく聴く番組だけを同じ順で出す。#151）。 */
@@ -44,6 +45,8 @@ interface LibraryRepository {
     /** 手元のファイルの合計。ダウンロード・削除で追従する。 */
     fun observeLocalStorage(): Flow<LocalStorageUsage>
     fun observeProgram(programId: ProgramId): Flow<Program?>
+    /** 番組を 1 回だけ読む。無ければ null。既定は [observeProgram] の最初の値（実装が DB に問い合わせを足さずに済むように。#244）。 */
+    suspend fun getProgram(programId: ProgramId): Program? = observeProgram(programId).first()
     /** [EpisodeOrder.newestFirst]（公開日の新しい順、同着はタイトルの辞書順）。 */
     fun observeEpisodes(programId: ProgramId): Flow<List<EpisodeWithState>>
     suspend fun getEpisode(episodeId: EpisodeId): EpisodeWithState?

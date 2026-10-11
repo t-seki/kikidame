@@ -32,12 +32,7 @@ import dev.tseki.kikidame.data.sharedfolder.ScannedFiles
 import dev.tseki.kikidame.data.sharedfolder.TagReader
 import dev.tseki.kikidame.data.device.ContentResolverDeviceDocuments
 import dev.tseki.kikidame.data.device.DeviceDocuments
-import dev.tseki.kikidame.data.device.DeviceFolderTree
-import dev.tseki.kikidame.data.sharedfolder.CloseableFolderTree
 import dev.tseki.kikidame.data.sharedfolder.FolderTreeFactory
-import dev.tseki.kikidame.data.smb.SmbFolderTree
-import dev.tseki.kikidame.domain.DeviceFolder
-import dev.tseki.kikidame.domain.SmbConnection
 import dev.tseki.kikidame.data.settings.DataStoreAppSettings
 import dev.tseki.kikidame.data.session.SessionStore
 import dev.tseki.kikidame.data.session.TokenCipher
@@ -54,6 +49,7 @@ import javax.inject.Qualifier
 import javax.inject.Singleton
 import kotlin.time.Clock
 
+/** Room の DB と DAO。 */
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
@@ -70,7 +66,12 @@ object DatabaseModule {
 
     @Provides
     fun provideLocalFileDao(db: KikidameDatabase): LocalFileDao = db.localFileDao()
+}
 
+/** 共有フォルダ（SMB と端末のフォルダ）の取得元が使う部品。 */
+@Module
+@InstallIn(SingletonComponent::class)
+object SharedFolderModule {
     @Provides
     @Singleton
     fun provideDeviceDocuments(@ApplicationContext context: Context): DeviceDocuments =
@@ -79,11 +80,7 @@ object DatabaseModule {
     /** 共有フォルダの木。SMB（#198）か端末のフォルダ（SAF、#199）。 */
     @Provides
     @Singleton
-    fun provideFolderTreeFactory(documents: DeviceDocuments): FolderTreeFactory = object : FolderTreeFactory {
-        override fun open(connection: SmbConnection): CloseableFolderTree = SmbFolderTree(connection)
-
-        override fun open(folder: DeviceFolder): CloseableFolderTree = DeviceFolderTree(documents, folder.treeUri)
-    }
+    fun provideFolderTreeFactory(documents: DeviceDocuments): FolderTreeFactory = DefaultFolderTreeFactory(documents)
 
     @Provides
     @Singleton
@@ -92,11 +89,12 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideScannedFiles(dao: EpisodeDao): ScannedFiles = RoomScannedFiles(dao)
+}
 
-    @Provides
-    @Singleton
-    fun provideClock(): Clock = Clock.System
-
+/** Preferences DataStore と、その上に載るセッション・設定。 */
+@Module
+@InstallIn(SingletonComponent::class)
+object PreferencesModule {
     @Provides
     @Singleton
     @SessionPreferences
@@ -107,16 +105,27 @@ object DatabaseModule {
     @Singleton
     fun provideSessionStore(@SessionPreferences dataStore: DataStore<Preferences>, cipher: TokenCipher): SessionStore =
         SessionStore(dataStore, cipher)
+
     @Provides
     @Singleton
     @SettingsPreferences
     fun provideSettingsPreferences(@ApplicationContext context: Context): DataStore<Preferences> =
         PreferenceDataStoreFactory.create { context.preferencesDataStoreFile("settings") }
+
     @Provides
     @Singleton
     fun provideAppSettings(@SettingsPreferences dataStore: DataStore<Preferences>): AppSettingsRepository =
         DataStoreAppSettings(dataStore)
 }
+
+@Module
+@InstallIn(SingletonComponent::class)
+object ClockModule {
+    @Provides
+    @Singleton
+    fun provideClock(): Clock = Clock.System
+}
+
 @Qualifier
 @Retention(AnnotationRetention.RUNTIME)
 annotation class SessionPreferences

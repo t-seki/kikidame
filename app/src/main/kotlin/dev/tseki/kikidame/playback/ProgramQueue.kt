@@ -4,7 +4,6 @@ import dev.tseki.kikidame.domain.EpisodeWithState
 import dev.tseki.kikidame.domain.LibraryRepository
 import dev.tseki.kikidame.domain.PlaybackRules
 import dev.tseki.kikidame.domain.PlaybackStateRepository
-import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 /**
  * 番組のキュー（#231）: ある回を聴き始めるとき、その番組の手元にある回を古い順に全部積み、その回から、
@@ -22,7 +21,7 @@ class ProgramQueue @Inject constructor(
     /** [target] は手元にある回（[EpisodeWithState.isPlayable]）。キューに見つからなければ先頭（0）から。 */
     suspend fun startingAt(target: EpisodeWithState): QueueStart {
         val episodeId = target.episode.id
-        val program = library.observeProgram(target.episode.programId).first()
+        val program = library.getProgram(target.episode.programId)
         val queue = library.getPlayableEpisodes(target.episode.programId)
         val index = queue.indexOfFirst { it.episode.id == episodeId }.coerceAtLeast(0)
         val saved = playbackStates.get(episodeId)

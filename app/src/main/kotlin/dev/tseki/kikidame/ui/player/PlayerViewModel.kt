@@ -113,7 +113,10 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    /** スリープタイマーの表示（#36）: 残り時間「24:59」（60 分直後は「1:00:00」。一時停止中は止まったまま）、「回の終わり」、未設定なら null。 */
+    /**
+     * スリープタイマーの表示（#36）: 残り時間「24:59」（60 分直後は「1:00:00」。一時停止中は止まったまま）、「回の終わり」、未設定なら null。
+     * 設定済みかどうかは、画面がこれの null かどうかで見る（どの設定も最初の値をすぐ出すので、設定済みで null のまま残らない）。
+     */
     val sleepTimerLabel: StateFlow<UiText?> = sleepTimer.setting
         .flatMapLatest { setting ->
             when (setting) {
@@ -128,10 +131,6 @@ class PlayerViewModel @Inject constructor(
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-
-    val sleepTimerSet: StateFlow<Boolean> = sleepTimer.setting
-        .map { it != null }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     /** [after] 後に一時停止（再生中だけ減る）。null で解除。 */
     fun setSleepTimer(after: Duration?) = sleepTimer.set(after?.let { SleepTimerSetting.Countdown(it) })

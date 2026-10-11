@@ -28,7 +28,6 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -109,7 +108,7 @@ class EpisodeListViewModel @Inject constructor(
 
     /** ON にするとき、上限が未設定なら既定の 3 を入れる（「上限なし」は ON にした後で選ぶ）。 */
     fun setSyncEnabled(enabled: Boolean) = act {
-        val current = program.value ?: library.observeProgram(programId).first() ?: return@act
+        val current = program.value ?: library.getProgram(programId) ?: return@act
         if (enabled) {
             val rule = current.retentionRule.let { if (it.keepLatest == null) it.copy(keepLatest = DEFAULT_KEEP_LATEST) else it }
             library.updateSync(programId, syncEnabled = true, rule)
@@ -121,7 +120,7 @@ class EpisodeListViewModel @Inject constructor(
 
     fun confirmDisableSync() = act {
         _pendingDisable.value = null
-        val current = library.observeProgram(programId).first() ?: return@act
+        val current = library.getProgram(programId) ?: return@act
         library.updateSync(programId, syncEnabled = false, current.retentionRule)
     }
 
@@ -146,7 +145,7 @@ class EpisodeListViewModel @Inject constructor(
     fun setDeleteAfterPlayed(value: Boolean) = updateRule { it.copy(deleteAfterPlayed = value) }
 
     private fun updateRule(transform: (RetentionRule) -> RetentionRule) = act {
-        val current = library.observeProgram(programId).first() ?: return@act
+        val current = library.getProgram(programId) ?: return@act
         library.updateSync(programId, current.syncEnabled, transform(current.retentionRule))
     }
 
