@@ -9,6 +9,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -35,6 +36,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import javax.inject.Inject
+import kotlin.reflect.KClass
 
 /** 初回の取得元の選択（#198）。 */
 @Serializable
@@ -114,20 +116,20 @@ fun KikidameNavHost(sessionViewModel: SessionViewModel = hiltViewModel()) {
         }
         composable<ConnectRoute> {
             ConnectScreen(
-                onBack = if (navController.previousBackStackEntry != null) navController::popIfNotRoot else null,
-                onSourceChanged = { navController.navigate(SourcePickRoute) { popUpTo(0) } },
+                onBack = navController.backOrNull(),
+                onSourceChanged = navController::restartFromSourcePick,
             )
         }
         composable<SmbConnectRoute> {
             SmbConnectScreen(
-                onBack = if (navController.previousBackStackEntry != null) navController::popIfNotRoot else null,
-                onSourceChanged = { navController.navigate(SourcePickRoute) { popUpTo(0) } },
+                onBack = navController.backOrNull(),
+                onSourceChanged = navController::restartFromSourcePick,
             )
         }
         composable<DeviceFolderRoute> {
             DeviceFolderScreen(
-                onBack = if (navController.previousBackStackEntry != null) navController::popIfNotRoot else null,
-                onSourceChanged = { navController.navigate(SourcePickRoute) { popUpTo(0) } },
+                onBack = navController.backOrNull(),
+                onSourceChanged = navController::restartFromSourcePick,
             )
         }
         composable<LibraryPickRoute> {
@@ -136,7 +138,7 @@ fun KikidameNavHost(sessionViewModel: SessionViewModel = hiltViewModel()) {
                 onDone = {
                     if (fromSettings) navController.popIfNotRoot() else navController.navigate(ProgramListRoute) { popUpTo(0) }
                 },
-                onBack = if (fromSettings) navController::popIfNotRoot else null,
+                onBack = navController.backOrNull(),
             )
         }
         composable<SettingsRoute> {
@@ -199,19 +201,27 @@ private fun SessionState.SignedOut.signedOutDestination(): Any = when {
 }
 
 /** 取得元を選んで接続する画面（まだ番組一覧に入っていない）。 */
-private val SIGN_IN_ROUTES = listOf("SourcePickRoute", "ConnectRoute", "SmbConnectRoute", "DeviceFolderRoute")
+private val SIGN_IN_ROUTES: List<KClass<*>> =
+    listOf(SourcePickRoute::class, ConnectRoute::class, SmbConnectRoute::class, DeviceFolderRoute::class)
+
+/** 戻り先があるときだけ ← を出す（戻り先が無い画面では null）。 */
+private fun NavHostController.backOrNull(): (() -> Unit)? =
+    if (previousBackStackEntry != null) ::popIfNotRoot else null
+
+/** 取得元の選択からやり直す（スタックを空にして積み直す）。 */
+private fun NavHostController.restartFromSourcePick() {
+    navigate(SourcePickRoute) { popUpTo(0) }
+}
 
 /** セッション状態が変わったときだけ呼ぶ。今いる画面と食い違う場合にスタックを作り直す。 */
 private fun NavHostController.followSessionChange(state: SessionState) {
-    val current = currentBackStackEntry?.destination?.route ?: return
-    // route は完全修飾名なので末尾で比べる（"SmbConnectRoute" は "ConnectRoute" で終わらないが、念のため完全一致にする）
-    val name = current.substringAfterLast('.')
-    val onSignInScreen = name in SIGN_IN_ROUTES
+    val current = currentBackStackEntry?.destination ?: return
+    val onSignInScreen = SIGN_IN_ROUTES.any { current.hasRoute(it) }
     when (state) {
         // 取得元を選んでいる途中の画面にいる間は動かさない
         is SessionState.SignedOut -> if (!onSignInScreen) navigate(state.signedOutDestination()) { popUpTo(0) }
-        is SessionState.NeedsLibrary -> if (name != "LibraryPickRoute") navigate(LibraryPickRoute) { popUpTo(0) }
+        is SessionState.NeedsLibrary -> if (!current.hasRoute<LibraryPickRoute>()) navigate(LibraryPickRoute) { popUpTo(0) }
         is SessionState.Ready ->
-            if (onSignInScreen || (name == "LibraryPickRoute" && previousBackStackEntry == null)) navigate(ProgramListRoute) { popUpTo(0) }
+            if (onSignInScreen || (current.hasRoute<LibraryPickRoute>() && previousBackStackEntry == null)) navigate(ProgramListRoute) { popUpTo(0) }
     }
 }
