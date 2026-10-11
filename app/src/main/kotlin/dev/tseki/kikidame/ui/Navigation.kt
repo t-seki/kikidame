@@ -1,7 +1,6 @@
 package dev.tseki.kikidame.ui
 
 import android.util.Log
-import android.util.SparseArray
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
