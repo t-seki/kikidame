@@ -1,4 +1,6 @@
 package dev.tseki.kikidame.playback
+import dev.tseki.kikidame.testing.InMemoryPlaybackStateRepository
+import dev.tseki.kikidame.testing.InMemoryLibraryRepository
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tseki.kikidame.domain.DownloadState
 import dev.tseki.kikidame.domain.Episode
