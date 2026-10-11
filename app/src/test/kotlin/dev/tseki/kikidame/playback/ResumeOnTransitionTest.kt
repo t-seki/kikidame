@@ -1,7 +1,6 @@
 package dev.tseki.kikidame.playback
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
-import androidx.media3.common.Player
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.PlaybackState
