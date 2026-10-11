@@ -1,9 +1,7 @@
 package dev.tseki.kikidame.download
 
 import android.content.Context
-import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
@@ -12,7 +10,8 @@ import dev.tseki.kikidame.domain.AppSettingsRepository
 import dev.tseki.kikidame.domain.DownloadRepository
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.SessionRepository
-import dev.tseki.kikidame.sync.SyncScheduler
+import dev.tseki.kikidame.work.cancelUniqueAndAwait
+import dev.tseki.kikidame.work.networkConstraints
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -50,12 +49,10 @@ class DownloadScheduler @Inject constructor(
 
     /**
      * PENDING が残っていれば Worker を起動する（アプリ起動時・設定変更時・同期の後にも呼ぶ）。
-     * 取得元が端末のフォルダならネットワークの条件をかけない（#199 の決定 4 と「決定の追記」。[SyncScheduler.requiredNetworkType]）。
+     * 取得元が端末のフォルダならネットワークの条件をかけない（#199 の決定 4 と「決定の追記」。[dev.tseki.kikidame.work.requiredNetworkType]）。
      */
     override suspend fun kick() {
-        val constraints = Constraints.Builder()
-            .setRequiredNetworkType(SyncScheduler.requiredNetworkType(settings.wifiOnly.first(), sessionRepository.state.first()))
-            .build()
+        val constraints = networkConstraints(settings.wifiOnly.first(), sessionRepository.state.first())
         val request = OneTimeWorkRequestBuilder<DownloadWorker>().setConstraints(constraints).build()
         workManager.enqueueUniqueWork(DownloadWorker.UNIQUE_NAME, ExistingWorkPolicy.KEEP, request)
     }
@@ -77,9 +74,7 @@ class DownloadScheduler @Inject constructor(
      * （行とファイルをこれから消すので、続けても `.part` が残るか、古い取得元へ無駄に取りに行くだけ）。
      */
     suspend fun cancelAll() {
-        workManager.cancelUniqueWork(DownloadWorker.UNIQUE_NAME)
-        workManager.getWorkInfosForUniqueWorkFlow(DownloadWorker.UNIQUE_NAME)
-            .first { infos -> infos.all { it.state.isFinished } }
+        workManager.cancelUniqueAndAwait(DownloadWorker.UNIQUE_NAME)
     }
     /** 進行中の各回とその割合。走っていなければ null。 */
     val progress: Flow<DownloadProgress?> =
