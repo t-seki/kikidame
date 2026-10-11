@@ -1,20 +1,13 @@
 package dev.tseki.kikidame.ui.episodes
 
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
@@ -22,36 +15,26 @@ import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.SyncDisabled
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.StarOutline
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Switch
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -60,8 +43,6 @@ import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.DownloadState
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.EpisodeWithState
-import dev.tseki.kikidame.domain.LocalStorageUsage
-import dev.tseki.kikidame.domain.Program
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.download.DownloadProgress
 import dev.tseki.kikidame.ui.BackgroundSyncBar
@@ -70,7 +51,6 @@ import dev.tseki.kikidame.ui.player.MiniPlayer
 import dev.tseki.kikidame.ui.resolve
 import dev.tseki.kikidame.ui.toPublishedDateText
 import dev.tseki.kikidame.ui.toPerformersText
-import dev.tseki.kikidame.ui.toText
 import dev.tseki.kikidame.ui.toClockText
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -94,7 +74,7 @@ fun EpisodeListScreen(
     val pendingDisable by viewModel.pendingDisable.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var sheetFor by remember { mutableStateOf<EpisodeId?>(null) }
-    var showSyncSheet by remember { mutableStateOf(false) }
+    var syncSheet by remember { mutableStateOf(SyncSheetState.Hidden) }
 
     val context = LocalContext.current
     LaunchedEffect(Unit) {
@@ -103,7 +83,6 @@ fun EpisodeListScreen(
     LaunchedEffect(Unit) {
         viewModel.programRemoved.collect { onBack() }
     }
-    var confirmRemoveProgram by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -128,7 +107,7 @@ fun EpisodeListScreen(
                                 Icon(Icons.Outlined.StarOutline, contentDescription = stringResource(R.string.program_list_star_add))
                             }
                         }
-                        IconButton(onClick = { showSyncSheet = true }, enabled = program != null) {
+                        IconButton(onClick = { syncSheet = SyncSheetState.Open }, enabled = program != null) {
                             // filled と outlined の Sync は形がほぼ同じなので、OFF は斜線入りで区別する
                             if (program?.syncEnabled == true) {
                                 Icon(Icons.Filled.Sync, contentDescription = stringResource(R.string.episode_list_sync_settings_on), tint = MaterialTheme.colorScheme.primary)
@@ -174,43 +153,14 @@ fun EpisodeListScreen(
         }
     }
 
-    val currentProgram = program
-    if (showSyncSheet && currentProgram != null) {
-        ProgramSyncSheet(
-            program = currentProgram,
-            localStorage = localStorage,
-            onDismiss = { showSyncSheet = false },
-            onSetEnabled = viewModel::setSyncEnabled,
-            onKeepLatest = viewModel::setKeepLatest,
-            onDeleteAfterPlayed = viewModel::setDeleteAfterPlayed,
-            onSyncNow = { viewModel.syncNow(); showSyncSheet = false },
-            onRemoveProgram = { showSyncSheet = false; confirmRemoveProgram = true },
-        )
-    }
-    if (confirmRemoveProgram && currentProgram != null) {
-        AlertDialog(
-            onDismissRequest = { confirmRemoveProgram = false },
-            title = { Text(stringResource(R.string.episode_list_remove_program_title)) },
-            text = { Text(stringResource(R.string.episode_list_remove_program_text, currentProgram.name)) },
-            confirmButton = {
-                TextButton(onClick = { confirmRemoveProgram = false; viewModel.removeProgram() }) {
-                    Text(stringResource(R.string.episode_list_remove_program_confirm), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = { TextButton(onClick = { confirmRemoveProgram = false }) { Text(stringResource(R.string.common_cancel)) } },
-        )
-    }
-    pendingDisable?.let { count ->
-        AlertDialog(
-            onDismissRequest = viewModel::cancelDisableSync,
-            title = { Text(stringResource(R.string.episode_list_disable_sync_title)) },
-            text = { Text(pluralStringResource(R.plurals.episode_list_disable_sync_text, count, count)) },
-            confirmButton = {
-                TextButton(onClick = viewModel::confirmDisableSync) { Text(stringResource(R.string.episode_list_disable_sync_confirm), color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = { TextButton(onClick = viewModel::cancelDisableSync) { Text(stringResource(R.string.common_cancel)) } },
-        )
-    }
+    ProgramSyncDialogs(
+        program = program,
+        localStorage = localStorage,
+        pendingDisable = pendingDisable,
+        state = syncSheet,
+        onStateChange = { syncSheet = it },
+        viewModel = viewModel,
+    )
 
     val target = sheetFor?.let { id -> episodes?.firstOrNull { it.episode.id == id } }
     if (target != null) {
@@ -278,85 +228,4 @@ internal fun EpisodeWithState.toSupportingText(waitingForNetwork: Boolean): UiTe
     }
     val parts = listOfNotNull(published, episode.performers.toPerformersText(), UiText.Plain(episode.runtime.toClockText()), status)
     return UiText.Joined(parts, UiText.Plain(" · "))
-}
-
-/**
- * 同期対象と保持ルールの編集。保存するだけで、適用は次の同期（保存した瞬間には何も消えない）。
- * 取得元 ID の無い番組は同期できないのでスイッチを無効にする。
- */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
-@Composable
-private fun ProgramSyncSheet(
-    program: Program,
-    localStorage: LocalStorageUsage?,
-    onDismiss: () -> Unit,
-    onSetEnabled: (Boolean) -> Unit,
-    onKeepLatest: (Int?) -> Unit,
-    onDeleteAfterPlayed: (Boolean) -> Unit,
-    onSyncNow: () -> Unit,
-    onRemoveProgram: () -> Unit,
-) {
-    // 消失した番組（取得元の一覧に無く、突合でも結び直せなかった）と取得元 ID の無い番組は同期できない
-    val canSync = program.sourceItemId != null && !program.isGone
-    val enabled = program.syncEnabled
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Text(program.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
-        // この番組の手元のファイル（#42）。保持ルールを触る前に目に入る位置に
-        localStorage?.let {
-            Text(
-                if (it.episodeCount > 0) stringResource(R.string.episode_list_storage, it.toText().resolve()) else stringResource(R.string.episode_list_storage_empty),
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 24.dp),
-            )
-        }
-        ListItem(
-            modifier = Modifier.combinedClickable(enabled = canSync) { onSetEnabled(!enabled) },
-            headlineContent = { Text(stringResource(R.string.episode_list_sync_this_program)) },
-            supportingContent = {
-                Text(
-                    when {
-                        program.isGone -> stringResource(R.string.episode_list_sync_gone, program.goneSince?.toPublishedDateText().orEmpty())
-                        !canSync -> stringResource(R.string.episode_list_sync_unavailable)
-                        else -> stringResource(R.string.episode_list_sync_description)
-                    },
-                )
-            },
-            trailingContent = { Switch(checked = enabled && canSync, onCheckedChange = onSetEnabled, enabled = canSync) },
-        )
-        ListItem(
-            modifier = Modifier.alpha(if (enabled) 1f else 0.5f),
-            headlineContent = { Text(stringResource(R.string.episode_list_keep_latest)) },
-            supportingContent = {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
-                    for (choice in EpisodeListViewModel.KEEP_LATEST_CHOICES) {
-                        FilterChip(
-                            selected = program.retentionRule.keepLatest == choice,
-                            onClick = { onKeepLatest(choice) },
-                            enabled = enabled,
-                            label = { Text(choice?.let { pluralStringResource(R.plurals.episode_list_keep_latest_choice, it, it) } ?: stringResource(R.string.episode_list_keep_unlimited)) },
-                        )
-                    }
-                }
-            },
-        )
-        ListItem(
-            modifier = Modifier
-                .alpha(if (enabled) 1f else 0.5f)
-                .combinedClickable(enabled = enabled) { onDeleteAfterPlayed(!program.retentionRule.deleteAfterPlayed) },
-            headlineContent = { Text(stringResource(R.string.episode_list_delete_after_played)) },
-            supportingContent = { Text(stringResource(R.string.episode_list_delete_after_played_description)) },
-            trailingContent = {
-                Switch(checked = program.retentionRule.deleteAfterPlayed, onCheckedChange = onDeleteAfterPlayed, enabled = enabled)
-            },
-        )
-        if (canSync) {
-            Button(onClick = onSyncNow, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
-                Text(stringResource(R.string.episode_list_sync_now))
-            }
-        } else {
-            // 取得元に在る番組を消しても次の同期で戻ってくる（再生位置だけ失う）ので、消せるのは取得元に無い番組だけ
-            SheetAction(Icons.Filled.Delete, stringResource(R.string.episode_list_remove_program)) { onRemoveProgram() }
-        }
-        Spacer(Modifier.padding(bottom = 24.dp))
-    }
 }
