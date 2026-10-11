@@ -12,15 +12,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.LocalContentColor
@@ -180,4 +183,19 @@ internal fun SheetAction(icon: ImageVector, label: String, onClick: () -> Unit) 
         leadingContent = { Icon(icon, contentDescription = null) },
         headlineContent = { Text(label) },
     )
+}
+
+/**
+ * 行の右端の再生済みの切り替え（#230）。各回一覧（手元にある回）と「続きから」が共通で使う。
+ * アイコンと読み上げは今の状態（再生済み／未再生）を表し、タップで反対に切り替える。
+ */
+@Composable
+internal fun PlayedToggleButton(played: Boolean, onToggle: () -> Unit) {
+    IconButton(onClick = onToggle) {
+        if (played) {
+            Icon(Icons.Default.CheckCircle, contentDescription = stringResource(R.string.episode_list_played_tap))
+        } else {
+            Icon(Icons.Outlined.Circle, contentDescription = stringResource(R.string.episode_list_unplayed_tap))
+        }
+    }
 }
