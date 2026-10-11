@@ -1,18 +1,15 @@
 package dev.tseki.kikidame.ui.episodes
 
-import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.DownloadRepository
 import dev.tseki.kikidame.ui.UiText
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.EpisodeWithState
 import dev.tseki.kikidame.domain.LibraryRepository
-import dev.tseki.kikidame.domain.LocalDeletionScope
 import dev.tseki.kikidame.domain.LocalStorageUsage
 import dev.tseki.kikidame.domain.PlaybackRules
 import dev.tseki.kikidame.domain.PlaybackStateRepository
@@ -27,7 +24,6 @@ import dev.tseki.kikidame.playback.NowPlaying
 import dev.tseki.kikidame.playback.NowPlayingState
 import dev.tseki.kikidame.sync.LibraryRefresher
 import dev.tseki.kikidame.ui.EpisodeListRoute
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -79,9 +75,7 @@ class EpisodeListViewModel @Inject constructor(
      * 聴いている回（別の番組の回のこともある）。この番組の回なら行にマークを出す。
      * 再生位置（ミニプレイヤー用、1 秒ごとに変わる）は行に要らないので落とし、行を毎秒作り直さない。
      */
-    val nowPlaying: StateFlow<NowPlayingState?> = nowPlaying.state
-        .map { it?.copy(positionMs = 0, durationMs = 0) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), nowPlaying.state.value?.copy(positionMs = 0, durationMs = 0))
+    val nowPlaying: StateFlow<NowPlayingState?> = nowPlaying.state.forRows(viewModelScope)
 
     /** 進行中のダウンロード（各回 ID と割合）。 */
     val progress: StateFlow<DownloadProgress?> = scheduler.progress
@@ -92,6 +86,7 @@ class EpisodeListViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     private val localMessages = MutableSharedFlow<UiText>(extraBufferCapacity = 4, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    private val actions = EpisodeActions(viewModelScope, downloads, localMessages, TAG, "episode action failed")
 
     /** 更新の結果、この画面での操作の結果、ミニプレイヤーが消えた理由を 1 本にまとめてスナックバーへ。 */
     val messages: Flow<UiText> = merge(refresher.messages, localMessages, nowPlaying.messages)
@@ -167,38 +162,16 @@ class EpisodeListViewModel @Inject constructor(
 
     fun retry(episodeId: EpisodeId) = act { scheduler.retry(episodeId) }
 
-    fun unpin(episodeId: EpisodeId) = act {
-        downloads.unpin(episodeId)
-        localMessages.tryEmit(UiText.Res(R.string.episode_list_msg_unpinned))
-    }
+    fun unpin(episodeId: EpisodeId) = actions.unpin(episodeId)
 
     fun deleteLocal(episodeId: EpisodeId) = act {
         val scope = downloads.deleteLocal(episodeId)
         val syncEnabled = program.value?.syncEnabled == true
-        localMessages.tryEmit(
-            when (scope) {
-                // 同期対象なら保持すべき回は次の同期で落とし直される（handoff「手動削除と同期の往復」）
-                LocalDeletionScope.FILE_ONLY ->
-                    if (syncEnabled) UiText.Res(R.string.episode_list_msg_file_deleted_synced)
-                    else UiText.Res(R.string.episode_list_msg_file_deleted)
-                LocalDeletionScope.EPISODE -> UiText.Res(R.string.episode_list_msg_episode_removed)
-            },
-        )
+        localMessages.tryEmit(scope.toMessage(syncEnabled))
     }
 
-    /** Room / ファイル I/O の失敗で落とさず、文言にして出す。 */
-    private fun act(block: suspend () -> Unit) {
-        viewModelScope.launch {
-            try {
-                block()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.e(TAG, "episode action failed", e)
-                localMessages.tryEmit(UiText.Res(R.string.episode_list_msg_action_failed, e::class.simpleName.orEmpty()))
-            }
-        }
-    }
+    /** Room / ファイル I/O の失敗で落とさず、文言にして出す（[EpisodeActions.launch]）。 */
+    private fun act(block: suspend () -> Unit) = actions.launch(block)
 
     companion object {
         private const val TAG = "EpisodeListViewModel"

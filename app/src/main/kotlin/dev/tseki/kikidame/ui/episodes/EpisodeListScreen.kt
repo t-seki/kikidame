@@ -14,14 +14,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.SyncDisabled
-import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.AlertDialog
@@ -260,13 +258,7 @@ private fun EpisodeTrailingAction(
         DownloadState.FAILED -> IconButton(onClick = onRetry) {
             Icon(Icons.Filled.ErrorOutline, contentDescription = stringResource(R.string.episode_list_failed_tap_retry), tint = MaterialTheme.colorScheme.error)
         }
-        DownloadState.DONE -> IconButton(onClick = onTogglePlayed) {
-            if (played) {
-                Icon(Icons.Default.CheckCircle, contentDescription = stringResource(R.string.episode_list_played_tap))
-            } else {
-                Icon(Icons.Outlined.Circle, contentDescription = stringResource(R.string.episode_list_unplayed_tap))
-            }
-        }
+        DownloadState.DONE -> PlayedToggleButton(played = played, onToggle = onTogglePlayed)
     }
 }
 
