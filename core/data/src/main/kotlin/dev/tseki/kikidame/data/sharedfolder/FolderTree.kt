@@ -1,11 +1,15 @@
 package dev.tseki.kikidame.data.sharedfolder
 
+import dev.tseki.kikidame.domain.DeviceFolder
+import dev.tseki.kikidame.domain.SmbConnection
 import java.io.InputStream
 import kotlin.time.Instant
 
 /**
  * 共有フォルダ（CONTEXT.md）の中身をたどるための、フォルダの木の最小の抽象（#197）。
  * SMB（#198）と端末のフォルダ（SAF、#199）がこれを実装し、[SharedFolderSource] がこの上で走査する。
+ * 取得元に共通の抽象（この interface、[CloseableFolderTree]、[FolderTreeFactory]）は `sharedfolder/` に置き、
+ * 実装は `smb/`（`SmbFolderTree`）と `device/`（`DeviceFolderTree`）に置く（#233）。
  *
  * - パスは共有フォルダの根からの相対パスで、区切りは `/`。根は空文字列
  * - 読むだけで、書き込み・削除はしない（ADR 0010 の決定 6）
@@ -31,6 +35,19 @@ interface FolderTree {
      * 接続を持たない木（端末のフォルダなど）は何もしない。失敗しても例外を投げない。
      */
     fun reset() {}
+}
+
+/** 使い終わったら閉じる [FolderTree]。閉じると接続も閉じる。 */
+interface CloseableFolderTree : FolderTree, AutoCloseable
+
+/**
+ * 共有フォルダの取得元から木を作る。1 回の取得元の操作ごとに作って閉じる（接続の寿命を呼び出しの外に持ち出さない）。
+ * SMB（#198）と端末のフォルダ（SAF、#199）。
+ */
+interface FolderTreeFactory {
+    fun open(connection: SmbConnection): CloseableFolderTree
+
+    fun open(folder: DeviceFolder): CloseableFolderTree
 }
 
 /** フォルダの子の 1 件。 */

@@ -30,11 +30,11 @@ import dev.tseki.kikidame.data.sharedfolder.RetrieverTagReader
 import dev.tseki.kikidame.data.sharedfolder.RoomScannedFiles
 import dev.tseki.kikidame.data.sharedfolder.ScannedFiles
 import dev.tseki.kikidame.data.sharedfolder.TagReader
-import dev.tseki.kikidame.data.sharedfolder.ContentResolverDeviceDocuments
-import dev.tseki.kikidame.data.sharedfolder.DeviceDocuments
-import dev.tseki.kikidame.data.sharedfolder.DeviceFolderTree
-import dev.tseki.kikidame.data.smb.CloseableFolderTree
-import dev.tseki.kikidame.data.smb.FolderTreeFactory
+import dev.tseki.kikidame.data.device.ContentResolverDeviceDocuments
+import dev.tseki.kikidame.data.device.DeviceDocuments
+import dev.tseki.kikidame.data.device.DeviceFolderTree
+import dev.tseki.kikidame.data.sharedfolder.CloseableFolderTree
+import dev.tseki.kikidame.data.sharedfolder.FolderTreeFactory
 import dev.tseki.kikidame.data.smb.SmbFolderTree
 import dev.tseki.kikidame.domain.DeviceFolder
 import dev.tseki.kikidame.domain.SmbConnection

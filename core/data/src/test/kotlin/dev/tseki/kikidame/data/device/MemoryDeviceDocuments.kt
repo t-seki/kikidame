@@ -1,4 +1,4 @@
-package dev.tseki.kikidame.data.sharedfolder
+package dev.tseki.kikidame.data.device
 
 import java.io.FileNotFoundException
 

@@ -16,7 +16,7 @@ import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import dev.tseki.kikidame.R
-import dev.tseki.kikidame.data.sharedfolder.DeviceDocuments
+import dev.tseki.kikidame.data.device.DeviceDocuments
 import dev.tseki.kikidame.domain.LocalDataReset
 import dev.tseki.kikidame.download.DownloadScheduler
 import dev.tseki.kikidame.playback.PlayerConnection
