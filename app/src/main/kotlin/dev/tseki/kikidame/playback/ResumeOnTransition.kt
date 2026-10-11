@@ -5,7 +5,6 @@ import dev.tseki.kikidame.domain.PlaybackRules
 import dev.tseki.kikidame.domain.PlaybackStateRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import kotlin.time.Duration.Companion.milliseconds
 /**
  * 前後の回への移動・自動遷移で新しい回に入ったとき、保存位置（[PlaybackRules.resumePosition]）へシークする。
  * Media3 のプレイリストは先頭の回にしか開始位置を持てないので、遷移時に補う。
@@ -22,7 +21,7 @@ class ResumeOnTransition(
     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
         if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) return
         val episodeId = EpisodeMediaItems.episodeId(mediaItem) ?: return
-        val runtime = mediaItem?.mediaMetadata?.durationMs?.takeIf { it > 0 }?.milliseconds ?: return
+        val runtime = EpisodeMediaItems.runtimeOf(mediaItem) ?: return
         scope.launch {
             val saved = repository.get(episodeId) ?: return@launch
             val resume = PlaybackRules.resumePosition(saved.position, runtime)
