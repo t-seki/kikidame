@@ -6,7 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dev.tseki.kikidame.data.sharedfolder.FolderEntry
-import dev.tseki.kikidame.data.sharedfolder.MemoryDeviceDocuments
+import dev.tseki.kikidame.data.device.MemoryDeviceDocuments
 import dev.tseki.kikidame.domain.ConnectedSource
 import dev.tseki.kikidame.domain.DeviceFolder
 import dev.tseki.kikidame.domain.UnsupportedFolderException

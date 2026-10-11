@@ -4,8 +4,8 @@ import dev.tseki.kikidame.data.jellyfin.JellyfinSource
 import dev.tseki.kikidame.data.sharedfolder.ScannedFiles
 import dev.tseki.kikidame.data.sharedfolder.SharedFolderSource
 import dev.tseki.kikidame.data.sharedfolder.TagReader
-import dev.tseki.kikidame.data.smb.CloseableFolderTree
-import dev.tseki.kikidame.data.smb.FolderTreeFactory
+import dev.tseki.kikidame.data.sharedfolder.CloseableFolderTree
+import dev.tseki.kikidame.data.sharedfolder.FolderTreeFactory
 import dev.tseki.kikidame.data.source.DownloadStream
 import dev.tseki.kikidame.data.source.ScanListener
 import dev.tseki.kikidame.data.source.SourceGateway

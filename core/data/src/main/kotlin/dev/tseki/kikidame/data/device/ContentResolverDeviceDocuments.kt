@@ -1,4 +1,4 @@
-package dev.tseki.kikidame.data.sharedfolder
+package dev.tseki.kikidame.data.device
 
 import android.content.ContentResolver
 import android.content.Intent
