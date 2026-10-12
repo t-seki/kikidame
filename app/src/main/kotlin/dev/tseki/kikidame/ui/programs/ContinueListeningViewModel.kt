@@ -29,7 +29,7 @@ import kotlin.time.Clock
 /**
  * 番組の画面の「続きから」タブ（#151）。途中まで聴いた各回を番組をまたいで最後に聴いた順に、件数の上限なしで出す
  * （条件は Android Auto の「続きから」と同じ [LibraryRepository.observeContinueListening]）。
- * 行の操作は各回一覧と同じ（右端で再生済みの切り替え、長押しで固定を外す・ファイルの削除・詳細）。
+ * 行の操作は各回一覧と同じ（右端で再生済みの切り替え、長押しで固定する・固定を外す・ファイルの削除・詳細）。
  * 再生済みにしたときだけ［元に戻す］を出すので、その合図を [markedPlayed] で画面へ渡す。
  *
  * 更新の結果と、ミニプレイヤーが消えた理由（[NowPlaying.messages]）は同じ画面の [ProgramListViewModel] が受け取る。
@@ -56,7 +56,7 @@ class ContinueListeningViewModel @Inject constructor(
     val nowPlaying: StateFlow<NowPlayingState?> = nowPlaying.state.forRows(viewModelScope)
 
     private val _messages = MutableSharedFlow<UiText>(extraBufferCapacity = 4, onBufferOverflow = BufferOverflow.DROP_OLDEST)
-    /** この画面での操作の結果（固定を外した・ファイルを消した・失敗）。 */
+    /** この画面での操作の結果（固定した・固定を外した・ファイルを消した・失敗）。 */
     val messages: Flow<UiText> = _messages
     private val actions = EpisodeActions(viewModelScope, downloads, _messages, TAG, "continue listening action failed")
 
@@ -72,6 +72,8 @@ class ContinueListeningViewModel @Inject constructor(
         playbackStates.update(episodeId) { PlaybackRules.setPlayed(it, played, clock.now()) }
         if (played) _markedPlayed.tryEmit(episodeId)
     }
+
+    fun pin(episodeId: EpisodeId) = actions.pin(episodeId)
 
     fun unpin(episodeId: EpisodeId) = actions.unpin(episodeId)
 
