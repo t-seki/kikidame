@@ -51,6 +51,7 @@ internal fun ContinueListeningPage(
     onEpisodeClick: (EpisodeId) -> Unit,
     onEpisodeDetails: (ProgramId, EpisodeId) -> Unit,
     onSetPlayed: (EpisodeId, Boolean) -> Unit,
+    onPin: (EpisodeId) -> Unit,
     onUnpin: (EpisodeId) -> Unit,
     onDeleteLocal: (EpisodeId) -> Unit,
 ) {
@@ -89,6 +90,7 @@ internal fun ContinueListeningPage(
             syncEnabled = target.program?.syncEnabled == true,
             onDownload = null, // 「続きから」の回は必ず手元にある
             onDismiss = { sheetFor = null },
+            onPin = { onPin(episode.id) },
             onUnpin = { onUnpin(episode.id) },
             onDelete = { onDeleteLocal(episode.id) },
             onDetails = { sheetFor = null; onEpisodeDetails(episode.programId, episode.id) },
@@ -153,6 +155,7 @@ private fun ContinueListeningPagePreview() {
             onEpisodeClick = {},
             onEpisodeDetails = { _, _ -> },
             onSetPlayed = { _, _ -> },
+            onPin = {},
             onUnpin = {},
             onDeleteLocal = {},
         )
@@ -170,6 +173,7 @@ private fun ContinueListeningPageEmptyPreview() {
             onEpisodeClick = {},
             onEpisodeDetails = { _, _ -> },
             onSetPlayed = { _, _ -> },
+            onPin = {},
             onUnpin = {},
             onDeleteLocal = {},
         )
