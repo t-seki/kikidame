@@ -48,17 +48,17 @@ internal fun ProgramSyncDialogs(
     pendingDisable: Int?,
     state: SyncSheetState,
     onStateChange: (SyncSheetState) -> Unit,
-    viewModel: EpisodeListViewModel,
+    actions: EpisodeListActions,
 ) {
     if (state == SyncSheetState.Open && program != null) {
         ProgramSyncSheet(
             program = program,
             localStorage = localStorage,
             onDismiss = { onStateChange(SyncSheetState.Hidden) },
-            onSetEnabled = viewModel::setSyncEnabled,
-            onKeepLatest = viewModel::setKeepLatest,
-            onDeleteAfterPlayed = viewModel::setDeleteAfterPlayed,
-            onSyncNow = { viewModel.syncNow(); onStateChange(SyncSheetState.Hidden) },
+            onSetEnabled = actions.setSyncEnabled,
+            onKeepLatest = actions.setKeepLatest,
+            onDeleteAfterPlayed = actions.setDeleteAfterPlayed,
+            onSyncNow = { actions.syncNow(); onStateChange(SyncSheetState.Hidden) },
             onRemoveProgram = { onStateChange(SyncSheetState.ConfirmRemove) },
         )
     }
@@ -68,7 +68,7 @@ internal fun ProgramSyncDialogs(
             title = { Text(stringResource(R.string.episode_list_remove_program_title)) },
             text = { Text(stringResource(R.string.episode_list_remove_program_text, program.name)) },
             confirmButton = {
-                TextButton(onClick = { onStateChange(SyncSheetState.Hidden); viewModel.removeProgram() }) {
+                TextButton(onClick = { onStateChange(SyncSheetState.Hidden); actions.removeProgram() }) {
                     Text(stringResource(R.string.episode_list_remove_program_confirm), color = MaterialTheme.colorScheme.error)
                 }
             },
@@ -77,13 +77,13 @@ internal fun ProgramSyncDialogs(
     }
     pendingDisable?.let { count ->
         AlertDialog(
-            onDismissRequest = viewModel::cancelDisableSync,
+            onDismissRequest = actions.cancelDisableSync,
             title = { Text(stringResource(R.string.episode_list_disable_sync_title)) },
             text = { Text(pluralStringResource(R.plurals.episode_list_disable_sync_text, count, count)) },
             confirmButton = {
-                TextButton(onClick = viewModel::confirmDisableSync) { Text(stringResource(R.string.episode_list_disable_sync_confirm), color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = actions.confirmDisableSync) { Text(stringResource(R.string.episode_list_disable_sync_confirm), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = viewModel::cancelDisableSync) { Text(stringResource(R.string.common_cancel)) } },
+            dismissButton = { TextButton(onClick = actions.cancelDisableSync) { Text(stringResource(R.string.common_cancel)) } },
         )
     }
 }
