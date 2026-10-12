@@ -158,6 +158,19 @@ class ContinueListeningViewModelTest {
         )
     }
 
+    /** 「固定する」は各回一覧と同じ（手元の回を固定にするよう頼み、文言で知らせる。番組が同期対象かは見ない）。 */
+    @Test
+    fun pinAsksTheRepositoryAndSaysSo() = runTest(dispatcher) {
+        val vm = viewModel()
+        val messages = mutableListOf<UiText>()
+        backgroundScope.launch(dispatcher) { vm.messages.collect { messages += it } }
+
+        vm.pin(EpisodeId(1))
+
+        assertEquals(listOf(EpisodeId(1)), downloads.pinned)
+        assertEquals<List<UiText>>(listOf(UiText.Res(R.string.episode_list_msg_pinned)), messages)
+    }
+
     /** 行の補足は「番組名 · 残り N 分」。残りは分に切り上げ、尺が分からない回は番組名だけ。 */
     @Test
     fun supportingTextIsProgramNameAndMinutesLeft() {
