@@ -120,6 +120,43 @@ class ProgramImageTest : RefreshTestBase() {
         assertTrue(images.root.listFiles().isNullOrEmpty())
     }
 
+    /**
+     * 上限（10 MiB）を超える `folder.jpg` は画像なしとして扱う。手元のファイルは消し、版は書いて同じファイルを取り直さない。
+     * ファイルが変われば取り直す（PR #288 1 周目 #5 の決定）。
+     */
+    @Test
+    fun tooLargeImageIsTreatedAsNoImageAndNotFetchedAgainUntilItChanges() = runTest {
+        signIn()
+        folder.put("TBSラジオ/A/2026-09-18.m4a")
+        folder.put("TBSラジオ/A/folder.jpg", jpeg)
+        repo.refresh()
+        val small = assertNotNull(program("A").image)
+
+        val largeAt = MemoryFolderTree.EPOCH + 1.hours
+        val large = ByteArray((SharedFolderSource.MAX_PROGRAM_IMAGE_BYTES + 1).toInt())
+        folder.put("TBSラジオ/A/folder.jpg", large, largeAt)
+        assertNull(shared.fetchProgramImage(SourceItemId("TBSラジオ/A")))
+        source.imageFetches.clear()
+        repo.refresh()
+
+        assertNull(program("A").image)
+        assertFalse(File(small.path).exists())
+        val row = assertNotNull(db.programDao().findById(program("A").id.value))
+        assertEquals("${large.size}:${largeAt.toEpochMilliseconds()}", row.imageVersion)
+        assertNull(row.imagePath)
+        assertEquals(listOf("TBSラジオ/A"), source.imageFetches)
+
+        // 同じ版の間は取り直さない
+        repo.refresh()
+        assertEquals(1, source.imageFetches.size)
+
+        // ファイルが変われば取り直す
+        folder.put("TBSラジオ/A/folder.jpg", newer, MemoryFolderTree.EPOCH + 2.hours)
+        repo.refresh()
+        assertEquals(2, source.imageFetches.size)
+        assertContentEquals(newer, File(assertNotNull(program("A").image).path).readBytes())
+    }
+
     /** 新しい回の無い番組（全走査の途中で取り込まれない）でも、最後の取り込みで画像を取る。 */
     @Test
     fun programWithoutNewEpisodesGetsItsImageAtTheEndOfTheScan() = runTest {

@@ -117,7 +117,7 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 - 3 段目の、拡張子が `m4a` / `mp3` / `aac` / `ogg` / `opus` / `flac` / `wav`（大文字・小文字を区別しない）のファイルだけを各回とする。
   それ以外（1・2 段目のファイル、4 段目以下、音声でないファイル）は黙って無視する。形式（`container`）は拡張子（小文字）
 - 例外は番組のフォルダ（3 段目）の `folder.jpg`（名前は大文字・小文字まで一致するものだけ。`folder.png` などは読まない）で、番組の画像（`CONTEXT.md`）として読む（#264、ADR 0012。rajikura の付け方に合わせた）。
-  一覧の大きさと更新日時（ms）から版（`SourceImage.version`、`<大きさ>:<更新日時の ms>`）を作って `SourceProgram.image` に載せ、中身は `SharedFolderSource.fetchProgramImage` で全部読む（10 MiB（`MAX_PROGRAM_IMAGE_BYTES`）より大きいものは読まずに失敗にする。上限の値に根拠は無い）
+  一覧の大きさと更新日時（ms）から版（`SourceImage.version`、`<大きさ>:<更新日時の ms>`）を作って `SourceProgram.image` に載せ、中身は `SharedFolderSource.fetchProgramImage` で全部読む（10 MiB（`MAX_PROGRAM_IMAGE_BYTES`）より大きいものは読まずに画像なし（null）として返す。上限の値に根拠は無い。「番組の画像」節）
 - 名前が `.`・`@`・`#` で始まるフォルダとファイルは、どの段（配信元・番組・各回）でも無視する（#197 の追加の決定。PR #202（#197）1 周目 #1 で人が決めた）。
   NAS や OS が作るもの（例: `@eaDir`・`#recycle`・`._<名前>.m4a`・`.DS_Store`。どれが作られるかは確かめていない）を拾わないため。決まった名前だけを除く一覧方式は、NAS の種類ごとに漏れが出るので採らない。
   1 番組の取得（`fetchProgram`・`fetchProgramEpisodes`）も同じ規則で、そういう名前の番組は無いものとして扱う
@@ -154,8 +154,9 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 - **口の形**: `SourceProgram.image`（`SourceImage(version)`。取得元に画像が無ければ null）に版だけを載せ、中身は `SourceGateway.fetchProgramImage(programId)` で別に取る。
   取り直すかを決めるのは取り込みの側（`RoomLibraryRefreshRepository.updateImages`）で、取得元は前の版を知らなくてよい。#282 の Jellyfin は ImageTag を版にして同じ口に載る想定
 - **取り込み**: 番組ごとの取り込み（全走査の途中、`ScanListener.onProgramScanned`）・全走査の最後の取り込み・1 番組の同期のどれでも、同期（削除・予約）の後に `updateImages` を回す。
-  新しい回の無い番組は途中の取り込みに流れないので、最後の取り込みで取る。版が行（`imageVersion`）と同じでファイルもあれば取らない。違えば取り、新しい名前のファイルに書いてから行を書き換え、前のファイルを消す。
-  取得元に画像が無ければ（`folder.jpg` が消えた）ファイルを消して行を null にする。取得・書き込みに失敗したら、その番組は前の画像のまま残して同期を続ける（版を書かないので、次の同期で取り直す）。取得元に届かない（`SourceException.Unreachable`）・認証が通らない（`Unauthorized`）ときは、その回の残りの番組の画像の取得を打ち切る（残りも前の画像のまま。PR #288 1 周目 #4）
+  新しい回の無い番組は途中の取り込みに流れないので、最後の取り込みで取る。版が行（`imageVersion`）と同じで、ファイルがあるか `imagePath` が null（その版は画像なしと分かっている）なら取らない。違えば取り、新しい名前のファイルに書いてから行を書き換え、前のファイルを消す。
+  取得元に画像が無ければ（`folder.jpg` が消えた）ファイルを消して行を null にする。
+  `folder.jpg` が 10 MiB（`SharedFolderSource.MAX_PROGRAM_IMAGE_BYTES`）を超えるときは、`fetchProgramImage` が読まずに null を返し、画像なしとして扱う。手元に画像のファイルがあれば消し、行には版だけを書く（`imagePath` は null）。同じ版の間は同期のたびに取り直さず、ファイルが変われば（版が変われば）取り直す（PR #288 1 周目 #5、人が決めた。一覧の後に `folder.jpg` が消えて null が返ったときも同じ扱い）。取得・書き込みに失敗したら、その番組は前の画像のまま残して同期を続ける（版を書かないので、次の同期で取り直す）。取得元に届かない（`SourceException.Unreachable`）・認証が通らない（`Unauthorized`）ときは、その回の残りの番組の画像の取得を打ち切る（残りも前の画像のまま。PR #288 1 周目 #4）
 - **接続**: 共有フォルダは `SessionSourceGateway` が `fetchProgramImage` のたびに木を開く（`openDownload` と同じ）。全走査の途中で呼ぶと、走査の接続とは別にもう 1 本張る。
   画像を取るのは版が変わった番組だけだが、この版を入れた直後の最初の同期では、`folder.jpg` を持つ番組の数だけ接続を張る（何本までなら困らないかは測っていない。未確認）
 - **置き場**: `filesDir/program_images/<番組のローカル ID>-<版の SHA-256 の頭 16 桁>.img`（`ProgramImageFiles`）。画像が変わると名前も変わるので、Coil のメモリのキャッシュがパスで引いても古い画像を出さない。
@@ -187,7 +188,7 @@ data class ProgramEntity(          // 番組（Jellyfin では MusicAlbum）。(
   val goneSince: Instant?,         // 消失した日時（v4、#3）
   val starred: Boolean,            // よく聴く（v5、#16）
   val imageVersion: String?,       // 手元に持っている番組の画像の版（v9、#264）。取得元の版と同じなら取り直さない
-  val imagePath: String?           // その画像のファイルの絶対パス（v9、#264）。imageVersion と同時に書く
+  val imagePath: String?           // その画像のファイルの絶対パス（v9、#264）。imageVersion と同時に書く。画像なしと分かった版（大きすぎる）では版だけを持ち null
 )
 
 @Entity(indices = [Index("sourceItemId", unique = true), Index("programId")])

@@ -170,8 +170,10 @@ class RoomLibraryRefreshRepository @Inject constructor(
      * 番組の画像を取得元にそろえる（ADR 0012 の決定 3）。[programs] のうち手元に行がある番組だけ。
      *
      * - 取得元に画像が無ければ、手元のファイルを消して行の版・パスを null にする
-     * - 版が行と同じでファイルもあれば、何もしない
+     * - 版が行と同じでファイルもあれば、何もしない。版が行と同じでパスが null（その版は画像なしと分かっている）でも何もしない
      * - それ以外は [SourceGateway.fetchProgramImage] で取り、新しい名前のファイルに書いてから行を書き換え、前のファイルを消す
+     * - 取りに行って null（一覧の後に消えた・大きすぎる（PR #288 1 周目 #5 の決定））なら画像なしとして扱い、手元のファイルを消して、
+     *   行には版だけを書く（パスは null）。同じ版の間は同期のたびに取り直さない。版が変われば取り直す
      * - 取得・書き込みに失敗したら、その番組は前の画像（ファイルと行）のまま残して先へ進む。同期は止めない
      * - ただし取得元に届かない（[SourceException.Unreachable]）・認証が通らない（[SourceException.Unauthorized]）ときは、
      *   残りの番組も同じく失敗するので、この回の画像の取得を打ち切る（例外は投げない。残りの番組も前の画像のまま）
@@ -186,7 +188,7 @@ class RoomLibraryRefreshRepository @Inject constructor(
                 continue
             }
             val current = row.imagePath
-            if (image.version == row.imageVersion && current != null && withContext(Dispatchers.IO) { images.exists(current) }) continue
+            if (image.version == row.imageVersion && (current == null || withContext(Dispatchers.IO) { images.exists(current) })) continue
             val bytes = try {
                 source.fetchProgramImage(sp.sourceId)
             } catch (e: CancellationException) {
@@ -202,8 +204,8 @@ class RoomLibraryRefreshRepository @Inject constructor(
                 continue
             }
             if (bytes == null) {
-                // 一覧の後に消えた
-                clearImage(row)
+                // 一覧の後に消えた・大きすぎる。画像なしとして版だけを書き、同じ版では取り直さない
+                clearImage(row, version = image.version)
                 continue
             }
             val file = try {
@@ -217,11 +219,11 @@ class RoomLibraryRefreshRepository @Inject constructor(
         }
     }
 
-    /** imageLock の中で呼ぶ。行の画像を外し、ファイルを消す。 */
-    private suspend fun clearImage(row: ProgramEntity) {
-        val path = row.imagePath ?: return
-        db.programDao().setImage(row.id, null, null)
-        withContext(Dispatchers.IO) { images.delete(path) }
+    /** imageLock の中で呼ぶ。行の画像を外し（版は [version]、パスは null）、ファイルを消す。 */
+    private suspend fun clearImage(row: ProgramEntity, version: String? = null) {
+        if (row.imagePath == null && row.imageVersion == version) return
+        db.programDao().setImage(row.id, version, null)
+        row.imagePath?.let { path -> withContext(Dispatchers.IO) { images.delete(path) } }
     }
 
     /** どの番組の行からも指されていない画像のファイル（孤児。「この番組を削除」で消せずに残った・前の版を消せずに残った）を消す。 */

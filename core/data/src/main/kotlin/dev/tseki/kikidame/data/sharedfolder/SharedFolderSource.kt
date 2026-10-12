@@ -172,7 +172,7 @@ class SharedFolderSource(
 
     /**
      * 番組のフォルダの [PROGRAM_IMAGE_NAME] を全部読む（ADR 0012）。無ければ null。取得元 ID が番組の形でなければ null。
-     * [MAX_PROGRAM_IMAGE_BYTES] より大きいファイルは読まずに [SourceException.Failed]（呼び出し側は前の画像を残す）。
+     * [MAX_PROGRAM_IMAGE_BYTES] より大きいファイルは読まずに null（画像なしとして扱う。PR #288 1 周目 #5 の決定）。
      */
     override suspend fun fetchProgramImage(programId: SourceItemId): ByteArray? {
         if (programSegments(programId) == null) return null
@@ -183,10 +183,7 @@ class SharedFolderSource(
                 return@onTree null
             }
             file.body.use { body ->
-                if (file.sizeBytes > MAX_PROGRAM_IMAGE_BYTES) {
-                    throw SourceException.Failed("program image too large: ${file.sizeBytes} bytes", null)
-                }
-                body.readBytes()
+                if (file.sizeBytes > MAX_PROGRAM_IMAGE_BYTES) null else body.readBytes()
             }
         }
     }
@@ -312,7 +309,10 @@ class SharedFolderSource(
         /** 番組の画像として読む、番組のフォルダの中のファイルの名前（ADR 0012。rajikura の付け方に合わせる）。 */
         const val PROGRAM_IMAGE_NAME: String = "folder.jpg"
 
-        /** 番組の画像として読むファイルの大きさの上限。これより大きいものはメモリに読まない（10 MiB。値に根拠は無く、測っていない）。 */
+        /**
+         * 番組の画像として読むファイルの大きさの上限。これより大きいものはメモリに読まず、画像なしとして扱う
+         * （10 MiB。値に根拠は無く、測っていない。上限を残すことは PR #288 1 周目 #5 で人が決めた）。
+         */
         const val MAX_PROGRAM_IMAGE_BYTES: Long = 10L * 1024 * 1024
 
         /** 各回とみなす拡張子（小文字で比べる）。 */
