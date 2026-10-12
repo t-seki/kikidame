@@ -124,6 +124,7 @@ fun ProgramListScreen(
             refresh = viewModel::refresh,
             setStarred = viewModel::setStarred,
             setPlayed = continueViewModel::setPlayed,
+            pin = continueViewModel::pin,
             unpin = continueViewModel::unpin,
             deleteLocal = continueViewModel::deleteLocal,
         )
@@ -165,6 +166,7 @@ internal class ProgramListActions(
     val setStarred: (ProgramId, Boolean) -> Unit,
     /** 「続きから」の再生済みの切り替え。 */
     val setPlayed: (EpisodeId, Boolean) -> Unit,
+    val pin: (EpisodeId) -> Unit,
     val unpin: (EpisodeId) -> Unit,
     val deleteLocal: (EpisodeId) -> Unit,
 )
@@ -297,6 +299,7 @@ internal fun ProgramListContent(
                         onEpisodeClick = onEpisodeClick,
                         onEpisodeDetails = onEpisodeDetails,
                         onSetPlayed = actions.setPlayed,
+                        onPin = actions.pin,
                         onUnpin = actions.unpin,
                         onDeleteLocal = actions.deleteLocal,
                     )
@@ -374,6 +377,7 @@ private val previewActions = ProgramListActions(
     refresh = {},
     setStarred = { _, _ -> },
     setPlayed = { _, _ -> },
+    pin = {},
     unpin = {},
     deleteLocal = {},
 )
