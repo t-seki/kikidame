@@ -48,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -105,7 +106,7 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
 /**
  * 再生画面の中身。ViewModel を受け取らず、値とラムダだけで描く（プレビューから呼べるように）。
  * [swipeSeek] はふつう既定値のまま（[state] の位置・尺と [onSeek] で動く）。プレビューではスワイプ中の状態を渡す。
- * [episodeImage]（回の画像。サービスが載せたバイト列、#283）があればそれを、無ければ [programImage] を、タイトルの上に正方形で出す（#264）。幅の 6 割を上限に、縦に収まらなければボタン類を押し出さない大きさまで縮める。
+ * [episodeImage]（回の画像。サービスが載せたバイト列、#283）があればそれを、無ければ [programImage] を、タイトルの上の正方形の枠に、切らずに全体を出す（#264、#301。`ContentScale.Fit`。横長・縦長の画像は余りに何も置かない）。幅の 6 割を上限に、縦に収まらなければボタン類を押し出さない大きさまで縮める。
  * 無ければ何も置かない。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -160,8 +161,8 @@ internal fun PlayerContent(
             // 番組の画像（#264）。スワイプのシークを拾う範囲（この Column）に含める。weight(fill = false) で、ほかの要素を置いた残りの高さを上限にする
             if (episodeImage != null || programImage != null) {
                 Box(Modifier.weight(1f, fill = false).fillMaxWidth(0.6f), contentAlignment = Alignment.Center) {
-                    if (episodeImage != null) EpisodeImageView(episodeImage, Modifier.aspectRatio(1f))
-                    else if (programImage != null) ProgramImageView(programImage, Modifier.aspectRatio(1f))
+                    if (episodeImage != null) EpisodeImageView(episodeImage, Modifier.aspectRatio(1f), ContentScale.Fit)
+                    else if (programImage != null) ProgramImageView(programImage, Modifier.aspectRatio(1f), ContentScale.Fit)
                 }
                 Spacer(Modifier.height(16.dp))
             }
@@ -379,7 +380,7 @@ private fun PlayerContentPreview() {
     PlayerContentPreviewHost(previewState)
 }
 
-/** 番組の画像あり（#264）。タイトルの上に正方形で出る。プレビューの中では単色。 */
+/** 番組の画像あり（#264）。タイトルの上の正方形の枠に切らずに全体が出る。プレビューの中では単色。 */
 @Preview(showBackground = true)
 @Composable
 private fun PlayerContentWithImagePreview() {
