@@ -54,6 +54,22 @@ class FakeJellyfinGateway : JellyfinGateway {
         fetchedPrograms += programSourceId
         return snapshot.episodes.filter { it.programSourceId == programSourceId }
     }
+
+    /** 番組 ID → 画像の中身。無ければ null（画像なし）。 */
+    val programImages = HashMap<SourceItemId, ByteArray>()
+    val fetchedImages = ArrayList<SourceItemId>()
+
+    /** 画像の取得だけが投げる。 */
+    var imageFailure: SourceException? = null
+
+    override suspend fun fetchProgramImage(credentials: ServerCredentials, programSourceId: SourceItemId): ByteArray? {
+        failWith?.let { throw it }
+        usedCredentials += credentials
+        fetchedImages += programSourceId
+        imageFailure?.let { throw it }
+        return programImages[programSourceId]
+    }
+
     /** 各回 ID → 本文。`honorRange` が false なら Range を無視して 200 で全体を返す。 */
     val files = HashMap<SourceItemId, ByteArray>()
     var honorRange = true

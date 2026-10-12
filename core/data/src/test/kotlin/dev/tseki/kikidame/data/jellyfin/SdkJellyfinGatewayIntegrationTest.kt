@@ -124,6 +124,26 @@ class SdkJellyfinGatewayIntegrationTest {
         assertNull(gateway.fetchProgram(credentials, episodes.first().sourceId))
     }
 
+    /** 番組の画像（#282）: `folder.jpg` のある番組 A だけ Primary の ImageTag を持ち、中身が JPEG で取れる。番組 B は画像なし。 */
+    @Test
+    fun programImageComesFromThePrimaryImage() = runTest {
+        val credentials = signIn()
+        val snapshot = gateway.fetchLibrary(credentials, radio(credentials))
+        val programA = snapshot.programs.first { it.name == "テスト番組A" }
+        val programB = snapshot.programs.first { it.name == "テスト番組B" }
+
+        val tag = assertNotNull(programA.image, "ImageTag が一覧で返らない").version
+        assertTrue(tag.isNotBlank())
+        assertNull(programB.image)
+        // 1 番組の取得でも同じ版
+        assertEquals(tag, gateway.fetchProgram(credentials, programA.sourceId)?.image?.version)
+
+        val bytes = assertNotNull(gateway.fetchProgramImage(credentials, programA.sourceId))
+        assertTrue(bytes.size > 2 && bytes[0] == 0xFF.toByte() && bytes[1] == 0xD8.toByte(), "JPEG の先頭ではない: ${bytes.size} bytes")
+        assertNull(gateway.fetchProgramImage(credentials, programB.sourceId), "画像の無い番組は null")
+        // 10.10.7 の画像の API は、無効なトークンでも返す（認証を求めない）ので、Unauthorized は確かめない
+    }
+
     @Test
     fun downloadStreamsTheOriginalAndHonoursRange() = runTest {
         val credentials = signIn()

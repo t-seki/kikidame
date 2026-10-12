@@ -38,7 +38,7 @@ interface SourceGateway {
      * 番組の画像（CONTEXT.md）の中身を取る（ADR 0012、#264）。取得元に画像が無い、または画像として扱わない（大きすぎるなど）なら null。
      * null のとき呼び出し側は画像なしとして扱い、その版では取り直さない。
      * 取り直すかどうかは呼び出し側が [SourceProgram.image] の版で決め、変わったときだけこれを呼ぶ。
-     * 既定は画像なし（null）。Jellyfin はまだ画像を取らないのでこの既定のまま（#282 で足す）。
+     * 既定は画像なし（null）。共有フォルダ（`folder.jpg`）と Jellyfin（Primary の画像、#282）が上書きする。
      */
     suspend fun fetchProgramImage(programId: SourceItemId): ByteArray? = null
 

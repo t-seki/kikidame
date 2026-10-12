@@ -35,6 +35,13 @@ interface JellyfinGateway {
      * `ParentId` での各回取得は番組が無くても空の一覧を返すので、1 番組の同期はこれで存在を確かめてから行う。
      */
     suspend fun fetchProgram(credentials: ServerCredentials, programSourceId: SourceItemId): SourceProgram?
+
+    /**
+     * 番組（MusicAlbum）の Primary の画像の中身を取る（#282、ADR 0012）。画像が無い・大きすぎるときは null。
+     * 版は [SourceProgram.image]（Primary の ImageTag）で、取り直すかは呼び出し側が決める。
+     */
+    suspend fun fetchProgramImage(credentials: ServerCredentials, programSourceId: SourceItemId): ByteArray?
+
     /**
      * 原本のストリームを開く。[rangeStart] > 0 なら `Range` で続きを要求するが、サーバが無視して
      * 全体を返すこともある（[DownloadStream.resumedFrom] で判別）。使い終わったら [DownloadStream.close]。

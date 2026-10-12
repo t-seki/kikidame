@@ -92,6 +92,8 @@ make_media() {
   make_track "$MEDIA/ニッポン放送/テスト番組A/2026-09-14.m4a"     "2026-09-14"     "テスト番組A" "ニッポン放送" "2026-09-14" "出演者甲;出演者乙"
   make_track "$MEDIA/ニッポン放送/テスト番組A/2026-09-14 (1).m4a" "2026-09-14 (1)" "テスト番組A" "ニッポン放送" "2026-09-14" "出演者甲"
   make_track "$MEDIA/ニッポン放送/テスト番組A/夏休みスペシャル.m4a" "夏休みスペシャル" "テスト番組A" "ニッポン放送" "2026-08-01" "出演者甲"
+  # 番組 A だけ folder.jpg を置く（番組の画像。#282。Jellyfin はアルバムの Primary にフォルダの folder.jpg を使う）。番組 B は画像なし
+  ffmpeg -loglevel error -y -f lavfi -i color=c=red:s=64x64 -frames:v 1 "$MEDIA/ニッポン放送/テスト番組A/folder.jpg"
   # 番組 B: 出演者が無い回を含む
   make_track "$MEDIA/TBSラジオ/テスト番組B/2026-09-07.m4a" "2026-09-07" "テスト番組B" "TBSラジオ" "2026-09-07" "出演者丙"
   make_track "$MEDIA/TBSラジオ/テスト番組B/2026-08-31.m4a" "2026-08-31" "テスト番組B" "TBSラジオ" "2026-08-31" ""
