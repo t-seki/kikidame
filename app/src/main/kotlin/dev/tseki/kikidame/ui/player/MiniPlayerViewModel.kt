@@ -4,11 +4,21 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.tseki.kikidame.domain.LibraryRepository
+import dev.tseki.kikidame.domain.ProgramImage
 import dev.tseki.kikidame.playback.NowPlaying
 import dev.tseki.kikidame.playback.NowPlayingState
 import dev.tseki.kikidame.playback.PlayerConnection
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -19,9 +29,27 @@ import javax.inject.Inject
 @HiltViewModel
 class MiniPlayerViewModel @Inject constructor(
     nowPlaying: NowPlaying,
+    library: LibraryRepository,
     private val connection: PlayerConnection,
 ) : ViewModel() {
     val state: StateFlow<NowPlayingState?> = nowPlaying.state
+
+    /**
+     * 聴いている回の番組の画像（ADR 0012、#289）。無ければ null。[state] は再生位置で毎秒変わるので、回の ID が変わったときだけ引き直す。
+     * 番組を購読するので、同期が画像を取り直しても追従する。回の画像（#283）は使わない。
+     */
+    val programImage: StateFlow<ProgramImage?> = nowPlaying.state
+        .map { it?.episodeId }
+        .distinctUntilChanged()
+        .flatMapLatest { id ->
+            if (id == null) return@flatMapLatest flowOf(null)
+            flow<ProgramImage?> {
+                val programId = library.getEpisode(id)?.episode?.programId ?: return@flow emit(null)
+                emitAll(library.observeProgram(programId).map { it?.image })
+            }
+        }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /**
      * ミニプレイヤーが見えている = サービスが生きているので、ここで controller を取っても新たな起動にはならない。
