@@ -55,5 +55,15 @@ class FakePlayer : SimpleBasePlayer(Looper.getMainLooper()) {
         state = state.buildUpon().setPlaybackState(Player.STATE_IDLE).build()
         return Futures.immediateVoidFuture()
     }
+    override fun handleReplaceMediaItems(fromIndex: Int, toIndex: Int, mediaItems: List<MediaItem>): ListenableFuture<*> {
+        val playlist = state.playlist.toMutableList()
+        mediaItems.forEachIndexed { i, item ->
+            val old = playlist[fromIndex + i]
+            playlist[fromIndex + i] = old.buildUpon().setMediaItem(item).build()
+        }
+        state = state.buildUpon().setPlaylist(playlist).build()
+        return Futures.immediateVoidFuture()
+    }
+
     override fun handleRelease(): ListenableFuture<*> = Futures.immediateVoidFuture()
 }

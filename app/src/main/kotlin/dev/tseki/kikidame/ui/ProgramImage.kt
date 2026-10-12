@@ -28,6 +28,20 @@ internal fun ProgramImageView(image: ProgramImage, modifier: Modifier = Modifier
     )
 }
 
+/**
+ * 回の画像（#283）。再生中の項目の `artworkData`（縮めた JPEG / PNG のバイト列）を [ProgramImageView] と同じ見た目で出す。
+ * 画像が無いときに呼ばない。
+ */
+@Composable
+internal fun EpisodeImageView(bytes: ByteArray, modifier: Modifier = Modifier) {
+    AsyncImage(
+        model = bytes,
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = modifier,
+    )
+}
+
 /** プレビュー用の番組の画像。パスは読まれず、[ProgramImagePreview] の中では単色で出る。 */
 internal val previewProgramImage = ProgramImage("/preview/program.img")
 
