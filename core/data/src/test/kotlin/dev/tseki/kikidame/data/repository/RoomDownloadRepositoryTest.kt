@@ -1,6 +1,12 @@
 package dev.tseki.kikidame.data.repository
 
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.tseki.kikidame.data.db.EpisodeEntity
+import dev.tseki.kikidame.data.db.KikidameDatabase
+import dev.tseki.kikidame.data.db.LocalFileEntity
+import dev.tseki.kikidame.data.db.ProgramEntity
 import dev.tseki.kikidame.domain.DownloadState
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.LocalDeletionScope
@@ -180,5 +186,98 @@ class RoomDownloadRepositoryTest : JellyfinRefreshTestBase() {
         File(presentPath).delete()
         assertFalse(downloads.ensureFilePresent(present))
         assertNull(library.getEpisode(present)!!.localFile)
+    }
+
+    // --- 別の経路と重なったとき（#261）。行を書く文の直前に、別の経路の書き込みを差し込む ---
+
+    @Test
+    fun markRunningDoesNotBringBackACancelledRow() = runTest {
+        val after = race(row(DownloadState.PENDING), "DELETE FROM local_files") { markRunning(it) }
+        assertNull(after, "cancelled while the worker was starting")
+    }
+
+    @Test
+    fun markRunningKeepsAPinSetByEnqueue() = runTest {
+        val after = race(row(DownloadState.PENDING, pinned = false), "UPDATE local_files SET pinned = 1") { markRunning(it) }
+        assertEquals(DownloadState.RUNNING, after!!.state)
+        assertTrue(after.pinned, "the manual download that upgraded the sync reservation is kept")
+    }
+
+    @Test
+    fun markFailedDoesNotBringBackADeletedRow() = runTest {
+        val after = race(row(DownloadState.RUNNING), "DELETE FROM local_files") { markFailed(it) }
+        assertNull(after)
+    }
+
+    @Test
+    fun resetToPendingDoesNotBringBackACancelledRow() = runTest {
+        val after = race(row(DownloadState.RUNNING), "DELETE FROM local_files") { resetToPending(it) }
+        assertNull(after)
+    }
+
+    @Test
+    fun retryDoesNotPutARunningRowBackToPending() = runTest {
+        val after = race(row(DownloadState.FAILED), "UPDATE local_files SET state = 'RUNNING'") { retry(it) }
+        assertEquals(DownloadState.RUNNING, after!!.state, "the worker already picked it up")
+    }
+
+    @Test
+    fun unpinDoesNotUndoAFinishedDownload() = runTest {
+        val after = race(row(DownloadState.RUNNING), "UPDATE local_files SET state = 'DONE', downloadedAt = 1") { unpin(it) }
+        assertEquals(DownloadState.DONE, after!!.state)
+        assertFalse(after.pinned)
+    }
+
+    @Test
+    fun cancelKeepsADownloadThatFinishedMeanwhile() = runTest {
+        val after = race(row(DownloadState.RUNNING), "UPDATE local_files SET state = 'DONE', downloadedAt = 1") { cancel(it) }
+        assertEquals(DownloadState.DONE, after?.state, "the finished file keeps its row")
+    }
+
+    private fun row(state: DownloadState, pinned: Boolean = true) =
+        LocalFileEntity(episodeId = 0, state = state, path = "${directory.root}/race.m4a", pinned = pinned, enqueuedAt = now)
+
+    /**
+     * 別の DB に 1 回分の行（[initial]）を置き、[op] が `local_files` を書く文（INSERT / UPDATE / DELETE）を流す直前に、
+     * 別の経路の書き込み [competing]（`WHERE episodeId = ?` は付け足す）を 1 回だけ流す。終わった後の行を返す。
+     * 読んでから書く間に別の経路が書いた、という重なりを決まった順で起こすためのもの。
+     */
+    private suspend fun race(
+        initial: LocalFileEntity,
+        competing: String,
+        op: suspend RoomDownloadRepository.(EpisodeId) -> Unit,
+    ): LocalFileEntity? {
+        var pending: (() -> Unit)? = null
+        lateinit var raceDb: KikidameDatabase
+        raceDb = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), KikidameDatabase::class.java)
+            .allowMainThreadQueries()
+            .setQueryCallback({ sql, _ ->
+                val write = sql.trimStart().uppercase()
+                val touchesRow = write.startsWith("INSERT") || write.startsWith("UPDATE") || write.startsWith("DELETE")
+                if (touchesRow && "LOCAL_FILES" in write) pending?.also { pending = null }?.invoke()
+            }, Runnable::run)
+            .build()
+        try {
+            val programId = raceDb.programDao().insert(ProgramEntity(sourceItemId = "p", name = "P", publisherName = null))
+            val episodeId = raceDb.episodeDao().insert(
+                EpisodeEntity(
+                    sourceItemId = "e",
+                    programId = programId,
+                    title = "E",
+                    publishedAt = now,
+                    addedAt = now,
+                    runtimeTicks = 0,
+                    sizeBytes = 0,
+                    container = "m4a",
+                ),
+            )
+            raceDb.localFileDao().upsert(initial.copy(episodeId = episodeId))
+            pending = { raceDb.openHelper.writableDatabase.execSQL("$competing WHERE episodeId = $episodeId") }
+            RoomDownloadRepository(raceDb, directory, clock).op(EpisodeId(episodeId))
+            assertNull(pending, "the competing write ran")
+            return raceDb.localFileDao().findByEpisode(episodeId)
+        } finally {
+            raceDb.close()
+        }
     }
 }
