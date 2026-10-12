@@ -229,26 +229,9 @@ class SdkJellyfinGateway @Inject constructor(
         val request = Request.Builder().url(url).header("Authorization", authorizationHeader(api, credentials)).build()
         withContext(Dispatchers.IO) {
             downloadClient.newCall(request).execute().use { response ->
-                when (response.code) {
-                    200 -> Unit
-                    404 -> return@use null
-                    401, 403 -> throw SourceException.Unauthorized()
-                    else -> throw SourceException.Failed("HTTP ${response.code}")
-                }
+                if (!imageStatusHasBody(response.code)) return@use null
                 val body = response.body ?: throw SourceException.Failed("empty body")
-                if (body.contentLength() > MAX_PROGRAM_IMAGE_BYTES) return@use null
-                // Content-Length が無い（chunked）ときのために、読みながらも上限を見る
-                val out = java.io.ByteArrayOutputStream()
-                val buffer = ByteArray(8 * 1024)
-                body.byteStream().use { input ->
-                    while (true) {
-                        val n = input.read(buffer)
-                        if (n < 0) break
-                        out.write(buffer, 0, n)
-                        if (out.size() > MAX_PROGRAM_IMAGE_BYTES) return@use null
-                    }
-                }
-                out.toByteArray()
+                readLimited(body.byteStream(), body.contentLength(), MAX_PROGRAM_IMAGE_BYTES)
             }
         }
     }
@@ -313,6 +296,33 @@ class SdkJellyfinGateway @Inject constructor(
     companion object {
         const val CLIENT_NAME = "Kikidame"
         const val PAGE_SIZE = 500
+
+        /** 画像の API の応答コード → 本文を読むか。200 は true、404（Primary が無い）は false、401/403 は [SourceException.Unauthorized]、ほかは [SourceException.Failed]。 */
+        internal fun imageStatusHasBody(code: Int): Boolean = when (code) {
+            200 -> true
+            404 -> false
+            401, 403 -> throw SourceException.Unauthorized()
+            else -> throw SourceException.Failed("HTTP $code")
+        }
+
+        /**
+         * 本文を [max] バイトまで読む。[contentLength]（不明なら負）が [max] を超える、または読みながら [max] を超えたら null
+         * （切れたバイト列は返さない）。
+         */
+        internal fun readLimited(input: java.io.InputStream, contentLength: Long, max: Long): ByteArray? {
+            if (contentLength > max) return null
+            val out = java.io.ByteArrayOutputStream()
+            val buffer = ByteArray(8 * 1024)
+            input.use {
+                while (true) {
+                    val n = it.read(buffer)
+                    if (n < 0) break
+                    out.write(buffer, 0, n)
+                    if (out.size() > max) return null
+                }
+            }
+            return out.toByteArray()
+        }
 
         /** 番組の画像の大きさの上限。共有フォルダの `SharedFolderSource.MAX_PROGRAM_IMAGE_BYTES` と同じ値（10 MiB。根拠は無く、測っていない）。超えたら画像なし。 */
         const val MAX_PROGRAM_IMAGE_BYTES = 10L * 1024 * 1024
