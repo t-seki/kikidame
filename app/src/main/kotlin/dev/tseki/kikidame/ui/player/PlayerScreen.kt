@@ -1,5 +1,4 @@
 package dev.tseki.kikidame.ui.player
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -40,40 +39,84 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tseki.kikidame.R
+import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.PlaybackSpeed
 import dev.tseki.kikidame.playback.SleepTimer
+import dev.tseki.kikidame.text.UiText
 import dev.tseki.kikidame.ui.resolve
+import dev.tseki.kikidame.ui.theme.KikidameTheme
 import dev.tseki.kikidame.ui.toClockText
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val played by viewModel.played.collectAsStateWithLifecycle()
     val subtitle by viewModel.subtitle.collectAsStateWithLifecycle()
     val speed by viewModel.speed.collectAsStateWithLifecycle()
-    var showSpeedSheet by remember { mutableStateOf(false) }
     val sleepTimerLabel by viewModel.sleepTimerLabel.collectAsStateWithLifecycle()
+    PlayerContent(
+        state = state,
+        played = played,
+        subtitle = subtitle,
+        speed = speed,
+        sleepTimerLabel = sleepTimerLabel,
+        onBack = onBack,
+        onSeek = viewModel::seekTo,
+        onSetPlayed = viewModel::setPlayed,
+        onPrevious = viewModel::previous,
+        onSeekBack = viewModel::seekBack,
+        onTogglePlayPause = viewModel::togglePlayPause,
+        onSeekForward = viewModel::seekForward,
+        onNext = viewModel::next,
+        onSetSpeed = viewModel::setSpeed,
+        onSetSleepTimer = viewModel::setSleepTimer,
+        onSetSleepTimerToEndOfEpisode = viewModel::setSleepTimerToEndOfEpisode,
+    )
+}
+
+/**
+ * 再生画面の中身。ViewModel を受け取らず、値とラムダだけで描く（プレビューから呼べるように）。
+ * [swipeSeek] はふつう既定値のまま（[state] の位置・尺と [onSeek] で動く）。プレビューではスワイプ中の状態を渡す。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun PlayerContent(
+    state: PlayerUiState,
+    played: Boolean,
+    subtitle: UiText?,
+    speed: Float,
+    sleepTimerLabel: UiText?,
+    onBack: () -> Unit,
+    onSeek: (Long) -> Unit,
+    onSetPlayed: (Boolean) -> Unit,
+    onPrevious: () -> Unit,
+    onSeekBack: () -> Unit,
+    onTogglePlayPause: () -> Unit,
+    onSeekForward: () -> Unit,
+    onNext: () -> Unit,
+    onSetSpeed: (Float) -> Unit,
+    onSetSleepTimer: (Duration?) -> Unit,
+    onSetSleepTimerToEndOfEpisode: () -> Unit,
+    swipeSeek: SwipeSeekState = rememberSwipeSeekState(state.episodeId, state.positionMs, state.durationMs, onSeek),
+) {
+    var showSpeedSheet by remember { mutableStateOf(false) }
     var showSleepSheet by remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
@@ -87,44 +130,14 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
             )
         },
     ) { padding ->
-        // 左右スワイプで秒単位のシーク（#29）。画面中央の領域から始めたドラッグだけ拾い、シークバーの上では
-        // Slider が勝つ（自分でドラッグを消費する）。ボタンの上から始めても拾う（タップはタッチスロップ内なので混ざらない）。
-        // ドラッグ中は開始時の位置からの差分と目標位置を表示し、指を離した時点で 1 回だけシークする。
-        // 尺が分かるまでは始めない（SeekBar の enabled と同じ）
-        val latest by rememberUpdatedState(state)
-        val density = LocalDensity.current
-        var swipeStartMs by remember { mutableStateOf(0L) }
-        var swipeOffsetDp by remember { mutableStateOf<Float?>(null) }
-        val swipeTargetMs = swipeOffsetDp?.let { SwipeSeek.targetMs(swipeStartMs, it, state.durationMs) }
-        // ドラッグ中に回が切り替わったら（自動遷移）、古い回の位置を基準にシークしないよう破棄する
-        LaunchedEffect(state.episodeId) { swipeOffsetDp = null }
+        // 左右スワイプで秒単位のシーク（#29）。拾う条件とジェスチャは SwipeSeekState.kt。
+        // ドラッグ中は開始時の位置からの差分と目標位置を表示し、指を離した時点で 1 回だけシークする
+        val swipeTargetMs = swipeSeek.targetMs
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .pointerInput(Unit) {
-                    detectHorizontalDragGestures(
-                        onDragStart = { start ->
-                            if (latest.durationMs > 0 &&
-                                SwipeSeek.isInCenterArea(start.x, start.y, size.width.toFloat(), size.height.toFloat())
-                            ) {
-                                swipeStartMs = latest.positionMs
-                                swipeOffsetDp = 0f
-                            }
-                        },
-                        onDragEnd = {
-                            swipeOffsetDp?.let { viewModel.seekTo(SwipeSeek.targetMs(swipeStartMs, it, latest.durationMs)) }
-                            swipeOffsetDp = null
-                        },
-                        onDragCancel = { swipeOffsetDp = null },
-                        onHorizontalDrag = { change, dragAmount ->
-                            // 中央の領域の外から始めた・尺が無い・回が切り替わった（swipeOffsetDp == null）なら拾わない
-                            val current = swipeOffsetDp ?: return@detectHorizontalDragGestures
-                            change.consume()
-                            swipeOffsetDp = current + with(density) { dragAmount.toDp().value }
-                        },
-                    )
-                }
+                .swipeToSeek(swipeSeek)
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
@@ -145,7 +158,7 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
             Spacer(Modifier.height(8.dp))
             // スワイプ中だけ見せる。場所は常に確保してレイアウトが跳ねないようにする
             Text(
-                text = swipeTargetMs?.let { "${SwipeSeek.deltaText(it - swipeStartMs).resolve()} → ${it.milliseconds.toClockText()}" } ?: " ",
+                text = swipeTargetMs?.let { "${SwipeSeek.deltaText(it - swipeSeek.startMs).resolve()} → ${it.milliseconds.toClockText()}" } ?: " ",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.alpha(if (swipeTargetMs != null) 1f else 0f),
@@ -154,7 +167,7 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
             SeekBar(
                 positionMs = swipeTargetMs ?: state.positionMs,
                 durationMs = state.durationMs,
-                onSeek = viewModel::seekTo,
+                onSeek = onSeek,
             )
             // シークバーの下: 倍速（#35）・再生済み・スリープタイマー（#36）を中央 3 列に（#57）。
             // 片手で使うので、親指が届かない TopAppBar ではなく主操作のすぐ上にまとめる。
@@ -162,9 +175,9 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                 SubAction(Icons.Filled.Speed, contentDescription = stringResource(R.string.player_speed), label = PlaybackSpeed.label(speed)) { showSpeedSheet = true }
                 if (played) {
-                    SubAction(Icons.Default.CheckCircle, contentDescription = null, label = stringResource(R.string.common_played), enabled = state.episodeId != null) { viewModel.setPlayed(false) }
+                    SubAction(Icons.Default.CheckCircle, contentDescription = null, label = stringResource(R.string.common_played), enabled = state.episodeId != null) { onSetPlayed(false) }
                 } else {
-                    SubAction(Icons.Outlined.Circle, contentDescription = null, label = stringResource(R.string.common_unplayed), enabled = state.episodeId != null) { viewModel.setPlayed(true) }
+                    SubAction(Icons.Outlined.Circle, contentDescription = null, label = stringResource(R.string.common_unplayed), enabled = state.episodeId != null) { onSetPlayed(true) }
                 }
                 val sleepLabel = sleepTimerLabel
                 if (sleepLabel != null) {
@@ -175,36 +188,36 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
             }
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                IconButton(onClick = viewModel::previous, enabled = state.hasPrevious) {
+                IconButton(onClick = onPrevious, enabled = state.hasPrevious) {
                     Icon(Icons.Default.SkipPrevious, contentDescription = stringResource(R.string.player_previous), Modifier.size(32.dp))
                 }
-                IconButton(onClick = viewModel::seekBack) {
+                IconButton(onClick = onSeekBack) {
                     Icon(Icons.Default.Replay10, contentDescription = stringResource(R.string.player_seek_back), Modifier.size(32.dp))
                 }
-                FilledIconButton(onClick = viewModel::togglePlayPause, modifier = Modifier.size(72.dp)) {
+                FilledIconButton(onClick = onTogglePlayPause, modifier = Modifier.size(72.dp)) {
                     if (state.isPlaying) {
                         Icon(Icons.Default.Pause, contentDescription = stringResource(R.string.common_pause), Modifier.size(40.dp))
                     } else {
                         Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.common_play), Modifier.size(40.dp))
                     }
                 }
-                IconButton(onClick = viewModel::seekForward) {
+                IconButton(onClick = onSeekForward) {
                     Icon(Icons.Default.Forward10, contentDescription = stringResource(R.string.player_seek_forward), Modifier.size(32.dp))
                 }
-                IconButton(onClick = viewModel::next, enabled = state.hasNext) {
+                IconButton(onClick = onNext, enabled = state.hasNext) {
                     Icon(Icons.Default.SkipNext, contentDescription = stringResource(R.string.player_next), Modifier.size(32.dp))
                 }
             }
         }
     }
     if (showSpeedSheet) {
-        SpeedSheet(current = speed, onSelect = viewModel::setSpeed, onDismiss = { showSpeedSheet = false })
+        SpeedSheet(current = speed, onSelect = onSetSpeed, onDismiss = { showSpeedSheet = false })
     }
     if (showSleepSheet) {
         SleepTimerSheet(
             isSet = sleepTimerLabel != null,
-            onSelectAfter = viewModel::setSleepTimer,
-            onSelectEndOfEpisode = viewModel::setSleepTimerToEndOfEpisode,
+            onSelectAfter = onSetSleepTimer,
+            onSelectEndOfEpisode = onSetSleepTimerToEndOfEpisode,
             onDismiss = { showSleepSheet = false },
         )
     }
@@ -287,4 +300,95 @@ private fun SeekBar(positionMs: Long, durationMs: Long, onSeek: (Long) -> Unit) 
             Text(durationMs.milliseconds.toClockText(), style = MaterialTheme.typography.titleMedium)
         }
     }
+}
+
+private val previewState = PlayerUiState(
+    episodeId = EpisodeId(1),
+    title = "第 128 回 春の新番組をふりかえる",
+    programName = "週末ラジオ",
+    isPlaying = true,
+    positionMs = 754_000L,
+    durationMs = 3_600_000L,
+    hasPrevious = true,
+    hasNext = true,
+)
+
+@Composable
+private fun PlayerContentPreviewHost(
+    state: PlayerUiState,
+    played: Boolean = false,
+    subtitle: UiText? = UiText.Plain("ラジオ局 · 山田太郎"),
+    sleepTimerLabel: UiText? = null,
+    swipeSeek: SwipeSeekState? = null,
+) {
+    KikidameTheme {
+        PlayerContent(
+            state = state,
+            played = played,
+            subtitle = subtitle,
+            speed = 1.25f,
+            sleepTimerLabel = sleepTimerLabel,
+            onBack = {},
+            onSeek = {},
+            onSetPlayed = {},
+            onPrevious = {},
+            onSeekBack = {},
+            onTogglePlayPause = {},
+            onSeekForward = {},
+            onNext = {},
+            onSetSpeed = {},
+            onSetSleepTimer = {},
+            onSetSleepTimerToEndOfEpisode = {},
+            swipeSeek = swipeSeek ?: rememberSwipeSeekState(state.episodeId, state.positionMs, state.durationMs, onSeek = {}),
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PlayerContentPreview() {
+    PlayerContentPreviewHost(previewState)
+}
+
+/** 再生済み・一時停止中・スリープタイマーを設定中。 */
+@Preview(showBackground = true)
+@Composable
+private fun PlayerContentPlayedPreview() {
+    PlayerContentPreviewHost(
+        previewState.copy(isPlaying = false, hasNext = false),
+        played = true,
+        sleepTimerLabel = UiText.Plain("14:59"),
+    )
+}
+
+/** 読み込み中（尺が分からない。シークバーは無効で、スワイプも始まらない）。サブタイトルの行は 1 行分の場所だけ取る。 */
+@Preview(showBackground = true)
+@Composable
+private fun PlayerContentUnknownDurationPreview() {
+    PlayerContentPreviewHost(
+        previewState.copy(isPlaying = false, positionMs = 0L, durationMs = 0L, hasPrevious = false),
+        subtitle = null,
+    )
+}
+
+/** 再生できなかった。 */
+@Preview(showBackground = true)
+@Composable
+private fun PlayerContentErrorPreview() {
+    PlayerContentPreviewHost(previewState.copy(isPlaying = false, error = UiText.Plain("再生できませんでした")))
+}
+
+/** スワイプ中（右へ 70dp = +14 秒。差分と目標位置を出し、シークバーも目標位置を指す）。 */
+@Preview(showBackground = true)
+@Composable
+private fun PlayerContentSwipingPreview() {
+    val swipeSeek = remember {
+        SwipeSeekState().apply {
+            positionMs = previewState.positionMs
+            durationMs = previewState.durationMs
+            start(x = 0.5f, y = 0.5f, width = 1f, height = 1f)
+            drag(70f)
+        }
+    }
+    PlayerContentPreviewHost(previewState, swipeSeek = swipeSeek)
 }
