@@ -88,21 +88,19 @@ class RoomDownloadRepository @Inject constructor(
     }
 
     override suspend fun cancel(episodeId: EpisodeId) {
+        // パスを読むだけ。消すかどうか（DONE でないか）は消す文の中で見る: 読んだ後に完了した回の行を消さない（#261）
         val row = db.localFileDao().findByEpisode(episodeId.value) ?: return
-        if (row.state == DownloadState.DONE) return
-        db.localFileDao().delete(episodeId.value)
+        if (db.localFileDao().deleteUnlessDone(episodeId.value) == 0) return
         row.path?.let { withContext(Dispatchers.IO) { File(it + PART_SUFFIX).delete() } }
     }
 
     override suspend fun retry(episodeId: EpisodeId) {
         // 再試行は列の末尾に付け直す
-        updateRow(episodeId) { row ->
-            if (row.state == DownloadState.FAILED) row.copy(state = DownloadState.PENDING, enqueuedAt = clock.now()) else null
-        }
+        db.localFileDao().retryFailed(episodeId.value, clock.now())
     }
 
     override suspend fun unpin(episodeId: EpisodeId) {
-        updateRow(episodeId) { row -> if (row.pinned) row.copy(pinned = false) else null }
+        db.localFileDao().unpin(episodeId.value)
     }
 
     override suspend fun deleteLocal(episodeId: EpisodeId): LocalDeletionScope {
@@ -177,11 +175,11 @@ class RoomDownloadRepository @Inject constructor(
     override suspend fun resetRunning() = db.localFileDao().resetRunning()
 
     override suspend fun resetToPending(episodeId: EpisodeId) {
-        updateRow(episodeId) { row -> if (row.state == DownloadState.RUNNING) row.copy(state = DownloadState.PENDING) else null }
+        db.localFileDao().resetToPending(episodeId.value)
     }
 
     override suspend fun markRunning(episodeId: EpisodeId) {
-        updateRow(episodeId) { row -> row.copy(state = DownloadState.RUNNING, lastAttemptAt = clock.now()) }
+        db.localFileDao().markRunning(episodeId.value, clock.now())
     }
 
     override suspend fun markDone(episodeId: EpisodeId, path: String, sizeBytes: Long) {
@@ -192,14 +190,13 @@ class RoomDownloadRepository @Inject constructor(
     }
 
     override suspend fun markFailed(episodeId: EpisodeId) {
-        updateRow(episodeId) { row ->
-            row.copy(state = DownloadState.FAILED, attemptCount = row.attemptCount + 1, lastAttemptAt = clock.now())
-        }
+        db.localFileDao().markFailed(episodeId.value, clock.now())
     }
 
     /**
      * `local_files` の行を読み、あれば [change] で変えて書く。行が無いときと、[change] が null を返したときは書かない。書いたら true。
-     * トランザクションは張らない（囲むかどうかは呼ぶ側が決める）。
+     * トランザクションは張らない（囲むかどうかは呼ぶ側が決める）。読んでから書くまでの間に別の経路が書くと、その書き込みを古い行で戻し、
+     * 消された行を生き返らせるので、トランザクションの中でだけ呼ぶ（今は [markDone] だけ）。ほかの 1 回の更新は `LocalFileDao` の 1 つの文で行う（#261）
      */
     private suspend fun updateRow(episodeId: EpisodeId, change: (LocalFileEntity) -> LocalFileEntity?): Boolean {
         val row = db.localFileDao().findByEpisode(episodeId.value) ?: return false

@@ -209,6 +209,25 @@ interface LocalFileDao {
     suspend fun upsert(localFile: LocalFileEntity)
     @Query("DELETE FROM local_files WHERE episodeId = :episodeId")
     suspend fun delete(episodeId: Long)
+
+    // 以下は 1 回の状態の更新を 1 つの文で行う（#261）。行を読んでから upsert すると、間に別の経路が書いた列を古い値で戻し、
+    // 間に消された行を生き返らせる。1 つの文にすると読み書きの間が無くなり、行が無ければ何も書かず、変える列だけを書く。
+    // 状態を条件にするもの（deleteUnlessDone・retryFailed・resetToPending）は、条件を見ることと書くことも同じ文で行う。
+    // markRunning と markFailed は状態を条件にしない（WHERE episodeId だけ）。防ぐのは、消された行を生き返らせることと、
+    // ほかの列を巻き戻すことだけで、DONE の行を RUNNING / FAILED にすることは防がない。置き換え前の upsert も状態を見ておらず、
+    // 状態の遷移は変えない（#261 の非目標）ので、そのままにしている
+    @Query("DELETE FROM local_files WHERE episodeId = :episodeId AND state != 'DONE'")
+    suspend fun deleteUnlessDone(episodeId: Long): Int
+    @Query("UPDATE local_files SET state = 'PENDING', enqueuedAt = :enqueuedAt WHERE episodeId = :episodeId AND state = 'FAILED'")
+    suspend fun retryFailed(episodeId: Long, enqueuedAt: Instant)
+    @Query("UPDATE local_files SET pinned = 0 WHERE episodeId = :episodeId AND pinned = 1")
+    suspend fun unpin(episodeId: Long)
+    @Query("UPDATE local_files SET state = 'PENDING' WHERE episodeId = :episodeId AND state = 'RUNNING'")
+    suspend fun resetToPending(episodeId: Long)
+    @Query("UPDATE local_files SET state = 'RUNNING', lastAttemptAt = :at WHERE episodeId = :episodeId")
+    suspend fun markRunning(episodeId: Long, at: Instant)
+    @Query("UPDATE local_files SET state = 'FAILED', attemptCount = attemptCount + 1, lastAttemptAt = :at WHERE episodeId = :episodeId")
+    suspend fun markFailed(episodeId: Long, at: Instant)
 }
 @Dao
 interface PlaybackStateDao {
