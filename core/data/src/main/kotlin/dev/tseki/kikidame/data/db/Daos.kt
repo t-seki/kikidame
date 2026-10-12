@@ -211,7 +211,11 @@ interface LocalFileDao {
     suspend fun delete(episodeId: Long)
 
     // 以下は 1 回の状態の更新を 1 つの文で行う（#261）。行を読んでから upsert すると、間に別の経路が書いた列を古い値で戻し、
-    // 間に消された行を生き返らせる。条件と書き込みを 1 つの文にして、その間を無くす。行が無ければ何も書かない
+    // 間に消された行を生き返らせる。1 つの文にすると読み書きの間が無くなり、行が無ければ何も書かず、変える列だけを書く。
+    // 状態を条件にするもの（deleteUnlessDone・retryFailed・resetToPending）は、条件を見ることと書くことも同じ文で行う。
+    // markRunning と markFailed は状態を条件にしない（WHERE episodeId だけ）。防ぐのは、消された行を生き返らせることと、
+    // ほかの列を巻き戻すことだけで、DONE の行を RUNNING / FAILED にすることは防がない。置き換え前の upsert も状態を見ておらず、
+    // 状態の遷移は変えない（#261 の非目標）ので、そのままにしている
     @Query("DELETE FROM local_files WHERE episodeId = :episodeId AND state != 'DONE'")
     suspend fun deleteUnlessDone(episodeId: Long): Int
     @Query("UPDATE local_files SET state = 'PENDING', enqueuedAt = :enqueuedAt WHERE episodeId = :episodeId AND state = 'FAILED'")
