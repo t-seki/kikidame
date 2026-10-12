@@ -39,7 +39,7 @@ internal enum class SyncSheetState { Hidden, Open, ConfirmRemove }
 /**
  * 番組の同期のシート（[ProgramSyncSheet]）と、番組を消す確認・同期をやめる確認の 2 つのダイアログ。
  * 状態は呼び出し側が持ち（トップバーのボタンで開くため）、番組が読めるまでは何も出さない。
- * 同期をやめる確認は ViewModel の [pendingDisable] で開き、[SyncSheetState] とは関係ない。
+ * 同期をやめる確認は、呼び出し側から引数で渡される [pendingDisable]（null なら出さない）で開き、[SyncSheetState] とは関係ない。
  */
 @Composable
 internal fun ProgramSyncDialogs(

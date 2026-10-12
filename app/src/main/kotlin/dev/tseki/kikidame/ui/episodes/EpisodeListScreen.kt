@@ -357,7 +357,7 @@ private fun previewEpisode(id: Long, title: String, state: DownloadState?, playe
         container = "mp3",
         performers = listOf("出演者A"),
     ),
-    localFile = state?.let { LocalFile(EpisodeId(id), it, path = "/preview/$id.mp3", pinned = false) },
+    localFile = state?.let { LocalFile(EpisodeId(id), it, path = if (it == DownloadState.DONE) "/preview/$id.mp3" else null, pinned = false) },
     playback = PlaybackState(EpisodeId(id), position = 10.minutes, played = played, updatedAt = Instant.fromEpochSeconds(0)),
 )
 
