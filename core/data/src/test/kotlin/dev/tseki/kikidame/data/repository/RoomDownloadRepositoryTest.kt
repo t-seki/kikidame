@@ -222,6 +222,30 @@ class RoomDownloadRepositoryTest : JellyfinRefreshTestBase() {
     }
 
     @Test
+    fun pinPinsAFinishedFileWithoutTouchingTheFile() = runTest {
+        val id = episodeId("2026-09-16 (1)")
+        val file = directory.resolve("a1.m4a").apply { parentFile!!.mkdirs(); writeText("audio") }
+        db.localFileDao().upsert(LocalFileEntity(episodeId = id.value, state = DownloadState.DONE, path = file.path, pinned = false, enqueuedAt = now, downloadedAt = now))
+        downloads.pin(id)
+        val row = db.localFileDao().findByEpisode(id.value)!!
+        assertTrue(row.pinned)
+        assertEquals(DownloadState.DONE, row.state)
+        assertEquals(file.path, row.path)
+        assertEquals("audio", file.readText())
+    }
+
+    @Test
+    fun pinLeavesAnUnfinishedRowAndAMissingRowAlone() = runTest {
+        val pending = episodeId("2026-09-16 (1)")
+        db.localFileDao().upsert(LocalFileEntity(episodeId = pending.value, state = DownloadState.PENDING, path = null, pinned = false, enqueuedAt = now))
+        downloads.pin(pending)
+        assertFalse(db.localFileDao().findByEpisode(pending.value)!!.pinned)
+        val none = episodeId("2026-09-15 (1)")
+        downloads.pin(none)
+        assertNull(db.localFileDao().findByEpisode(none.value))
+    }
+
+    @Test
     fun unpinDoesNotUndoAFinishedDownload() = runTest {
         val after = race(row(DownloadState.RUNNING), "UPDATE local_files SET state = 'DONE', downloadedAt = 1") { unpin(it) }
         assertEquals(DownloadState.DONE, after!!.state)

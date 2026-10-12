@@ -144,7 +144,7 @@ internal fun EpisodeRow(
 
 /**
  * 長押しのシート（#153: 各回一覧と「続きから」で共通）。ダウンロード（[onDownload]）は null なら出さない
- * （「続きから」の回は必ず手元にある）。[syncEnabled] は番組が同期対象か（固定を外す操作の条件）。
+ * （「続きから」の回は必ず手元にある）。固定する（[onPin]）も null なら出さない。出す条件は手元にあり固定していない回で、番組が同期対象かは見ない（#280）。[syncEnabled] は番組が同期対象か（固定を外す操作の条件）。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -154,6 +154,7 @@ internal fun EpisodeActionsSheet(
     onDismiss: () -> Unit,
     onDownload: (() -> Unit)?,
     onUnpin: () -> Unit,
+    onPin: (() -> Unit)? = null,
     onDelete: () -> Unit,
     onDetails: () -> Unit,
 ) {
@@ -162,6 +163,9 @@ internal fun EpisodeActionsSheet(
         Text(item.episode.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
         if (onDownload != null && local == null && item.episode.sourceItemId != null) {
             SheetAction(Icons.Filled.Download, stringResource(R.string.episode_list_action_download)) { onDownload(); onDismiss() }
+        }
+        if (onPin != null && local?.state == DownloadState.DONE && !local.pinned) {
+            SheetAction(Icons.Outlined.PushPin, stringResource(R.string.episode_list_action_pin)) { onPin(); onDismiss() }
         }
         if (local?.state == DownloadState.DONE && local.pinned && syncEnabled) {
             SheetAction(Icons.Outlined.PushPin, stringResource(R.string.episode_list_action_unpin)) { onUnpin(); onDismiss() }

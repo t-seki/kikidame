@@ -204,6 +204,7 @@
     <string name="episode_list_status_waiting_wifi">Waiting for Wi-Fi</string>
     <!-- Long-press actions -->
     <string name="episode_list_action_download">Download (pin)</string>
+    <string name="episode_list_action_pin">Pin (exempt from retention rules)</string>
     <string name="episode_list_action_unpin">Unpin (apply retention rules)</string>
     <string name="episode_list_action_delete_file">Delete file (playback position is kept)</string>
     <string name="episode_list_action_delete_episode">Remove this episode (not in the source, cannot be restored)</string>
@@ -230,6 +231,7 @@
     <string name="episode_list_sync_now">Sync this program now</string>
     <string name="episode_list_remove_program">Remove this program from the device</string>
     <!-- Snackbar messages -->
+    <string name="episode_list_msg_pinned">Pinned. Retention rules no longer apply</string>
     <string name="episode_list_msg_unpinned">Unpinned. Retention rules now apply</string>
     <string name="episode_list_msg_file_deleted_synced">File deleted. This program is synced, so the episode is downloaded again at the next sync if it should be kept</string>
     <string name="episode_list_msg_file_deleted">File deleted. The playback position is kept</string>
