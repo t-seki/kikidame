@@ -1,0 +1,4 @@
+- Program artwork fetched at sync (folder.jpg, Jellyfin's Primary image), shown in the program list, episode list, mini player and player screen
+- Player screen, notification, lock screen and Android Auto show the episode's embedded artwork, or the program's if none
+- Episodes downloaded by sync can now be pinned from the episode sheet (episode list and Continue)
+- Pull to refresh in the episode list now syncs that program; "Sync this program now" is gone
