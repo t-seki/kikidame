@@ -158,16 +158,16 @@ class RoomLibraryRefreshRepositoryTest : JellyfinRefreshTestBase() {
         assertTrue(result.hasChanges)
     }
 
-    /** 番組単位の取り込み・1 番組の同期も新しい回を数える（#142）。 */
+    /** 1 番組の同期も新しい回を数える（#142）。 */
     @Test
-    fun perProgramPathsCountNewEpisodes() = runTest {
+    fun syncProgramCountsNewEpisodes() = runTest {
         signInAndSelect()
         gateway.snapshot = snapshot
         repo.refresh()
         val programId = library.observePrograms().first().single().program.id
 
         gateway.snapshot = snapshot.copy(episodes = snapshot.episodes + sourceEpisode("audio-4", "$program 2026-09-21-1", "2026-09-20T15:00:00Z"))
-        assertEquals(1, repo.refreshProgram(programId)?.newEpisodes)
+        assertEquals(1, repo.syncProgram(programId)?.newEpisodes)
         assertEquals(0, repo.syncProgram(programId)?.newEpisodes)
 
         gateway.snapshot = snapshot.copy(episodes = snapshot.episodes + sourceEpisode("audio-5", "$program 2026-09-24-1", "2026-09-23T15:00:00Z"))
@@ -215,9 +215,9 @@ class RoomLibraryRefreshRepositoryTest : JellyfinRefreshTestBase() {
         assertEquals(fetchedAt, ready.lastFetchedAt)
     }
 
-    /** 番組単位の取り込み・同期は試みとして記録しない（最終同期の時刻と同じ扱い）。 */
+    /** 1 番組の同期は試みとして記録しない（最終同期の時刻と同じ扱い）。 */
     @Test
-    fun perProgramRefreshDoesNotRecordAnAttempt() = runTest {
+    fun syncProgramDoesNotRecordAnAttempt() = runTest {
         signInAndSelect()
         gateway.snapshot = snapshot
         repo.refresh()
@@ -225,7 +225,6 @@ class RoomLibraryRefreshRepositoryTest : JellyfinRefreshTestBase() {
         now += 90.minutes
         val programId = library.observePrograms().first().single().program.id
 
-        repo.refreshProgram(programId)
         repo.syncProgram(programId)
 
         assertEquals(attemptedAt, assertIs<SessionState.Ready>(session.state.first()).lastAttemptedAt)

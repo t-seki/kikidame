@@ -38,7 +38,7 @@ import kotlin.time.Instant
  * 共有フォルダのファイルのサイズ・更新日時（`sourceFileSize` / `sourceModifiedAt`、#197）も取得元の値で書く）、`LocalFile` / `PlaybackState` は触らない。
  *
  * 全走査（[refresh]）は同期そのもの: 取り込んだ後に [SyncPlanner] を回し、保持ルールによる削除・取得元から消えた各回の除去・
- * ダウンロードの予約まで行う（ADR 0004）。番組単位（[refreshProgram]）は取り込みだけで、削除はしない。
+ * ダウンロードの予約まで行う（ADR 0004）。1 番組の同期（[syncProgram]）は、その番組だけを取り込んで同期する。
  * 共有フォルダの全走査では、取得元がタグを読み終えた番組から先に 1 番組ずつ取り込んで同期し（[syncProgram] と同じ範囲）、
  * 全部を読み終えたら全体を取り込み直して消失を判断する（#209 の決定 1）。どの取り込みも、それぞれ 1 トランザクション。
  */
@@ -105,15 +105,6 @@ class RoomLibraryRefreshRepository @Inject constructor(
         }
     }
 
-    override suspend fun refreshProgram(programId: ProgramId): RefreshResult? {
-        requireReady()
-        return when (val fetched = fetchProgramSnapshot(programId) ?: return null) {
-            ProgramFetch.Gone -> goneProgramResult()
-            // 突合（結び直しを含む）はこの番組の各回だけを相手にする。削除も予約もしない
-            is ProgramFetch.Found -> apply(fetched.snapshot)
-        }
-    }
-
     override suspend fun syncProgram(programId: ProgramId, excluded: Set<EpisodeId>): RefreshResult? {
         requireReady()
         return when (val fetched = fetchProgramSnapshot(programId) ?: return null) {
@@ -134,7 +125,7 @@ class RoomLibraryRefreshRepository @Inject constructor(
     }
 
     /**
-     * [refreshProgram] と [syncProgram] の共通の前段。番組を取得元から取り、消失を立てる／戻す。
+     * [syncProgram] の前段。番組を取得元から取り、消失を立てる／戻す。
      * 番組が手元に無いか、取得元 ID を持たなければ null。
      */
     private suspend fun fetchProgramSnapshot(programId: ProgramId): ProgramFetch? {

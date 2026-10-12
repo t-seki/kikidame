@@ -39,11 +39,9 @@ class LibraryRefresherTest {
 
     private class FakeRefreshRepository : LibraryRefreshRepository {
         var result: RefreshResult? = null
-        var programResult: RefreshResult? = null
         var error: SourceException? = null
         var gate: CompletableDeferred<Unit>? = null
         var calls = 0
-        var programCalls = 0
         var lastExcluded: Set<EpisodeId> = emptySet()
         /** 全走査の途中で流す進み具合（#209）。[gate] の前に流す。 */
         var progress: List<ScanProgress> = emptyList()
@@ -67,12 +65,6 @@ class LibraryRefresherTest {
             if (ignoresCancellation) withContext(NonCancellable) { gate?.await() } else gate?.await()
             error?.let { throw it }
             return result!!
-        }
-
-        override suspend fun refreshProgram(programId: ProgramId): RefreshResult? {
-            programCalls++
-            error?.let { throw it }
-            return programResult
         }
 
         var syncProgramResult: RefreshResult? = null
@@ -256,38 +248,47 @@ class LibraryRefresherTest {
         assertEquals(0, repo.calls)
     }
 
+    /** 各回一覧の引っ張って更新（orFullSync）も 1 番組の同期。削除・予約の文言が出て、全走査は走らない（#279）。 */
     @Test
-    fun refreshProgramUsesTheProgramPathAndItsOwnMessage() = runTest(StandardTestDispatcher()) {
-        val repo = FakeRefreshRepository().apply { programResult = RefreshResult(1, 7, 0, 0, now, newEpisodes = 2) }
+    fun syncProgramOrFullSyncUsesTheProgramPath() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { syncProgramResult = RefreshResult(1, 7, 0, 0, now, deleted = 1) }
         val refresher = refresher(repo)
         refresher.messages.test {
-            assertEquals(7, refresher.refreshProgram(ProgramId(1))?.episodes)
-            assertEquals(sentences(UiText.Plural(R.plurals.sync_new_episodes, 2)), awaitItem())
+            assertEquals(7, refresher.syncProgram(ProgramId(1), orFullSync = true)?.episodes)
+            assertEquals(sentences(actions(UiText.Plural(R.plurals.sync_deleted, 1))), awaitItem())
         }
-        assertEquals(1, repo.programCalls)
+        assertEquals(1, repo.syncProgramCalls)
         assertEquals(0, repo.calls)
     }
 
-    /** 番組単位の取り込みでも、番組がサーバ上で見つからなければ「最新の状態です」ではなくそう出す。 */
+    /** 番組がサーバ上で見つからなければ「最新の状態です」ではなくそう出す。 */
     @Test
-    fun refreshProgramOfAGoneProgramSaysSo() = runTest(StandardTestDispatcher()) {
-        val repo = FakeRefreshRepository().apply { programResult = RefreshResult(0, 0, 0, 0, now, onHold = 1) }
+    fun syncProgramOfAGoneProgramSaysSo() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { syncProgramResult = RefreshResult(0, 0, 0, 0, now, onHold = 1) }
         val refresher = refresher(repo)
         refresher.messages.test {
-            refresher.refreshProgram(ProgramId(1))
+            refresher.syncProgram(ProgramId(1), orFullSync = true)
             assertEquals(UiText.Res(R.string.sync_program_gone), awaitItem())
         }
     }
 
     @Test
-    fun refreshProgramFallsBackToAFullSyncWithoutServerId() = runTest(StandardTestDispatcher()) {
-        val repo = FakeRefreshRepository().apply { programResult = null; result = RefreshResult(2, 9, 0, 0, now) }
+    fun syncProgramOrFullSyncFallsBackToAFullSyncWithoutServerId() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { syncProgramResult = null; result = RefreshResult(2, 9, 0, 0, now) }
         val refresher = refresher(repo)
         refresher.messages.test {
-            assertEquals(9, refresher.refreshProgram(ProgramId(1))?.episodes)
+            assertEquals(9, refresher.syncProgram(ProgramId(1), orFullSync = true)?.episodes)
             assertEquals(upToDate, awaitItem())
         }
         assertEquals(1, repo.calls)
+    }
+
+    @Test
+    fun syncProgramWithoutOrFullSyncDoesNothingWithoutServerId() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { syncProgramResult = null }
+        val refresher = refresher(repo)
+        assertNull(refresher.syncProgram(ProgramId(1)))
+        assertEquals(0, repo.calls)
     }
 
     @Test
@@ -414,7 +415,7 @@ class LibraryRefresherTest {
     fun manualRefreshJoinsASilentOne() = joinsASilentRefresh { refresh() }
 
     @Test
-    fun refreshProgramJoinsASilentRefresh() = joinsASilentRefresh { refreshProgram(ProgramId(1)) }
+    fun syncProgramOrFullSyncJoinsASilentRefresh() = joinsASilentRefresh { syncProgram(ProgramId(1), orFullSync = true) }
 
     @Test
     fun syncProgramJoinsASilentRefresh() = joinsASilentRefresh { syncProgram(ProgramId(1)) }
@@ -427,7 +428,6 @@ class LibraryRefresherTest {
         val gate = CompletableDeferred<Unit>()
         val repo = FakeRefreshRepository().apply {
             result = RefreshResult(3, 40, 0, 0, now)
-            programResult = RefreshResult(1, 7, 0, 0, now)
             syncProgramResult = RefreshResult(1, 6, 0, 0, now)
             this.gate = gate
         }
@@ -454,7 +454,6 @@ class LibraryRefresherTest {
         assertFalse(refresher.isRefreshing.value)
         assertFalse(refresher.isSyncingInBackground.value)
         assertEquals(1, repo.calls)
-        assertEquals(0, repo.programCalls)
         assertEquals(0, repo.syncProgramCalls)
     }
 
