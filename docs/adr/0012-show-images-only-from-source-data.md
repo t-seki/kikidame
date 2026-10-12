@@ -39,4 +39,4 @@ date: 2026-10-12
 - #264 で、共有フォルダの番組の画像と、番組一覧の行・再生画面の表示を入れた。Jellyfin の番組の画像の取得は #282、回の画像と再生まわり（通知・ロック画面・Auto）は #283
 - 取得元の境界（`SourceGateway`）に、番組の画像の中身を取る口（`fetchProgramImage`）を足した。版は `SourceProgram.image` に載せ、取り直すかは取り込みの側が決める。口の形と置き場は `docs/claude-code-handoff.md` の「番組の画像」節
 - 依存に Coil（`coil-compose`）が加わった。ライセンスの一覧（`aboutlibraries.json`）を作り直した
-- 2026-10-12 #282: Jellyfin はアルバムの Primary の画像を取り、版は Primary の ImageTag
+- 2026-10-12 #282: Jellyfin はアルバムの Primary の画像を取り、版は Primary の ImageTag。共有フォルダと同じ 10 MiB の上限を掛け、超えたら画像なしとして扱う（手元のファイルは消し、版は書いて同じ版を取り直さない。PR #293 の 1 周目 #3 で人が決めた。上限の値に根拠は無く、測っていない）
