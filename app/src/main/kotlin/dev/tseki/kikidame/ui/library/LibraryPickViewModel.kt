@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.tseki.kikidame.domain.ConnectedSource
 import dev.tseki.kikidame.domain.LibraryView
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
@@ -53,11 +53,11 @@ class LibraryPickViewModel @Inject constructor(
                 val preselected = current?.takeIf { id -> music.any { it.id == id } }
                     ?: music.singleOrNull()?.id
                 _uiState.update { it.copy(libraries = libraries, selectedId = preselected, isLoading = false) }
-            } catch (e: ServerException.Unauthorized) {
+            } catch (e: SourceException.Unauthorized) {
                 // 401 はログアウトと同じ扱い。セッション状態が変わり、NavHost が接続画面へ導く
                 _uiState.update { it.copy(isLoading = false, error = e.toUserMessage()) }
                 sessionRepository.signOut()
-            } catch (e: ServerException) {
+            } catch (e: SourceException) {
                 _uiState.update { it.copy(isLoading = false, error = e.toUserMessage()) }
             }
         }

@@ -65,7 +65,7 @@ class BrowseTreeTest {
         )
         assertEquals(listOf(BrowseTree.STARRED_ID, BrowseTree.PROGRAMS_ID), tree.children(BrowseTree.ROOT_ID)!!.map { it.mediaId })
     }
-    /** 「続きから」の子は最近聴いた順の各回そのもので、番組をまたぎ、各回の葉は番組の一覧と同じ形（2 行目・印付き）。 */
+    /** 「続きから」の子は最後に聴いた順の各回そのもので、番組をまたぎ、各回の葉は番組の一覧と同じ形（2 行目・印付き）。 */
     @Test
     fun continueTabListsInProgressEpisodesAcrossProgramsMostRecentFirst() = runTest {
         setUp(

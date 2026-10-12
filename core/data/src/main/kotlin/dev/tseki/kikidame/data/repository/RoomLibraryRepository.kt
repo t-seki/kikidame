@@ -45,11 +45,11 @@ class RoomLibraryRepository @Inject constructor(
             .sortedWith(compareBy(EpisodeOrder) { it.episode })
     // 「聴き始めている」の閾値は PlaybackRules から取り、SQL にバインドして LIMIT の前に絞る（Kotlin 側で絞り直すと
     // 上位が未開始の回で埋まったとき limit 件に満たなくなる）
-    override suspend fun getRecentlyListened(limit: Int): List<EpisodeWithState> =
-        episodeDao.listRecentlyListened(limit, Ticks.fromDuration(PlaybackRules.NOT_STARTED_THRESHOLD))
+    override suspend fun getContinueListening(limit: Int): List<EpisodeWithState> =
+        episodeDao.listContinueListening(limit, Ticks.fromDuration(PlaybackRules.NOT_STARTED_THRESHOLD))
             .map { it.toDomain() }
-    override fun observeRecentlyListened(): Flow<List<EpisodeWithState>> =
-        episodeDao.observeRecentlyListened(Ticks.fromDuration(PlaybackRules.NOT_STARTED_THRESHOLD))
+    override fun observeContinueListening(): Flow<List<EpisodeWithState>> =
+        episodeDao.observeContinueListening(Ticks.fromDuration(PlaybackRules.NOT_STARTED_THRESHOLD))
             .map { rows -> rows.map { it.toDomain() } }
             .distinctUntilChanged()
     override suspend fun updateSync(programId: ProgramId, syncEnabled: Boolean, rule: RetentionRule) =

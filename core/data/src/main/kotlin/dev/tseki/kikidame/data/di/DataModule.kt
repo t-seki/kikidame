@@ -24,7 +24,7 @@ import dev.tseki.kikidame.data.repository.RoomLibraryRefreshRepository
 import dev.tseki.kikidame.data.repository.RoomLibraryRepository
 import dev.tseki.kikidame.data.repository.RoomLocalDataReset
 import dev.tseki.kikidame.data.repository.RoomPlaybackStateRepository
-import dev.tseki.kikidame.data.session.KeystoreTokenCipher
+import dev.tseki.kikidame.data.session.KeystoreCredentialCipher
 import dev.tseki.kikidame.data.session.SessionSourceGateway
 import dev.tseki.kikidame.data.sharedfolder.RetrieverTagReader
 import dev.tseki.kikidame.data.sharedfolder.RoomScannedFiles
@@ -35,7 +35,7 @@ import dev.tseki.kikidame.data.device.DeviceDocuments
 import dev.tseki.kikidame.data.sharedfolder.FolderTreeFactory
 import dev.tseki.kikidame.data.settings.DataStoreAppSettings
 import dev.tseki.kikidame.data.session.SessionStore
-import dev.tseki.kikidame.data.session.TokenCipher
+import dev.tseki.kikidame.data.session.CredentialCipher
 import dev.tseki.kikidame.data.source.SourceGateway
 import dev.tseki.kikidame.domain.AppSettingsRepository
 import dev.tseki.kikidame.domain.DownloadQueue
@@ -103,7 +103,7 @@ object PreferencesModule {
 
     @Provides
     @Singleton
-    fun provideSessionStore(@SessionPreferences dataStore: DataStore<Preferences>, cipher: TokenCipher): SessionStore =
+    fun provideSessionStore(@SessionPreferences dataStore: DataStore<Preferences>, cipher: CredentialCipher): SessionStore =
         SessionStore(dataStore, cipher)
 
     @Provides
@@ -159,7 +159,7 @@ abstract class RepositoryModule {
     abstract fun bindSourceGateway(impl: SessionSourceGateway): SourceGateway
 
     @Binds
-    abstract fun bindTokenCipher(impl: KeystoreTokenCipher): TokenCipher
+    abstract fun bindCredentialCipher(impl: KeystoreCredentialCipher): CredentialCipher
     @Binds
     abstract fun bindDownloadRepository(impl: RoomDownloadRepository): DownloadRepository
     @Binds

@@ -1,7 +1,7 @@
 package dev.tseki.kikidame.ui.connect
 
 import dev.tseki.kikidame.R
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.ui.UiText
 
 /**
@@ -13,11 +13,11 @@ fun interface LocalNetworkPermissionCheck {
 }
 
 /**
- * 接続に失敗したときに画面に出す文言。[message] の後に、届かない（[ServerException.Unreachable]）うえにローカルネットワークの権限が
+ * 接続に失敗したときに画面に出す文言。[message] の後に、届かない（[SourceException.Unreachable]）うえにローカルネットワークの権限が
  * 無ければ、権限の案内を続ける。権限は届かないときだけ確かめる。
  */
-internal fun ServerException.connectErrorText(message: UiText, permission: LocalNetworkPermissionCheck): UiText {
-    val hint = if (this is ServerException.Unreachable && permission.isRequiredAndMissing()) {
+internal fun SourceException.connectErrorText(message: UiText, permission: LocalNetworkPermissionCheck): UiText {
+    val hint = if (this is SourceException.Unreachable && permission.isRequiredAndMissing()) {
         UiText.Res(R.string.connect_hint_local_network_permission)
     } else {
         null

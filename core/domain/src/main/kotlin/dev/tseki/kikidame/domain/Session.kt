@@ -163,29 +163,29 @@ data class LibraryView(
 )
 
 /** 取得元とのやり取りの失敗。UI はこれで文言を決める。 */
-sealed class ServerException(message: String, cause: Throwable? = null) : Exception(message, cause) {
+sealed class SourceException(message: String, cause: Throwable? = null) : Exception(message, cause) {
     /**
      * 認証情報が無効（Jellyfin の 401/403、SMB の認証の失敗）、または端末のフォルダの永続権限が無い・取り消された、選んだフォルダ（根）が
      * 無いと分かった（#199 の決定 5）。接続をやり直させる（ログアウトし、端末のフォルダは選び直させる）。
      */
-    class Unauthorized(cause: Throwable? = null) : ServerException("unauthorized", cause)
+    class Unauthorized(cause: Throwable? = null) : SourceException("unauthorized", cause)
 
     /** 到達できない（DNS・接続・タイムアウト。共有フォルダの読み取りがやり直しても失敗したときも。端末のフォルダの一時的な失敗を含む）。 */
-    class Unreachable(cause: Throwable? = null) : ServerException("unreachable", cause)
+    class Unreachable(cause: Throwable? = null) : SourceException("unreachable", cause)
 
     /** それ以外（5xx、想定外のレスポンス）。 */
-    class Failed(message: String, cause: Throwable? = null) : ServerException(message, cause)
+    class Failed(message: String, cause: Throwable? = null) : SourceException(message, cause)
 }
 
 interface SessionRepository {
     val state: Flow<SessionState>
 
-    /** Jellyfin にログインしてセッションを保存する。失敗は [ServerException]。 */
+    /** Jellyfin にログインしてセッションを保存する。失敗は [SourceException]。 */
     suspend fun signIn(serverUrl: String, userName: String, password: String)
 
     /**
-     * SMB の共有に接続できるか（共有の直下が読めるか）を確かめ、読めたら保存する（#198）。失敗は [ServerException]:
-     * 認証の失敗は [ServerException.Unauthorized]、届かない・共有が読めないのは [ServerException.Unreachable] / [ServerException.Failed]。
+     * SMB の共有に接続できるか（共有の直下が読めるか）を確かめ、読めたら保存する（#198）。失敗は [SourceException]:
+     * 認証の失敗は [SourceException.Unauthorized]、届かない・共有が読めないのは [SourceException.Unreachable] / [SourceException.Failed]。
      * 保存すると [SessionState.Ready] になる（初回の全走査は呼び出し側が始める）。Jellyfin の接続は消える。
      */
     suspend fun connectSharedFolder(connection: SmbConnection)
@@ -193,7 +193,7 @@ interface SessionRepository {
     /**
      * 端末のフォルダ（[treeUri] は `ACTION_OPEN_DOCUMENT_TREE` の結果）を取得元にする（#199）。端末のストレージのフォルダでなければ
      * [UnsupportedFolderException]。永続的な読み取りの権限を取り、フォルダの直下が読めるかを確かめてから保存する。読めなければ
-     * [ServerException] を投げ、取った権限を手放す。保存すると [SessionState.Ready] になり、ほかの取得元の接続は消える。
+     * [SourceException] を投げ、取った権限を手放す。保存すると [SessionState.Ready] になり、ほかの取得元の接続は消える。
      * 読めたら、保存の前に、そのフォルダ以外に持っている永続権限を手放す（保存を最後にする。保存すると画面が離れるため）。
      */
     suspend fun connectDeviceFolder(treeUri: String)
@@ -216,7 +216,7 @@ interface LibraryRefreshRepository {
      * （保持ルールによる削除、取得元から消えた各回の除去、ダウンロードの予約）。
      * [excluded] が返す各回（再生中の回）は今回は削除しない。走査が長くかかっても今の再生中の回を外すよう、
      * 削除の前（共有フォルダでは番組ごと）に毎回呼び直す（#209）。
-     * 401 は [ServerException.Unauthorized] を投げる（呼び出し側がログアウトへ導く）。
+     * 401 は [SourceException.Unauthorized] を投げる（呼び出し側がログアウトへ導く）。
      * 取得元に問い合わせる前に試みた時刻（[SessionState.Ready.lastAttemptedAt]）を記録する。失敗しても残る。
      *
      * 共有フォルダでは、タグを読んだ番組をその番組を読み終えるたびに取り込み、その番組の中で削除・予約する（[syncProgram] と同じ範囲。#209）。

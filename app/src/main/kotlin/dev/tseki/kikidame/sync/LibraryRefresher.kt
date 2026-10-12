@@ -9,7 +9,7 @@ import dev.tseki.kikidame.domain.LibraryRefreshRepository
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.RefreshResult
 import dev.tseki.kikidame.domain.ScanProgress
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.domain.isDeviceFolder
@@ -234,17 +234,17 @@ class LibraryRefresher @Inject constructor(
             // 同期は済んでいる。Worker を起こせなくても結果は返す（次の起動やダウンロード操作で拾われる）
             if (result.enqueued > 0) kickDownloads()
             return result
-        } catch (e: ServerException.Unauthorized) {
+        } catch (e: SourceException.Unauthorized) {
             // ログアウトすると画面が接続画面へ移るので、文言を先に出す。端末のフォルダはアクセスが切れた（#199 の決定 5）
             val deviceFolder = sessionRepository.state.first().isDeviceFolder
             report(UiText.Res(if (deviceFolder) R.string.sync_error_device_folder_lost else R.string.sync_error_session_expired))
             sessionRepository.signOut()
             return null
-        } catch (e: ServerException.Unreachable) {
+        } catch (e: SourceException.Unreachable) {
             kickIfEnqueuedBeforeFailure()
             report(UiText.Res(R.string.sync_error_unreachable))
             return null
-        } catch (e: ServerException.Failed) {
+        } catch (e: SourceException.Failed) {
             kickIfEnqueuedBeforeFailure()
             report(UiText.Res(R.string.sync_error_fetch_failed, e.message.orEmpty()))
             return null
@@ -265,7 +265,7 @@ class LibraryRefresher @Inject constructor(
      * 全走査が途中で失敗しても、それまでに番組ごとの同期が予約していれば Worker を起こす（#209）。予約は DB に残っていて、
      * 次の同期ではその回の予約が数に入らない（もう行がある）ので、ここで起こさないと次の起動かダウンロードの操作まで待つ。
      * 認証の失敗（ログアウトする）と取り消しでは起こさない。ブロッキングの I/O の最中に取り消されると、取り消しが
-     * [ServerException.Unreachable] などに包まれて届くことがあるので、先に取り消し済みかを確かめ、そうなら取り消しとして投げ直す。
+     * [SourceException.Unreachable] などに包まれて届くことがあるので、先に取り消し済みかを確かめ、そうなら取り消しとして投げ直す。
      */
     private suspend fun Run.kickIfEnqueuedBeforeFailure() {
         currentCoroutineContext().ensureActive()
@@ -324,8 +324,8 @@ fun RefreshResult.toProgramSyncMessage(): UiText {
 }
 
 /** 接続画面の文言。 */
-fun ServerException.toUserMessage(): UiText = when (this) {
-    is ServerException.Unauthorized -> UiText.Res(R.string.sync_error_unauthorized)
-    is ServerException.Unreachable -> UiText.Res(R.string.sync_error_unreachable_connect)
-    is ServerException.Failed -> UiText.Res(R.string.sync_error_server_failed, message.orEmpty())
+fun SourceException.toUserMessage(): UiText = when (this) {
+    is SourceException.Unauthorized -> UiText.Res(R.string.sync_error_unauthorized)
+    is SourceException.Unreachable -> UiText.Res(R.string.sync_error_unreachable_connect)
+    is SourceException.Failed -> UiText.Res(R.string.sync_error_server_failed, message.orEmpty())
 }

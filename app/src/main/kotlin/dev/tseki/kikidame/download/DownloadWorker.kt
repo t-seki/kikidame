@@ -11,7 +11,7 @@ import dagger.assisted.AssistedInject
 import dev.tseki.kikidame.data.download.DownloadOutcome
 import dev.tseki.kikidame.data.download.EpisodeDownloader
 import dev.tseki.kikidame.domain.DownloadQueue
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
 import kotlinx.coroutines.flow.first
@@ -45,7 +45,7 @@ class DownloadWorker @AssistedInject constructor(
                     val fraction = if (total != null && total > 0) (downloaded.toFloat() / total).coerceIn(0f, 1f) else 0f
                     setProgress(workDataOf(KEY_EPISODE_ID to episodeId.value, KEY_FRACTION to fraction))
                 }
-            } catch (e: ServerException.Unauthorized) {
+            } catch (e: SourceException.Unauthorized) {
                 Log.w(TAG, "download unauthorized; signing out")
                 sessionRepository.signOut()
                 return Result.success()

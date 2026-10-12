@@ -8,7 +8,7 @@ import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.RefreshResult
 import dev.tseki.kikidame.domain.ScanProgress
 import dev.tseki.kikidame.ui.UiText
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.download.DownloadKicker
 import dev.tseki.kikidame.playback.NowPlaying
@@ -40,7 +40,7 @@ class LibraryRefresherTest {
     private class FakeRefreshRepository : LibraryRefreshRepository {
         var result: RefreshResult? = null
         var programResult: RefreshResult? = null
-        var error: ServerException? = null
+        var error: SourceException? = null
         var gate: CompletableDeferred<Unit>? = null
         var calls = 0
         var programCalls = 0
@@ -341,7 +341,7 @@ class LibraryRefresherTest {
 
     @Test
     fun unauthorizedSignsOut() = runTest(StandardTestDispatcher()) {
-        val repo = FakeRefreshRepository().apply { error = ServerException.Unauthorized() }
+        val repo = FakeRefreshRepository().apply { error = SourceException.Unauthorized() }
         val session = FakeSessionRepository()
         val refresher = refresher(repo, session = session)
 
@@ -355,7 +355,7 @@ class LibraryRefresherTest {
     /** 端末のフォルダのアクセスが切れたら、ログアウトして「フォルダを選び直して」と出す（#199 の決定 5）。 */
     @Test
     fun lostDeviceFolderSignsOutAndAsksToPickAgain() = runTest(StandardTestDispatcher()) {
-        val repo = FakeRefreshRepository().apply { error = ServerException.Unauthorized() }
+        val repo = FakeRefreshRepository().apply { error = SourceException.Unauthorized() }
         val session = FakeSessionRepository(deviceFolderReady())
         val refresher = refresher(repo, session = session)
 
@@ -368,7 +368,7 @@ class LibraryRefresherTest {
 
     @Test
     fun unreachableKeepsSessionAndReports() = runTest(StandardTestDispatcher()) {
-        val repo = FakeRefreshRepository().apply { error = ServerException.Unreachable() }
+        val repo = FakeRefreshRepository().apply { error = SourceException.Unreachable() }
         val session = FakeSessionRepository()
         val refresher = refresher(repo, session = session)
 
@@ -436,7 +436,7 @@ class LibraryRefresherTest {
     @Test
     fun silentRefreshErrorClearsTheBackgroundBar() = runTest(StandardTestDispatcher()) {
         val gate = CompletableDeferred<Unit>()
-        val repo = FakeRefreshRepository().apply { error = ServerException.Unreachable(); this.gate = gate }
+        val repo = FakeRefreshRepository().apply { error = SourceException.Unreachable(); this.gate = gate }
         val refresher = refresher(repo)
 
         val silent = async { refresher.refresh(silent = true) }
@@ -527,7 +527,7 @@ class LibraryRefresherTest {
     @Test
     fun joiningASilentRefreshReportsItsError() = runTest(StandardTestDispatcher()) {
         val gate = CompletableDeferred<Unit>()
-        val repo = FakeRefreshRepository().apply { error = ServerException.Unreachable(); this.gate = gate }
+        val repo = FakeRefreshRepository().apply { error = SourceException.Unreachable(); this.gate = gate }
         val refresher = refresher(repo)
 
         refresher.messages.test {
@@ -547,7 +547,7 @@ class LibraryRefresherTest {
 
     @Test
     fun silentRefreshErrorStaysQuietWithoutAJoin() = runTest(StandardTestDispatcher()) {
-        val repo = FakeRefreshRepository().apply { error = ServerException.Unreachable() }
+        val repo = FakeRefreshRepository().apply { error = SourceException.Unreachable() }
         val refresher = refresher(repo)
         refresher.messages.test {
             assertNull(refresher.refresh(silent = true))
@@ -637,7 +637,7 @@ class LibraryRefresherTest {
         assertNull(refresher.tagProgress.value)
 
         repo.gate = null
-        repo.error = ServerException.Unreachable(java.io.IOException("abort"))
+        repo.error = SourceException.Unreachable(java.io.IOException("abort"))
         assertNull(refresher.refresh())
         assertNull(refresher.tagProgress.value)
     }
@@ -660,7 +660,7 @@ class LibraryRefresherTest {
     fun aFailedScanStillKicksTheWorkerForDownloadsEnqueuedOnTheWay() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply {
             enqueuedOnTheWay = listOf(2)
-            error = ServerException.Unreachable(java.io.IOException("abort"))
+            error = SourceException.Unreachable(java.io.IOException("abort"))
         }
         val kicker = FakeKicker()
 
@@ -671,7 +671,7 @@ class LibraryRefresherTest {
 
     @Test
     fun aFailedScanWithoutDownloadsOnTheWayDoesNotKick() = runTest(StandardTestDispatcher()) {
-        val repo = FakeRefreshRepository().apply { error = ServerException.Unreachable(java.io.IOException("abort")) }
+        val repo = FakeRefreshRepository().apply { error = SourceException.Unreachable(java.io.IOException("abort")) }
         val kicker = FakeKicker()
 
         refresher(repo, kicker = kicker).refresh()
@@ -708,7 +708,7 @@ class LibraryRefresherTest {
             enqueuedOnTheWay = listOf(2)
             gate = CompletableDeferred()
             ignoresCancellation = true
-            error = ServerException.Unreachable(java.io.InterruptedIOException("interrupted"))
+            error = SourceException.Unreachable(java.io.InterruptedIOException("interrupted"))
         }
         val kicker = FakeKicker()
         val refresher = refresher(repo, kicker = kicker)

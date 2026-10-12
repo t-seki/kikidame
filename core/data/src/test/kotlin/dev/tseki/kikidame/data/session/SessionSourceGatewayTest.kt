@@ -12,7 +12,7 @@ import dev.tseki.kikidame.data.sharedfolder.ScannedFiles
 import dev.tseki.kikidame.data.sharedfolder.TagReader
 import dev.tseki.kikidame.domain.DeviceFolder
 import dev.tseki.kikidame.domain.SelectedLibrary
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.Session
 import dev.tseki.kikidame.domain.SmbConnection
 import dev.tseki.kikidame.data.source.ScanListener
@@ -109,7 +109,7 @@ class SessionSourceGatewayTest {
     fun connectionIsClosedWhenTheScanFails() = runTest {
         store.saveSmb(smb)
         folder.failing = true
-        assertFailsWith<ServerException.Unreachable> { gateway.fetchAll() }
+        assertFailsWith<SourceException.Unreachable> { gateway.fetchAll() }
         assertEquals(1, trees.closes)
     }
 
@@ -130,16 +130,16 @@ class SessionSourceGatewayTest {
     @Test
     fun failedDownloadClosesTheConnection() = runTest {
         store.saveSmb(smb)
-        assertFailsWith<ServerException.Failed> { gateway.openDownload(SourceItemId("A/B/none.m4a"), rangeStart = 0) }
+        assertFailsWith<SourceException.Failed> { gateway.openDownload(SourceItemId("A/B/none.m4a"), rangeStart = 0) }
         assertEquals(1, trees.closes)
     }
 
     @Test
     fun signedOutIsUnauthorized() = runTest {
-        assertFailsWith<ServerException.Unauthorized> { gateway.fetchAll() }
+        assertFailsWith<SourceException.Unauthorized> { gateway.fetchAll() }
         store.saveSmb(smb)
         store.clearCredentials()
-        assertFailsWith<ServerException.Unauthorized> { gateway.fetchProgram(SourceItemId("A/B")) }
+        assertFailsWith<SourceException.Unauthorized> { gateway.fetchProgram(SourceItemId("A/B")) }
         assertFalse(trees.opened.isNotEmpty(), "a signed-out shared folder is not opened")
     }
 
@@ -173,7 +173,7 @@ class SessionSourceGatewayTest {
     fun signedOutDeviceFolderIsNotOpened() = runTest {
         store.saveDeviceFolder(deviceFolder)
         store.clearCredentials()
-        assertFailsWith<ServerException.Unauthorized> { gateway.fetchAll() }
+        assertFailsWith<SourceException.Unauthorized> { gateway.fetchAll() }
         assertEquals(emptyList(), trees.openedFolders)
     }
 }

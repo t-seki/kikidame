@@ -119,11 +119,11 @@ class RoomLibraryRepositoryTest : RoomTestBase() {
     }
 
     /**
-     * 最近聴いた各回（#108）: 手元にあり・未再生・聴き始めている回だけを、記録の新しい順に上限まで。
+     * 「続きから」の各回（#108）: 手元にあり・未再生・聴き始めている回だけを、記録の新しい順に上限まで。
      * 手元に無い回、再生済みの回、聴き始めていない（位置が閾値未満の）回、記録の無い回は出ない。
      */
     @Test
-    fun recentlyListenedIsUnplayedStartedLocalEpisodesNewestRecordFirst() = runTest {
+    fun continueListeningIsUnplayedStartedLocalEpisodesNewestRecordFirst() = runTest {
         val programId = seedProgram()
         val episodes = repo.observeEpisodes(programId).first()
         val id = { title: String -> episodes.first { it.episode.title == title }.episode.id.value }
@@ -144,23 +144,23 @@ class RoomLibraryRepositoryTest : RoomTestBase() {
         )
         db.localFileDao().upsert(LocalFileEntity(notStarted, DownloadState.DONE, "/x/2026-06-26.m4a", pinned = true, downloadedAt = now))
         db.playbackStateDao().upsert(PlaybackStateEntity(notStarted, positionTicks = Ticks.fromDuration(2.seconds), played = false, updatedAt = at(40)))
-        assertEquals(listOf("X 2026-06-12", "X 2026-06-05"), repo.getRecentlyListened(20).map { it.episode.title })
+        assertEquals(listOf("X 2026-06-12", "X 2026-06-05"), repo.getContinueListening(20).map { it.episode.title })
         // 上限
-        assertEquals(listOf("X 2026-06-12"), repo.getRecentlyListened(1).map { it.episode.title })
+        assertEquals(listOf("X 2026-06-12"), repo.getContinueListening(1).map { it.episode.title })
         // 記録の上位が聴き始めていない回で埋まっていても、上限 1 で途中の回が返る（絞り込みが LIMIT の前に効く。
         // ⏭ 連打で通り過ぎた回の記録は普通にできる）
         db.playbackStateDao().upsert(PlaybackStateEntity(id("X 2026-06-12 (1)"), positionTicks = Ticks.fromDuration(1.seconds), played = false, updatedAt = at(50)))
-        assertEquals(listOf("X 2026-06-12"), repo.getRecentlyListened(1).map { it.episode.title })
+        assertEquals(listOf("X 2026-06-12"), repo.getContinueListening(1).map { it.episode.title })
         // 手元に無くなった回は出ない
         db.localFileDao().upsert(LocalFileEntity(id("X 2026-06-12"), DownloadState.PENDING, path = null, pinned = false))
-        assertEquals(listOf("X 2026-06-05"), repo.getRecentlyListened(20).map { it.episode.title })
+        assertEquals(listOf("X 2026-06-05"), repo.getContinueListening(20).map { it.episode.title })
     }
     /**
-     * 「続きから」タブ（#151）の読み出し: [RoomLibraryRepository.getRecentlyListened] と同じ条件・順で件数の上限が無く、
+     * 「続きから」タブ（#151）の読み出し: [RoomLibraryRepository.getContinueListening] と同じ条件・順で件数の上限が無く、
      * 再生位置の保存（順が入れ替わる）・再生済み・手元のファイルの削除・同期での各回の削除に追従する。
      */
     @Test
-    fun observeRecentlyListenedHasNoLimitAndFollowsChanges() = runTest {
+    fun observeContinueListeningHasNoLimitAndFollowsChanges() = runTest {
         val programId = seedProgram()
         val episodes = repo.observeEpisodes(programId).first()
         val id = { title: String -> episodes.first { it.episode.title == title }.episode.id.value }
@@ -172,7 +172,7 @@ class RoomLibraryRepositoryTest : RoomTestBase() {
         db.playbackStateDao().upsert(PlaybackStateEntity(id("X 2026-06-12"), positionTicks = 5 * minute, played = false, updatedAt = at(20)))
         db.playbackStateDao().upsert(PlaybackStateEntity(id("X 2026-06-19"), positionTicks = 7 * minute, played = false, updatedAt = at(30)))
         db.playbackStateDao().upsert(PlaybackStateEntity(id("X 2026-06-12 (1)"), positionTicks = Ticks.fromDuration(2.seconds), played = false, updatedAt = at(40)))
-        repo.observeRecentlyListened().test {
+        repo.observeContinueListening().test {
             assertEquals(listOf("X 2026-06-19", "X 2026-06-12", "X 2026-06-05"), titles(awaitItem()))
             // 再生が進んで位置が保存されると先頭へ
             db.playbackStateDao().upsert(PlaybackStateEntity(id("X 2026-06-05"), positionTicks = 4 * minute, played = false, updatedAt = at(50)))

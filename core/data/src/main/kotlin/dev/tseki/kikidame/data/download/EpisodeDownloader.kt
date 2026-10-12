@@ -5,7 +5,7 @@ import dev.tseki.kikidame.data.source.SourceGateway
 import dev.tseki.kikidame.domain.DownloadQueue
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.EpisodeWithState
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -85,7 +85,7 @@ class EpisodeDownloader @Inject constructor(
                     DownloadOutcome.Done(target.absolutePath, target.length())
                 }
             }
-        } catch (e: ServerException.Unauthorized) {
+        } catch (e: SourceException.Unauthorized) {
             // 認証切れは呼び出し側（Worker）がログアウトへ導く。行は PENDING に戻して次回に備える
             queue.resetToPending(episodeId)
             throw e

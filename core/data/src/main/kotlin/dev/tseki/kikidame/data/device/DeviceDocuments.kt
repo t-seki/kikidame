@@ -1,6 +1,6 @@
 package dev.tseki.kikidame.data.device
 
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import java.io.FileNotFoundException
 
 /**
@@ -8,7 +8,7 @@ import java.io.FileNotFoundException
  * `ContentResolver` と `DocumentsContract` で引く。テストではメモリ上のものに差し替える。
  *
  * どのメソッドも blocking。権限が無い・取り消されたときは [SecurityException] を投げてよい（[DeviceFolderTree] が
- * [ServerException.Unauthorized] に変える）。
+ * [SourceException.Unauthorized] に変える）。
  */
 interface DeviceDocuments {
     /** [treeUri] の永続的な読み取りの権限を持っているか。 */

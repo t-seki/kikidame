@@ -11,8 +11,8 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** アクセストークンの暗号化。実装は Android Keystore、テストではフェイク。 */
-interface TokenCipher {
+/** 認証情報（Jellyfin のアクセストークン・SMB のパスワード）の暗号化。実装は Android Keystore、テストではフェイク。 */
+interface CredentialCipher {
     fun encrypt(plain: String): String
     fun decrypt(stored: String): String
 }
@@ -22,7 +22,7 @@ interface TokenCipher {
  * 保存形式は `base64(iv) : base64(ciphertext)`。`EncryptedSharedPreferences` は使わない（非推奨）。
  */
 @Singleton
-class KeystoreTokenCipher @Inject constructor() : TokenCipher {
+class KeystoreCredentialCipher @Inject constructor() : CredentialCipher {
 
     private val key: SecretKey by lazy {
         val store = KeyStore.getInstance(PROVIDER).apply { load(null) }
@@ -57,6 +57,7 @@ class KeystoreTokenCipher @Inject constructor() : TokenCipher {
 
     private companion object {
         const val PROVIDER = "AndroidKeyStore"
+        // 旧名のまま残す。変えると既存の Keystore の鍵が引けず、保存済みの認証情報が復号できなくなる。
         const val ALIAS = "session-token"
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val TAG_BITS = 128

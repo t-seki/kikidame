@@ -96,7 +96,7 @@ data class EpisodeRow(
 private const val LOCAL_FILE_PRESENT = "lf.state = 'DONE' AND lf.path IS NOT NULL"
 
 /** 「続きから」（#108）の条件と順。Auto・再開の上限付きの読み出しと、アプリの「続きから」タブ（#151）の追従する読み出しで共有する。 */
-private const val RECENTLY_LISTENED = """
+private const val CONTINUE_LISTENING = """
     SELECT e.* FROM episodes e
       JOIN local_files lf ON lf.episodeId = e.id
       JOIN playback_states ps ON ps.episodeId = e.id
@@ -115,17 +115,17 @@ interface EpisodeDao {
     @Query("SELECT * FROM episodes WHERE id = :id")
     suspend fun findById(id: Long): EpisodeRow?
     /**
-     * 最近聴いた各回（#108）: 手元にあり、再生済みでなく、聴き始めている（位置が [notStartedTicks] 以上）各回を
+     * 「続きから」の各回（#108）: 手元にあり、再生済みでなく、聴き始めている（位置が [notStartedTicks] 以上）各回を
      * 記録の新しい順に。閾値の値は [dev.tseki.kikidame.domain.PlaybackRules.NOT_STARTED_THRESHOLD] から呼び出し側が渡す
      * （規則の由来は 1 箇所のまま、絞り込みは SQL で。LIMIT の前に絞らないと上位が未開始の回で埋まったとき空になる）。
      */
     @Transaction
-    @Query("$RECENTLY_LISTENED LIMIT :limit")
-    suspend fun listRecentlyListened(limit: Int, notStartedTicks: Long): List<EpisodeRow>
-    /** [listRecentlyListened] と同じ条件・順で、件数の上限なし。変化（再生位置の保存・再生済み・ファイルの削除）に追従する（#151 の「続きから」タブ）。 */
+    @Query("$CONTINUE_LISTENING LIMIT :limit")
+    suspend fun listContinueListening(limit: Int, notStartedTicks: Long): List<EpisodeRow>
+    /** [listContinueListening] と同じ条件・順で、件数の上限なし。変化（再生位置の保存・再生済み・ファイルの削除）に追従する（#151 の「続きから」タブ）。 */
     @Transaction
-    @Query(RECENTLY_LISTENED)
-    fun observeRecentlyListened(notStartedTicks: Long): Flow<List<EpisodeRow>>
+    @Query(CONTINUE_LISTENING)
+    fun observeContinueListening(notStartedTicks: Long): Flow<List<EpisodeRow>>
     @Query("SELECT * FROM episodes WHERE sourceItemId = :sourceItemId")
     suspend fun findBySourceItemId(sourceItemId: String): EpisodeEntity?
     @Query("SELECT id, sourceItemId, programId, title, publishedAt, runtimeTicks FROM episodes")

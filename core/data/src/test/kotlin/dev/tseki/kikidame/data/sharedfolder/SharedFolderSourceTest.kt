@@ -2,7 +2,7 @@ package dev.tseki.kikidame.data.sharedfolder
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tseki.kikidame.data.repository.RefreshTestBase
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SourceProgram
@@ -210,9 +210,9 @@ class SharedFolderSourceTest : RefreshTestBase() {
         folder.put("P/番組/a.m4a")
         folder.failing = true
 
-        assertFailsWith<ServerException.Unreachable> { source.fetchAll() }
-        assertFailsWith<ServerException.Unreachable> { source.fetchProgram(SourceItemId("P/番組")) }
-        assertFailsWith<ServerException.Unreachable> { source.fetchProgramEpisodes(SourceItemId("P/番組")) }
+        assertFailsWith<SourceException.Unreachable> { source.fetchAll() }
+        assertFailsWith<SourceException.Unreachable> { source.fetchProgram(SourceItemId("P/番組")) }
+        assertFailsWith<SourceException.Unreachable> { source.fetchProgramEpisodes(SourceItemId("P/番組")) }
     }
 
     @Test
@@ -227,7 +227,7 @@ class SharedFolderSourceTest : RefreshTestBase() {
             scanned = RoomScannedFiles(db.episodeDao()),
         )
 
-        assertFailsWith<ServerException.Unreachable> { failingReads.fetchAll() }
+        assertFailsWith<SourceException.Unreachable> { failingReads.fetchAll() }
     }
 
     @Test
@@ -240,7 +240,7 @@ class SharedFolderSourceTest : RefreshTestBase() {
             scanned = RoomScannedFiles(db.episodeDao()),
         )
 
-        assertFailsWith<ServerException.Unreachable> { empty.fetchAll() }
+        assertFailsWith<SourceException.Unreachable> { empty.fetchAll() }
     }
 
     @Test
@@ -266,7 +266,7 @@ class SharedFolderSourceTest : RefreshTestBase() {
         assertEquals(5L, rest.totalBytes)
         assertEquals(listOf<Byte>(4, 5), rest.body.readBytes().toList())
         val missing = runCatching { source.openDownload(SourceItemId("P/番組/b.m4a"), 0) }.exceptionOrNull()
-        assertIs<ServerException.Failed>(missing)
+        assertIs<SourceException.Failed>(missing)
     }
 
     // --- ファイル名を変えたときの突合（epic #195 の決定 7） ---

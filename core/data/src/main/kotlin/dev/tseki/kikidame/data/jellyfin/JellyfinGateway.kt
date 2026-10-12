@@ -3,7 +3,7 @@ package dev.tseki.kikidame.data.jellyfin
 import dev.tseki.kikidame.data.source.DownloadStream
 import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.SourceEpisode
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SourceProgram
 import dev.tseki.kikidame.domain.SourceSnapshot
@@ -16,7 +16,7 @@ fun Session.credentials(): ServerCredentials = ServerCredentials(serverUrl, acce
 
 /**
  * Jellyfin サーバとの境界。SDK への依存はこの実装にだけ閉じ込め、Repository のテストはフェイクで行う。
- * 失敗はすべて [ServerException] に正規化する。同期とダウンロードはこれを直接使わず、
+ * 失敗はすべて [SourceException] に正規化する。同期とダウンロードはこれを直接使わず、
  * 取得元の境界（[dev.tseki.kikidame.data.source.SourceGateway]）の Jellyfin の実装（[JellyfinSource]）を通す（ADR 0010）。
  */
 interface JellyfinGateway {

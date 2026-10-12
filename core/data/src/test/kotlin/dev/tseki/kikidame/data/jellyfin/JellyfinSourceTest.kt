@@ -4,7 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tseki.kikidame.data.repository.FakeJellyfinGateway
 import dev.tseki.kikidame.data.repository.testSessionStore
 import dev.tseki.kikidame.domain.SelectedLibrary
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.Session
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SourceProgram
@@ -52,7 +52,7 @@ class JellyfinSourceTest {
     @Test
     fun fetchAllNeedsASelectedLibrary() = runTest {
         store.saveSession(session)
-        assertFailsWith<ServerException.Unauthorized> { source.fetchAll() }
+        assertFailsWith<SourceException.Unauthorized> { source.fetchAll() }
         assertEquals(emptyList(), gateway.fetchedLibraries)
     }
 
@@ -70,10 +70,10 @@ class JellyfinSourceTest {
 
     @Test
     fun signedOutIsUnauthorized() = runTest {
-        assertFailsWith<ServerException.Unauthorized> { source.fetchAll() }
-        assertFailsWith<ServerException.Unauthorized> { source.fetchProgram(SourceItemId("album-1")) }
-        assertFailsWith<ServerException.Unauthorized> { source.fetchProgramEpisodes(SourceItemId("album-1")) }
-        assertFailsWith<ServerException.Unauthorized> { source.openDownload(SourceItemId("audio-1"), rangeStart = 0) }
+        assertFailsWith<SourceException.Unauthorized> { source.fetchAll() }
+        assertFailsWith<SourceException.Unauthorized> { source.fetchProgram(SourceItemId("album-1")) }
+        assertFailsWith<SourceException.Unauthorized> { source.fetchProgramEpisodes(SourceItemId("album-1")) }
+        assertFailsWith<SourceException.Unauthorized> { source.openDownload(SourceItemId("audio-1"), rangeStart = 0) }
         assertEquals(emptyList(), gateway.usedCredentials)
     }
 }

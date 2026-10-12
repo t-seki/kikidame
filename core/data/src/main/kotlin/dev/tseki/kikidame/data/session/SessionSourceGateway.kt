@@ -31,7 +31,7 @@ import javax.inject.Singleton
  *
  * 共有フォルダ（SMB・端末のフォルダ）は、1 回の呼び出しごとに [FolderTreeFactory] で木を作って閉じる（全走査は 1 本の接続で行い、
  * ダウンロードは [DownloadStream.close] で閉じる）。接続の寿命を呼び出しの外に持ち出さない。
- * 接続していなければ（Jellyfin の接続も無ければ）[JellyfinSource] が [ServerException.Unauthorized] を投げる。
+ * 接続していなければ（Jellyfin の接続も無ければ）[JellyfinSource] が [SourceException.Unauthorized] を投げる。
  */
 @Singleton
 class SessionSourceGateway internal constructor(

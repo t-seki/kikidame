@@ -13,7 +13,7 @@ import dev.tseki.kikidame.domain.UnsupportedFolderException
 import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.SmbConnection
 import java.io.IOException
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SessionState
 import kotlinx.coroutines.CoroutineScope
@@ -43,7 +43,7 @@ class DataStoreSessionRepositoryTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val gateway = FakeJellyfinGateway()
     private val dataStore by lazy { testDataStore(tmp.root, scope) }
-    private val store by lazy { SessionStore(dataStore, FakeTokenCipher()) }
+    private val store by lazy { SessionStore(dataStore, FakeCredentialCipher()) }
     private val tree = FakeFolderTree()
     private val trees = FakeFolderTreeFactory(tree)
     private val documents = MemoryDeviceDocuments(granted = false)
@@ -75,7 +75,7 @@ class DataStoreSessionRepositoryTest {
 
     @Test
     fun wrongPasswordIsUnauthorizedAndLeavesSignedOut() = runTest {
-        assertFailsWith<ServerException.Unauthorized> { repo.signIn("jellyfin.lab.example", "alice", "nope") }
+        assertFailsWith<SourceException.Unauthorized> { repo.signIn("jellyfin.lab.example", "alice", "nope") }
         assertIs<SessionState.SignedOut>(repo.state.first())
     }
 
@@ -174,13 +174,13 @@ class DataStoreSessionRepositoryTest {
 
     @Test
     fun connectionFailuresAreNotSaved() = runTest {
-        tree.failure = ServerException.Unauthorized()
-        assertFailsWith<ServerException.Unauthorized> { repo.connectSharedFolder(smb) }
+        tree.failure = SourceException.Unauthorized()
+        assertFailsWith<SourceException.Unauthorized> { repo.connectSharedFolder(smb) }
         tree.failure = IOException("no route to host")
-        assertFailsWith<ServerException.Unreachable> { repo.connectSharedFolder(smb) }
+        assertFailsWith<SourceException.Unreachable> { repo.connectSharedFolder(smb) }
         tree.failure = null
         tree.entries = emptyMap() // 共有の中のパスが無い
-        assertFailsWith<ServerException.Failed> { repo.connectSharedFolder(smb) }
+        assertFailsWith<SourceException.Failed> { repo.connectSharedFolder(smb) }
         assertIs<SessionState.SignedOut>(repo.state.first())
         assertEquals(trees.opened.size, trees.closes, "every connection tried is closed")
     }
@@ -232,7 +232,7 @@ class DataStoreSessionRepositoryTest {
     @Test
     fun jellyfinCallsFailWhileConnectedToASharedFolder() = runTest {
         repo.connectSharedFolder(smb)
-        assertFailsWith<ServerException.Unauthorized> { repo.listLibraries() }
+        assertFailsWith<SourceException.Unauthorized> { repo.listLibraries() }
     }
 
     /** 端末のフォルダ（#199）: 永続権限を取り、直下が読めたらフォルダ名と一緒に保存する。 */
@@ -262,12 +262,12 @@ class DataStoreSessionRepositoryTest {
     @Test
     fun deviceFolderFailuresAreNotSavedAndReleaseThePermission() = runTest {
         tree.entries = emptyMap() // 根が読めない
-        assertFailsWith<ServerException.Failed> { repo.connectDeviceFolder(folderUri) }
+        assertFailsWith<SourceException.Failed> { repo.connectDeviceFolder(folderUri) }
         tree.entries = mapOf("" to emptyList())
-        tree.failure = ServerException.Unauthorized()
-        assertFailsWith<ServerException.Unauthorized> { repo.connectDeviceFolder(folderUri) }
+        tree.failure = SourceException.Unauthorized()
+        assertFailsWith<SourceException.Unauthorized> { repo.connectDeviceFolder(folderUri) }
         tree.failure = IOException("I/O error")
-        assertFailsWith<ServerException.Failed> { repo.connectDeviceFolder(folderUri) }
+        assertFailsWith<SourceException.Failed> { repo.connectDeviceFolder(folderUri) }
 
         assertIs<SessionState.SignedOut>(repo.state.first())
         assertEquals(emptyList(), documents.persistedTreeUris())

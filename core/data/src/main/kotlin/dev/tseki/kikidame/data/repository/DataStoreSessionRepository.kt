@@ -16,7 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.SelectedLibrary
-import dev.tseki.kikidame.domain.ServerException
+import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.Session
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
@@ -51,13 +51,13 @@ class DataStoreSessionRepository @Inject constructor(
         withContext(Dispatchers.IO) {
             val tree = trees.open(normalized)
             try {
-                tree.list("") ?: throw ServerException.Failed("shared folder not found")
+                tree.list("") ?: throw SourceException.Failed("shared folder not found")
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: ServerException) {
+            } catch (e: SourceException) {
                 throw e
             } catch (e: Exception) {
-                throw ServerException.Unreachable(e)
+                throw SourceException.Unreachable(e)
             } finally {
                 tree.close()
             }
@@ -72,7 +72,7 @@ class DataStoreSessionRepository @Inject constructor(
                 documents.takePermission(treeUri)
                 // フォルダの直下が読めるか。読めなければ保存しない
                 trees.open(DeviceFolder(treeUri, name = "")).use { tree ->
-                    tree.list("") ?: throw ServerException.Failed("folder not found")
+                    tree.list("") ?: throw SourceException.Failed("folder not found")
                 }
                 val name = documents.query(treeUri, documents.rootDocumentId(treeUri))?.name.orEmpty()
                 // 前に選んでいたフォルダ（アクセスが切れて選び直したときなど）の権限を手放す。失敗しても接続は続ける。
@@ -87,9 +87,9 @@ class DataStoreSessionRepository @Inject constructor(
                 // 取った権限を手放す。手放すのに失敗しても、元の失敗を投げる
                 runCatching { documents.releasePermission(treeUri) }
                 when (e) {
-                    is CancellationException, is ServerException -> throw e
-                    is SecurityException -> throw ServerException.Unauthorized(e)
-                    else -> throw ServerException.Failed(e.message ?: e::class.simpleName.orEmpty(), e)
+                    is CancellationException, is SourceException -> throw e
+                    is SecurityException -> throw SourceException.Unauthorized(e)
+                    else -> throw SourceException.Failed(e.message ?: e::class.simpleName.orEmpty(), e)
                 }
             }
         }
@@ -108,8 +108,8 @@ class DataStoreSessionRepository @Inject constructor(
 
     private suspend fun requireSession(): Session = when (val s = store.current()) {
         is SessionState.NeedsLibrary -> s.session
-        is SessionState.Ready -> (s.source as? ConnectedSource.Jellyfin)?.session ?: throw ServerException.Unauthorized()
-        is SessionState.SignedOut -> throw ServerException.Unauthorized()
+        is SessionState.Ready -> (s.source as? ConnectedSource.Jellyfin)?.session ?: throw SourceException.Unauthorized()
+        is SessionState.SignedOut -> throw SourceException.Unauthorized()
     }
 
     companion object {

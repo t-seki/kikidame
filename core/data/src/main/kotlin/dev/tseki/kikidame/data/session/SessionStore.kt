@@ -24,11 +24,11 @@ import kotlin.time.Instant
  * 以前のバージョンから変えていないので、更新の後も接続が残る。epic #195 の決定 12）、SMB のキー（`smb_*`）、
  * 端末のフォルダのキー（`device_*`、#199）のどれか 1 つを持つ。`smb_host` があれば SMB、`device_tree_uri` があれば端末のフォルダ、
  * どちらも無ければ Jellyfin とみなす。
- * Jellyfin のトークンと SMB のパスワードは [TokenCipher] で暗号化して置く。Jellyfin のパスワードは保存しない。
+ * Jellyfin のトークンと SMB のパスワードは [CredentialCipher] で暗号化して置く。Jellyfin のパスワードは保存しない。
  */
 class SessionStore(
     private val dataStore: DataStore<Preferences>,
-    private val cipher: TokenCipher,
+    private val cipher: CredentialCipher,
 ) {
     val state: Flow<SessionState> = dataStore.data.map { it.toState() }
 
