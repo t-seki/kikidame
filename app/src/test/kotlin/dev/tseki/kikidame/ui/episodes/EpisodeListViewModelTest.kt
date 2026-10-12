@@ -5,11 +5,14 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.testing.WorkManagerTestInitHelper
+import dev.tseki.kikidame.R
+import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.Program
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.RetentionRule
 import dev.tseki.kikidame.download.DownloadScheduler
 import dev.tseki.kikidame.playback.NowPlaying
+import dev.tseki.kikidame.text.UiText
 import dev.tseki.kikidame.testing.FakeAppSettingsRepository
 import dev.tseki.kikidame.testing.FakeDownloadRepository
 import dev.tseki.kikidame.testing.FakeSessionRepository
@@ -19,6 +22,8 @@ import dev.tseki.kikidame.testing.InMemoryPlaybackStateRepository
 import dev.tseki.kikidame.testing.idleLibraryRefresher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -122,5 +127,19 @@ class EpisodeListViewModelTest {
         assertNull(vm.pendingDisable.value)
         assertEquals(listOf(SyncUpdate(ProgramId(1), false, rule)), library.syncUpdates)
         assertEquals(false, library.programs.value.single().syncEnabled)
+    }
+
+    /** 「固定する」は手元の回を固定にするよう頼み、文言で知らせる（番組が同期対象かは見ない）。 */
+    @Test
+    fun pinAsksTheRepositoryAndSaysSo() = runTest(dispatcher) {
+        library.programs.value = listOf(program(1, syncEnabled = false))
+        val vm = viewModel(1)
+        val messages = mutableListOf<UiText>()
+        backgroundScope.launch { vm.messages.toList(messages) }
+
+        vm.pin(EpisodeId(7))
+
+        assertEquals(listOf(EpisodeId(7)), downloads.pinned)
+        assertEquals(listOf<UiText>(UiText.Res(R.string.episode_list_msg_pinned)), messages)
     }
 }

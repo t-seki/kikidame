@@ -143,6 +143,7 @@
     <string name="episode_list_unplayed_tap">未再生（タップで再生済みに）</string>
     <string name="episode_list_status_waiting_wifi">Wi-Fi 待ち</string>
     <string name="episode_list_action_download">ダウンロード（固定）</string>
+    <string name="episode_list_action_pin">固定する（保持ルールの対象外にする）</string>
     <string name="episode_list_action_unpin">固定を外す（保持ルールの対象にする）</string>
     <string name="episode_list_action_delete_file">ファイルを削除（再生位置は残る）</string>
     <string name="episode_list_action_delete_episode">この回を消す（取得元に無いため戻せない）</string>
@@ -162,6 +163,7 @@
     <string name="episode_list_delete_after_played_description">聴き終えた回を次の同期で手元から消します</string>
     <string name="episode_list_sync_now">この番組を今すぐ同期</string>
     <string name="episode_list_remove_program">この番組を手元から消す</string>
+    <string name="episode_list_msg_pinned">固定しました。保持ルールの対象外になります</string>
     <string name="episode_list_msg_unpinned">固定を外しました。保持ルールの対象になります</string>
     <string name="episode_list_msg_file_deleted_synced">ファイルを削除しました。同期対象の番組なので、保持すべき回なら次の同期で落とし直されます</string>
     <string name="episode_list_msg_file_deleted">ファイルを削除しました。再生位置は残っています</string>

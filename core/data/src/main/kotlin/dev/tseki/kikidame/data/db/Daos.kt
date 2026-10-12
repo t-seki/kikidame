@@ -226,6 +226,8 @@ interface LocalFileDao {
     suspend fun deleteUnlessDone(episodeId: Long): Int
     @Query("UPDATE local_files SET state = 'PENDING', enqueuedAt = :enqueuedAt WHERE episodeId = :episodeId AND state = 'FAILED'")
     suspend fun retryFailed(episodeId: Long, enqueuedAt: Instant)
+    @Query("UPDATE local_files SET pinned = 1 WHERE episodeId = :episodeId AND state = 'DONE' AND pinned = 0")
+    suspend fun pin(episodeId: Long)
     @Query("UPDATE local_files SET pinned = 0 WHERE episodeId = :episodeId AND pinned = 1")
     suspend fun unpin(episodeId: Long)
     @Query("UPDATE local_files SET state = 'PENDING' WHERE episodeId = :episodeId AND state = 'RUNNING'")
