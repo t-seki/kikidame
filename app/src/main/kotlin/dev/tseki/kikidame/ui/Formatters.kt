@@ -2,6 +2,7 @@ package dev.tseki.kikidame.ui
 import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.PublishedAt
 import dev.tseki.kikidame.domain.LocalStorageUsage
+import dev.tseki.kikidame.text.UiText
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.todayIn
 import kotlinx.datetime.toLocalDateTime
@@ -9,10 +10,9 @@ import java.util.Locale
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
-fun Instant.toPublishedDateText(): String = toLocalDateTime(PublishedAt.ZONE).date.toString()
 /**
  * 番組一覧の「最新」用の短い日付（#41）。今年なら MM-DD、それ以外は YYYY-MM-DD（古い番組は年が要る）。
- * 各回一覧の公開日は [toPublishedDateText] のまま年を落とさない（一覧内で年をまたぐ）。出すかどうかは各回一覧側で決める
+ * 各回一覧の公開日は [dev.tseki.kikidame.text.toPublishedDateText] のまま年を落とさない（一覧内で年をまたぐ）。出すかどうかは各回一覧側で決める
  * （タイトルが公開日と同じ回では丸ごと省く。#66）。
  */
 fun Instant.toLatestDateText(today: LocalDate = Clock.System.todayIn(PublishedAt.ZONE)): String {

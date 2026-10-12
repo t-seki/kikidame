@@ -1,7 +1,7 @@
 package dev.tseki.kikidame.ui.player
 
 import dev.tseki.kikidame.R
-import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.text.UiText
 import kotlin.math.roundToLong
 
 /**

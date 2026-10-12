@@ -10,7 +10,7 @@ import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.domain.SmbConnection
 import dev.tseki.kikidame.sync.LibraryRefresher
-import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.text.UiText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -98,7 +98,7 @@ class SmbConnectViewModel @Inject constructor(
     }
 }
 
-/** SMB の接続画面の文言（Jellyfin の [dev.tseki.kikidame.sync.toUserMessage] は URL やサーバの文言なので別にする）。 */
+/** SMB の接続画面の文言（Jellyfin の [toUserMessage] は URL やサーバの文言なので別にする）。 */
 internal fun SourceException.toSmbUserMessage(): UiText = when (this) {
     is SourceException.Unauthorized -> UiText.Res(R.string.smb_error_unauthorized)
     is SourceException.Unreachable -> UiText.Res(R.string.smb_error_unreachable)

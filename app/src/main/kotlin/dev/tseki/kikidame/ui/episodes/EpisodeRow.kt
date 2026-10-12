@@ -47,7 +47,7 @@ import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.DownloadState
 import dev.tseki.kikidame.domain.EpisodeWithState
 import dev.tseki.kikidame.playback.NowPlayingState
-import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.text.UiText
 import dev.tseki.kikidame.ui.resolve
 import kotlin.time.Duration
 
