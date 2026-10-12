@@ -25,6 +25,7 @@ import javax.inject.Inject
 /**
  * 一覧の下のミニプレイヤー。読みはプロセス内の [NowPlaying]（サービスを起動しない）、
  * 操作だけ [PlayerConnection] を使う（ADR 0006）。
+ * 番組の画像は [LibraryRepository] から引く（回の ID は [NowPlaying] から取り、サービスは起動しない。ADR 0006 に反しない）。
  */
 @HiltViewModel
 class MiniPlayerViewModel @Inject constructor(
