@@ -2,7 +2,7 @@ package dev.tseki.kikidame.ui.connect
 
 import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.SourceException
-import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.text.UiText
 
 /**
  * Android 17 のローカルネットワークの権限が要るのに無いか（[dev.tseki.kikidame.LocalNetworkPermission.isRequiredAndMissing]）。

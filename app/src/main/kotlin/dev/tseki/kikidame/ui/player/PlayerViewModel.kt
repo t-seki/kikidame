@@ -22,7 +22,7 @@ import dev.tseki.kikidame.playback.SleepTimer
 import dev.tseki.kikidame.playback.SleepTimerSetting
 import dev.tseki.kikidame.playback.knownRuntime
 import dev.tseki.kikidame.ui.PlayerRoute
-import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.text.UiText
 import dev.tseki.kikidame.ui.toClockText
 import dev.tseki.kikidame.ui.toPerformersText
 import kotlinx.coroutines.CancellationException

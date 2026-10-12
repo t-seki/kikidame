@@ -4,8 +4,8 @@ import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.DownloadState
 import dev.tseki.kikidame.domain.EpisodeWithState
 import dev.tseki.kikidame.domain.Program
-import dev.tseki.kikidame.ui.UiText
-import dev.tseki.kikidame.ui.toPublishedDateText
+import dev.tseki.kikidame.text.UiText
+import dev.tseki.kikidame.text.toPublishedDateText
 import dev.tseki.kikidame.ui.toPerformersText
 import dev.tseki.kikidame.ui.toClockText
 import dev.tseki.kikidame.ui.toDateTimeText

@@ -12,7 +12,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.DeviceFolder
-import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.text.UiText
 import dev.tseki.kikidame.ui.resolve
 
 /**

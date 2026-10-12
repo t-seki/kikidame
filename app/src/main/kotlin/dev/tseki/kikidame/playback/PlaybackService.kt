@@ -20,7 +20,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import dagger.hilt.android.AndroidEntryPoint
 import dev.tseki.kikidame.MainActivity
 import dev.tseki.kikidame.R
-import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.text.UiText
 import dev.tseki.kikidame.di.ApplicationScope
 import dev.tseki.kikidame.domain.AppSettingsRepository
 import dev.tseki.kikidame.domain.EpisodeWithState

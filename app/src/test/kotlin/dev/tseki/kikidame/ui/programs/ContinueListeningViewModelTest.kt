@@ -17,7 +17,7 @@ import dev.tseki.kikidame.testing.InMemoryLibraryRepository
 import dev.tseki.kikidame.testing.InMemoryPlaybackStateRepository
 import dev.tseki.kikidame.playback.NowPlaying
 import dev.tseki.kikidame.playback.NowPlayingState
-import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.text.UiText
 import dev.tseki.kikidame.ui.resolve
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi

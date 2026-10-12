@@ -1,7 +1,7 @@
 package dev.tseki.kikidame.ui.programs
 
 import androidx.lifecycle.ViewModel
-import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.text.UiText
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.tseki.kikidame.domain.AppSettingsRepository

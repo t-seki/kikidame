@@ -30,7 +30,7 @@ import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.LocalStorageUsage
 import dev.tseki.kikidame.domain.Program
 import dev.tseki.kikidame.ui.resolve
-import dev.tseki.kikidame.ui.toPublishedDateText
+import dev.tseki.kikidame.text.toPublishedDateText
 import dev.tseki.kikidame.ui.toText
 
 /** 同期のシートの状態。「番組を手元から消す」はシートを閉じて確認ダイアログを開く遷移なので、1 つの値で持つ。 */

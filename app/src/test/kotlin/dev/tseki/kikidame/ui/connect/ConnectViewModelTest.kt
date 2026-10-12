@@ -4,7 +4,7 @@ import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.testing.FakeSessionRepository
-import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.text.UiText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher

@@ -6,7 +6,7 @@ import dev.tseki.kikidame.domain.DownloadRepository
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.LocalDeletionScope
 import dev.tseki.kikidame.playback.NowPlayingState
-import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.text.UiText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow

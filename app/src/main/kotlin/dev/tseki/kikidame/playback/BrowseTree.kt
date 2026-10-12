@@ -13,7 +13,7 @@ import dev.tseki.kikidame.domain.PlaybackState
 import dev.tseki.kikidame.domain.Program
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.ProgramSummary
-import dev.tseki.kikidame.ui.toPublishedDateText
+import dev.tseki.kikidame.text.toPublishedDateText
 import kotlinx.coroutines.flow.first
 import kotlin.time.Duration
 /**

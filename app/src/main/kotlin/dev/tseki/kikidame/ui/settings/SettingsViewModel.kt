@@ -14,7 +14,7 @@ import dev.tseki.kikidame.download.DownloadScheduler
 import dev.tseki.kikidame.ui.source.SourceChanger
 import dev.tseki.kikidame.sync.LibraryRefresher
 import dev.tseki.kikidame.sync.SyncScheduler
-import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.text.UiText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
