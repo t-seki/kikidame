@@ -161,7 +161,6 @@
     <string name="episode_list_keep_unlimited">上限なし</string>
     <string name="episode_list_delete_after_played">再生済みなら削除</string>
     <string name="episode_list_delete_after_played_description">聴き終えた回を次の同期で手元から消します</string>
-    <string name="episode_list_sync_now">この番組を今すぐ同期</string>
     <string name="episode_list_remove_program">この番組を手元から消す</string>
     <string name="episode_list_msg_pinned">固定しました。保持ルールの対象外になります</string>
     <string name="episode_list_msg_unpinned">固定を外しました。保持ルールの対象になります</string>

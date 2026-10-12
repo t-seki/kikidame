@@ -5,12 +5,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ListItem
@@ -58,7 +56,6 @@ internal fun ProgramSyncDialogs(
             onSetEnabled = actions.setSyncEnabled,
             onKeepLatest = actions.setKeepLatest,
             onDeleteAfterPlayed = actions.setDeleteAfterPlayed,
-            onSyncNow = { actions.syncNow(); onStateChange(SyncSheetState.Hidden) },
             onRemoveProgram = { onStateChange(SyncSheetState.ConfirmRemove) },
         )
     }
@@ -101,7 +98,6 @@ private fun ProgramSyncSheet(
     onSetEnabled: (Boolean) -> Unit,
     onKeepLatest: (Int?) -> Unit,
     onDeleteAfterPlayed: (Boolean) -> Unit,
-    onSyncNow: () -> Unit,
     onRemoveProgram: () -> Unit,
 ) {
     // 消失した番組（取得元の一覧に無く、突合でも結び直せなかった）と取得元 ID の無い番組は同期できない
@@ -157,11 +153,7 @@ private fun ProgramSyncSheet(
                 Switch(checked = program.retentionRule.deleteAfterPlayed, onCheckedChange = onDeleteAfterPlayed, enabled = enabled)
             },
         )
-        if (canSync) {
-            Button(onClick = onSyncNow, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).fillMaxWidth()) {
-                Text(stringResource(R.string.episode_list_sync_now))
-            }
-        } else {
+        if (!canSync) {
             // 取得元に在る番組を消しても次の同期で戻ってくる（再生位置だけ失う）ので、消せるのは取得元に無い番組だけ
             SheetAction(Icons.Filled.Delete, stringResource(R.string.episode_list_remove_program)) { onRemoveProgram() }
         }

@@ -228,7 +228,6 @@
     <!-- Retention rule: delete an episode once it is Played -->
     <string name="episode_list_delete_after_played">Delete after played</string>
     <string name="episode_list_delete_after_played_description">At the next sync, removes episodes you have finished</string>
-    <string name="episode_list_sync_now">Sync this program now</string>
     <string name="episode_list_remove_program">Remove this program from the device</string>
     <!-- Snackbar messages -->
     <string name="episode_list_msg_pinned">Pinned. Retention rules no longer apply</string>
