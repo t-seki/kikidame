@@ -47,6 +47,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import dev.tseki.kikidame.ui.ProgramImagePreview
+import dev.tseki.kikidame.ui.previewProgramImage
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tseki.kikidame.R
@@ -339,19 +341,23 @@ private fun ProgramsList(
     onProgramClick: (ProgramId) -> Unit,
     onSetStarred: (ProgramId, Boolean) -> Unit,
 ) {
+    // 画像を持つ番組が 1 つでもあれば、無い番組の行も画像の場所を空けて文字をそろえる。1 つも無ければ詰める（#264）
+    val reserveImage = list.any { it.program.image != null }
     LazyColumn(Modifier.fillMaxSize(), state = listState) {
-        programItems(list, onProgramClick, onSetStarred)
+        programItems(list, reserveImage, onProgramClick, onSetStarred)
     }
 }
 
 private fun LazyListScope.programItems(
     list: List<ProgramSummary>,
+    reserveImage: Boolean,
     onProgramClick: (ProgramId) -> Unit,
     onSetStarred: (ProgramId, Boolean) -> Unit,
 ) {
     items(list, key = { it.program.id.value }) { summary ->
         ProgramRow(
             summary,
+            reserveImage = reserveImage,
             onClick = { onProgramClick(summary.program.id) },
             onToggleStarred = { onSetStarred(summary.program.id, !summary.program.starred) },
         )
@@ -428,6 +434,40 @@ private fun ProgramListContentPreview() {
             onEpisodeDetails = { _, _ -> },
             actions = previewActions,
         )
+    }
+}
+
+/**
+ * 番組の画像あり（#264）。画像の無い「週末の旅」も 48dp を空けて、番組名の位置がそろう。
+ * 画像はプレビューの中では単色（[ProgramImagePreview]）。画像を持つ番組が無い一覧は [ProgramListContentPreview]（詰める）。
+ */
+@Preview
+@Composable
+private fun ProgramListContentWithImagesPreview() {
+    val withImages = previewPrograms.mapIndexed { i, summary ->
+        if (i < 2) summary.copy(program = summary.program.copy(image = previewProgramImage)) else summary
+    }
+    KikidameTheme {
+        ProgramImagePreview {
+            ProgramListContent(
+                initialTab = ProgramListTab.ALL_PROGRAMS,
+                filtered = previewFiltered(withImages),
+                canRefresh = true,
+                isRefreshing = false,
+                isSyncingInBackground = false,
+                tagProgress = null,
+                query = "",
+                continueItems = emptyList(),
+                nowPlaying = null,
+                snackbarHostState = remember { SnackbarHostState() },
+                bottomBar = {},
+                onProgramClick = {},
+                onSettingsClick = {},
+                onEpisodeClick = {},
+                onEpisodeDetails = { _, _ -> },
+                actions = previewActions,
+            )
+        }
     }
 }
 

@@ -10,6 +10,8 @@ import java.io.InputStream
 /**
  * 取得元（CONTEXT.md）との境界（ADR 0010）。同期とダウンロードは、これだけを通して取得元に触る。
  * 取得元の種類（Jellyfin など）に依存しない。認証などの接続の情報は実装の側で持つ。
+ * 口は 5 つ: 全走査（[fetchAll]）、1 番組の各回（[fetchProgramEpisodes]）、番組そのもの（[fetchProgram]）、
+ * 番組の画像の中身（[fetchProgramImage]、ADR 0012）、各回の原本のストリーム（[openDownload]）。
  * 失敗はすべて [SourceException] に正規化する。接続していなければ [SourceException.Unauthorized]。認証の失敗（Jellyfin の 401/403、
  * SMB の認証の失敗）と、端末のフォルダ（#199）の永続権限が無い・取り消された・選んだフォルダが無いと分かったときも [SourceException.Unauthorized]
  * （呼び出し側がログアウトへ導く）。届かない・読めないは [SourceException.Unreachable]（判断保留）。
@@ -31,6 +33,14 @@ interface SourceGateway {
      * 1 番組の各回の取得は番組が無くても空の一覧を返しうるので、1 番組の同期はこれで存在を確かめてから行う。
      */
     suspend fun fetchProgram(programId: SourceItemId): SourceProgram?
+
+    /**
+     * 番組の画像（CONTEXT.md）の中身を取る（ADR 0012、#264）。取得元に画像が無い、または画像として扱わない（大きすぎるなど）なら null。
+     * null のとき呼び出し側は画像なしとして扱い、その版では取り直さない。
+     * 取り直すかどうかは呼び出し側が [SourceProgram.image] の版で決め、変わったときだけこれを呼ぶ。
+     * 既定は画像なし（null）。Jellyfin はまだ画像を取らないのでこの既定のまま（#282 で足す）。
+     */
+    suspend fun fetchProgramImage(programId: SourceItemId): ByteArray? = null
 
     /**
      * 各回の原本のストリームを開く。[rangeStart] > 0 なら続きを要求するが、取得元が応じずに

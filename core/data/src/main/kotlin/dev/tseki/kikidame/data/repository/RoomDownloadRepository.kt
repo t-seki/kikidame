@@ -127,10 +127,13 @@ class RoomDownloadRepository @Inject constructor(
         deleteFiles(row.localFile?.path)
     }
 
+    /** 番組の行ごと消す。手元の音声ファイルと番組の画像（ADR 0012）のファイルも消す。画像を消せなくても削除は止めない（残ったファイルは次の全走査の掃除で消える）。 */
     override suspend fun removeProgram(programId: ProgramId) {
         val paths = db.localFileDao().listPathsByProgram(programId.value)
+        val imagePath = db.programDao().findById(programId.value)?.imagePath
         db.withTransaction { db.programDao().deleteById(programId.value) } // episodes → local_files / playback_states は cascade
         for (p in paths) deleteFiles(p)
+        imagePath?.let { withContext(Dispatchers.IO) { File(it).delete() } }
     }
 
     /** トランザクション内で呼ぶ。`local_files` / `playback_states` は cascade。各回が 0 になった取得元 ID 無しの番組も消す。 */

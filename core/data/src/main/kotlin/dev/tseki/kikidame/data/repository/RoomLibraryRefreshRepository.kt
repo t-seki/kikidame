@@ -1,10 +1,12 @@
 package dev.tseki.kikidame.data.repository
 
+import android.util.Log
 import androidx.room.withTransaction
 import dev.tseki.kikidame.data.db.EpisodeEntity
 import dev.tseki.kikidame.data.db.KikidameDatabase
 import dev.tseki.kikidame.data.db.ProgramEntity
 import dev.tseki.kikidame.data.db.toDomain
+import dev.tseki.kikidame.data.files.ProgramImageFiles
 import dev.tseki.kikidame.data.session.SessionStore
 import dev.tseki.kikidame.data.source.ScanListener
 import dev.tseki.kikidame.data.source.SourceGateway
@@ -27,6 +29,14 @@ import dev.tseki.kikidame.domain.SyncInputs
 import dev.tseki.kikidame.domain.SyncPlanner
 import dev.tseki.kikidame.domain.SyncProgramInput
 import dev.tseki.kikidame.domain.Ticks
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Clock
@@ -41,6 +51,10 @@ import kotlin.time.Instant
  * ダウンロードの予約まで行う（ADR 0004）。1 番組の同期（[syncProgram]）は、その番組だけを取り込んで同期する。
  * 共有フォルダの全走査では、取得元がタグを読み終えた番組から先に 1 番組ずつ取り込んで同期し（[syncProgram] と同じ範囲）、
  * 全部を読み終えたら全体を取り込み直して消失を判断する（#209 の決定 1）。どの取り込みも、それぞれ 1 トランザクション。
+ *
+ * 番組の画像（ADR 0012、#264）も、取り込みのたびに取得元にそろえる（[updateImages]）。番組ごとの取り込み・全走査の最後の取り込み・
+ * 1 番組の同期のどれでも、同期（削除・予約）の後に行う。取り直すのは版（[dev.tseki.kikidame.domain.SourceImage.version]）が
+ * 変わったときだけ。全走査の最後に、どの番組の行からも指されていない画像のファイルを消す（[pruneImages]）。
  */
 @Singleton
 class RoomLibraryRefreshRepository @Inject constructor(
@@ -49,7 +63,10 @@ class RoomLibraryRefreshRepository @Inject constructor(
     private val source: SourceGateway,
     private val downloads: DownloadRepository,
     private val clock: Clock,
+    private val images: ProgramImageFiles,
 ) : LibraryRefreshRepository {
+    /** 画像のファイルの書き込み・消去と、行の版・パスの更新を 1 つずつ行う（全走査と 1 番組の同期が重なっても、書いたばかりのファイルを掃除で消さない）。 */
+    private val imageLock = Mutex()
 
     override suspend fun refresh(
         excluded: () -> Set<EpisodeId>,
@@ -64,6 +81,9 @@ class RoomLibraryRefreshRepository @Inject constructor(
         // 番組ごとに取り込み済みの回は、ここでは変化にならない（予約・削除も済んでいる）。消失の判断と結び直しはここで全体を相手に行う
         val result = apply(snapshot)
         val outcome = synchronize(snapshot, excluded())
+        // 番組ごとに取り込んだ番組は、もう版がそろっているので取り直さない。タグを読まなかった番組（新しい回が無い）の画像はここで取る
+        updateImages(snapshot.programs)
+        pruneImages()
         store.saveLastFetchedAt(result.fetchedAt)
         return result.copy(
             enqueued = outcome.enqueued + scanned.enqueued,
@@ -102,6 +122,7 @@ class RoomLibraryRefreshRepository @Inject constructor(
             if (outcome.enqueued > 0) onEnqueued(outcome.enqueued)
             deleted += outcome.deleted
             removed += outcome.removed
+            updateImages(listOf(program))
         }
     }
 
@@ -113,6 +134,7 @@ class RoomLibraryRefreshRepository @Inject constructor(
             is ProgramFetch.Found -> {
                 val result = apply(fetched.snapshot)
                 val outcome = synchronize(fetched.snapshot, excluded)
+                updateImages(fetched.snapshot.programs)
                 result.copy(enqueued = outcome.enqueued, deleted = outcome.deleted, removed = outcome.removed, onHold = outcome.onHold)
             }
         }
@@ -142,6 +164,72 @@ class RoomLibraryRefreshRepository @Inject constructor(
                 scope = SnapshotScope.Program(sourceId),
             ),
         )
+    }
+
+    /**
+     * 番組の画像を取得元にそろえる（ADR 0012 の決定 3）。[programs] のうち手元に行がある番組だけ。
+     *
+     * - 取得元に画像が無ければ、手元のファイルを消して行の版・パスを null にする
+     * - 版が行と同じでファイルもあれば、何もしない。版が行と同じでパスが null（その版は画像なしと分かっている）でも何もしない
+     * - それ以外は [SourceGateway.fetchProgramImage] で取り、新しい名前のファイルに書いてから行を書き換え、前のファイルを消す
+     * - 取りに行って null（一覧の後に消えた・大きすぎる（PR #288 1 周目 #5 の決定））なら画像なしとして扱い、手元のファイルを消して、
+     *   行には版だけを書く（パスは null）。同じ版の間は同期のたびに取り直さない。版が変われば取り直す
+     * - 取得・書き込みに失敗したら、その番組は前の画像（ファイルと行）のまま残して先へ進む。同期は止めない
+     * - ただし取得元に届かない（[SourceException.Unreachable]）・認証が通らない（[SourceException.Unauthorized]）ときは、
+     *   残りの番組も同じく失敗するので、この回の画像の取得を打ち切る（例外は投げない。残りの番組も前の画像のまま）
+     */
+    internal suspend fun updateImages(programs: List<SourceProgram>) = imageLock.withLock {
+        for (sp in programs) {
+            currentCoroutineContext().ensureActive()
+            val row = db.programDao().findBySourceItemId(sp.sourceId.value) ?: continue
+            val image = sp.image
+            if (image == null) {
+                clearImage(row)
+                continue
+            }
+            val current = row.imagePath
+            if (image.version == row.imageVersion && (current == null || withContext(Dispatchers.IO) { images.exists(current) })) continue
+            val bytes = try {
+                source.fetchProgramImage(sp.sourceId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: SourceException.Unreachable) {
+                Log.w(TAG, "program image fetch failed; skipping the remaining images: ${sp.sourceId.value}", e)
+                break
+            } catch (e: SourceException.Unauthorized) {
+                Log.w(TAG, "program image fetch failed; skipping the remaining images: ${sp.sourceId.value}", e)
+                break
+            } catch (e: Exception) {
+                Log.w(TAG, "program image fetch failed: ${sp.sourceId.value}", e)
+                continue
+            }
+            if (bytes == null) {
+                // 一覧の後に消えた・大きすぎる。画像なしとして版だけを書き、同じ版では取り直さない
+                clearImage(row, version = image.version)
+                continue
+            }
+            val file = try {
+                withContext(Dispatchers.IO) { images.write(row.id, image.version, bytes) }
+            } catch (e: IOException) {
+                Log.w(TAG, "program image write failed: ${sp.sourceId.value}", e)
+                continue
+            }
+            db.programDao().setImage(row.id, image.version, file.absolutePath)
+            if (current != null && current != file.absolutePath) withContext(Dispatchers.IO) { images.delete(current) }
+        }
+    }
+
+    /** imageLock の中で呼ぶ。行の画像を外し（版は [version]、パスは null）、ファイルを消す。 */
+    private suspend fun clearImage(row: ProgramEntity, version: String? = null) {
+        if (row.imagePath == null && row.imageVersion == version) return
+        db.programDao().setImage(row.id, version, null)
+        row.imagePath?.let { path -> withContext(Dispatchers.IO) { images.delete(path) } }
+    }
+
+    /** どの番組の行からも指されていない画像のファイル（孤児。「この番組を削除」で消せずに残った・前の版を消せずに残った）を消す。 */
+    private suspend fun pruneImages() = imageLock.withLock {
+        val keep = db.programDao().listImagePaths().toSet()
+        withContext(Dispatchers.IO) { images.deleteAllExcept(keep) }
     }
 
     private fun goneProgramResult() =
@@ -259,6 +347,10 @@ class RoomLibraryRefreshRepository @Inject constructor(
         val localByProgram = db.episodeDao().listSyncRows().groupBy({ ProgramId(it.programId) }, { it.toDomain() })
         val programs = db.programDao().listAll().map { it.toDomain() }
         return SyncInputs.of(programs, localByProgram, snapshot)
+    }
+
+    private companion object {
+        const val TAG = "LibraryRefresh"
     }
 
     /** 取得元が返さない値（サイズ）は手元の値を残す。 */

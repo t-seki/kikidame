@@ -239,7 +239,7 @@ class RoomLibraryRefreshRepositoryTest : JellyfinRefreshTestBase() {
         val directory = EpisodesDirectory(ApplicationProvider.getApplicationContext())
         val file = directory.resolve("TBS/X/X 2026-06-12.m4a").apply { parentFile!!.mkdirs(); writeBytes(ByteArray(16)) }
         assertTrue(file.isFile)
-        RoomLocalDataReset(db, store, directory).resetAll()
+        RoomLocalDataReset(db, store, directory, images).resetAll()
         assertTrue(library.observePrograms().first().isEmpty())
         assertIs<SessionState.SignedOut>(session.state.first())
         assertFalse(file.exists())

@@ -6,6 +6,7 @@ import dev.tseki.kikidame.data.source.SourceGateway
 import dev.tseki.kikidame.domain.PublishedAt
 import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceEpisode
+import dev.tseki.kikidame.domain.SourceImage
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SourceProgram
 import dev.tseki.kikidame.domain.SourceSnapshot
@@ -30,6 +31,9 @@ import kotlin.time.Instant
  * - 構成はちょうど `<配信元>/<番組>/<各回のファイル>` の 3 段（epic #195 の決定 5）。2 段目のフォルダはすべて番組
  *   （音声ファイルが 0 本でも番組）。3 段目の、拡張子が [AUDIO_EXTENSIONS] のファイルだけを各回とし、
  *   それ以外（1・2 段目のファイル、4 段目以下、音声でないファイル）は黙って無視する。配信元と番組はフォルダの名前で決める
+ * - 例外は番組のフォルダ（2 段目）の [PROGRAM_IMAGE_NAME]（`folder.jpg`。名前は大文字小文字まで一致するものだけ）で、
+ *   番組の画像（CONTEXT.md）として読む（ADR 0012、#264）。一覧の大きさと更新日時を [SourceProgram.image] の版にし、
+ *   中身は [fetchProgramImage] で読む。`folder.png` など、ほかの画像は読まない
  * - 名前が `.`・`@`・`#` で始まるフォルダとファイル（NAS や OS が作るもの）は、どの段でも無視する（[isIgnoredName]、#197 の追加の決定）。
  *   [fetchProgram]・[fetchProgramEpisodes] も同じ規則で、そういう名前の番組は無いものとして扱う
  * - 取得元 ID は相対パス（決定 7）。番組は `<配信元>/<番組>`、各回は `<配信元>/<番組>/<ファイル名>`
@@ -105,7 +109,12 @@ class SharedFolderSource(
                 currentCoroutineContext().ensureActive()
                 val programPath = "$publisherPath/${program.name}"
                 val files = retry { tree.list(programPath) } ?: continue
-                val sourceProgram = SourceProgram(sourceId = SourceItemId(programPath), name = program.name, publisherName = publisher.name)
+                val sourceProgram = SourceProgram(
+                    sourceId = SourceItemId(programPath),
+                    name = program.name,
+                    publisherName = publisher.name,
+                    image = files.programImage(),
+                )
                 listed += sourceProgram to files.audioFiles()
             }
         }
@@ -155,7 +164,27 @@ class SharedFolderSource(
     override suspend fun fetchProgram(programId: SourceItemId): SourceProgram? {
         val (publisher, program) = programSegments(programId) ?: return null
         return onTree {
-            tree.list(programId.value)?.let { SourceProgram(sourceId = programId, name = program, publisherName = publisher) }
+            tree.list(programId.value)?.let {
+                SourceProgram(sourceId = programId, name = program, publisherName = publisher, image = it.programImage())
+            }
+        }
+    }
+
+    /**
+     * 番組のフォルダの [PROGRAM_IMAGE_NAME] を全部読む（ADR 0012）。無ければ null。取得元 ID が番組の形でなければ null。
+     * [MAX_PROGRAM_IMAGE_BYTES] より大きいファイルは読まずに null（画像なしとして扱う。PR #288 1 周目 #5 の決定）。
+     */
+    override suspend fun fetchProgramImage(programId: SourceItemId): ByteArray? {
+        if (programSegments(programId) == null) return null
+        return onTree {
+            val file = try {
+                tree.open("${programId.value}/$PROGRAM_IMAGE_NAME", 0)
+            } catch (e: FileNotFoundException) {
+                return@onTree null
+            }
+            file.body.use { body ->
+                if (file.sizeBytes > MAX_PROGRAM_IMAGE_BYTES) null else body.readBytes()
+            }
         }
     }
 
@@ -277,6 +306,15 @@ class SharedFolderSource(
         /** やり直す前に待つ時間（#209）。切れた直後にすぐ張り直して同じ失敗を重ねないため。長さに根拠は無い（測っていない）。 */
         val RETRY_DELAY: Duration = 2.seconds
 
+        /** 番組の画像として読む、番組のフォルダの中のファイルの名前（ADR 0012。rajikura の付け方に合わせる）。 */
+        const val PROGRAM_IMAGE_NAME: String = "folder.jpg"
+
+        /**
+         * 番組の画像として読むファイルの大きさの上限。これより大きいものはメモリに読まず、画像なしとして扱う
+         * （10 MiB。値に根拠は無く、測っていない。上限を残すことは PR #288 1 周目 #5 で人が決めた）。
+         */
+        const val MAX_PROGRAM_IMAGE_BYTES: Long = 10L * 1024 * 1024
+
         /** 各回とみなす拡張子（小文字で比べる）。 */
         val AUDIO_EXTENSIONS: Set<String> = setOf("m4a", "mp3", "aac", "ogg", "opus", "flac", "wav")
 
@@ -292,6 +330,11 @@ class SharedFolderSource(
         /** 各回とみなすファイル（3 段目の音声ファイル）を名前の順に。 */
         private fun List<FolderEntry>.audioFiles(): List<FolderEntry> =
             filter { !it.isDirectory && !isIgnoredName(it.name) && extensionOf(it.name) in AUDIO_EXTENSIONS }.sortedBy { it.name }
+
+        /** 番組のフォルダの一覧から番組の画像の目印を作る。版は大きさと更新日時（ms）。無ければ null。 */
+        private fun List<FolderEntry>.programImage(): SourceImage? =
+            firstOrNull { !it.isDirectory && it.name == PROGRAM_IMAGE_NAME }
+                ?.let { SourceImage("${it.sizeBytes}:${it.modifiedAt.toEpochMilliseconds()}") }
 
         private fun List<FolderEntry>.directories(): List<FolderEntry> =
             filter { it.isDirectory && !isIgnoredName(it.name) }.sortedBy { it.name }

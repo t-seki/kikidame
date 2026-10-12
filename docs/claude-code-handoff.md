@@ -116,6 +116,8 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 - 2 段目のフォルダはすべて番組（音声ファイルが 0 本でも番組。1 番組の取得がフォルダの有無で答えるのと揃える）。配信元と番組はフォルダの名前で決め、タグは使わない
 - 3 段目の、拡張子が `m4a` / `mp3` / `aac` / `ogg` / `opus` / `flac` / `wav`（大文字・小文字を区別しない）のファイルだけを各回とする。
   それ以外（1・2 段目のファイル、4 段目以下、音声でないファイル）は黙って無視する。形式（`container`）は拡張子（小文字）
+- 例外は番組のフォルダ（2 段目）の `folder.jpg`（名前は大文字・小文字まで一致するものだけ。`folder.png` などは読まない）で、番組の画像（`CONTEXT.md`）として読む（#264、ADR 0012。rajikura の付け方に合わせた）。
+  一覧の大きさと更新日時（ms）から版（`SourceImage.version`、`<大きさ>:<更新日時の ms>`）を作って `SourceProgram.image` に載せ、中身は `SharedFolderSource.fetchProgramImage` で全部読む（10 MiB（`MAX_PROGRAM_IMAGE_BYTES`）より大きいものは読まずに画像なし（null）として返す。上限の値に根拠は無い。「番組の画像」節）
 - 名前が `.`・`@`・`#` で始まるフォルダとファイルは、どの段（配信元・番組・各回）でも無視する（#197 の追加の決定。PR #202（#197）1 周目 #1 で人が決めた）。
   NAS や OS が作るもの（例: `@eaDir`・`#recycle`・`._<名前>.m4a`・`.DS_Store`。どれが作られるかは確かめていない）を拾わないため。決まった名前だけを除く一覧方式は、NAS の種類ごとに漏れが出るので採らない。
   1 番組の取得（`fetchProgram`・`fetchProgramEpisodes`）も同じ規則で、そういう名前の番組は無いものとして扱う
@@ -145,6 +147,25 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 どれかが変わったファイルと新しいファイルだけタグを読む。更新日時は ms に揃えて比べる（Room は ms で持つ。ms より細かい値が来ても同じとみなす。SMB の実装から何が来るかは #198 で確かめる。未確認）。
 `sizeBytes` はダウンロードの完了時に実サイズで上書きされるので、この判定には使わない。
 
+## 番組の画像（#264）
+
+番組の画像（`CONTEXT.md`）を同期で取得元から取り、アプリの領域にファイルで持つ（ADR 0012）。表示は手元のファイルだけを読む。
+
+- **口の形**: `SourceProgram.image`（`SourceImage(version)`。取得元に画像が無ければ null）に版だけを載せ、中身は `SourceGateway.fetchProgramImage(programId)` で別に取る。
+  取り直すかを決めるのは取り込みの側（`RoomLibraryRefreshRepository.updateImages`）で、取得元は前の版を知らなくてよい。#282 の Jellyfin は ImageTag を版にして同じ口に載る想定
+- **取り込み**: 番組ごとの取り込み（全走査の途中、`ScanListener.onProgramScanned`）・全走査の最後の取り込み・1 番組の同期のどれでも、同期（削除・予約）の後に `updateImages` を回す。
+  新しい回の無い番組は途中の取り込みに流れないので、最後の取り込みで取る。版が行（`imageVersion`）と同じで、ファイルがあるか `imagePath` が null（その版は画像なしと分かっている）なら取らない。違えば取り、新しい名前のファイルに書いてから行を書き換え、前のファイルを消す。
+  取得元に画像が無ければ（`folder.jpg` が消えた）ファイルを消して行を null にする。
+  `folder.jpg` が 10 MiB（`SharedFolderSource.MAX_PROGRAM_IMAGE_BYTES`）を超えるときは、`fetchProgramImage` が読まずに null を返し、画像なしとして扱う。手元に画像のファイルがあれば消し、行には版だけを書く（`imagePath` は null）。同じ版の間は同期のたびに取り直さず、ファイルが変われば（版が変われば）取り直す（PR #288 1 周目 #5、人が決めた。一覧の後に `folder.jpg` が消えて null が返ったときも同じ扱い）。取得・書き込みに失敗したら、その番組は前の画像のまま残して同期を続ける（版を書かないので、次の同期で取り直す）。取得元に届かない（`SourceException.Unreachable`）・認証が通らない（`Unauthorized`）ときは、その回の残りの番組の画像の取得を打ち切る（残りも前の画像のまま。PR #288 1 周目 #4）
+- **接続**: 共有フォルダは `SessionSourceGateway` が `fetchProgramImage` のたびに木を開く（`openDownload` と同じ）。全走査の途中で呼ぶと、走査の接続とは別にもう 1 本張る。
+  画像を取るのは版が変わった番組だけだが、この版を入れた直後の最初の同期では、`folder.jpg` を持つ番組の数だけ接続を張る（何本までなら困らないかは測っていない。未確認）
+- **置き場**: `filesDir/program_images/<番組のローカル ID>-<版の SHA-256 の頭 16 桁>.img`（`ProgramImageFiles`）。画像が変わると名前も変わるので、Coil のメモリのキャッシュがパスで引いても古い画像を出さない。
+  一時ファイルに書いてから名前を変える。「この番組を削除」（`RoomDownloadRepository.removeProgram`）は、行を消す前に `imagePath` を取り、行を消した後にそのファイルを消す（消せなくても削除は止めない）。全走査の最後に、どの行からも指されていないファイル（消せずに残ったものなど）を孤児として消す。
+  「取得元を変える」（`RoomLocalDataReset`）は全部消す。ファイルの書き込み・消去と行の更新は `RoomLibraryRefreshRepository` の中の `Mutex` で 1 つずつ行う
+- **表示**: Coil（`coil-compose`、Apache-2.0）の `AsyncImage` に手元のファイルを渡す（`ui/ProgramImage.kt` の `ProgramImageView`）。番組一覧の行と再生画面に出し、各回一覧とミニプレイヤーには出さない（`docs/ui.md`）。
+  プレビューは `ProgramImagePreview`（Coil の `LocalAsyncImagePreviewHandler`）で単色に差し替える
+- 回の画像（各回のファイルに埋め込まれた画像）と、再生まわり（通知・ロック画面・Auto）は #283
+
 ## Room スキーマ（この形で作る）
 
 主キーはすべてローカル代理キー。取得元 ID は nullable unique（ADR 0001）。
@@ -152,6 +173,7 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 
 版 7（#196、ADR 0010）で、列 `serverItemId` を `sourceItemId` に、`stationName` / `airedAt` を `publisherName` / `publishedAt` に改め、`playback_states.syncedAt` を削除した。
 版 8（#197）で、`episodes` に共有フォルダのファイルのサイズと更新日時（`sourceFileSize` / `sourceModifiedAt`、nullable）を足した（「共有フォルダの走査」節）。
+版 9（#264、ADR 0012）で、`programs` に番組の画像の版とファイルのパス（`imageVersion` / `imagePath`、nullable）を足した（「番組の画像」節）。
 
 ```kotlin
 @Entity(indices = [Index("sourceItemId", unique = true), Index("publisherName", "name")])
@@ -164,7 +186,9 @@ data class ProgramEntity(          // 番組（Jellyfin では MusicAlbum）。(
   val keepLatest: Int?,            // 最新 N 回まで保持（null = 上限なし）
   val deleteAfterPlayed: Boolean,
   val goneSince: Instant?,         // 消失した日時（v4、#3）
-  val starred: Boolean             // よく聴く（v5、#16）
+  val starred: Boolean,            // よく聴く（v5、#16）
+  val imageVersion: String?,       // 手元に持っている番組の画像の版（v9、#264）。取得元の版と同じなら取り直さない
+  val imagePath: String?           // その画像のファイルの絶対パス（v9、#264）。imageVersion と同時に書く。画像なしと分かった版（大きすぎる）では版だけを持ち null
 )
 
 @Entity(indices = [Index("sourceItemId", unique = true), Index("programId")])
@@ -300,6 +324,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
   - 番組一覧は「最新の各回の公開日が新しい順」（#16 から #151 までは「よく聴く」の番組を上の節に分け、各節内でこの順。#151 で節をやめ、「番組一覧」タブは全番組をこの順で 1 本に、「よく聴く」タブは ★ の番組だけをこの順で出す）、各回一覧は「公開日の新しい順」（同着はタイトルの辞書順）
   - 各回の行に再生済みマークと、次に開いたとき途中から再開する回（再開位置の規則で先頭に戻らない回。
     再生済みかどうかは見ない）には進捗（再開位置 / 尺）を出す
+  - 番組の画像（#264、ADR 0012）は番組一覧の行（★ の右に 48dp）と再生画面（タイトルの上）に出す。各回一覧とミニプレイヤーには出さない。出し方は `docs/ui.md`、取り方は「番組の画像」節
 - **再生操作**: 再生／一時停止／シーク／±10 秒スキップ（M1 では ±30 秒。#29 で 10 秒にし、左右スワイプの秒単位シークを足した）／前後の回へ移動。
   連続再生は同じ番組内で **公開日の古い順** に次の回へ。再生済みの回は飛ばさない。再生済み／未再生の手動切替
   - 各回を開いた時点で、その番組の手元にある全各回（古い順）を Media3 のプレイリストとして
@@ -358,6 +383,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
   `LibraryMatching.match`（JUnit 5）。`:core:data` に `JellyfinGateway` インターフェース（`signIn` / `listLibraries` / `fetchLibrary`）と
   jellyfin-sdk-kotlin 実装、`SessionStore`。Repository が突合結果を 1 トランザクションで Room に適用。テストはフェイクのゲートウェイ。
   #196（ADR 0010）から、同期とダウンロードは取得元の境界 `SourceGateway`（`fetchAll` / `fetchProgram` / `fetchProgramEpisodes` / `openDownload`、`:core:data` の `data.source`）だけを通す。
+  #264（ADR 0012）で番組の画像の中身を取る `fetchProgramImage` を足した（既定は画像なし。Jellyfin はまだこの既定のまま。#282）。
   Jellyfin の実装は `JellyfinSource` で、`SessionStore` から認証の情報を読んで `JellyfinGateway` を呼ぶ
   モジュールは 3 つのまま
 
@@ -519,6 +545,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 - `docs/adr/0009-ui-text-resolved-only-in-compose.md` — UI の文言は strings.xml、文字列に解決するのは Compose だけ（`UiText`）。既定は英語
 - `docs/adr/0010-add-file-shares-as-sources.md` — ファイル共有（SMB・端末のフォルダ）を取得元に加える。サーバ ID を取得元 ID に改めた
 - `docs/adr/0011-no-autoplay-on-bluetooth-connect.md` — Bluetooth の接続では自動で再生しない（ロック画面の再開のカードの ▶ で足りる）
+- `docs/adr/0012-show-images-only-from-source-data.md` — 画像はデータにあるときだけ出す。番組の画像は同期で取って手元に持ち、回の画像は再生のときに手元のファイルから読む
 - Jellyfin 12 認証仕様: https://gist.github.com/nielsvanvelzen/ea047d9028f676185832e51ffaf12a6f
 - jellyfin-sdk-kotlin Releases: https://github.com/jellyfin/jellyfin-sdk-kotlin/releases
 - Jellyfin OpenAPI (stable): https://api.jellyfin.org/openapi/jellyfin-openapi-stable.json

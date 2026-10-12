@@ -14,6 +14,7 @@ import dev.tseki.kikidame.domain.LibraryRepository
 import dev.tseki.kikidame.domain.PlaybackRules
 import dev.tseki.kikidame.domain.PlaybackSpeed
 import dev.tseki.kikidame.domain.PlaybackStateRepository
+import dev.tseki.kikidame.domain.ProgramImage
 import dev.tseki.kikidame.playback.EpisodeMediaItems
 import dev.tseki.kikidame.playback.NowPlaying
 import dev.tseki.kikidame.playback.PlayerConnection
@@ -96,6 +97,22 @@ class PlayerViewModel @Inject constructor(
                 emitAll(combine(library.observeProgram(programId), performers) { program, names -> playerSubtitle(program?.publisherName, names) })
             }
         }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    /**
+     * 再生中の回の番組の画像（ADR 0012、#264）。無ければ null。番組を購読するので、この画面を開いたまま同期が画像を取り直しても追従する。
+     * 回の画像（埋め込み）を優先するのは #283 で、ここでは番組の画像だけを出す。
+     */
+    val programImage: StateFlow<ProgramImage?> = _uiState
+        .map { it.episodeId }
+        .distinctUntilChanged()
+        .flatMapLatest { id ->
+            if (id == null) return@flatMapLatest flowOf(null)
+            flow<ProgramImage?> {
+                val programId = library.getEpisode(id)?.episode?.programId ?: return@flow emit(null)
+                emitAll(library.observeProgram(programId).map { it?.image })
+            }
+        }
+        .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     /** 倍速（#35）。アプリ全体の設定で、サービス側が同じ Flow を購読してプレイヤーに反映する。 */
     val speed: StateFlow<Float> = settings.playbackSpeed

@@ -60,6 +60,10 @@ class SessionSourceGateway internal constructor(
     override suspend fun fetchProgram(programId: SourceItemId): SourceProgram? =
         withSource { it.fetchProgram(programId) }
 
+    /** 番組の画像。共有フォルダは呼び出しごとに木を開く（全走査の途中で呼ばれると、走査の接続とは別にもう 1 本張る）。 */
+    override suspend fun fetchProgramImage(programId: SourceItemId): ByteArray? =
+        withSource { it.fetchProgramImage(programId) }
+
     override suspend fun openDownload(episodeId: SourceItemId, rangeStart: Long): DownloadStream {
         val tree = openTreeOrNull() ?: return jellyfin.openDownload(episodeId, rangeStart)
         // 木は成功すれば返す DownloadStream が閉じる。失敗したらここで閉じる

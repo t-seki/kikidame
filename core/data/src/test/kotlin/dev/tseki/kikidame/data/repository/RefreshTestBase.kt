@@ -4,6 +4,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.tseki.kikidame.data.db.LocalFileEntity
 import dev.tseki.kikidame.data.device.MemoryDeviceDocuments
 import dev.tseki.kikidame.data.files.EpisodesDirectory
+import dev.tseki.kikidame.data.files.ProgramImageFiles
 import dev.tseki.kikidame.data.jellyfin.JellyfinSource
 import dev.tseki.kikidame.data.source.SourceGateway
 import dev.tseki.kikidame.domain.DownloadState
@@ -33,6 +34,7 @@ abstract class RefreshTestBase : RoomTestBase() {
     protected val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     protected val store by lazy { testSessionStore(tmp.root, scope) }
     protected val directory by lazy { EpisodesDirectory(ApplicationProvider.getApplicationContext()) }
+    protected val images by lazy { ProgramImageFiles(File(tmp.root, "program_images")) }
     protected val downloads by lazy { RoomDownloadRepository(db, directory, clock) }
     protected val library by lazy { RoomLibraryRepository(db.programDao(), db.episodeDao(), db.localFileDao()) }
     protected val playback by lazy { RoomPlaybackStateRepository(db, clock) }
@@ -40,7 +42,7 @@ abstract class RefreshTestBase : RoomTestBase() {
     @After
     fun cancelScope() = scope.cancel()
 
-    protected fun refreshRepository(source: SourceGateway) = RoomLibraryRefreshRepository(db, store, source, downloads, clock)
+    protected fun refreshRepository(source: SourceGateway) = RoomLibraryRefreshRepository(db, store, source, downloads, clock, images)
 
     /**
      * 取得元の回。[published] は日付だけ（その日の 0 時 UTC）か Instant の形。

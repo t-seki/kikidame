@@ -28,6 +28,13 @@ data class ProgramEntity(
     val goneSince: Instant? = null,
     /** よく聴く（表示用の印。CONTEXT.md）。v5 で追加 */
     @ColumnInfo(defaultValue = "0") val starred: Boolean = false,
+    /**
+     * 手元に持っている番組の画像（ADR 0012、#264）の版（`SourceImage.version`）と、そのファイルの絶対パス。
+     * 版が取得元と同じなら画像を取り直さない。画像を持たなければどちらも null。2 つは同時に書く。
+     * 取りに行って画像なしだった版（大きすぎるなど）は、版だけを持ちパスは null（同じ版の間は取り直さない）。v9 で追加
+     */
+    val imageVersion: String? = null,
+    val imagePath: String? = null,
 )
 /** 各回 = Audio。 */
 @Entity(

@@ -9,7 +9,15 @@ data class SourceProgram(
     val name: String,
     /** 配信元。Jellyfin では MusicAlbum の AlbumArtist。無ければ null。 */
     val publisherName: String?,
+    /** 番組の画像（CONTEXT.md）。取得元に無ければ null。中身は `SourceGateway.fetchProgramImage` で別に取る（ADR 0012）。 */
+    val image: SourceImage? = null,
 )
+
+/**
+ * 取得元にある番組の画像の目印（ADR 0012、#264）。[version] が前の同期と同じなら、画像を取り直さない。
+ * 共有フォルダでは `folder.jpg` の大きさと更新日時から作る。Jellyfin では ImageTag を使う想定（#282）。
+ */
+data class SourceImage(val version: String)
 
 /** 取得元上の各回。Jellyfin では Audio。 */
 data class SourceEpisode(

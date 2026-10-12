@@ -6,7 +6,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Star
@@ -29,6 +31,7 @@ import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.ProgramSummary
 import dev.tseki.kikidame.domain.PublishedAt
 import dev.tseki.kikidame.text.UiText
+import dev.tseki.kikidame.ui.ProgramImageView
 import dev.tseki.kikidame.ui.resolve
 import dev.tseki.kikidame.ui.toLatestDateText
 import kotlin.time.Clock
@@ -37,6 +40,8 @@ import kotlinx.datetime.todayIn
 
 /**
  * 左端の ★ でよく聴くを切り替える。右端は同期対象／消失の状態表示。
+ * ★ の右、番組名の左に 48dp の正方形で番組の画像（ADR 0012、#264）を置く。[reserveImage] が true なら、画像の無い番組でも
+ * 48dp を空けて（何も描かない）文字の位置を全行でそろえる。一覧の中に画像を持つ番組が 1 つも無いときは、呼び出し側が false にして詰める。
  *
  * M3 の `ListItem` は補足が 2 行に折り返して 3 行になると左右の要素を上に寄せる（`ListItem.kt` の `place()`、#157）。
  * 番組の行は行の高さに関わらず左右を真ん中に置く方針なので、`ListItem` は使わず [Row] で組む。
@@ -45,7 +50,7 @@ import kotlinx.datetime.todayIn
  * 3 行になっても上下 8dp・最小 72dp のままにする（`ListItem` の 3 行の既定は上下 12dp・最小 88dp。#157 で決めた）。
  */
 @Composable
-internal fun ProgramRow(summary: ProgramSummary, onClick: () -> Unit, onToggleStarred: () -> Unit) {
+internal fun ProgramRow(summary: ProgramSummary, reserveImage: Boolean, onClick: () -> Unit, onToggleStarred: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}.clickable(onClick = onClick),
         color = MaterialTheme.colorScheme.surface,
@@ -65,6 +70,12 @@ internal fun ProgramRow(summary: ProgramSummary, onClick: () -> Unit, onToggleSt
                         }
                     }
                 }
+            }
+            val image = summary.program.image
+            if (image != null) {
+                ProgramImageView(image, Modifier.padding(end = 16.dp).size(48.dp))
+            } else if (reserveImage) {
+                Spacer(Modifier.padding(end = 16.dp).size(48.dp))
             }
             Column(Modifier.weight(1f)) {
                 Text(summary.program.name, style = MaterialTheme.typography.bodyLarge)

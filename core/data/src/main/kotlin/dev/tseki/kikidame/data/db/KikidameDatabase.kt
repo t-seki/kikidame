@@ -8,7 +8,7 @@ import androidx.room.TypeConverters
 import androidx.room.migration.AutoMigrationSpec
 @Database(
     entities = [ProgramEntity::class, EpisodeEntity::class, LocalFileEntity::class, PlaybackStateEntity::class],
-    version = 8,
+    version = 9,
     exportSchema = true,
     autoMigrations = [
         // v2: programs の (publisherName, name) を unique でなくした（サーバに同名の番組があり得る）
@@ -25,6 +25,8 @@ import androidx.room.migration.AutoMigrationSpec
         AutoMigration(from = 6, to = 7, spec = KikidameDatabase.V6ToV7::class),
         // v8: episodes.sourceFileSize / sourceModifiedAt（共有フォルダのタグを読み直すかの判定、#197）
         AutoMigration(from = 7, to = 8),
+        // v9: programs.imageVersion / imagePath（番組の画像、ADR 0012、#264）
+        AutoMigration(from = 8, to = 9),
     ],
 )
 @TypeConverters(Converters::class)
