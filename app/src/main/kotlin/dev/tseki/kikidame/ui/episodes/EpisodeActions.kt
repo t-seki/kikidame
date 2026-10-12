@@ -64,6 +64,12 @@ internal class EpisodeActions(
         }
     }
 
+    /** 手元の回を固定にし、固定したことを文言で知らせる。 */
+    fun pin(episodeId: EpisodeId) = launch {
+        downloads.pin(episodeId)
+        messages.tryEmit(UiText.Res(R.string.episode_list_msg_pinned))
+    }
+
     /** 固定を外し、外したことを文言で知らせる。 */
     fun unpin(episodeId: EpisodeId) = launch {
         downloads.unpin(episodeId)

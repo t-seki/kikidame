@@ -161,6 +161,8 @@ class EpisodeListViewModel @Inject constructor(
 
     fun retry(episodeId: EpisodeId) = act { scheduler.retry(episodeId) }
 
+    fun pin(episodeId: EpisodeId) = actions.pin(episodeId)
+
     fun unpin(episodeId: EpisodeId) = actions.unpin(episodeId)
 
     fun deleteLocal(episodeId: EpisodeId) = act {

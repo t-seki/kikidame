@@ -75,6 +75,9 @@ interface DownloadRepository {
     /** FAILED を PENDING に戻す（手動なので試行回数は見ない）。 */
     suspend fun retry(episodeId: EpisodeId)
 
+    /** 手元にある（`DONE`）固定していない回を固定にする。ファイルは落とし直さない。手元に無い・取り込み中の回には何もしない。 */
+    suspend fun pin(episodeId: EpisodeId)
+
     suspend fun unpin(episodeId: EpisodeId)
 
     /** [deletionScopeFor] の規則で消す。 */

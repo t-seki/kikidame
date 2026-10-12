@@ -99,6 +99,10 @@ class RoomDownloadRepository @Inject constructor(
         db.localFileDao().retryFailed(episodeId.value, clock.now())
     }
 
+    override suspend fun pin(episodeId: EpisodeId) {
+        db.localFileDao().pin(episodeId.value)
+    }
+
     override suspend fun unpin(episodeId: EpisodeId) {
         db.localFileDao().unpin(episodeId.value)
     }
