@@ -1,5 +1,7 @@
 package dev.tseki.kikidame.ui.player
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -57,6 +59,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.PlaybackSpeed
+import dev.tseki.kikidame.domain.ProgramImage
+import dev.tseki.kikidame.ui.ProgramImagePreview
+import dev.tseki.kikidame.ui.ProgramImageView
+import dev.tseki.kikidame.ui.previewProgramImage
 import dev.tseki.kikidame.playback.SleepTimer
 import dev.tseki.kikidame.text.UiText
 import dev.tseki.kikidame.ui.resolve
@@ -69,12 +75,14 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val played by viewModel.played.collectAsStateWithLifecycle()
     val subtitle by viewModel.subtitle.collectAsStateWithLifecycle()
+    val programImage by viewModel.programImage.collectAsStateWithLifecycle()
     val speed by viewModel.speed.collectAsStateWithLifecycle()
     val sleepTimerLabel by viewModel.sleepTimerLabel.collectAsStateWithLifecycle()
     PlayerContent(
         state = state,
         played = played,
         subtitle = subtitle,
+        programImage = programImage,
         speed = speed,
         sleepTimerLabel = sleepTimerLabel,
         onBack = onBack,
@@ -94,6 +102,8 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
 /**
  * 再生画面の中身。ViewModel を受け取らず、値とラムダだけで描く（プレビューから呼べるように）。
  * [swipeSeek] はふつう既定値のまま（[state] の位置・尺と [onSeek] で動く）。プレビューではスワイプ中の状態を渡す。
+ * [programImage] があればタイトルの上に正方形で出す（#264）。幅の 6 割を上限に、縦に収まらなければボタン類を押し出さない大きさまで縮める。
+ * 無ければ何も置かない。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -101,6 +111,7 @@ internal fun PlayerContent(
     state: PlayerUiState,
     played: Boolean,
     subtitle: UiText?,
+    programImage: ProgramImage?,
     speed: Float,
     sleepTimerLabel: UiText?,
     onBack: () -> Unit,
@@ -142,6 +153,13 @@ internal fun PlayerContent(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
+            // 番組の画像（#264）。スワイプのシークを拾う範囲（この Column）に含める。weight(fill = false) で、ほかの要素を置いた残りの高さを上限にする
+            if (programImage != null) {
+                Box(Modifier.weight(1f, fill = false).fillMaxWidth(0.6f), contentAlignment = Alignment.Center) {
+                    ProgramImageView(programImage, Modifier.aspectRatio(1f))
+                }
+                Spacer(Modifier.height(16.dp))
+            }
             Text(state.title, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
             // `配信元 · 出演者`（#70）。無い回や読み込み前も 1 行分の場所は確保して、回が進んだときにタイトルが跳ねないようにする
             Spacer(Modifier.height(4.dp))
@@ -320,27 +338,31 @@ private fun PlayerContentPreviewHost(
     subtitle: UiText? = UiText.Plain("ラジオ局 · 山田太郎"),
     sleepTimerLabel: UiText? = null,
     swipeSeek: SwipeSeekState? = null,
+    programImage: ProgramImage? = null,
 ) {
     KikidameTheme {
-        PlayerContent(
-            state = state,
-            played = played,
-            subtitle = subtitle,
-            speed = 1.25f,
-            sleepTimerLabel = sleepTimerLabel,
-            onBack = {},
-            onSeek = {},
-            onSetPlayed = {},
-            onPrevious = {},
-            onSeekBack = {},
-            onTogglePlayPause = {},
-            onSeekForward = {},
-            onNext = {},
-            onSetSpeed = {},
-            onSetSleepTimer = {},
-            onSetSleepTimerToEndOfEpisode = {},
-            swipeSeek = swipeSeek ?: rememberSwipeSeekState(state.episodeId, state.positionMs, state.durationMs, onSeek = {}),
-        )
+        ProgramImagePreview {
+            PlayerContent(
+                state = state,
+                played = played,
+                subtitle = subtitle,
+                programImage = programImage,
+                speed = 1.25f,
+                sleepTimerLabel = sleepTimerLabel,
+                onBack = {},
+                onSeek = {},
+                onSetPlayed = {},
+                onPrevious = {},
+                onSeekBack = {},
+                onTogglePlayPause = {},
+                onSeekForward = {},
+                onNext = {},
+                onSetSpeed = {},
+                onSetSleepTimer = {},
+                onSetSleepTimerToEndOfEpisode = {},
+                swipeSeek = swipeSeek ?: rememberSwipeSeekState(state.episodeId, state.positionMs, state.durationMs, onSeek = {}),
+            )
+        }
     }
 }
 
@@ -348,6 +370,20 @@ private fun PlayerContentPreviewHost(
 @Composable
 private fun PlayerContentPreview() {
     PlayerContentPreviewHost(previewState)
+}
+
+/** 番組の画像あり（#264）。タイトルの上に正方形で出る。プレビューの中では単色。 */
+@Preview(showBackground = true)
+@Composable
+private fun PlayerContentWithImagePreview() {
+    PlayerContentPreviewHost(previewState, programImage = previewProgramImage)
+}
+
+/** 番組の画像あり・低い画面。画像はボタン類を押し出さない大きさまで縮む。 */
+@Preview(showBackground = true, heightDp = 560)
+@Composable
+private fun PlayerContentWithImageShortScreenPreview() {
+    PlayerContentPreviewHost(previewState, programImage = previewProgramImage)
 }
 
 /** 再生済み・一時停止中・スリープタイマーを設定中。 */

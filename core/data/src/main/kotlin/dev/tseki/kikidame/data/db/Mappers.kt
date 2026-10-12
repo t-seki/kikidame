@@ -9,6 +9,7 @@ import dev.tseki.kikidame.domain.LocalProgramKey
 import dev.tseki.kikidame.domain.PlaybackState
 import dev.tseki.kikidame.domain.Program
 import dev.tseki.kikidame.domain.ProgramId
+import dev.tseki.kikidame.domain.ProgramImage
 import dev.tseki.kikidame.domain.ProgramSummary
 import dev.tseki.kikidame.domain.RetentionRule
 import dev.tseki.kikidame.domain.SourceItemId
@@ -24,6 +25,7 @@ fun ProgramEntity.toDomain(): Program = Program(
     retentionRule = RetentionRule(keepLatest = keepLatest, deleteAfterPlayed = deleteAfterPlayed),
     goneSince = goneSince,
     starred = starred,
+    image = imagePath?.let(::ProgramImage),
 )
 fun ProgramSummaryRow.toDomain(): ProgramSummary = ProgramSummary(
     program = program.toDomain(),

@@ -91,6 +91,8 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
     implementation(libs.compose.material.icons.extended)
+    // 番組の画像（ADR 0012、#264）。手元のファイルだけを読むので、ネットワークの部品（coil-network-*）は入れない
+    implementation(libs.coil.compose)
     debugImplementation(libs.compose.ui.tooling)
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.session)

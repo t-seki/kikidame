@@ -15,7 +15,7 @@ import kotlin.test.assertNull
 import kotlin.time.Instant
 
 /**
- * 過去のスキーマ（`schemas/` の JSON）から最新まで AutoMigration で上がること。v4→v5・v5→v6・v7→v8 は既存の行の既定値まで、
+ * 過去のスキーマ（`schemas/` の JSON）から最新まで AutoMigration で上がること。v4→v5・v5→v6・v7→v8・v8→v9 は既存の行の既定値まで、
  * v6→v7 は改名した列の値まで見る。
  * 古い版への INSERT は、その版の列名（`serverItemId`・`stationName`・`airedAt` など）で書く。
  */
@@ -162,11 +162,40 @@ class MigrationTest {
         }
     }
 
+    /** v8→v9: programs.imageVersion / imagePath（番組の画像、ADR 0012、#264）。既存の行は画像なし（null）で読め、値は残る。 */
+    @Test
+    fun v8ToV9AddsProgramImageColumnsAsNull() {
+        helper.createDatabase(DB_NAME, 8).use { db ->
+            db.execSQL(
+                "INSERT INTO programs (id, sourceItemId, name, publisherName, syncEnabled, keepLatest, deleteAfterPlayed, goneSince, starred) " +
+                    "VALUES (1, 'TBSラジオ/ハライチのターン！', 'ハライチのターン！', 'TBSラジオ', 1, 3, 0, NULL, 1)",
+            )
+        }
+        helper.runMigrationsAndValidate(DB_NAME, 9, true).close()
+
+        val migrated = Room.databaseBuilder(
+            ApplicationProvider.getApplicationContext(),
+            KikidameDatabase::class.java,
+            DB_NAME,
+        ).allowMainThreadQueries().build()
+        try {
+            val program = runBlocking { migrated.programDao().findById(1) }!!
+            assertNull(program.imageVersion)
+            assertNull(program.imagePath)
+            assertNull(program.toDomain().image)
+            assertEquals("TBSラジオ/ハライチのターン！", program.sourceItemId)
+            assertEquals(true, program.starred)
+            assertEquals(emptyList(), runBlocking { migrated.programDao().listImagePaths() })
+        } finally {
+            migrated.close()
+        }
+    }
+
     /** 最初のスキーマからの通し。列追加が nullable か既定値付きで、途中のどこも手書きマイグレーションを要さないこと。 */
     @Test
     fun v1MigratesAllTheWayToLatest() {
         helper.createDatabase(DB_NAME, 1).close()
-        helper.runMigrationsAndValidate(DB_NAME, 8, true).close()
+        helper.runMigrationsAndValidate(DB_NAME, 9, true).close()
     }
 
     companion object {

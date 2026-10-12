@@ -3,6 +3,7 @@ import android.util.Log
 import androidx.room.withTransaction
 import dev.tseki.kikidame.data.db.KikidameDatabase
 import dev.tseki.kikidame.data.files.EpisodesDirectory
+import dev.tseki.kikidame.data.files.ProgramImageFiles
 import dev.tseki.kikidame.data.session.SessionStore
 import dev.tseki.kikidame.domain.LocalDataReset
 import kotlinx.coroutines.Dispatchers
@@ -10,7 +11,7 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 /**
- * 「取得元を変える」（#50）。番組・各回（外部キーで手元のファイル情報と再生位置も）とセッションを消し、音声ファイルも消す（#50）。
+ * 「取得元を変える」（#50）。番組・各回（外部キーで手元のファイル情報と再生位置も）とセッションを消し、音声ファイルと番組の画像（ADR 0012）も消す（#50）。
  * 行を消したあとにファイルへ到達する手段は無い（行の無いファイルを DB に取り込み直さない。取得元が存在の正）ので、残す意味が無い。
  * 消せなかったファイルがあってもログに残して先へ進む（接続画面へ行けなくなる方が困る）。残ったファイルは
  * `docs/development.md`「手元のファイルと DB の突き合わせ」の手順で消す。
@@ -20,6 +21,7 @@ class RoomLocalDataReset @Inject constructor(
     private val db: KikidameDatabase,
     private val store: SessionStore,
     private val directory: EpisodesDirectory,
+    private val images: ProgramImageFiles,
 ) : LocalDataReset {
     private companion object {
         const val TAG = "LocalDataReset"
@@ -31,6 +33,8 @@ class RoomLocalDataReset @Inject constructor(
             val children = directory.root?.listFiles()
             if (children == null) Log.w(TAG, "episodes directory unavailable; files not deleted")
             children?.forEach { if (!it.deleteRecursively()) Log.w(TAG, "could not delete ${it.path}") }
+            val left = images.deleteAll()
+            if (left > 0) Log.w(TAG, "could not delete $left program images")
         }
         store.clearAll()
     }

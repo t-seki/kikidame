@@ -75,6 +75,12 @@ interface ProgramDao {
     suspend fun listAll(): List<ProgramEntity>
     @Query("UPDATE programs SET goneSince = :at WHERE id = :id")
     suspend fun setGoneSince(id: Long, at: Instant?)
+    /** 番組の画像（ADR 0012）の版とファイルを書く。画像を持たなくなったらどちらも null。 */
+    @Query("UPDATE programs SET imageVersion = :version, imagePath = :path WHERE id = :id")
+    suspend fun setImage(id: Long, version: String?, path: String?)
+    /** 手元に持っている番組の画像のファイル（どの行からも指されていないファイルを消すのに使う）。 */
+    @Query("SELECT imagePath FROM programs WHERE imagePath IS NOT NULL")
+    suspend fun listImagePaths(): List<String>
     @Query("UPDATE programs SET starred = :starred WHERE id = :id")
     suspend fun setStarred(id: Long, starred: Boolean)
     @Insert
