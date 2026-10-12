@@ -92,6 +92,7 @@ fun ProgramListScreen(
     val isSyncingInBackground by viewModel.isSyncingInBackground.collectAsStateWithLifecycle()
     val tagProgress by viewModel.tagProgress.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
+    // 「続きから」の 2 つも、そのページが組まれていなくても（どのタブでも）番組の画面が出ている間は購読が続く
     val continueItems by continueViewModel.items.collectAsStateWithLifecycle()
     val nowPlaying by continueViewModel.nowPlaying.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
