@@ -60,6 +60,7 @@ import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.PlaybackSpeed
 import dev.tseki.kikidame.domain.ProgramImage
+import dev.tseki.kikidame.ui.EpisodeImageView
 import dev.tseki.kikidame.ui.ProgramImagePreview
 import dev.tseki.kikidame.ui.ProgramImageView
 import dev.tseki.kikidame.ui.previewProgramImage
@@ -76,6 +77,7 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
     val played by viewModel.played.collectAsStateWithLifecycle()
     val subtitle by viewModel.subtitle.collectAsStateWithLifecycle()
     val programImage by viewModel.programImage.collectAsStateWithLifecycle()
+    val episodeImage by viewModel.episodeImage.collectAsStateWithLifecycle()
     val speed by viewModel.speed.collectAsStateWithLifecycle()
     val sleepTimerLabel by viewModel.sleepTimerLabel.collectAsStateWithLifecycle()
     PlayerContent(
@@ -83,6 +85,7 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
         played = played,
         subtitle = subtitle,
         programImage = programImage,
+        episodeImage = episodeImage,
         speed = speed,
         sleepTimerLabel = sleepTimerLabel,
         onBack = onBack,
@@ -102,7 +105,7 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
 /**
  * 再生画面の中身。ViewModel を受け取らず、値とラムダだけで描く（プレビューから呼べるように）。
  * [swipeSeek] はふつう既定値のまま（[state] の位置・尺と [onSeek] で動く）。プレビューではスワイプ中の状態を渡す。
- * [programImage] があればタイトルの上に正方形で出す（#264）。幅の 6 割を上限に、縦に収まらなければボタン類を押し出さない大きさまで縮める。
+ * [episodeImage]（回の画像。サービスが載せたバイト列、#283）があればそれを、無ければ [programImage] を、タイトルの上に正方形で出す（#264）。幅の 6 割を上限に、縦に収まらなければボタン類を押し出さない大きさまで縮める。
  * 無ければ何も置かない。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -112,6 +115,7 @@ internal fun PlayerContent(
     played: Boolean,
     subtitle: UiText?,
     programImage: ProgramImage?,
+    episodeImage: ByteArray? = null,
     speed: Float,
     sleepTimerLabel: UiText?,
     onBack: () -> Unit,
@@ -154,9 +158,10 @@ internal fun PlayerContent(
             verticalArrangement = Arrangement.Center,
         ) {
             // 番組の画像（#264）。スワイプのシークを拾う範囲（この Column）に含める。weight(fill = false) で、ほかの要素を置いた残りの高さを上限にする
-            if (programImage != null) {
+            if (episodeImage != null || programImage != null) {
                 Box(Modifier.weight(1f, fill = false).fillMaxWidth(0.6f), contentAlignment = Alignment.Center) {
-                    ProgramImageView(programImage, Modifier.aspectRatio(1f))
+                    if (episodeImage != null) EpisodeImageView(episodeImage, Modifier.aspectRatio(1f))
+                    else if (programImage != null) ProgramImageView(programImage, Modifier.aspectRatio(1f))
                 }
                 Spacer(Modifier.height(16.dp))
             }
@@ -339,6 +344,7 @@ private fun PlayerContentPreviewHost(
     sleepTimerLabel: UiText? = null,
     swipeSeek: SwipeSeekState? = null,
     programImage: ProgramImage? = null,
+    episodeImage: ByteArray? = null,
 ) {
     KikidameTheme {
         ProgramImagePreview {
@@ -347,6 +353,7 @@ private fun PlayerContentPreviewHost(
                 played = played,
                 subtitle = subtitle,
                 programImage = programImage,
+                episodeImage = episodeImage,
                 speed = 1.25f,
                 sleepTimerLabel = sleepTimerLabel,
                 onBack = {},
@@ -377,6 +384,13 @@ private fun PlayerContentPreview() {
 @Composable
 private fun PlayerContentWithImagePreview() {
     PlayerContentPreviewHost(previewState, programImage = previewProgramImage)
+}
+
+/** 回の画像あり（#283）。番組の画像より優先して出る。プレビューの中では単色（バイト列は読まれない）。 */
+@Preview(showBackground = true)
+@Composable
+private fun PlayerContentWithEpisodeImagePreview() {
+    PlayerContentPreviewHost(previewState, programImage = previewProgramImage, episodeImage = ByteArray(0))
 }
 
 /** 番組の画像あり・低い画面。画像はボタン類を押し出さない大きさまで縮む。 */
