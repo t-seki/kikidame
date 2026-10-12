@@ -34,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -56,6 +57,9 @@ import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.download.DownloadProgress
 import dev.tseki.kikidame.ui.BackgroundSyncBar
+import dev.tseki.kikidame.ui.ProgramImagePreview
+import dev.tseki.kikidame.ui.ProgramImageView
+import dev.tseki.kikidame.ui.previewProgramImage
 import dev.tseki.kikidame.text.UiText
 import dev.tseki.kikidame.playback.NowPlayingState
 import dev.tseki.kikidame.ui.player.MiniPlayer
@@ -179,9 +183,13 @@ internal fun EpisodeListContent(
             Column {
                 TopAppBar(
                     title = {
-                        Column {
-                            Text(program?.name ?: "")
-                            program?.publisherName?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            // 番組の画像（#289）。戻るボタンの右、タイトルの左。無い番組では場所を空けず、今の見た目のまま
+                            program?.image?.let { ProgramImageView(it, Modifier.padding(end = 12.dp).size(40.dp)) }
+                            Column {
+                                Text(program?.name ?: "")
+                                program?.publisherName?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                            }
                         }
                     },
                     navigationIcon = {
@@ -392,6 +400,33 @@ private fun EpisodeListContentPreview() {
             onEpisodeDetails = { _, _ -> },
             onBack = {},
         )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun EpisodeListContentWithImagePreview() {
+    KikidameTheme {
+        ProgramImagePreview {
+            EpisodeListContent(
+                program = previewProgram.copy(image = previewProgramImage),
+                episodes = listOf(previewEpisode(1, "第 5 回", DownloadState.DONE)),
+                localStorage = LocalStorageUsage(totalBytes = 40_000_000, episodeCount = 1),
+                canRefresh = true,
+                isRefreshing = false,
+                isSyncingInBackground = false,
+                progress = null,
+                waitingForNetwork = false,
+                nowPlaying = null,
+                pendingDisable = null,
+                snackbarHostState = remember { SnackbarHostState() },
+                bottomBar = {},
+                actions = previewActions,
+                onEpisodeClick = {},
+                onEpisodeDetails = { _, _ -> },
+                onBack = {},
+            )
+        }
     }
 }
 
