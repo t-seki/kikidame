@@ -47,6 +47,15 @@ import android.provider.Settings
 import dev.tseki.kikidame.BuildConfig
 import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.ConnectedSource
+import dev.tseki.kikidame.domain.DeviceFolder
+import dev.tseki.kikidame.domain.LocalStorageUsage
+import dev.tseki.kikidame.domain.SelectedLibrary
+import dev.tseki.kikidame.domain.Session
+import dev.tseki.kikidame.domain.SmbConnection
+import dev.tseki.kikidame.domain.SourceItemId
+import dev.tseki.kikidame.ui.theme.KikidameTheme
+import androidx.compose.ui.tooling.preview.Preview
+import kotlin.time.Instant
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.ui.SectionTitle
 import dev.tseki.kikidame.ui.ValueRow
@@ -56,7 +65,6 @@ import dev.tseki.kikidame.ui.source.ChangeSourceConfirmDialog
 import dev.tseki.kikidame.ui.toDateTimeText
 import dev.tseki.kikidame.ui.toText
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
@@ -70,8 +78,6 @@ fun SettingsScreen(
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    var confirmSignOut by remember { mutableStateOf(false) }
-    var confirmReset by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     LaunchedEffect(message) {
@@ -80,6 +86,42 @@ fun SettingsScreen(
             viewModel.consumeMessage()
         }
     }
+
+    SettingsContent(
+        session = session,
+        wifiOnly = wifiOnly,
+        localStorage = localStorage,
+        themeMode = themeMode,
+        snackbarHostState = snackbarHostState,
+        onBack = onBack,
+        onChangeLibrary = onChangeLibrary,
+        onOpenLicenses = onOpenLicenses,
+        onSetWifiOnly = viewModel::setWifiOnly,
+        onSetThemeMode = viewModel::setThemeMode,
+        onSignOut = viewModel::signOut,
+        onResetAndConnectElsewhere = viewModel::resetAndConnectElsewhere,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+internal fun SettingsContent(
+    session: SessionState?,
+    wifiOnly: Boolean,
+    localStorage: LocalStorageUsage?,
+    themeMode: ThemeMode?,
+    snackbarHostState: SnackbarHostState,
+    onBack: () -> Unit,
+    onChangeLibrary: () -> Unit,
+    onOpenLicenses: () -> Unit,
+    onSetWifiOnly: (Boolean) -> Unit,
+    onSetThemeMode: (ThemeMode) -> Unit,
+    onSignOut: () -> Unit,
+    onResetAndConnectElsewhere: () -> Unit,
+) {
+    var confirmSignOut by remember { mutableStateOf(false) }
+    var confirmReset by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -136,10 +178,10 @@ fun SettingsScreen(
             // 手元のファイルの合計（#42）。保持ルールや固定を調整する動機は容量なので、見えるようにする
             ValueRow(stringResource(R.string.settings_storage), localStorage?.toText()?.resolve() ?: "-")
             ListItem(
-                modifier = Modifier.clickable { viewModel.setWifiOnly(!wifiOnly) },
+                modifier = Modifier.clickable { onSetWifiOnly(!wifiOnly) },
                 headlineContent = { Text(stringResource(R.string.settings_wifi_only)) },
                 supportingContent = { Text(stringResource(R.string.settings_wifi_only_description)) },
-                trailingContent = { Switch(checked = wifiOnly, onCheckedChange = viewModel::setWifiOnly) },
+                trailingContent = { Switch(checked = wifiOnly, onCheckedChange = onSetWifiOnly) },
             )
             HorizontalDivider()
             SectionTitle(stringResource(R.string.settings_section_display))
@@ -151,7 +193,7 @@ fun SettingsScreen(
                         for (choice in ThemeMode.entries) {
                             FilterChip(
                                 selected = themeMode == choice,
-                                onClick = { viewModel.setThemeMode(choice) },
+                                onClick = { onSetThemeMode(choice) },
                                 enabled = themeMode != null,
                                 label = { Text(stringResource(choice.label())) },
                             )
@@ -206,17 +248,18 @@ fun SettingsScreen(
             onDismissRequest = { confirmSignOut = false },
             title = { Text(stringResource(R.string.settings_sign_out_title)) },
             text = { Text(stringResource(R.string.settings_sign_out_text)) },
-            confirmButton = { TextButton(onClick = { confirmSignOut = false; viewModel.signOut() }) { Text(stringResource(R.string.settings_sign_out)) } },
+            confirmButton = { TextButton(onClick = { confirmSignOut = false; onSignOut() }) { Text(stringResource(R.string.settings_sign_out)) } },
             dismissButton = { TextButton(onClick = { confirmSignOut = false }) { Text(stringResource(R.string.common_cancel)) } },
         )
     }
     if (confirmReset) {
         ChangeSourceConfirmDialog(
-            onConfirm = { confirmReset = false; viewModel.resetAndConnectElsewhere() },
+            onConfirm = { confirmReset = false; onResetAndConnectElsewhere() },
             onDismiss = { confirmReset = false },
         )
     }
 }
+
 private fun ThemeMode.label(): Int = when (this) {
     ThemeMode.SYSTEM -> R.string.settings_theme_system
     ThemeMode.DARK -> R.string.settings_theme_dark
@@ -224,3 +267,70 @@ private fun ThemeMode.label(): Int = when (this) {
 }
 
 private const val SOURCE_URL = "https://github.com/t-seki/kikidame"
+
+private val previewJellyfinSession = Session(serverUrl = "https://jellyfin.example.com", userName = "alice", userId = "u1", accessToken = "t")
+
+@Composable
+private fun SettingsContentPreviewHost(session: SessionState) {
+    KikidameTheme {
+        SettingsContent(
+            session = session,
+            wifiOnly = true,
+            localStorage = LocalStorageUsage(totalBytes = 1_234_567_890L, episodeCount = 12),
+            themeMode = ThemeMode.SYSTEM,
+            snackbarHostState = remember { SnackbarHostState() },
+            onBack = {},
+            onChangeLibrary = {},
+            onOpenLicenses = {},
+            onSetWifiOnly = {},
+            onSetThemeMode = {},
+            onSignOut = {},
+            onResetAndConnectElsewhere = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, heightDp = 1400)
+@Composable
+private fun SettingsContentPreview() {
+    SettingsContentPreviewHost(
+        SessionState.Ready(
+            ConnectedSource.Jellyfin(previewJellyfinSession, SelectedLibrary(SourceItemId("lib1"), "ラジオ")),
+            lastFetchedAt = Instant.fromEpochSeconds(1_760_000_000),
+        ),
+    )
+}
+
+@Preview(showBackground = true, heightDp = 1400)
+@Composable
+private fun SettingsContentNeedsLibraryPreview() {
+    SettingsContentPreviewHost(SessionState.NeedsLibrary(previewJellyfinSession))
+}
+
+@Preview(showBackground = true, heightDp = 1400)
+@Composable
+private fun SettingsContentSmbPreview() {
+    SettingsContentPreviewHost(
+        SessionState.Ready(
+            ConnectedSource.Smb(SmbConnection(host = "nas.local", share = "radio", path = "録音/2026", userName = "alice", password = "")),
+            lastFetchedAt = Instant.fromEpochSeconds(1_760_000_000),
+        ),
+    )
+}
+
+@Preview(showBackground = true, heightDp = 1400)
+@Composable
+private fun SettingsContentDevicePreview() {
+    SettingsContentPreviewHost(
+        SessionState.Ready(
+            ConnectedSource.Device(DeviceFolder(treeUri = "content://com.android.externalstorage.documents/tree/primary%3ARadio", name = "Radio")),
+            lastFetchedAt = null,
+        ),
+    )
+}
+
+@Preview(showBackground = true, heightDp = 1400)
+@Composable
+private fun SettingsContentSignedOutPreview() {
+    SettingsContentPreviewHost(SessionState.SignedOut(lastServerUrl = null, lastUserName = null))
+}
