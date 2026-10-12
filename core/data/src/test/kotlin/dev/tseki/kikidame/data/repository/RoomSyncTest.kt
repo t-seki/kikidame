@@ -23,7 +23,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 
-/** 全走査 = 同期（ADR 0004）の適用と、番組単位の更新（#12）が削除しないこと。 */
+/** 全走査 = 同期（ADR 0004）の適用と、1 番組の同期（#279 で各回一覧の引っ張って更新も同じ）がその番組の中で削除・予約すること（削除の権限を持つこと）。 */
 @RunWith(AndroidJUnit4::class)
 class RoomSyncTest : JellyfinRefreshTestBase() {
     /** 公開日をタイトルにした 60 分の回。 */
