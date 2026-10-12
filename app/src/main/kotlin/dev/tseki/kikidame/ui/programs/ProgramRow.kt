@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.dp
 import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.ProgramSummary
 import dev.tseki.kikidame.domain.PublishedAt
-import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.text.UiText
 import dev.tseki.kikidame.ui.resolve
 import dev.tseki.kikidame.ui.toLatestDateText
 import kotlin.time.Clock

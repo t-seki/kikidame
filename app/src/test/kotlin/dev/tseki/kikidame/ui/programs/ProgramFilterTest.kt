@@ -6,7 +6,7 @@ import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.ProgramSummary
 import dev.tseki.kikidame.ui.programs.ProgramFilter.Publisher
 import dev.tseki.kikidame.ui.programs.ProgramFilter.PublisherKey
-import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.text.UiText
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

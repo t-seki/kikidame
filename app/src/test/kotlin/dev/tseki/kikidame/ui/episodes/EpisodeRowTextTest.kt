@@ -3,7 +3,7 @@ package dev.tseki.kikidame.ui.episodes
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.text.UiText
 import dev.tseki.kikidame.ui.resolve
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config

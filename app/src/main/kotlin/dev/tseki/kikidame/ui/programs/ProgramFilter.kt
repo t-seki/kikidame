@@ -2,7 +2,7 @@ package dev.tseki.kikidame.ui.programs
 
 import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.ProgramSummary
-import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.text.UiText
 
 /**
  * 番組一覧の絞り込み。検索（#44）は番組名と配信元名の部分一致で、大文字小文字は区別しない。

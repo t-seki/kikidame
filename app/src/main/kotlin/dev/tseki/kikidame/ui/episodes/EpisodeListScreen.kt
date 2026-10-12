@@ -46,10 +46,10 @@ import dev.tseki.kikidame.domain.EpisodeWithState
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.download.DownloadProgress
 import dev.tseki.kikidame.ui.BackgroundSyncBar
-import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.text.UiText
 import dev.tseki.kikidame.ui.player.MiniPlayer
 import dev.tseki.kikidame.ui.resolve
-import dev.tseki.kikidame.ui.toPublishedDateText
+import dev.tseki.kikidame.text.toPublishedDateText
 import dev.tseki.kikidame.ui.toPerformersText
 import dev.tseki.kikidame.ui.toClockText
 

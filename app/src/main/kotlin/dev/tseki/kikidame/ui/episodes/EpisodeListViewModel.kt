@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.tseki.kikidame.domain.DownloadRepository
-import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.text.UiText
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.EpisodeWithState
 import dev.tseki.kikidame.domain.LibraryRepository

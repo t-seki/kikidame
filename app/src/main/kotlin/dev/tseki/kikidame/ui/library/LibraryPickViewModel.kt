@@ -10,8 +10,8 @@ import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.sync.LibraryRefresher
-import dev.tseki.kikidame.sync.toUserMessage
-import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.ui.connect.toUserMessage
+import dev.tseki.kikidame.text.UiText
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first

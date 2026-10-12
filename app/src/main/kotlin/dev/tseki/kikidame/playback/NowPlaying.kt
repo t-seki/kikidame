@@ -11,7 +11,7 @@ import kotlin.time.Duration.Companion.seconds
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import dev.tseki.kikidame.domain.EpisodeId
-import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.text.UiText
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow

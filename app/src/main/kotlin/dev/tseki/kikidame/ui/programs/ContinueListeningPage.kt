@@ -17,7 +17,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.ProgramId
-import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.text.UiText
 import dev.tseki.kikidame.ui.episodes.EpisodeActionsSheet
 import dev.tseki.kikidame.ui.episodes.EpisodeRow
 import dev.tseki.kikidame.ui.episodes.PlayedToggleButton

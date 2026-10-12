@@ -12,7 +12,7 @@ import dev.tseki.kikidame.domain.PlaybackStateRepository
 import dev.tseki.kikidame.domain.Program
 import dev.tseki.kikidame.playback.NowPlaying
 import dev.tseki.kikidame.playback.NowPlayingState
-import dev.tseki.kikidame.ui.UiText
+import dev.tseki.kikidame.text.UiText
 import dev.tseki.kikidame.ui.episodes.EpisodeActions
 import dev.tseki.kikidame.ui.episodes.forRows
 import dev.tseki.kikidame.ui.episodes.toMessage
