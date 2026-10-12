@@ -36,14 +36,14 @@ class ProgramImageTest : RefreshTestBase() {
     private val source by lazy { CountingSource(shared) }
     private val repo by lazy { refreshRepository(source) }
 
-    /** 画像の中身を取った番組を数える。[failImage] を立てると画像の中身の取得だけが失敗する。 */
+    /** 画像の中身を取った番組を数える。[imageFailure] を置くと画像の中身の取得だけがそれを投げる。 */
     class CountingSource(private val inner: SourceGateway) : SourceGateway by inner {
         val imageFetches = ArrayList<String>()
-        var failImage = false
+        var imageFailure: Exception? = null
 
         override suspend fun fetchProgramImage(programId: SourceItemId): ByteArray? {
             imageFetches += programId.value
-            if (failImage) throw SourceException.Unreachable(IOException("unreachable"))
+            imageFailure?.let { throw it }
             return inner.fetchProgramImage(programId)
         }
     }
@@ -144,7 +144,7 @@ class ProgramImageTest : RefreshTestBase() {
 
         folder.put("TBSラジオ/A/folder.jpg", newer, MemoryFolderTree.EPOCH + 1.hours)
         folder.put("TBSラジオ/A/2026-09-25.m4a")
-        source.failImage = true
+        source.imageFailure = SourceException.Unreachable(IOException("unreachable"))
         val result = repo.refresh()
 
         assertEquals(1, result.newEpisodes)
@@ -152,7 +152,7 @@ class ProgramImageTest : RefreshTestBase() {
         assertContentEquals(jpeg, File(before.path).readBytes())
 
         // 次の同期で取り直す（版を書いていないので）
-        source.failImage = false
+        source.imageFailure = null
         repo.refresh()
         assertContentEquals(newer, File(assertNotNull(program("A").image).path).readBytes())
     }
@@ -169,9 +169,35 @@ class ProgramImageTest : RefreshTestBase() {
         assertContentEquals(jpeg, File(assertNotNull(program("A").image).path).readBytes())
     }
 
-    /** 番組の行が消えた（「この番組を削除」など）画像のファイルは、次の全走査で消える。 */
+    /** 取得元に届かない・認証が通らないときは、残りの番組の画像を取りに行かない（同期は通り、前の画像は残る）。ほかの失敗はその番組だけ飛ばす。 */
     @Test
-    fun imagesOfRemovedProgramsArePrunedByTheNextScan() = runTest {
+    fun unreachableOrUnauthorizedStopsTheRemainingImageFetches() = runTest {
+        signIn()
+        for (p in listOf("A", "B", "C")) folder.put("TBSラジオ/$p/2026-09-18.m4a")
+        repo.refresh()
+        for (p in listOf("A", "B", "C")) folder.put("TBSラジオ/$p/folder.jpg", jpeg)
+
+        for (failure in listOf(SourceException.Unreachable(IOException("unreachable")), SourceException.Unauthorized())) {
+            source.imageFetches.clear()
+            source.imageFailure = failure
+            repo.refresh()
+            assertEquals(listOf("TBSラジオ/A"), source.imageFetches, "stops after ${failure::class.simpleName}")
+        }
+
+        source.imageFetches.clear()
+        source.imageFailure = SourceException.Failed("broken", null)
+        repo.refresh()
+        assertEquals(listOf("TBSラジオ/A", "TBSラジオ/B", "TBSラジオ/C"), source.imageFetches)
+        for (p in listOf("A", "B", "C")) assertNull(program(p).image)
+
+        source.imageFailure = null
+        repo.refresh()
+        for (p in listOf("A", "B", "C")) assertNotNull(program(p).image)
+    }
+
+    /** 「この番組を削除」は、その番組の画像のファイルもすぐ消す（ADR 0012 の決定 2）。 */
+    @Test
+    fun removeProgramDeletesItsImage() = runTest {
         signIn()
         folder.put("TBSラジオ/A/2026-09-18.m4a")
         folder.put("TBSラジオ/A/folder.jpg", jpeg)
@@ -183,12 +209,25 @@ class ProgramImageTest : RefreshTestBase() {
         folder.remove("TBSラジオ/B/2026-09-18.m4a")
         folder.remove("TBSラジオ/B/folder.jpg")
         downloads.removeProgram(program("B").id)
-        assertTrue(File(b.path).exists())
+
+        assertFalse(File(b.path).exists())
+        assertTrue(File(a.path).exists())
+    }
+
+    /** どの番組の行からも指されていない画像のファイル（消している最中に止まった残りなど）は、全走査の最後に消える。 */
+    @Test
+    fun orphanImagesArePrunedByTheScan() = runTest {
+        signIn()
+        folder.put("TBSラジオ/A/2026-09-18.m4a")
+        folder.put("TBSラジオ/A/folder.jpg", jpeg)
+        repo.refresh()
+        val a = assertNotNull(program("A").image)
+        val orphan = File(images.root, "999-0123456789abcdef.img").apply { writeBytes(jpeg) }
 
         repo.refresh()
 
         assertTrue(File(a.path).exists())
-        assertFalse(File(b.path).exists())
+        assertFalse(orphan.exists())
     }
 
     /** 取得元を変えてやり直す（ADR 0010 の決定 2）と、画像のファイルも消える。 */

@@ -39,7 +39,7 @@ class ProgramImageFiles(val root: File) {
         File(path).delete()
     }
 
-    /** [keep]（絶対パス）に無いファイルを消す。番組の行が消えた・画像が変わったときに残ったファイルの掃除。 */
+    /** [keep]（絶対パス）に無いファイルを消す。番組の行が消えた・画像が変わったときに消せずに残ったファイルの掃除。 */
     fun deleteAllExcept(keep: Set<String>) {
         root.listFiles()?.forEach { if (it.absolutePath !in keep) it.delete() }
     }

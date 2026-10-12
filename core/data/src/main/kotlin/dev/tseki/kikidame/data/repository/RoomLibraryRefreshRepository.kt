@@ -173,6 +173,8 @@ class RoomLibraryRefreshRepository @Inject constructor(
      * - 版が行と同じでファイルもあれば、何もしない
      * - それ以外は [SourceGateway.fetchProgramImage] で取り、新しい名前のファイルに書いてから行を書き換え、前のファイルを消す
      * - 取得・書き込みに失敗したら、その番組は前の画像（ファイルと行）のまま残して先へ進む。同期は止めない
+     * - ただし取得元に届かない（[SourceException.Unreachable]）・認証が通らない（[SourceException.Unauthorized]）ときは、
+     *   残りの番組も同じく失敗するので、この回の画像の取得を打ち切る（例外は投げない。残りの番組も前の画像のまま）
      */
     internal suspend fun updateImages(programs: List<SourceProgram>) = imageLock.withLock {
         for (sp in programs) {
@@ -189,6 +191,12 @@ class RoomLibraryRefreshRepository @Inject constructor(
                 source.fetchProgramImage(sp.sourceId)
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: SourceException.Unreachable) {
+                Log.w(TAG, "program image fetch failed; skipping the remaining images: ${sp.sourceId.value}", e)
+                break
+            } catch (e: SourceException.Unauthorized) {
+                Log.w(TAG, "program image fetch failed; skipping the remaining images: ${sp.sourceId.value}", e)
+                break
             } catch (e: Exception) {
                 Log.w(TAG, "program image fetch failed: ${sp.sourceId.value}", e)
                 continue
@@ -216,7 +224,7 @@ class RoomLibraryRefreshRepository @Inject constructor(
         withContext(Dispatchers.IO) { images.delete(path) }
     }
 
-    /** どの番組の行からも指されていない画像のファイルを消す（番組の行が消えた・前の版が残った）。 */
+    /** どの番組の行からも指されていない画像のファイル（孤児。「この番組を削除」で消せずに残った・前の版を消せずに残った）を消す。 */
     private suspend fun pruneImages() = imageLock.withLock {
         val keep = db.programDao().listImagePaths().toSet()
         withContext(Dispatchers.IO) { images.deleteAllExcept(keep) }

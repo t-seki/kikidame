@@ -155,11 +155,11 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
   取り直すかを決めるのは取り込みの側（`RoomLibraryRefreshRepository.updateImages`）で、取得元は前の版を知らなくてよい。#282 の Jellyfin は ImageTag を版にして同じ口に載る想定
 - **取り込み**: 番組ごとの取り込み（全走査の途中、`ScanListener.onProgramScanned`）・全走査の最後の取り込み・1 番組の同期のどれでも、同期（削除・予約）の後に `updateImages` を回す。
   新しい回の無い番組は途中の取り込みに流れないので、最後の取り込みで取る。版が行（`imageVersion`）と同じでファイルもあれば取らない。違えば取り、新しい名前のファイルに書いてから行を書き換え、前のファイルを消す。
-  取得元に画像が無ければ（`folder.jpg` が消えた）ファイルを消して行を null にする。取得・書き込みに失敗したら、その番組は前の画像のまま残して同期を続ける（版を書かないので、次の同期で取り直す）
+  取得元に画像が無ければ（`folder.jpg` が消えた）ファイルを消して行を null にする。取得・書き込みに失敗したら、その番組は前の画像のまま残して同期を続ける（版を書かないので、次の同期で取り直す）。取得元に届かない（`SourceException.Unreachable`）・認証が通らない（`Unauthorized`）ときは、その回の残りの番組の画像の取得を打ち切る（残りも前の画像のまま。PR #288 1 周目 #4）
 - **接続**: 共有フォルダは `SessionSourceGateway` が `fetchProgramImage` のたびに木を開く（`openDownload` と同じ）。全走査の途中で呼ぶと、走査の接続とは別にもう 1 本張る。
   画像を取るのは版が変わった番組だけだが、この版を入れた直後の最初の同期では、`folder.jpg` を持つ番組の数だけ接続を張る（何本までなら困らないかは測っていない。未確認）
 - **置き場**: `filesDir/program_images/<番組のローカル ID>-<版の SHA-256 の頭 16 桁>.img`（`ProgramImageFiles`）。画像が変わると名前も変わるので、Coil のメモリのキャッシュがパスで引いても古い画像を出さない。
-  一時ファイルに書いてから名前を変える。全走査の最後に、どの行からも指されていないファイルを消す（「この番組を削除」（`removeProgram`）で行が消えた番組の画像は、次の全走査で消える）。
+  一時ファイルに書いてから名前を変える。「この番組を削除」（`RoomDownloadRepository.removeProgram`）は、行を消す前に `imagePath` を取り、行を消した後にそのファイルを消す（消せなくても削除は止めない）。全走査の最後に、どの行からも指されていないファイル（消せずに残ったものなど）を孤児として消す。
   「取得元を変える」（`RoomLocalDataReset`）は全部消す。ファイルの書き込み・消去と行の更新は `RoomLibraryRefreshRepository` の中の `Mutex` で 1 つずつ行う
 - **表示**: Coil（`coil-compose`、Apache-2.0）の `AsyncImage` に手元のファイルを渡す（`ui/ProgramImage.kt` の `ProgramImageView`）。番組一覧の行と再生画面に出し、各回一覧とミニプレイヤーには出さない（`docs/ui.md`）。
   プレビューは `ProgramImagePreview`（Coil の `LocalAsyncImagePreviewHandler`）で単色に差し替える
