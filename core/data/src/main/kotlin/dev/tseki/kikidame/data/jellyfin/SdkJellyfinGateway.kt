@@ -8,6 +8,7 @@ import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceItemId
+import dev.tseki.kikidame.domain.SourceImage
 import dev.tseki.kikidame.domain.SourceProgram
 import dev.tseki.kikidame.domain.SourceSnapshot
 import dev.tseki.kikidame.domain.Session
@@ -23,6 +24,7 @@ import org.jellyfin.sdk.api.client.exception.SecureConnectionException
 import org.jellyfin.sdk.api.client.exception.TimeoutException
 import org.jellyfin.sdk.api.client.extensions.authenticateUserByName
 import org.jellyfin.sdk.api.client.extensions.authenticationApi
+import org.jellyfin.sdk.api.client.extensions.imageApi
 import org.jellyfin.sdk.api.client.extensions.libraryApi
 import org.jellyfin.sdk.api.client.extensions.userViewApi
 import org.jellyfin.sdk.api.client.util.AuthorizationHeaderBuilder
@@ -31,6 +33,7 @@ import org.jellyfin.sdk.model.ClientInfo
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.CollectionType
+import org.jellyfin.sdk.model.api.ImageType
 import org.jellyfin.sdk.model.api.ItemFields
 import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.SortOrder
@@ -139,6 +142,8 @@ class SdkJellyfinGateway @Inject constructor(
         sourceId = SourceItemId(id.toString()),
         name = name.orEmpty(),
         publisherName = albumArtist ?: albumArtists?.firstOrNull()?.name,
+        // 番組の画像（#282）。Primary の ImageTag が版。Primary が無ければ画像なし
+        image = imageTags?.get(ImageType.PRIMARY)?.takeIf { it.isNotBlank() }?.let(::SourceImage),
     )
 
     /** `parent` 配下の Audio を 500 件ずつ全部。ライブラリでも番組（MusicAlbum）でも同じ形。 */
@@ -178,13 +183,7 @@ class SdkJellyfinGateway @Inject constructor(
     ): DownloadStream = call {
         val api = api(credentials.serverUrl, credentials.accessToken)
         val url = api.libraryApi.getDownloadUrl(UUID.fromString(episodeSourceId.value))
-        val authorization = AuthorizationHeaderBuilder.buildHeader(
-            clientName = api.clientInfo.name,
-            clientVersion = api.clientInfo.version,
-            deviceId = api.deviceInfo.id,
-            deviceName = api.deviceInfo.name,
-            accessToken = credentials.accessToken,
-        )
+        val authorization = authorizationHeader(api, credentials)
         val request = Request.Builder()
             .url(url)
             .header("Authorization", authorization)
@@ -219,6 +218,32 @@ class SdkJellyfinGateway @Inject constructor(
         }
         DownloadStream(resumedFrom = resumedFrom, totalBytes = totalBytes, body = body.byteStream()) { response.close() }
     }
+
+    /**
+     * 番組（MusicAlbum）の Primary の画像を全部読む（#282）。URL と認証ヘッダは SDK に作らせ、転送は OkHttp で行う（[openDownload] と同じ）。
+     * 画像が無い（404）・[MAX_PROGRAM_IMAGE_BYTES] を超えるときは null。
+     */
+    override suspend fun fetchProgramImage(credentials: ServerCredentials, programSourceId: SourceItemId): ByteArray? = call {
+        val api = api(credentials.serverUrl, credentials.accessToken)
+        val url = api.imageApi.getItemImageUrl(UUID.fromString(programSourceId.value), ImageType.PRIMARY)
+        val request = Request.Builder().url(url).header("Authorization", authorizationHeader(api, credentials)).build()
+        withContext(Dispatchers.IO) {
+            downloadClient.newCall(request).execute().use { response ->
+                if (!imageStatusHasBody(response.code)) return@use null
+                val body = response.body ?: throw SourceException.Failed("empty body")
+                readLimited(body.byteStream(), body.contentLength(), MAX_PROGRAM_IMAGE_BYTES)
+            }
+        }
+    }
+
+    private fun authorizationHeader(api: ApiClient, credentials: ServerCredentials): String =
+        AuthorizationHeaderBuilder.buildHeader(
+            clientName = api.clientInfo.name,
+            clientVersion = api.clientInfo.version,
+            deviceId = api.deviceInfo.id,
+            deviceName = api.deviceInfo.name,
+            accessToken = credentials.accessToken,
+        )
 
     private val downloadClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
@@ -271,6 +296,36 @@ class SdkJellyfinGateway @Inject constructor(
     companion object {
         const val CLIENT_NAME = "Kikidame"
         const val PAGE_SIZE = 500
+
+        /** 画像の API の応答コード → 本文を読むか。200 は true、404（Primary が無い）は false、401/403 は [SourceException.Unauthorized]、ほかは [SourceException.Failed]。 */
+        internal fun imageStatusHasBody(code: Int): Boolean = when (code) {
+            200 -> true
+            404 -> false
+            401, 403 -> throw SourceException.Unauthorized()
+            else -> throw SourceException.Failed("HTTP $code")
+        }
+
+        /**
+         * 本文を [max] バイトまで読む。[contentLength]（不明なら負）が [max] を超える、または読みながら [max] を超えたら null
+         * （切れたバイト列は返さない）。
+         */
+        internal fun readLimited(input: java.io.InputStream, contentLength: Long, max: Long): ByteArray? {
+            if (contentLength > max) return null
+            val out = java.io.ByteArrayOutputStream()
+            val buffer = ByteArray(8 * 1024)
+            input.use {
+                while (true) {
+                    val n = it.read(buffer)
+                    if (n < 0) break
+                    out.write(buffer, 0, n)
+                    if (out.size() > max) return null
+                }
+            }
+            return out.toByteArray()
+        }
+
+        /** 番組の画像の大きさの上限。共有フォルダの `SharedFolderSource.MAX_PROGRAM_IMAGE_BYTES` と同じ値（10 MiB。根拠は無く、測っていない）。超えたら画像なし。 */
+        const val MAX_PROGRAM_IMAGE_BYTES = 10L * 1024 * 1024
         private const val TAG = "JellyfinGateway"
         private val CONTENT_RANGE_START = Regex("bytes\\s+(\\d+)-")
         private val CONTENT_RANGE_TOTAL = Regex("/(\\d+)\\s*$")

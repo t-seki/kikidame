@@ -36,6 +36,9 @@ class JellyfinSource @Inject constructor(
     override suspend fun fetchProgram(programId: SourceItemId): SourceProgram? =
         gateway.fetchProgram(credentials(), programId)
 
+    override suspend fun fetchProgramImage(programId: SourceItemId): ByteArray? =
+        gateway.fetchProgramImage(credentials(), programId)
+
     override suspend fun openDownload(episodeId: SourceItemId, rangeStart: Long): DownloadStream =
         gateway.openDownload(credentials(), episodeId, rangeStart)
 

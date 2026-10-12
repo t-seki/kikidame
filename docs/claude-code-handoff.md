@@ -81,11 +81,15 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 主に使う取得パス（SDK 経由で呼ぶ）:
 
 - ライブラリ一覧: `/UserViews`。`CollectionType = music` のものだけ選択できる（他は理由付きでグレーアウト）
-- 番組一覧: `/Items?ParentId={libraryId}&IncludeItemTypes=MusicAlbum&Recursive=true`（1 回）
+- 番組一覧: `/Items?ParentId={libraryId}&IncludeItemTypes=MusicAlbum&Recursive=true`（1 回。`Fields` は付けない）。
+  番組の画像の版は、返る `ImageTags.Primary`（`SourceProgram.image`）。`Fields` を付けなくても返ることを、Jellyfin 10.10.7 の実サーバ（`scripts/jellyfin-testserver.sh up 1010`）で確かめた（`folder.jpg` のあるアルバムだけ `ImageTags` に `Primary` が出た）。Jellyfin 12 では未確認（#282）
 - 各回一覧: `/Items?ParentId={libraryId}&IncludeItemTypes=Audio&Recursive=true&Fields=DateCreated,ParentId&SortBy=DateCreated&SortOrder=Descending&StartIndex=…&Limit=500`
   （ライブラリ全体を 500 件ずつ。番組ごとには呼ばない。`AlbumId` で番組に結び付け、どの番組にも属さない Audio は取り込まない。
   **`Fields=MediaSources` は付けない**: SDK 1.9 は `MediaStream.IsOriginal` を必須と見なすが 10.11 は返さず、デコードで落ちる。
   ファイルサイズは M3 のダウンロード時に確定させる）
+- 番組の画像の中身（#282）: `/Items/{albumId}/Images/Primary`（SDK の `imageApi.getItemImageUrl` で URL を作り、転送は OkHttp。認証ヘッダは `openDownload` と同じ）。
+  404（Primary が無い）と 10 MiB（`SdkJellyfinGateway.MAX_PROGRAM_IMAGE_BYTES`。共有フォルダの上限と同じ値で、根拠は無い）超えは null（画像なし）。サイズ指定・変換は付けず、サーバの原本をそのまま持つ。
+  10.10.7 の画像の API は、無効なトークンでも画像を返した（認証を求めない）。ヘッダは付けるが、認証の失敗の経路（401/403 → `Unauthorized`）は実サーバでは確かめていない
 - 原本ダウンロード: `/Items/{itemId}/Download`（トランスコードは使わない。direct play 前提）
 - 再生位置・再生済みの送信: **`POST /UserItems/{itemId}/UserData`**（`UpdateUserItemDataDto` の
   `PlaybackPositionTicks` / `Played` / `LastPlayedDate`）。`/Sessions/Playing/*` は使わない
@@ -152,7 +156,7 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 番組の画像（`CONTEXT.md`）を同期で取得元から取り、アプリの領域にファイルで持つ（ADR 0012）。表示は手元のファイルだけを読む。
 
 - **口の形**: `SourceProgram.image`（`SourceImage(version)`。取得元に画像が無ければ null）に版だけを載せ、中身は `SourceGateway.fetchProgramImage(programId)` で別に取る。
-  取り直すかを決めるのは取り込みの側（`RoomLibraryRefreshRepository.updateImages`）で、取得元は前の版を知らなくてよい。#282 の Jellyfin は ImageTag を版にして同じ口に載る想定
+  取り直すかを決めるのは取り込みの側（`RoomLibraryRefreshRepository.updateImages`）で、取得元は前の版を知らなくてよい。Jellyfin（#282）は Primary の ImageTag を版にして同じ口に載る（`JellyfinSource.fetchProgramImage` → `JellyfinGateway.fetchProgramImage`）。ImageTag が変わらなければ取り直さない（`JellyfinProgramImageTest`）
 - **取り込み**: 番組ごとの取り込み（全走査の途中、`ScanListener.onProgramScanned`）・全走査の最後の取り込み・1 番組の同期のどれでも、同期（削除・予約）の後に `updateImages` を回す。
   新しい回の無い番組は途中の取り込みに流れないので、最後の取り込みで取る。版が行（`imageVersion`）と同じで、ファイルがあるか `imagePath` が null（その版は画像なしと分かっている）なら取らない。違えば取り、新しい名前のファイルに書いてから行を書き換え、前のファイルを消す。
   取得元に画像が無ければ（`folder.jpg` が消えた）ファイルを消して行を null にする。
@@ -387,7 +391,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
   `LibraryMatching.match`（JUnit 5）。`:core:data` に `JellyfinGateway` インターフェース（`signIn` / `listLibraries` / `fetchLibrary`）と
   jellyfin-sdk-kotlin 実装、`SessionStore`。Repository が突合結果を 1 トランザクションで Room に適用。テストはフェイクのゲートウェイ。
   #196（ADR 0010）から、同期とダウンロードは取得元の境界 `SourceGateway`（`fetchAll` / `fetchProgram` / `fetchProgramEpisodes` / `openDownload`、`:core:data` の `data.source`）だけを通す。
-  #264（ADR 0012）で番組の画像の中身を取る `fetchProgramImage` を足した（既定は画像なし。Jellyfin はまだこの既定のまま。#282）。
+  #264（ADR 0012）で番組の画像の中身を取る `fetchProgramImage` を足した（既定は画像なし。共有フォルダは `folder.jpg`、Jellyfin（#282）は Primary の画像を返す）。
   Jellyfin の実装は `JellyfinSource` で、`SessionStore` から認証の情報を読んで `JellyfinGateway` を呼ぶ
   モジュールは 3 つのまま
 

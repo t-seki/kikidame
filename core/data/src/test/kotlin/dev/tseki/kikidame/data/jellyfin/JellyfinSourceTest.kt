@@ -68,8 +68,20 @@ class JellyfinSourceTest {
         assertEquals(listOf(credentials), gateway.usedCredentials)
     }
 
+    /** 番組の画像（#282）もライブラリを選ぶ前から取れる（番組の取得と同じ認証の情報）。 */
+    @Test
+    fun fetchProgramImageUsesTheStoredCredentials() = runTest {
+        store.saveSession(session)
+        gateway.programImages[SourceItemId("album-1")] = byteArrayOf(9, 8)
+
+        assertEquals(listOf<Byte>(9, 8), source.fetchProgramImage(SourceItemId("album-1"))?.toList())
+        assertEquals(null, source.fetchProgramImage(SourceItemId("album-2")))
+        assertEquals(listOf(credentials, credentials), gateway.usedCredentials)
+    }
+
     @Test
     fun signedOutIsUnauthorized() = runTest {
+        assertFailsWith<SourceException.Unauthorized> { source.fetchProgramImage(SourceItemId("album-1")) }
         assertFailsWith<SourceException.Unauthorized> { source.fetchAll() }
         assertFailsWith<SourceException.Unauthorized> { source.fetchProgram(SourceItemId("album-1")) }
         assertFailsWith<SourceException.Unauthorized> { source.fetchProgramEpisodes(SourceItemId("album-1")) }
