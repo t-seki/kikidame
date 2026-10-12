@@ -76,7 +76,7 @@ class PlayerViewModel @Inject constructor(
     private val requestedEpisodeId = EpisodeId(route.episodeId)
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState
-    private val _episodeArtwork = MutableStateFlow<ByteArray?>(null)
+    private val _episodeImage = MutableStateFlow<ByteArray?>(null)
     /** 再生中の回の再生済みフラグ。Room を正として表示する。 */
     val played: StateFlow<Boolean> = _uiState
         .map { it.episodeId }
@@ -101,7 +101,8 @@ class PlayerViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     /**
      * 再生中の回の番組の画像（ADR 0012、#264）。無ければ null。番組を購読するので、この画面を開いたまま同期が画像を取り直しても追従する。
-     * 画面に出すのは [episodeArtwork] を優先し、これはその回の画像が無いときの番組の画像。
+     * 画面に出すのは [episodeImage] を優先し、これはその回の画像が無いときの番組の画像。
+     * 回の画像として番組の画像が載った後は、同期が番組の画像を取り直しても、次に回が替わるまで再生画面・通知の画像は差し替わらない（載せた `artworkData` を読むため）。
      */
     val programImage: StateFlow<ProgramImage?> = _uiState
         .map { it.episodeId }
@@ -119,7 +120,7 @@ class PlayerViewModel @Inject constructor(
      * 再生中の回の画像（#283）。サービスが現在の項目の `artworkData` に載せたもの（回の埋め込み画像、無ければ番組の画像。通知・ロック画面・Auto と同じ）。
      * 載るまで・どちらも無いときは null。
      */
-    val episodeArtwork: StateFlow<ByteArray?> = _episodeArtwork
+    val episodeImage: StateFlow<ByteArray?> = _episodeImage
 
     /** 倍速（#35）。アプリ全体の設定で、サービス側が同じ Flow を購読してプレイヤーに反映する。 */
     val speed: StateFlow<Float> = settings.playbackSpeed
@@ -226,7 +227,7 @@ class PlayerViewModel @Inject constructor(
     private fun refresh(player: Player) {
         val item = player.currentMediaItem
         val artwork = item?.mediaMetadata?.artworkData
-        if (!(artwork contentEquals _episodeArtwork.value)) _episodeArtwork.value = artwork
+        if (!(artwork contentEquals _episodeImage.value)) _episodeImage.value = artwork
         _uiState.update {
             it.copy(
                 episodeId = EpisodeMediaItems.episodeId(item),

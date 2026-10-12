@@ -53,13 +53,13 @@ class PlaybackService : MediaLibraryService() {
     @Inject lateinit var settings: AppSettingsRepository
     @Inject lateinit var sleepTimer: SleepTimer
     @Inject lateinit var programQueue: ProgramQueue
-    @Inject lateinit var episodeArtwork: EpisodeArtwork
+    @Inject lateinit var episodeImage: EpisodeImage
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var session: MediaLibrarySession? = null
     private var positionPersister: PositionPersister? = null
     private var resumeOnTransition: ResumeOnTransition? = null
     private var nowPlayingListener: Player.Listener? = null
-    private var artworkAttacher: ArtworkAttacher? = null
+    private var episodeImageAttacher: EpisodeImageAttacher? = null
     private var speedJob: Job? = null
     private var sleepTimerRunner: SleepTimerRunner? = null
     private lateinit var browseTree: BrowseTree
@@ -129,7 +129,7 @@ class PlaybackService : MediaLibraryService() {
         resumeOnTransition = ResumeOnTransition(player, playbackStateRepository, scope).also { it.attach() }
         nowPlayingListener = nowPlaying.listener(player, scope).also(player::addListener)
         // 回の画像（#283）: 聴く回に替わるたび、埋め込み画像（無ければ番組の画像）を現在の項目に載せる
-        artworkAttacher = ArtworkAttacher(player, scope, episodeArtwork::load).also { it.attach() }
+        episodeImageAttacher = EpisodeImageAttacher(player, scope, episodeImage::load).also { it.attach() }
         player.addListener(errorListener)
         // 倍速（#35）: アプリ全体で 1 つ。設定が変われば即反映。ピッチは変えない
         speedJob = scope.launch { settings.playbackSpeed.collect { speed -> player.setPlaybackSpeed(speed) } }
@@ -148,7 +148,7 @@ class PlaybackService : MediaLibraryService() {
         // player に触るものは release() の前に止める。scope の cancel もここ（NowPlaying の位置の ticker が scope に住む）
         speedJob?.cancel()
         sleepTimerRunner?.detach()
-        artworkAttacher?.detach()
+        episodeImageAttacher?.detach()
         positionPersister?.detach()
         resumeOnTransition?.detach()
         scope.cancel()

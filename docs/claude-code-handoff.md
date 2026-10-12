@@ -164,9 +164,9 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
   「取得元を変える」（`RoomLocalDataReset`）は全部消す。ファイルの書き込み・消去と行の更新は `RoomLibraryRefreshRepository` の中の `Mutex` で 1 つずつ行う
 - **表示**: Coil（`coil-compose`、Apache-2.0）の `AsyncImage` に手元のファイルを渡す（`ui/ProgramImage.kt` の `ProgramImageView`）。番組一覧の行と再生画面に出し、各回一覧とミニプレイヤーには出さない（`docs/ui.md`）。
   プレビューは `ProgramImagePreview`（Coil の `LocalAsyncImagePreviewHandler`）で単色に差し替える
-- **回の画像と再生まわり（#283）**: 回の画像（各回のファイルに埋め込まれた画像）は走査では読まず、再生に入った回の分だけ `EpisodeArtwork`（`MediaMetadataRetriever.embeddedPicture`。無ければ番組の画像のファイル）が読む。
-  長辺 512px 以下に縮め（透過があれば PNG、無ければ JPEG 85）、`ArtworkAttacher`（`PlaybackService` が付けるリスナー）が聴く回に替わるたびに現在の項目を `replaceMediaItem` で `setArtworkData` 付きに差し替える（キューの全件は読まない）。
-  通知・ロック画面・Auto の再生中の表示と、再生画面（`PlayerViewModel.episodeArtwork`。Coil に ByteArray を渡す `EpisodeArtworkView`）は、この `artworkData` を読む。ContentProvider は足さない。
+- **回の画像と再生まわり（#283）**: 回の画像（各回のファイルに埋め込まれた画像）は走査では読まず、再生に入った回の分だけ `EpisodeImage`（`MediaMetadataRetriever.embeddedPicture`。無ければ番組の画像のファイル）が読む。
+  長辺 512px 以下に縮め（透過があれば PNG、無ければ JPEG 85）、`EpisodeImageAttacher`（`PlaybackService` が付けるリスナー）が聴く回に替わるたびに現在の項目を `replaceMediaItem` で `setArtworkData` 付きに差し替える（キューの全件は読まない）。
+  通知・ロック画面・Auto の再生中の表示と、再生画面（`PlayerViewModel.episodeImage`。Coil に ByteArray を渡す `EpisodeImageView`）は、この `artworkData` を読む。ContentProvider は足さない。
   Auto のブラウズツリーの各項目（`BrowseTree`）には画像を出さない。Media3 が再生中のファイルの埋め込み画像を自分で `Player.mediaMetadata` に載せるかは確かめていない（未確認）。
   差し替えが再生を途切れさせないか（ExoPlayer が同じ URI の項目の更新を作り直しなしで受けるか）は、実機で見ていない（未確認）
 

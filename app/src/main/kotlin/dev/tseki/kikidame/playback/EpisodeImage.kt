@@ -4,6 +4,7 @@ import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.LibraryRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -16,15 +17,26 @@ import kotlin.math.max
  * 通知・ロック画面・Auto には `setArtworkData` でバイト列を渡す（外のプロセスに画像を渡す ContentProvider は持たない）ので、
  * 縮めて（長辺 [MAX_SIDE_PX] まで）圧縮し直す。
  */
-class EpisodeArtwork @Inject constructor(private val library: LibraryRepository) {
+class EpisodeImage @Inject constructor(private val library: LibraryRepository) {
     suspend fun load(episodeId: EpisodeId): ByteArray? {
         val episode = library.getEpisode(episodeId) ?: return null
         val audioPath = episode.localFile?.path
         val programImagePath = library.getProgram(episode.episode.programId)?.image?.path
         return withContext(Dispatchers.IO) {
-            audioPath?.let { runCatching { embeddedPicture(it) }.getOrNull() }?.let(::shrink)
-                ?: programImagePath?.let { runCatching { File(it).readBytes() }.getOrNull() }?.let(::shrink)
+            audioPath?.let { candidate { embeddedPicture(it)?.let(::shrink) } }
+                ?: programImagePath?.let { candidate { shrink(File(it).readBytes()) } }
         }
+    }
+
+    /** 候補 1 つの読み込み・縮小。失敗（OOM・不正な画像など）は、その候補が無いものとして null（次の候補へ）。[CancellationException] は投げ直す。 */
+    private inline fun candidate(block: () -> ByteArray?): ByteArray? = try {
+        block()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        null
+    } catch (e: OutOfMemoryError) {
+        null
     }
 
     private fun embeddedPicture(path: String): ByteArray? {

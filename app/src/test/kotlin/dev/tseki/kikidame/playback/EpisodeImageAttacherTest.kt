@@ -14,7 +14,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
-class ArtworkAttacherTest {
+class EpisodeImageAttacherTest {
     private val player = FakePlayer()
     private fun item(id: Long, artwork: ByteArray? = null) = MediaItem.Builder()
         .setMediaId(id.toString())
@@ -28,7 +28,7 @@ class ArtworkAttacherTest {
     fun attachesTheEpisodesImageToTheCurrentItemOnly() = runTest(StandardTestDispatcher()) {
         val loaded = mutableListOf<EpisodeId>()
         player.setPlaylist(listOf(item(1), item(2)), listOf(1000, 1000))
-        ArtworkAttacher(player, this) { id -> loaded += id; byteArrayOf(id.value.toByte()) }.attach()
+        EpisodeImageAttacher(player, this) { id -> loaded += id; byteArrayOf(id.value.toByte()) }.attach()
         player.seekToNextMediaItem()
         player.update { }
         runCurrent()
@@ -42,7 +42,7 @@ class ArtworkAttacherTest {
     @Test
     fun leavesTheItemAloneWhenThereIsNoImage() = runTest(StandardTestDispatcher()) {
         player.setPlaylist(listOf(item(1), item(2)), listOf(1000, 1000))
-        ArtworkAttacher(player, this) { null }.attach()
+        EpisodeImageAttacher(player, this) { null }.attach()
         player.seekToNextMediaItem()
         player.update { }
         runCurrent()
@@ -53,7 +53,7 @@ class ArtworkAttacherTest {
     fun doesNotLoadAgainWhenTheItemAlreadyHasAnImage() = runTest(StandardTestDispatcher()) {
         var calls = 0
         player.setPlaylist(listOf(item(1), item(2, byteArrayOf(9))), listOf(1000, 1000))
-        ArtworkAttacher(player, this) { calls++; byteArrayOf(1) }.attach()
+        EpisodeImageAttacher(player, this) { calls++; byteArrayOf(1) }.attach()
         player.seekToNextMediaItem()
         player.update { }
         runCurrent()
@@ -64,7 +64,7 @@ class ArtworkAttacherTest {
     @Test
     fun dropsTheImageWhenAnotherEpisodeIsCurrentByThen() = runTest(StandardTestDispatcher()) {
         player.setPlaylist(listOf(item(1), item(2), item(3)), listOf(1000, 1000, 1000))
-        ArtworkAttacher(player, this) { id ->
+        EpisodeImageAttacher(player, this) { id ->
             if (id == EpisodeId(2)) player.seekToNextMediaItem()
             byteArrayOf(id.value.toByte())
         }.attach()

@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
  * 載せるのは同じ回の項目の差し替え（`replaceMediaItem`）で、URI は変えない。画像が無い（[load] が null）ときは何もしない。
  * 通知・ロック画面・Auto・再生画面はこの `artworkData` を読む。
  */
-class ArtworkAttacher(
+class EpisodeImageAttacher(
     private val player: Player,
     private val scope: CoroutineScope,
     private val load: suspend (EpisodeId) -> ByteArray?,

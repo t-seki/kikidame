@@ -33,7 +33,7 @@ internal fun ProgramImageView(image: ProgramImage, modifier: Modifier = Modifier
  * 画像が無いときに呼ばない。
  */
 @Composable
-internal fun EpisodeArtworkView(bytes: ByteArray, modifier: Modifier = Modifier) {
+internal fun EpisodeImageView(bytes: ByteArray, modifier: Modifier = Modifier) {
     AsyncImage(
         model = bytes,
         contentDescription = null,
