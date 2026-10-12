@@ -208,7 +208,7 @@ interface SessionRepository {
 
 /**
  * 取得元の一覧を取り込み、同期する。
- * 全走査は同期そのもの（ADR 0004）、番組単位の取得は取り込みだけで削除しない。
+ * 全走査は同期そのもの（ADR 0004）。1 番組の同期も、その番組についての一覧が完全なので削除の権限を持つ。
  */
 interface LibraryRefreshRepository {
     /**
@@ -232,15 +232,10 @@ interface LibraryRefreshRepository {
     ): RefreshResult
 
     /**
-     * 1 番組の各回だけを取得して取り込む（#12）。削除も予約もせず、最終同期の時刻も更新しない。
-     * 番組が取得元 ID を持たなければ null（呼び出し側は全体の [refresh] にフォールバックする）。
-     */
-    suspend fun refreshProgram(programId: ProgramId): RefreshResult?
-
-    /**
      * 1 番組だけ同期する。番組の存在を確かめてから（無ければ消失 = 判断保留）その番組の各回一覧を取り、
      * 取り込み → [SyncPlanner] → 除去・削除・予約をこの番組に限って行う。その番組についての一覧は完全なので
-     * 削除の権限を持つ（ADR 0004）。最終同期の時刻は更新しない。取得元 ID を持たなければ null。
+     * 削除の権限を持つ（ADR 0004）。最終同期の時刻は更新しない。番組の行が無いか取得元 ID を持たなければ null
+     * （各回一覧の「引っ張って更新」の呼び出し側は全体の [refresh] にフォールバックする）。
      */
     suspend fun syncProgram(programId: ProgramId, excluded: Set<EpisodeId> = emptySet()): RefreshResult?
 }

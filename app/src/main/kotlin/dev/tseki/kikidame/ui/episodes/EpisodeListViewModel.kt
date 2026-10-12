@@ -90,9 +90,9 @@ class EpisodeListViewModel @Inject constructor(
     /** 更新の結果、この画面での操作の結果、ミニプレイヤーが消えた理由を 1 本にまとめてスナックバーへ。 */
     val messages: Flow<UiText> = merge(refresher.messages, localMessages, nowPlaying.messages)
 
-    /** 各回一覧の「引っ張って更新」= この番組だけ取り込む（#12）。削除はしない。 */
+    /** 各回一覧の「引っ張って更新」= 1 番組の同期（#279）。番組の行が無い・取得元 ID が無いときは全走査に切り替える。 */
     fun refresh() {
-        viewModelScope.launch { refresher.refreshProgram(programId) }
+        viewModelScope.launch { refresher.syncProgram(programId, orFullSync = true) }
     }
 
     /** ボトムシートの「この番組を今すぐ同期」= 1 番組の同期。 */

@@ -39,8 +39,7 @@ import javax.inject.Singleton
  * 更新と同期の唯一の入口。同時に 1 つしか走らせず、結果を文言にして画面へ流す。
  *
  * - [refresh]: 全走査 = ライブラリ全体の同期（ADR 0004）。番組一覧の「引っ張って更新」、定期・起動時の Worker が呼ぶ
- * - [syncProgram]: 1 番組の同期。シートの「この番組を今すぐ同期」が呼ぶ
- * - [refreshProgram]: 番組単位の取り込み（#12）。各回一覧の「引っ張って更新」が呼ぶ。削除しない
+ * - [syncProgram]: 1 番組の同期。各回一覧の「引っ張って更新」と、シートの「この番組を今すぐ同期」が呼ぶ（#279）
  * - 「Wi-Fi のみ」は手動を含めて効く。従量制なら取得元に触らず理由を出して終える。手元のファイルの整合（#5）はその前に走る。
  *   取得元が端末のフォルダなら効かせない（#199 の決定 4。[dev.tseki.kikidame.domain.wifiOnlyApplies]）
  * - 401 はログアウトと同じ処理をする（セッション状態が変わり、画面側が接続画面へ導く）。端末のフォルダでアクセスが切れたときも同じで、
@@ -102,14 +101,13 @@ class LibraryRefresher @Inject constructor(
      */
     suspend fun refresh(silent: Boolean = false): RefreshResult? = guarded(silent) { sync() }
 
-    /** 1 番組だけ取り込む。取得元 ID の無い番組は全走査（同期）にフォールバックする。 */
-    suspend fun refreshProgram(programId: ProgramId): RefreshResult? = guarded(silent = false) {
-        refreshRepository.refreshProgram(programId)?.also { report(it.toProgramSyncMessage()) } ?: sync()
-    }
-
-    /** 1 番組だけ同期する。取得元 ID の無い番組は何もしない（シート側でスイッチを無効にしている）。 */
-    suspend fun syncProgram(programId: ProgramId): RefreshResult? = guarded(silent = false) {
+    /**
+     * 1 番組だけ同期する。番組の行が無いか取得元 ID の無い番組は、[orFullSync] なら全走査（同期）に切り替え（各回一覧の
+     * 「引っ張って更新」。#279）、そうでなければ何もしない（シート側でスイッチを無効にしている）。
+     */
+    suspend fun syncProgram(programId: ProgramId, orFullSync: Boolean = false): RefreshResult? = guarded(silent = false) {
         refreshRepository.syncProgram(programId, excluded = excluded())?.also { report(it.toProgramSyncMessage()) }
+            ?: if (orFullSync) sync() else null
     }
 
     /** 全走査して結果の文言を出す。手元に変化があれば silent でも出す（#142）。 */

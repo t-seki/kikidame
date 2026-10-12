@@ -23,7 +23,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 
-/** 全走査 = 同期（ADR 0004）の適用と、番組単位の更新（#12）が削除しないこと。 */
+/** 全走査 = 同期（ADR 0004）の適用と、1 番組の同期（#279 で各回一覧の引っ張って更新も同じ）がその番組の中で削除・予約すること（削除の権限を持つこと）。 */
 @RunWith(AndroidJUnit4::class)
 class RoomSyncTest : JellyfinRefreshTestBase() {
     /** 公開日をタイトルにした 60 分の回。 */
@@ -258,26 +258,24 @@ class RoomSyncTest : JellyfinRefreshTestBase() {
         assertEquals(true, episode("a3").localFile?.pinned)
     }
 
+    /** 同期を OFF にした番組でも、1 番組の同期は固定していない手元のファイルを消す（#279。番組一覧の引っ張って更新と同じ）。 */
     @Test
-    fun refreshProgramTakesInWithoutDeletingOrTouchingLastSync() = runTest {
+    fun syncProgramOfAProgramWithSyncOffDeletesUnpinnedFilesAndKeepsPinned() = runTest {
         signInAndSelect()
         gateway.snapshot = threeEpisodes
         repo.refresh()
-        library.updateSync(programId(), syncEnabled = true, RetentionRule(keepLatest = 1))
-        val file = markDone("a1", pinned = false)
+        library.updateSync(programId(), syncEnabled = false, RetentionRule(keepLatest = 1))
+        val unpinned = markDone("a1", pinned = false)
+        val pinned = markDone("a2", pinned = true)
         val fetchedAt = assertIs<SessionState.Ready>(session.state.first()).lastFetchedAt
         now += 5.minutes
-        gateway.snapshot = threeEpisodes.copy(episodes = listOf(se("a4", "2026-09-04")))
 
-        val result = assertNotNull(repo.refreshProgram(programId()))
+        val result = assertNotNull(repo.syncProgram(programId()))
 
-        assertEquals(listOf(SourceItemId("album-1")), gateway.fetchedPrograms)
-        assertEquals(1, result.episodes)
+        assertEquals(1, result.deleted)
         assertEquals(0, result.enqueued)
-        assertEquals(0, result.deleted)
-        assertTrue(file.exists(), "a per-program refresh never deletes (ADR 0004)")
-        assertEquals(4, library.observePrograms().first().single().episodeCount, "the new episode is added, the missing ones stay")
-        assertNull(episode("a4").localFile, "nothing is enqueued")
+        assertFalse(unpinned.exists())
+        assertTrue(pinned.exists())
         assertEquals(fetchedAt, assertIs<SessionState.Ready>(session.state.first()).lastFetchedAt)
     }
 
@@ -382,26 +380,6 @@ class RoomSyncTest : JellyfinRefreshTestBase() {
         assertNull(library.observeProgram(id).first()?.goneSince)
     }
     @Test
-    fun refreshProgramAlsoRecordsAndClearsGone() = runTest {
-        signInAndSelect()
-        gateway.snapshot = threeEpisodes
-        repo.refresh()
-        val id = programId()
-        val file = markDone("a1", pinned = false)
-
-        gateway.snapshot = SourceSnapshot(emptyList(), emptyList())
-        val onHold = assertNotNull(repo.refreshProgram(id))
-        assertEquals(1, onHold.onHold)
-        assertEquals(now, library.observeProgram(id).first()?.goneSince)
-        assertTrue(file.exists(), "a per-program refresh never deletes")
-        assertEquals(3, episodes().size)
-
-        gateway.snapshot = threeEpisodes
-        repo.refreshProgram(id)
-        assertNull(library.observeProgram(id).first()?.goneSince, "pull-to-refresh on the episode list clears the badge")
-    }
-
-    @Test
     fun removeProgramDeletesRowsFilesAndPlayback() = runTest {
         signInAndSelect()
         gateway.snapshot = threeEpisodes
@@ -418,11 +396,11 @@ class RoomSyncTest : JellyfinRefreshTestBase() {
         assertNull(db.playbackStateDao().findByEpisode(a1.value))
     }
     @Test
-    fun refreshProgramReturnsNullForAProgramWithoutServerId() = runTest {
+    fun syncProgramReturnsNullForAProgramWithoutServerId() = runTest {
         signInAndSelect()
         val id = ProgramId(db.programDao().insert(dev.tseki.kikidame.data.db.ProgramEntity(sourceItemId = null, name = "seed", publisherName = null)))
 
-        assertNull(repo.refreshProgram(id))
+        assertNull(repo.syncProgram(id))
         assertTrue(gateway.fetchedPrograms.isEmpty())
     }
 }
