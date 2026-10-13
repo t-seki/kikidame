@@ -245,7 +245,7 @@ Auto はブラウズツリーを開き直すたびに `onGetChildren` を呼ぶ�
   $ADB shell rm -r /sdcard/KikidameTest
   ```
 
-この節のコマンドは、worker の環境に実機が無いため worker は流していない。PR #214 のマージ前の検証（2026-10-11）で、Supervisor と人がこの節の形で試験用のフォルダを置いて確かめた（下のチェックリストの結果）。
+この節のコマンドは、worker の環境に実機が無いため worker は流していない。PR #214 のマージ前の検証（2026-10-11）で、Supervisor と人がこの節の形で試験用のフォルダを置いて確かめた（[device-checklists.md](device-checklists.md) の「実機チェックリスト（#199）」の結果）。
 
 ## 手元のファイルと DB の突き合わせ（#50）
 
