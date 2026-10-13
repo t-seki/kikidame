@@ -102,7 +102,7 @@ $ADB shell am force-stop $PKG
 # DB を引き出し、対象の local_files.state を 'DONE' → 'PENDING' に書き換えて戻す（debug 版の run-as。「裏の同期をすぐ起こす」と同じ形）
 W=$(mktemp -d)   # repo の外に置く
 for f in kikidame.db kikidame.db-wal; do $ADB exec-out run-as $PKG cat databases/$f > $W/$f; done
-python3 -c "import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); print(c.execute(\"UPDATE local_files SET state='PENDING' WHERE episodeId=? AND state='DONE'\", (sys.argv[2],)).rowcount); c.commit()" $W/kikidame.db '<episodeId>'   # 1 なら書き換わった（WAL は開いたときに取り込まれる）
+python3 -c "import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); print(c.execute(\"UPDATE local_files SET state='PENDING' WHERE episodeId=? AND state='DONE'\", (sys.argv[2],)).rowcount); c.commit(); c.execute('PRAGMA wal_checkpoint(TRUNCATE)'); c.close()" $W/kikidame.db '<episodeId>'   # 1 なら書き換わった。checkpoint で WAL を本体に書き込む
 $ADB shell run-as $PKG rm -f databases/kikidame.db-wal databases/kikidame.db-shm
 $ADB exec-in run-as $PKG sh -c 'cat > databases/kikidame.db' < $W/kikidame.db
 rm -r $W
