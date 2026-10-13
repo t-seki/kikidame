@@ -242,7 +242,7 @@ class SharedFolderSource(
 
     /**
      * 取得元 ID・サイズ・更新日時がどれも前の走査と同じなら、その回の前の値（タグを読み直さない。epic #195 の決定 8）。違えば null。
-     * Room には ms で入るので、ms に揃えてから比べる（ms より細かい更新日時が来ても同じとみなす。SMB の実装（smbj）が実機で何の精度を返すかは未確認。docs/development.md の実機の確認項目）
+     * Room には ms で入るので、ms に揃えてから比べる（ms より細かい更新日時が来ても同じとみなす。SMB の実装（smbj）が実機で何の精度を返すかは未確認。docs/device-checklists.md の実機の確認項目）
      */
     private fun cachedValues(programId: SourceItemId, file: FolderEntry, previous: Map<SourceItemId, ScannedFile>): TagValues? {
         val modifiedAt = file.modifiedAt.truncatedToMillis()
