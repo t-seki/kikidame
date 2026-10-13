@@ -87,7 +87,7 @@ Google Play では配布しない（[ADR 0008](./docs/adr/0008-open-source-distr
 - **最初の取り込みの間は、アプリを開いて画面をつけておく。** 画面が消えてアプリが裏に回ると、しばらくして（数秒〜数分。端末や状況で変わる）Android がアプリの通信を切り、取り込みは止まる。取り込み済みの番組は残り、次にアプリを開いたとき、読み終えていない番組から続きを読む（取り込み済みの番組のタグは読み直さない）。番組が共有から消えたかどうかは、最後まで読み終えた走査でだけ判断する
 - 読み取りが失敗したら、接続を張り直して同じファイルから読み直し、続けて 3 回失敗したら、その同期は到達不能で終わる。張り直しで実際に続けられるか（短い通信の途切れの後など）は、実機ではまだ確かめていない
 - 各回のファイル名を変えると未結合になり、同じ番組の中でタイトル（次に公開日と尺）で結び直す。番組のフォルダ名を変えると、配信元と番組名で結べないので、その番組は消失（判断保留）になる
-- お使いの NAS とネットワークで動くか（名前の解決、ゲストの接続、最初の取り込みにかかる時間）は、開発者の NAS と端末でしか確かめていない。[docs/development.md](./docs/development.md) の「実機で試す（#198: SMB の共有フォルダ）」とそのチェックリストを参照
+- お使いの NAS とネットワークで動くか（名前の解決、ゲストの接続、最初の取り込みにかかる時間）は、開発者の NAS と端末でしか確かめていない。「実機で試す（#198: SMB の共有フォルダ）」の準備は [docs/device-testing.md](./docs/device-testing.md)、チェックリストは [docs/device-checklists.md](./docs/device-checklists.md) を参照
 
 ### 端末のフォルダ
 
@@ -97,7 +97,7 @@ Google Play では配布しない（[ADR 0008](./docs/adr/0008-open-source-distr
 - **フォルダのファイルは消さずに置いておく。** フォルダからファイルを消すと、次の同期でその回は取得元から消えたものとして扱われ、アプリの中のコピーも消える（固定していても消える）。PC で録ったファイルを Syncthing や FolderSync などでフォルダに同期して溜める使い方を想定しているので、ファイルはそのまま置いておく
 - 端末のフォルダからのダウンロードと同期にはネットワークが要らないので、「Wi-Fi のみ」もかけない（端末の中から端末の中へのコピーなので）
 - フォルダを読めなくなったら（権限が取り消された、フォルダを移した・消した）、ログアウトしてフォルダを選び直してもらう。手元の番組・各回・ファイルは残り、選び直したフォルダの中の構成が同じなら結び直る
-- 内部ストレージのフォルダは実機（Android 17）で、取り込み・コピー・再生・フォルダを動かした後の選び直しまで確かめた。SD カードとファイルの多いフォルダで動くかは未確認。[docs/development.md](./docs/development.md) の「実機で試す（#199: 端末のフォルダ）」を参照
+- 内部ストレージのフォルダは実機（Android 17）で、取り込み・コピー・再生・フォルダを動かした後の選び直しまで確かめた。SD カードとファイルの多いフォルダで動くかは未確認。[docs/device-checklists.md](./docs/device-checklists.md) の「実機で試す（#199: 端末のフォルダ）」を参照
 
 ## 仕組みの要点
 
@@ -121,7 +121,7 @@ export JAVA_HOME=~/.local/jdk/current   # JDK 25
 ./gradlew :app:installDebug             # 接続中の端末へ
 ```
 
-ツールチェインの揃え方、WSL2 からのワイヤレスデバッグ、実機のチェックリスト、DB とファイルの突き合わせは [docs/development.md](./docs/development.md)。
+ツールチェインの揃え方は [docs/development.md](./docs/development.md)、WSL2 からのワイヤレスデバッグと DB とファイルの突き合わせは [docs/device-testing.md](./docs/device-testing.md)、実機のチェックリストは [docs/device-checklists.md](./docs/device-checklists.md)（済んだものは [docs/device-checklists-archive.md](./docs/device-checklists-archive.md)）。
 
 ## モジュール構成
 
@@ -149,7 +149,10 @@ export JAVA_HOME=~/.local/jdk/current   # JDK 25
 - 用語集: [CONTEXT.md](./CONTEXT.md)
 - 設計判断の記録: [docs/adr/](./docs/adr/)
 - 実装引き継ぎ（設計の全体像・マイルストーン）: [docs/claude-code-handoff.md](./docs/claude-code-handoff.md)
-- 開発ガイド（ツールチェイン・テスト・実機確認・並行作業）: [docs/development.md](./docs/development.md)
+- 開発ガイド（ツールチェイン・テスト・リリース・並行作業）: [docs/development.md](./docs/development.md)
+- 実機で試す手順（ワイヤレスデバッグ・Android Auto・試験用のデータの準備・DB とファイルの突き合わせ）: [docs/device-testing.md](./docs/device-testing.md)
+- 未確認の項目が残る実機チェックリスト: [docs/device-checklists.md](./docs/device-checklists.md)
+- 済んだ実機チェックリスト: [docs/device-checklists-archive.md](./docs/device-checklists-archive.md)
 - UI の方針（大事にすること・色・画面ごとの役割）: [docs/ui.md](./docs/ui.md)
 
 ## ライセンス

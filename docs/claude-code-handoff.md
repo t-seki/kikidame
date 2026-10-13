@@ -172,7 +172,7 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
   長辺 512px 以下に縮め（透過があれば PNG、無ければ JPEG 85）、`EpisodeImageAttacher`（`PlaybackService` が付けるリスナー）が聴く回に替わるたびに現在の項目を `replaceMediaItem` で `setArtworkData` 付きに差し替える（キューの全件は読まない）。
   通知・ロック画面・Auto の再生中の表示と、再生画面（`PlayerViewModel.episodeImage`。Coil に ByteArray を渡す `EpisodeImageView`）は、この `artworkData` を読む。ContentProvider は足さない。
   Auto のブラウズツリーの各項目（`BrowseTree`）には画像を出さない。Media3 が再生中のファイルの埋め込み画像を自分で `Player.mediaMetadata` に載せるかは確かめていない（未確認）。
-  差し替えで音が途切れず再生位置も戻らないことは、2026-10-13 に人が release 版 v0.5.0 で確かめた（`docs/development.md` の「実機チェックリスト（#283: 回の画像）」）。ExoPlayer が同じ URI の項目の更新を作り直しなしで受けているか（内部の挙動）は確かめていない
+  差し替えで音が途切れず再生位置も戻らないことは、2026-10-13 に人が release 版 v0.5.0 で確かめた（`docs/device-checklists.md` の「実機チェックリスト（#283: 回の画像）」）。ExoPlayer が同じ URI の項目の更新を作り直しなしで受けているか（内部の挙動）は確かめていない
 
 ## Room スキーマ（この形で作る）
 

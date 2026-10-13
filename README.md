@@ -87,7 +87,7 @@ The app connects to **Jellyfin**, a **shared folder on a NAS (SMB)** or a **fold
 - **Keep the app open with the screen on during the first import.** When the screen turns off and the app goes to the background, Android cuts the app's network connection after a while (from a few seconds to a few minutes; it varies with the device and the situation), and the import stops. Programs already imported stay, and the next time you open the app the import continues with the programs not read yet (their tags are not read again). Whether a program has disappeared from the share is decided only by a scan that reaches the end
 - If a read fails, the app reconnects and tries the same file again, and ends the sync as unreachable after three failures in a row. Whether reconnecting actually lets a scan continue (for example after a short network glitch) has not been seen on a real device yet
 - Renaming an episode file makes it unlinked and it is matched again by title (then by published day and duration) within the same program. Renaming a program folder makes the program Gone (On Hold), because the publisher and program name no longer match
-- Whether this works on your NAS and network (name resolution, guest access, how long the first import takes) is verified only on the developer's NAS and device; see "実機で試す（#198: SMB の共有フォルダ）" and its checklists in [docs/development.md](./docs/development.md) (Japanese)
+- Whether this works on your NAS and network (name resolution, guest access, how long the first import takes) is verified only on the developer's NAS and device; see "実機で試す（#198: SMB の共有フォルダ）" for the setup in [docs/device-testing.md](./docs/device-testing.md) and its checklists in [docs/device-checklists.md](./docs/device-checklists.md) (Japanese)
 
 ### Folder on this device
 
@@ -97,7 +97,7 @@ The app connects to **Jellyfin**, a **shared folder on a NAS (SMB)** or a **fold
 - **Keep the files in the folder.** If you delete a file from the folder, the next sync treats that episode as gone from the source and deletes the app's copy too, even if it is Pinned. This is meant for recordings you sync into the folder from a PC (Syncthing, FolderSync and the like): keep them there
 - Downloads and syncs from a folder on this device need no network at all, so "Wi-Fi only" does not apply to it (the copy stays inside the device)
 - If the app loses access to the folder (the permission was revoked, or the folder was moved or deleted), it signs out and asks you to pick the folder again. Programs, episodes and files on the device are kept, and they link up again if the folder you pick has the same layout
-- Folders in internal storage have been verified on a real device (Android 17): import, copying, playback, and re-selecting the folder after it was moved. Whether it works on SD cards and large folders is unverified. See "実機で試す（#199: 端末のフォルダ）" in [docs/development.md](./docs/development.md) (Japanese)
+- Folders in internal storage have been verified on a real device (Android 17): import, copying, playback, and re-selecting the folder after it was moved. Whether it works on SD cards and large folders is unverified. See "実機で試す（#199: 端末のフォルダ）" in [docs/device-checklists.md](./docs/device-checklists.md) (Japanese)
 
 ## How it works
 
@@ -121,7 +121,7 @@ export JAVA_HOME=~/.local/jdk/current   # JDK 25
 ./gradlew :app:installDebug             # install on the connected device
 ```
 
-Setting up the toolchain, wireless debugging from WSL2, the device checklist, and reconciling the DB with the files on disk are covered in [docs/development.md](./docs/development.md) (Japanese).
+Setting up the toolchain is covered in [docs/development.md](./docs/development.md), wireless debugging from WSL2 and reconciling the DB with the files on disk in [docs/device-testing.md](./docs/device-testing.md), and the device checklists in [docs/device-checklists.md](./docs/device-checklists.md) (completed ones in [docs/device-checklists-archive.md](./docs/device-checklists-archive.md)) (Japanese).
 
 ## Modules
 
@@ -151,7 +151,10 @@ The documentation below is in Japanese.
 - Glossary: [CONTEXT.md](./CONTEXT.md) (each term carries its English name)
 - Architecture decision records: [docs/adr/](./docs/adr/)
 - Implementation handoff (overall design, milestones): [docs/claude-code-handoff.md](./docs/claude-code-handoff.md)
-- Development guide (toolchain, tests, device checks, parallel work): [docs/development.md](./docs/development.md)
+- Development guide (toolchain, tests, release, parallel work): [docs/development.md](./docs/development.md)
+- Testing on a device (wireless debugging, Android Auto, preparing test data, reconciling the DB with the files): [docs/device-testing.md](./docs/device-testing.md)
+- Device checklists with unchecked items: [docs/device-checklists.md](./docs/device-checklists.md)
+- Completed device checklists: [docs/device-checklists-archive.md](./docs/device-checklists-archive.md)
 - UI guidelines (what matters, colors, the role of each screen): [docs/ui.md](./docs/ui.md)
 
 ## License

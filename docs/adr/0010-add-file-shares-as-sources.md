@@ -21,7 +21,7 @@ date: 2026-10-10
 - **SMB をアプリに組み込む（4）**: SMB を SAF に出す現役のアプリは、CIFS Documents Provider（最終リリース 2025-05、SMB3 の暗号化に未対応）と RSAF（rclone 経由）くらいしか見つからなかった。smbj（`com.hierynomus:smbj`）は Apache-2.0、0.15.0（2026-08-21）、SMB2/3 対応、BouncyCastle に依存し、Material Files・CIFS Documents Provider・SambaLite が Android で使っている
 - **NFS を対象外にする（4）**: NFS を SAF に出すアプリは見つからず、Android に組み込める現役の NFS クライアントのライブラリも見つからなかった（nfs4j はサーバの実装、EMC nfs-client-java は 2022 年で停止）
 - **端末のフォルダを SAF で選ぶ（4）**: SAF の永続権限は再起動の後も残り、1 アプリあたり 512 件（上限を超えると古いものから外れる）。対象の移動・削除、アプリのデータ消去で失効する（AOSP `UriGrantsManagerService.java` の `MAX_PERSISTED_URI_GRANTS`、Android Developers の documents-files のページ）
-- **ローカルネットワークへの接続**: LAN 内のサーバへの接続に要る `ACCESS_LOCAL_NETWORK`（Android 17+）は、Jellyfin のために宣言済み（`app/src/main/AndroidManifest.xml`）で、実行時の要求も実装済み（`MainActivity.kt`）。SMB の接続がこの権限だけで足りるかは未確認（#198 では実機で確かめられていない。`docs/development.md` の「実機で試す（#198）」の確認項目）。#199 で、要求するのは取得元が Jellyfin か SMB のときだけに改めた（「結果」の #199 の項の 7）
+- **ローカルネットワークへの接続**: LAN 内のサーバへの接続に要る `ACCESS_LOCAL_NETWORK`（Android 17+）は、Jellyfin のために宣言済み（`app/src/main/AndroidManifest.xml`）で、実行時の要求も実装済み（`MainActivity.kt`）。SMB の接続がこの権限だけで足りるかは未確認（#198 では実機で確かめられていない。`docs/device-checklists.md` の「実機で試す（#198）」の確認項目）。#199 で、要求するのは取得元が Jellyfin か SMB のときだけに改めた（「結果」の #199 の項の 7）
 - 決定 2・3・5〜10 の理由は、epic #195 に書かれていない（決定だけが記されている）。この ADR でも理由を補わない
 
 この決定の最初の一歩（#196）では、Jellyfin の挙動を変えない方針（#196 のスコープ）で次を行った:
@@ -39,7 +39,7 @@ date: 2026-10-10
 
 - ADR 0001・0003・0004 は Jellyfin を前提に書いている（0001 のサーバ ID、0003 の `/Items/{id}/Download` と `Range`、0004 の全走査 `fetchLibrary`）。それぞれの末尾に、この ADR を指す注記を足した。本文は書き換えていない
 - 共有フォルダの走査・SMB・SAF は #197・#198・#199 で行う
-- SMB の取得元（#198）: 接続は取得元の種類ごとの型にした（`SessionState.Ready` が `ConnectedSource.Jellyfin` か `ConnectedSource.Smb` を持つ）。DataStore の Jellyfin のキーは変えず、SMB のキー（`smb_*`）を足したので、DataStore の移行は要らない（更新の後も Jellyfin の接続が残ることは単体テストで見た。実機での確認は `docs/development.md` の「実機で試す（#198）」の項目）。取得元の種類による切り替えは `SessionSourceGateway`。SMB の接続は 1 回の操作ごとに張って閉じる。依存は smbj（Apache-2.0）と、推移的な asn-one（Apache-2.0）・mbassador（MIT）・bcprov-jdk18on（Bouncy Castle Licence）で、MPL-2.0 で公開する方針（ADR 0008）とは食い違わない（どれも寛容なライセンス。ライセンスは各 POM の記述による）
+- SMB の取得元（#198）: 接続は取得元の種類ごとの型にした（`SessionState.Ready` が `ConnectedSource.Jellyfin` か `ConnectedSource.Smb` を持つ）。DataStore の Jellyfin のキーは変えず、SMB のキー（`smb_*`）を足したので、DataStore の移行は要らない（更新の後も Jellyfin の接続が残ることは単体テストで見た。実機での確認は `docs/device-checklists.md` の「実機で試す（#198）」の項目）。取得元の種類による切り替えは `SessionSourceGateway`。SMB の接続は 1 回の操作ごとに張って閉じる。依存は smbj（Apache-2.0）と、推移的な asn-one（Apache-2.0）・mbassador（MIT）・bcprov-jdk18on（Bouncy Castle Licence）で、MPL-2.0 で公開する方針（ADR 0008）とは食い違わない（どれも寛容なライセンス。ライセンスは各 POM の記述による）
 - 決定 8 の改め（2026-10-11、#209 の grill）: 「全部のファイルの一覧とタグを読み終えてから、まとめて取り込む」を、**番組ごとに取り込む**形に改めた。大きな共有（各回のファイルが約 6,090 本）で、最初の全走査がタグの読み取りの途中（約 16 分 40 秒後）に接続の切断で到達不能になり、何も取り込まれなかったため（#209 の背景。PR #206 のマージ前の検証）。決定 8 の「新しいファイル、またはパス・サイズ・更新日時のどれかが変わったファイルのときだけタグを読む」は変えない。#209 の決定の要旨:
   1. 共有フォルダの全走査は、一覧（名前・大きさ・更新日時）を先に全部取り、番組ごとにタグを読み、その番組を読み終えたら取り込む（取り込みの範囲と、その番組の中での削除・予約は 1 番組の同期と同じ）。全部を読み終えたら、番組の消失の判断と最終同期の時刻の記録を今までどおり行う（ADR 0004 の削除の権限は変えない）。仮のタイトルで取り込むことはしない。Jellyfin の走査は変えない
   2. 取り込み済みの回は DB に大きさと更新日時を持つので、次の同期ではタグを読まない。止まって失うのは、読みかけの番組 1 つ分だけ。そのための別の控えは作らない
@@ -58,7 +58,7 @@ date: 2026-10-10
   7. `ACCESS_LOCAL_NETWORK` は、取得元が Jellyfin か SMB のとき（ログアウト中で前回の取得元が Jellyfin か SMB のときを含む）だけ起動時に要求し、まだ取得元を選んでいない人には取得元の選択で Jellyfin か SMB を選んだときに要求する。端末のフォルダの人には要求しない（上の理由の「ローカルネットワークへの接続」に書いた起動時の要求を、この形に改めた）
   8. 選ぶときは、取得元の選択の「端末のフォルダ」から説明の画面（3 段の構成の例と、内部ストレージの直下や Download そのものは選べないこと）を経て、OS のフォルダ選択（`ACTION_OPEN_DOCUMENT_TREE`）を開く。選んだ後は SMB と同じく直下が読めるかだけを確かめて保存する
   - 接続の型は `ConnectedSource.Device`、DataStore のキーは `device_*` を足した（既存のキーは変えていないので、移行は要らない）。依存は足していない（`DocumentsContract` と `ContentResolver` は SDK の標準）
-  - SAF の実機の挙動（`Download` の下のサブフォルダを選べるか、SD カードのツリーの URI の形と authority、フォルダの中のファイルが多いときの遅さ）は確かめていない（未確認。`docs/development.md` の「実機で試す（#199）」の確認項目）
+  - SAF の実機の挙動（`Download` の下のサブフォルダを選べるか、SD カードのツリーの URI の形と authority、フォルダの中のファイルが多いときの遅さ）は確かめていない（未確認。`docs/device-checklists.md` の「実機で試す（#199）」の確認項目）
 
 改名の注記（#239）: 上の本文の `ServerException` は、その後 `SourceException` に改めた（この ADR の最初の一歩では `Server*` の改名に含めていなかった）。本文は当時の記述のまま残している。
 

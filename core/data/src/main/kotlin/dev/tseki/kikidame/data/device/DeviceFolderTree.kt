@@ -28,7 +28,7 @@ import kotlin.time.Instant
  *   それ以外の失敗（cursor が null、[IllegalArgumentException] などの例外）は、無いのか一時的な失敗（provider が落ちた、SD カードが
  *   一時的に外れたなど）なのかを見分けられないので、そのまま投げて通常の失敗に倒す（全走査は [SharedFolderSource] がやり直し、
  *   続けば到達不能。手元のデータを守るため、SMB と同じ扱い）。根が消えたときに provider がどれを返すかは実機で確かめていない（未確認。
- *   `docs/development.md` の「実機チェックリスト（#199）」）
+ *   `docs/device-checklists.md` の「実機チェックリスト（#199）」）
  * - 根が無いのを [list] の null で返さない（全走査が到達不能で終わるか、`fetchProgram` が全番組を消失と判断するため）。
  *   [list] が null を返すのは、根はあって、そのパスのフォルダが無い（またはフォルダでない）ときだけ
  * - [list]・[read]・[open] の呼び出しの中で出た [SecurityException] は [SourceException.Unauthorized] に変える。そのほかの失敗はそのまま投げる。
