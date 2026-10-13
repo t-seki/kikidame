@@ -195,7 +195,7 @@ main のチェックアウトから fork subagent に並列で実装させて回
 ### worktree の準備
 
 - fork の worktree は repo 直下の `.claude/worktrees/`（`.gitignore` 済み）に切られる
-- worktree には `local.properties`（git 管理外）を置かない。コピーしない（auto mode の分類器に止められる。#163）。`local.properties` の中身は `sdk.dir` の 1 行だけなので、代わりに環境変数 `ANDROID_HOME` で SDK を渡す
+- worktree には `local.properties`（git 管理外）を置かない。コピーしない（`cp` が auto mode の分類器に止められたことがある。#163）。`local.properties` の中身は `sdk.dir` の 1 行だけなので、代わりに環境変数 `ANDROID_HOME` で SDK を渡す
 - Gradle は `ANDROID_HOME=~/Android/Sdk JAVA_HOME=~/.local/jdk/current ./gradlew <タスク>` の形で回す（例: `./gradlew :app:assembleDebug`。#163）。`build/` は worktree ごとに別なので初回ビルドが重い。`~/.gradle` のキャッシュは共有されるので依存の再ダウンロードは無い
 - Gradle のデーモンも `~/.gradle` 単位で、main と全 worktree が共有している。ほかの worktree でビルドが走っている間は `./gradlew --stop` を打たない（走っているビルドが `Gradle build daemon has been stopped: stop command received` で落ちる。#188）。検証用の worktree は `--stop` なしで `git worktree remove` してよい
 - issue の「触るファイル」と完了条件に、次を入れる（入れ忘れると PR のレビューで指摘されて直すことになる）
@@ -244,7 +244,7 @@ Renovate の PR をどちらに数えるかは「マージの承認」に従う�
 
 ### 大きさの基準
 
-`257 行・25347 バイト（d8886a9）`
+`257 行・25371 バイト（d8886a9）`
 
 この development.md の大きさの基準（測り方と値の形は [REPO-SECTION.md の「大きさの基準」](https://github.com/t-seki/dotfiles/blob/main/claude/.claude/skills/supervise/REPO-SECTION.md#大きさの基準)）。
 
