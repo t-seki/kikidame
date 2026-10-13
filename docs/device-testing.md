@@ -99,7 +99,13 @@ LAN では 10 MB が 0.5 秒で落ちるので、ダウンロード中に kill �
 
 ```bash
 $ADB shell am force-stop $PKG
-# DB を引き出し、対象の local_files.state を 'DONE' → 'PENDING' に書き換えて戻す（device-testing.md の「DB だけ消す」と同じ run-as 手順）
+# DB を引き出し、対象の local_files.state を 'DONE' → 'PENDING' に書き換えて戻す（debug 版の run-as。「裏の同期をすぐ起こす」と同じ形）
+W=$(mktemp -d)   # repo の外に置く
+for f in kikidame.db kikidame.db-wal; do $ADB exec-out run-as $PKG cat databases/$f > $W/$f; done
+python3 -c "import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); print(c.execute(\"UPDATE local_files SET state='PENDING' WHERE episodeId=? AND state='DONE'\", (sys.argv[2],)).rowcount); c.commit()" $W/kikidame.db '<episodeId>'   # 1 なら書き換わった（WAL は開いたときに取り込まれる）
+$ADB shell run-as $PKG rm -f databases/kikidame.db-wal databases/kikidame.db-shm
+$ADB exec-in run-as $PKG sh -c 'cat > databases/kikidame.db' < $W/kikidame.db
+rm -r $W
 $ADB shell "head -c 5000000 '<path>' > '<path>.part' && rm '<path>'"
 $ADB logcat -c && <アプリを起動>
 $ADB logcat -d | grep JellyfinGateway   # download <id> from 5000000 -> HTTP 206 Content-Range=bytes 5000000-.../...
