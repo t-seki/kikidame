@@ -31,6 +31,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -181,11 +182,13 @@ internal fun EpisodeListContent(
 ) {
     var sheetFor by remember { mutableStateOf<EpisodeId?>(null) }
     var syncSheet by remember { mutableStateOf(SyncSheetState.Hidden) }
-    // 開いたとき・閉じたとき（Open から外れたとき。onDismiss でも「番組を手元から消す」の確認への遷移でも）を ViewModel に伝える（#311）
-    val changeSyncSheet: (SyncSheetState) -> Unit = { next ->
-        if (syncSheet != SyncSheetState.Open && next == SyncSheetState.Open) actions.syncSheetOpened()
-        if (syncSheet == SyncSheetState.Open && next != SyncSheetState.Open) actions.syncSheetClosed()
-        syncSheet = next
+    // 開いたとき・閉じたときを ViewModel に伝える（#311）。閉じたときは Open から外れたとき（onDismiss でも「番組を手元から消す」の
+    // 確認への遷移でも）と、開いたまま画面が作り直されたとき（回転など。syncSheet は Hidden に戻る）のどれでも 1 回だけ呼ぶ
+    if (syncSheet == SyncSheetState.Open) {
+        DisposableEffect(Unit) {
+            actions.syncSheetOpened()
+            onDispose { actions.syncSheetClosed() }
+        }
     }
 
     Scaffold(
@@ -215,7 +218,7 @@ internal fun EpisodeListContent(
                                 Icon(Icons.Outlined.StarOutline, contentDescription = stringResource(R.string.program_list_star_add))
                             }
                         }
-                        IconButton(onClick = { changeSyncSheet(SyncSheetState.Open) }, enabled = program != null) {
+                        IconButton(onClick = { syncSheet = SyncSheetState.Open }, enabled = program != null) {
                             // filled と outlined の Sync は形がほぼ同じなので、OFF は斜線入りで区別する
                             if (program?.syncEnabled == true) {
                                 Icon(Icons.Filled.Sync, contentDescription = stringResource(R.string.episode_list_sync_settings_on), tint = MaterialTheme.colorScheme.primary)
@@ -266,7 +269,7 @@ internal fun EpisodeListContent(
         localStorage = localStorage,
         pendingDisable = pendingDisable,
         state = syncSheet,
-        onStateChange = changeSyncSheet,
+        onStateChange = { syncSheet = it },
         actions = actions,
     )
 

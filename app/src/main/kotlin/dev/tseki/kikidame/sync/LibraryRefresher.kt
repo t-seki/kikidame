@@ -256,7 +256,7 @@ class LibraryRefresher @Inject constructor(
                 current.result.await()
                 continue
             }
-            if (!shouldSync()) return null
+            if (!askShouldSync(shouldSync)) return null
             val run = synchronized(lock) {
                 if (cancellations != cancellationsAtStart) return null
                 if (running == null) start(silent = false, callerJob) else null
@@ -264,6 +264,21 @@ class LibraryRefresher @Inject constructor(
             return runToEnd(run, block)
         }
     }
+
+    /**
+     * [awaitTurn] の走らせる直前の判定。判定は Room を読む（設定を比べる）ので、失敗しても落とさず（`applicationScope` には
+     * 例外を受け取る先が無い）、[execute] と同じく取り込み失敗の文言にして、走らせない。
+     */
+    private suspend fun askShouldSync(shouldSync: suspend () -> Boolean): Boolean =
+        try {
+            shouldSync()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "could not decide whether to sync", e)
+            _messages.tryEmit(UiText.Res(R.string.sync_error_import_failed, e::class.simpleName.orEmpty()))
+            false
+        }
 
     /**
      * 新しい実行を [running] に入れ、表示を立てる。[lock] の中で呼ぶ。

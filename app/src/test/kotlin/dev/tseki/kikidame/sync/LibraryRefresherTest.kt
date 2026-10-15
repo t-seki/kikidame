@@ -760,6 +760,21 @@ class LibraryRefresherTest {
         assertFalse(refresher.isRefreshing.value)
     }
 
+    /** 走らせる直前の判定（Room を読む）が失敗しても落とさず、取り込み失敗の文言を出して走らせない。 */
+    @Test
+    fun syncAfterRunningReportsAFailingShouldSync() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { syncProgramResult = RefreshResult(1, 6, 0, 0, now) }
+        val refresher = refresher(repo)
+
+        refresher.messages.test {
+            refresher.launchSyncProgramAfterRunning(ProgramId(1)) { throw IllegalStateException("db") }
+            runCurrent()
+            assertEquals(UiText.Res(R.string.sync_error_import_failed, "IllegalStateException"), awaitItem())
+        }
+        assertEquals(0, repo.syncProgramCalls)
+        assertFalse(refresher.isRefreshing.value)
+    }
+
     /** 手動の同期の最中に閉じても捨てられず、それが終わった後にその番組を同期する（#311 の決定 3）。 */
     @Test
     fun syncAfterRunningWaitsForAManualRefresh() = runTest(StandardTestDispatcher()) {
