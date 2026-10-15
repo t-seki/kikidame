@@ -34,6 +34,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import kotlin.time.Clock
 
@@ -90,20 +92,49 @@ class EpisodeListViewModel @Inject constructor(
     /** 更新の結果、この画面での操作の結果、ミニプレイヤーが消えた理由を 1 本にまとめてスナックバーへ。 */
     val messages: Flow<UiText> = merge(refresher.messages, localMessages, nowPlaying.messages)
 
-    /** 各回一覧の「引っ張って更新」= 1 番組の同期（#279）。番組の行が無い・取得元 ID が無いときは全走査に切り替える。 */
-    fun refresh() {
-        viewModelScope.launch { refresher.syncProgram(programId, orFullSync = true) }
+    /**
+     * 各回一覧の「引っ張って更新」= 1 番組の同期（#279）。番組の行が無い・取得元 ID が無いときは全走査に切り替える。
+     * `applicationScope` で走らせ、画面を離れても最後まで続ける（#311 の決定 9）。
+     */
+    fun refresh() = refresher.launchSyncProgram(programId, orFullSync = true)
+
+    // --- 同期対象・保持ルール（変えている間は保存するだけ。シートを閉じたとき、変わっていればこの番組を同期する。#311） ---
+
+    /**
+     * 設定の書き込みと、シートを閉じたときの読み直しを、この順に並べる。チップを押してすぐ閉じても、書き込みが済んでから比べる
+     * （書き込みは押した時点で鍵を取るので、後から来る閉じたときの読み直しはその後になる）。
+     */
+    private val settingsLock = Mutex()
+
+    /** シートを開いたときの同期の設定。null ならシートは開いていない（か、開いたときに番組が読めていなかった）。 */
+    private var openedWith: EffectiveSyncSettings? = null
+
+    /** 同期のシートを開いた。今の同期の設定を、閉じたときに比べるために覚える。 */
+    fun onSyncSheetOpened() {
+        openedWith = program.value?.let(::EffectiveSyncSettings)
     }
 
-    // --- 同期対象・保持ルール（適用は次の同期。ここでは保存するだけ） ---
+    /**
+     * 同期のシートを閉じた（閉じる経路は問わない。#311 の決定 1）。開いたときから同期の設定が変わっていれば、この番組だけを同期する。
+     * 同期は `applicationScope` で走り、走っている同期があれば終わるのを待つ（[LibraryRefresher.launchSyncProgramAfterRunning]）。
+     * 設定を書き終えてから比べるため、比べるのは同期を走らせる直前（待った後）にする。
+     */
+    fun onSyncSheetClosed() {
+        val before = openedWith ?: return
+        openedWith = null
+        refresher.launchSyncProgramAfterRunning(programId) {
+            val after = settingsLock.withLock { library.getProgram(programId) } ?: return@launchSyncProgramAfterRunning false
+            EffectiveSyncSettings(after) != before
+        }
+    }
 
-    /** OFF にすると次の同期で消える回の数。null なら確認ダイアログは出ていない。 */
+    /** OFF にすると、シートを閉じたときの同期で消える回の数。null なら確認ダイアログは出ていない。 */
     private val _pendingDisable = MutableStateFlow<Int?>(null)
     val pendingDisable: StateFlow<Int?> = _pendingDisable
 
     /** ON にするとき、上限が未設定なら既定の 3 を入れる（「上限なし」は ON にした後で選ぶ）。 */
-    fun setSyncEnabled(enabled: Boolean) = act {
-        val current = program.value ?: library.getProgram(programId) ?: return@act
+    fun setSyncEnabled(enabled: Boolean) = actOnSettings {
+        val current = library.getProgram(programId) ?: return@actOnSettings
         if (enabled) {
             val rule = current.retentionRule.let { if (it.keepLatest == null) it.copy(keepLatest = DEFAULT_KEEP_LATEST) else it }
             library.updateSync(programId, syncEnabled = true, rule)
@@ -113,9 +144,9 @@ class EpisodeListViewModel @Inject constructor(
         }
     }
 
-    fun confirmDisableSync() = act {
+    fun confirmDisableSync() = actOnSettings {
         _pendingDisable.value = null
-        val current = library.getProgram(programId) ?: return@act
+        val current = library.getProgram(programId) ?: return@actOnSettings
         library.updateSync(programId, syncEnabled = false, current.retentionRule)
     }
 
@@ -139,10 +170,13 @@ class EpisodeListViewModel @Inject constructor(
 
     fun setDeleteAfterPlayed(value: Boolean) = updateRule { it.copy(deleteAfterPlayed = value) }
 
-    private fun updateRule(transform: (RetentionRule) -> RetentionRule) = act {
-        val current = library.getProgram(programId) ?: return@act
+    private fun updateRule(transform: (RetentionRule) -> RetentionRule) = actOnSettings {
+        val current = library.getProgram(programId) ?: return@actOnSettings
         library.updateSync(programId, current.syncEnabled, transform(current.retentionRule))
     }
+
+    /** 同期の設定の書き込み。[settingsLock] の中で行う（シートを閉じたときの比べより先に済ませる）。 */
+    private fun actOnSettings(block: suspend () -> Unit) = act { settingsLock.withLock { block() } }
 
     fun setPlayed(episodeId: EpisodeId, played: Boolean) {
         viewModelScope.launch {
@@ -168,6 +202,15 @@ class EpisodeListViewModel @Inject constructor(
 
     /** Room / ファイル I/O の失敗で落とさず、文言にして出す（[EpisodeActions.launch]）。 */
     private fun act(block: suspend () -> Unit) = actions.launch(block)
+
+    /**
+     * 同期に効く番組の設定。同期対象でない番組の同期は保持ルールを見ない（`SyncPlanner.planProgram`）ので、OFF のときは保持ルールを
+     * 比べない。ON にすると上限の既定の 3 が入るため、OFF の番組を ON にして OFF に戻しても、保持ルールの違いで「変わった」とはしない
+     * （#311 の決定 1）。
+     */
+    private data class EffectiveSyncSettings(val syncEnabled: Boolean, val retentionRule: RetentionRule?) {
+        constructor(program: Program) : this(program.syncEnabled, program.retentionRule.takeIf { program.syncEnabled })
+    }
 
     companion object {
         private const val TAG = "EpisodeListViewModel"

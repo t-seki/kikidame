@@ -728,4 +728,174 @@ class LibraryRefresherTest {
     fun cancelAndAwaitWithoutARunningRefreshDoesNothing() = runTest(StandardTestDispatcher()) {
         refresher(FakeRefreshRepository()).cancelAndAwait()
     }
+
+    /** シートを閉じたときの同期は、走っている同期が無ければすぐ走り、引っ張って更新と同じ文言を出す（#311 の決定 5）。 */
+    @Test
+    fun syncAfterRunningRunsAtOnceWhenIdle() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { syncProgramResult = RefreshResult(1, 6, 0, 0, now) }
+        val refresher = refresher(repo)
+
+        refresher.messages.test {
+            refresher.launchSyncProgramAfterRunning(ProgramId(1))
+            runCurrent()
+            assertEquals(upToDate, awaitItem())
+        }
+        assertEquals(1, repo.syncProgramCalls)
+        assertEquals(0, repo.calls)
+        assertFalse(refresher.isRefreshing.value)
+    }
+
+    /** 走らせる直前の判定が false なら走らせない（設定が開いたときと同じなら同期しない。#311 の決定 1）。 */
+    @Test
+    fun syncAfterRunningSkipsWhenShouldSyncSaysNo() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { syncProgramResult = RefreshResult(1, 6, 0, 0, now) }
+        val refresher = refresher(repo)
+
+        refresher.messages.test {
+            refresher.launchSyncProgramAfterRunning(ProgramId(1)) { false }
+            runCurrent()
+            expectNoEvents()
+        }
+        assertEquals(0, repo.syncProgramCalls)
+        assertFalse(refresher.isRefreshing.value)
+    }
+
+    /** 走らせる直前の判定（Room を読む）が失敗しても落とさず、取り込み失敗の文言を出して走らせない。 */
+    @Test
+    fun syncAfterRunningReportsAFailingShouldSync() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { syncProgramResult = RefreshResult(1, 6, 0, 0, now) }
+        val refresher = refresher(repo)
+
+        refresher.messages.test {
+            refresher.launchSyncProgramAfterRunning(ProgramId(1)) { throw IllegalStateException("db") }
+            runCurrent()
+            assertEquals(UiText.Res(R.string.sync_error_import_failed, "IllegalStateException"), awaitItem())
+        }
+        assertEquals(0, repo.syncProgramCalls)
+        assertFalse(refresher.isRefreshing.value)
+    }
+
+    /** 手動の同期の最中に閉じても捨てられず、それが終わった後にその番組を同期する（#311 の決定 3）。 */
+    @Test
+    fun syncAfterRunningWaitsForAManualRefresh() = runTest(StandardTestDispatcher()) {
+        val gate = CompletableDeferred<Unit>()
+        val repo = FakeRefreshRepository().apply {
+            result = RefreshResult(3, 40, 0, 0, now)
+            syncProgramResult = RefreshResult(1, 6, 0, 0, now)
+            this.gate = gate
+        }
+        val refresher = refresher(repo)
+
+        refresher.messages.test {
+            val manual = async { refresher.refresh() }
+            runCurrent()
+            refresher.launchSyncProgramAfterRunning(ProgramId(1))
+            runCurrent()
+            assertEquals(0, repo.syncProgramCalls, "waits for the running sync")
+
+            gate.complete(Unit)
+            assertEquals(40, manual.await()?.episodes)
+            assertEquals(upToDate, awaitItem())
+            runCurrent()
+            assertEquals(upToDate, awaitItem(), "the program sync reports like a pull to refresh")
+            expectNoEvents()
+        }
+        assertEquals(1, repo.calls)
+        assertEquals(1, repo.syncProgramCalls)
+        assertFalse(refresher.isRefreshing.value)
+    }
+
+    /**
+     * 裏の同期の最中に閉じても合流せず（裏の同期の表示はそのまま）、それが終わった後にその番組を同期する。
+     * 走らせる直前の判定は、待った後に呼ばれる（#311 の決定 3）。
+     */
+    @Test
+    fun syncAfterRunningDoesNotJoinASilentRefresh() = runTest(StandardTestDispatcher()) {
+        val gate = CompletableDeferred<Unit>()
+        val repo = FakeRefreshRepository().apply {
+            result = RefreshResult(3, 40, 0, 0, now)
+            syncProgramResult = RefreshResult(1, 6, 0, 0, now)
+            this.gate = gate
+        }
+        val refresher = refresher(repo)
+        var asked = 0
+
+        refresher.messages.test {
+            val silent = async { refresher.refresh(silent = true) }
+            runCurrent()
+            refresher.launchSyncProgramAfterRunning(ProgramId(1)) { asked++; true }
+            runCurrent()
+            assertTrue(refresher.isSyncingInBackground.value, "does not join")
+            assertFalse(refresher.isRefreshing.value)
+            assertEquals(0, asked, "asks only when it is about to run")
+
+            gate.complete(Unit)
+            assertEquals(40, silent.await()?.episodes)
+            runCurrent()
+            assertEquals(1, asked)
+            assertEquals(upToDate, awaitItem(), "only the program sync reports; the silent one stays quiet")
+            expectNoEvents()
+        }
+        assertEquals(1, repo.calls)
+        assertEquals(1, repo.syncProgramCalls)
+        assertFalse(refresher.isRefreshing.value)
+        assertFalse(refresher.isSyncingInBackground.value)
+    }
+
+    /** 待っている間に取り消されたら（取得元を変える・ログアウトの前）、閉じたときの同期は走らせない（#311）。 */
+    @Test
+    fun syncAfterRunningIsDroppedWhenTheRunningSyncIsCancelled() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply {
+            result = RefreshResult(3, 40, 0, 0, now)
+            syncProgramResult = RefreshResult(1, 6, 0, 0, now)
+            gate = CompletableDeferred()
+        }
+        val refresher = refresher(repo)
+
+        val first = async { refresher.refresh() }
+        runCurrent()
+        refresher.launchSyncProgramAfterRunning(ProgramId(1))
+        runCurrent()
+
+        refresher.cancelAndAwait()
+        runCurrent()
+
+        assertTrue(first.isCancelled)
+        assertEquals(0, repo.syncProgramCalls)
+        assertFalse(refresher.isRefreshing.value)
+        repo.gate = null
+        assertEquals(3, refresher.refresh()?.programs, "a refresh after the change still runs")
+    }
+
+    /** 閉じたときの同期の最中に来た引っ張って更新は、今までどおり何もしない（合流は silent な実行にだけ。#134）。 */
+    @Test
+    fun aManualCallDuringASyncAfterRunningIsIgnored() = runTest(StandardTestDispatcher()) {
+        val downloads = FakeDownloadRepository(gate = CompletableDeferred())
+        val repo = FakeRefreshRepository().apply { syncProgramResult = RefreshResult(1, 6, 0, 0, now) }
+        val refresher = refresher(repo, downloads = downloads)
+
+        refresher.launchSyncProgramAfterRunning(ProgramId(1))
+        runCurrent()
+        assertTrue(refresher.isRefreshing.value)
+        assertNull(refresher.syncProgram(ProgramId(1), orFullSync = true))
+        refresher.cancelAndAwait()
+    }
+
+    /** 引っ張って更新（番組一覧・各回一覧）は applicationScope で走る（呼び出し側のコルーチンに縛られない。#311 の決定 9）。 */
+    @Test
+    fun launchedRefreshesRunInTheApplicationScope() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply {
+            result = RefreshResult(3, 40, 0, 0, now)
+            syncProgramResult = RefreshResult(1, 6, 0, 0, now)
+        }
+        val refresher = refresher(repo)
+
+        refresher.launchRefresh()
+        runCurrent()
+        refresher.launchSyncProgram(ProgramId(1), orFullSync = true)
+        runCurrent()
+
+        assertEquals(1, repo.calls)
+        assertEquals(1, repo.syncProgramCalls)
+    }
 }

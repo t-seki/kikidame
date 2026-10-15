@@ -123,9 +123,8 @@ class ProgramListViewModel @Inject constructor(
     fun selectTab(tab: ProgramListTab) {
         viewModelScope.launch { settings.setProgramListTab(tab) }
     }
-    fun refresh() {
-        viewModelScope.launch { refresher.refresh() }
-    }
+    /** 番組一覧の「引っ張って更新」= 全体の同期。`applicationScope` で走らせ、画面を離れても最後まで続ける（#311 の決定 9）。 */
+    fun refresh() = refresher.launchRefresh()
     /** よく聴くの印を付ける／外す（表示にだけ効く）。 */
     fun setStarred(programId: ProgramId, starred: Boolean) {
         viewModelScope.launch { library.setStarred(programId, starred) }

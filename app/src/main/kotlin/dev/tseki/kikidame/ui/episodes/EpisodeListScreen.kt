@@ -31,6 +31,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -127,6 +128,8 @@ fun EpisodeListScreen(
             removeProgram = viewModel::removeProgram,
             cancelDisableSync = viewModel::cancelDisableSync,
             confirmDisableSync = viewModel::confirmDisableSync,
+            syncSheetOpened = viewModel::onSyncSheetOpened,
+            syncSheetClosed = viewModel::onSyncSheetClosed,
         ),
         onEpisodeClick = onEpisodeClick,
         onEpisodeDetails = onEpisodeDetails,
@@ -151,6 +154,10 @@ internal class EpisodeListActions(
     val removeProgram: () -> Unit,
     val cancelDisableSync: () -> Unit,
     val confirmDisableSync: () -> Unit,
+    /** 同期のシートを開いた（閉じたときに比べる設定を覚える。#311）。 */
+    val syncSheetOpened: () -> Unit,
+    /** 同期のシートを閉じた（経路は問わない。設定が変わっていればこの番組を同期する。#311）。 */
+    val syncSheetClosed: () -> Unit,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -175,6 +182,14 @@ internal fun EpisodeListContent(
 ) {
     var sheetFor by remember { mutableStateOf<EpisodeId?>(null) }
     var syncSheet by remember { mutableStateOf(SyncSheetState.Hidden) }
+    // 開いたとき・閉じたときを ViewModel に伝える（#311）。閉じたときは Open から外れたとき（onDismiss でも「番組を手元から消す」の
+    // 確認への遷移でも）と、開いたまま画面が作り直されたとき（回転など。syncSheet は Hidden に戻る）のどれでも 1 回だけ呼ぶ
+    if (syncSheet == SyncSheetState.Open) {
+        DisposableEffect(Unit) {
+            actions.syncSheetOpened()
+            onDispose { actions.syncSheetClosed() }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -343,6 +358,8 @@ private val previewActions = EpisodeListActions(
     removeProgram = {},
     cancelDisableSync = {},
     confirmDisableSync = {},
+    syncSheetOpened = {},
+    syncSheetClosed = {},
 )
 
 private val previewProgram = Program(
