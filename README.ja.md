@@ -4,7 +4,7 @@ English: [README.md](./README.md)
 
 録り溜めた**ラジオ番組**を、Jellyfin サーバ・NAS の共有フォルダ・端末のフォルダのどれかに置いている人向けに、番組単位のルールで自動ダウンロード／削除し、取得元に到達できなくても聴けるようにする Android アプリ（ポッドキャストのファイルも使える）。Jellyfin プロジェクトとは無関係の非公式クライアントです。
 
-https://github.com/user-attachments/assets/d086df7d-0258-4c18-82f7-14e0b5b3ad0b
+https://github.com/user-attachments/assets/32c5be2d-5aee-4df7-baac-68106685913f
 
 <p>
 <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" width="180" alt="Continue"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" width="180" alt="Episodes"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" width="180" alt="Player"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/4.png" width="180" alt="Sync settings">
