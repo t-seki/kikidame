@@ -86,7 +86,8 @@ internal fun ProgramSyncDialogs(
 }
 
 /**
- * 同期対象と保持ルールの編集。保存するだけで、適用は次の同期（保存した瞬間には何も消えない）。
+ * 同期対象と保持ルールの編集。変えている間は保存するだけで、何も消えない。シートを閉じたとき、開いたときから設定が変わっていれば
+ * その番組の同期が走って適用される（ダウンロードも削除も。呼び出し側が [ProgramSyncDialogs] の状態の変化で ViewModel に伝える。#311）。
  * 取得元 ID の無い番組は同期できないのでスイッチを無効にする。
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)

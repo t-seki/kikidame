@@ -127,6 +127,8 @@ fun EpisodeListScreen(
             removeProgram = viewModel::removeProgram,
             cancelDisableSync = viewModel::cancelDisableSync,
             confirmDisableSync = viewModel::confirmDisableSync,
+            syncSheetOpened = viewModel::onSyncSheetOpened,
+            syncSheetClosed = viewModel::onSyncSheetClosed,
         ),
         onEpisodeClick = onEpisodeClick,
         onEpisodeDetails = onEpisodeDetails,
@@ -151,6 +153,10 @@ internal class EpisodeListActions(
     val removeProgram: () -> Unit,
     val cancelDisableSync: () -> Unit,
     val confirmDisableSync: () -> Unit,
+    /** 同期のシートを開いた（閉じたときに比べる設定を覚える。#311）。 */
+    val syncSheetOpened: () -> Unit,
+    /** 同期のシートを閉じた（経路は問わない。設定が変わっていればこの番組を同期する。#311）。 */
+    val syncSheetClosed: () -> Unit,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -175,6 +181,12 @@ internal fun EpisodeListContent(
 ) {
     var sheetFor by remember { mutableStateOf<EpisodeId?>(null) }
     var syncSheet by remember { mutableStateOf(SyncSheetState.Hidden) }
+    // 開いたとき・閉じたとき（Open から外れたとき。onDismiss でも「番組を手元から消す」の確認への遷移でも）を ViewModel に伝える（#311）
+    val changeSyncSheet: (SyncSheetState) -> Unit = { next ->
+        if (syncSheet != SyncSheetState.Open && next == SyncSheetState.Open) actions.syncSheetOpened()
+        if (syncSheet == SyncSheetState.Open && next != SyncSheetState.Open) actions.syncSheetClosed()
+        syncSheet = next
+    }
 
     Scaffold(
         topBar = {
@@ -203,7 +215,7 @@ internal fun EpisodeListContent(
                                 Icon(Icons.Outlined.StarOutline, contentDescription = stringResource(R.string.program_list_star_add))
                             }
                         }
-                        IconButton(onClick = { syncSheet = SyncSheetState.Open }, enabled = program != null) {
+                        IconButton(onClick = { changeSyncSheet(SyncSheetState.Open) }, enabled = program != null) {
                             // filled と outlined の Sync は形がほぼ同じなので、OFF は斜線入りで区別する
                             if (program?.syncEnabled == true) {
                                 Icon(Icons.Filled.Sync, contentDescription = stringResource(R.string.episode_list_sync_settings_on), tint = MaterialTheme.colorScheme.primary)
@@ -254,7 +266,7 @@ internal fun EpisodeListContent(
         localStorage = localStorage,
         pendingDisable = pendingDisable,
         state = syncSheet,
-        onStateChange = { syncSheet = it },
+        onStateChange = changeSyncSheet,
         actions = actions,
     )
 
@@ -343,6 +355,8 @@ private val previewActions = EpisodeListActions(
     removeProgram = {},
     cancelDisableSync = {},
     confirmDisableSync = {},
+    syncSheetOpened = {},
+    syncSheetClosed = {},
 )
 
 private val previewProgram = Program(

@@ -185,8 +185,8 @@
     <string name="episode_list_disable_sync_title">Stop syncing?</string>
     <!-- %1$d = number of unpinned files -->
     <plurals name="episode_list_disable_sync_text">
-        <item quantity="one">%1$d unpinned file will be deleted at the next sync. Pin the episodes you want to keep first.</item>
-        <item quantity="other">%1$d unpinned files will be deleted at the next sync. Pin the episodes you want to keep first.</item>
+        <item quantity="one">%1$d unpinned file will be deleted when you close this sheet. Pin the episodes you want to keep first.</item>
+        <item quantity="other">%1$d unpinned files will be deleted when you close this sheet. Pin the episodes you want to keep first.</item>
     </plurals>
     <string name="episode_list_disable_sync_confirm">Stop syncing</string>
     <!-- Pin icon before the title of a pinned episode -->

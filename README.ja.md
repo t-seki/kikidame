@@ -104,7 +104,7 @@ Google Play では配布しない（[ADR 0008](./docs/adr/0008-open-source-distr
 - **取得元（Jellyfin サーバか共有フォルダ）が各回の存在の正、手元はキャッシュ。** 同期の削除は、取得元の完全な一覧が取れたときにだけ行う（[ADR 0004](./docs/adr/0004-sync-deletes-only-from-full-listing.md)）。取れなければその番組は判断保留で、何も落とさず何も消さない
 - **再生位置と再生済みは手元が正。** サーバへ送らず、サーバの値も使わない（[ADR 0002](./docs/adr/0002-playback-position-local-authority.md)、[ADR 0007](./docs/adr/0007-playback-state-stays-local.md)）
 - **アプリ内の同一性は取得元 ID（Jellyfin の id、共有フォルダでは中の相対パス）に依存しない。** サーバでライブラリを作り直して ID が変わっても、共有フォルダでファイル名を変えても、配信元・番組名・タイトルで突合して結び直し、ファイルも再生位置も残す（[ADR 0001](./docs/adr/0001-local-surrogate-key.md)、[ADR 0005](./docs/adr/0005-rematch-unlinked-rows-before-sync-deletes.md)）
-- **保持ルールが効くのは同期のときだけ。** 再生済みにした瞬間や設定を変えた瞬間には何も消えない
+- **保持ルールが効くのは同期のときだけ。** 再生済みにした瞬間には何も消えない。番組の同期の設定を変えている間も何も消えず、設定を閉じたときにその番組の同期が走って適用される
 
 ## ビルドと実行
 

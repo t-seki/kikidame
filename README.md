@@ -104,7 +104,7 @@ The app connects to **Jellyfin**, a **shared folder on a NAS (SMB)** or a **fold
 - **The source (the Jellyfin server or the shared folder) is the source of truth for which episodes exist; the device is a cache.** Sync deletes only when it has obtained the source's full listing ([ADR 0004](./docs/adr/0004-sync-deletes-only-from-full-listing.md), Japanese). If it cannot, the program is On Hold: nothing is downloaded and nothing is deleted
 - **Playback position and played state are owned by the device.** They are never sent to the server, and the server's values are never used ([ADR 0002](./docs/adr/0002-playback-position-local-authority.md), [ADR 0007](./docs/adr/0007-playback-state-stays-local.md), Japanese)
 - **Identity in the app does not depend on source IDs** (a Jellyfin id, or the relative path inside a shared folder). If the library is rebuilt on the server and IDs change, or a file is renamed in a shared folder, programs and episodes are matched again by publisher, program name, and title, keeping files and playback positions ([ADR 0001](./docs/adr/0001-local-surrogate-key.md), [ADR 0005](./docs/adr/0005-rematch-unlinked-rows-before-sync-deletes.md), Japanese)
-- **Retention rules apply only at sync time.** Nothing is deleted the moment you mark an episode played or change a setting
+- **Retention rules apply only at sync time.** Nothing is deleted the moment you mark an episode played. Nothing is deleted while you change a program's sync settings either; when you close the settings, that program is synced and the rules are applied
 
 ## Build and run
 

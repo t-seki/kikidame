@@ -130,7 +130,7 @@
     <string name="episode_list_remove_program_confirm">手元から消す</string>
     <string name="episode_list_disable_sync_title">同期をやめますか？</string>
     <plurals name="episode_list_disable_sync_text">
-        <item quantity="other">固定されていない %1$d 回のファイルが次の同期で削除されます。残したい回は先に固定してください。</item>
+        <item quantity="other">固定されていない %1$d 回のファイルが、このシートを閉じると削除されます。残したい回は先に固定してください。</item>
     </plurals>
     <string name="episode_list_disable_sync_confirm">同期をやめる</string>
     <string name="episode_list_pinned">固定</string>

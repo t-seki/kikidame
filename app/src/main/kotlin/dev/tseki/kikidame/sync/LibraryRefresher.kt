@@ -39,7 +39,12 @@ import javax.inject.Singleton
  * 更新と同期の唯一の入口。同時に 1 つしか走らせず、結果を文言にして画面へ流す。
  *
  * - [refresh]: 全走査 = ライブラリ全体の同期（ADR 0004）。番組一覧の「引っ張って更新」、定期・起動時の Worker が呼ぶ
- * - [syncProgram]: 1 番組の同期。各回一覧の「引っ張って更新」が呼ぶ（#279）
+ * - [syncProgram]: 1 番組の同期。各回一覧の「引っ張って更新」（[launchSyncProgram]。#279）と、同期のシートを閉じたとき
+ *   （[launchSyncProgramAfterRunning]。#311）が呼ぶ
+ * - 画面の操作から来る同期（番組一覧・各回一覧の引っ張って更新、シートを閉じたときの同期）は `applicationScope` で走らせ、
+ *   画面を離れても最後まで続ける（#311）
+ * - シートを閉じたときの同期は、走っている同期（手動・裏のどちらでも）に合流も捨てられもせず、終わるのを待ってから走る。
+ *   待っている間に [cancelAndAwait] で取り消されたら走らせない（#311）
  * - 「Wi-Fi のみ」は手動を含めて効く。従量制なら取得元に触らず理由を出して終える。手元のファイルの整合（#5）はその前に走る。
  *   取得元が端末のフォルダなら効かせない（#199 の決定 4。[dev.tseki.kikidame.domain.wifiOnlyApplies]）
  * - 401 はログアウトと同じ処理をする（セッション状態が変わり、画面側が接続画面へ導く）。端末のフォルダでアクセスが切れたときも同じで、
@@ -89,9 +94,33 @@ class LibraryRefresher @Inject constructor(
     private val _messages = MutableSharedFlow<UiText>(extraBufferCapacity = 4, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val messages: SharedFlow<UiText> = _messages
 
-    /** 画面が消えても最後まで走らせたいとき（ライブラリ選択直後の初回取得）。 */
+    /**
+     * [cancelAndAwait] を呼んだ回数。[lock] の中で読み書きする。[launchSyncProgramAfterRunning] が待っている間に取り消されたかを、
+     * 待つ前と後で見比べて知る（待っている呼び出しは取り消される実行の job に入っていないため。#311）。
+     */
+    private var cancellations = 0L
+
+    /** 画面が消えても最後まで走らせたいとき（ライブラリ選択直後の初回取得、番組一覧の引っ張って更新。#311）。 */
     fun launchRefresh() {
         applicationScope.launch { refresh() }
+    }
+
+    /** 各回一覧の「引っ張って更新」。[syncProgram] を `applicationScope` で走らせ、画面を離れても最後まで続ける（#311 の決定 9）。 */
+    fun launchSyncProgram(programId: ProgramId, orFullSync: Boolean) {
+        applicationScope.launch { syncProgram(programId, orFullSync) }
+    }
+
+    /**
+     * 同期のシートを閉じたときの 1 番組の同期（#311）。`applicationScope` で走らせ、画面を離れても最後まで続ける。
+     * 走っている同期があれば、合流せず（裏の全走査がこの番組を処理し終えた後に変えた設定を反映するため）捨てられもせず、
+     * 終わるのを待ってから走る。[shouldSync] は走らせる直前（待った後）に呼び、false なら走らせない
+     * （設定が開いたときと同じなら同期しない、の判定に使う）。待っている間に [cancelAndAwait] が呼ばれたら走らせない。
+     * 番組の行が無いか取得元 ID が無ければ何もしない（全走査には切り替えない）。
+     */
+    fun launchSyncProgramAfterRunning(programId: ProgramId, shouldSync: suspend () -> Boolean = { true }) {
+        applicationScope.launch {
+            awaitTurn(shouldSync) { syncOne(programId) }
+        }
     }
 
     /**
@@ -106,9 +135,12 @@ class LibraryRefresher @Inject constructor(
      * 「引っ張って更新」。#279）、そうでなければ何もしない（シート側でスイッチを無効にしている）。
      */
     suspend fun syncProgram(programId: ProgramId, orFullSync: Boolean = false): RefreshResult? = guarded(silent = false) {
-        refreshRepository.syncProgram(programId, excluded = excluded())?.also { report(it.toProgramSyncMessage()) }
-            ?: if (orFullSync) sync() else null
+        syncOne(programId) ?: if (orFullSync) sync() else null
     }
+
+    /** 1 番組を同期して結果の文言を出す。番組の行が無いか取得元 ID が無ければ null（文言は出さない）。 */
+    private suspend fun Run.syncOne(programId: ProgramId): RefreshResult? =
+        refreshRepository.syncProgram(programId, excluded = excluded())?.also { report(it.toProgramSyncMessage()) }
 
     /** 全走査して結果の文言を出す。手元に変化があれば silent でも出す（#142）。 */
     private suspend fun Run.sync(): RefreshResult =
@@ -166,7 +198,10 @@ class LibraryRefresher @Inject constructor(
      * 捨てられたりしないように。#198）。実行が無ければ何もしない。走査はフォルダごと・ファイルごとに取り消しを見るので、待ちは短い。
      */
     suspend fun cancelAndAwait() {
-        val run = synchronized(lock) { running } ?: return
+        val run = synchronized(lock) {
+            cancellations++
+            running
+        } ?: return
         run.job?.cancel(CancellationException("source changed"))
         run.result.await()
     }
@@ -176,19 +211,16 @@ class LibraryRefresher @Inject constructor(
      * - silent な実行の最中の手動 → 合流する。クルクルを出し、まだ出していない結果の文言があれば出させ（変化があって既に出した文言は出し直さない。#142）、
      *   その実行の結果を待って返す（全走査をやり直さない）
      * - それ以外 → 何もせず null
+     *
+     * シートを閉じたときの同期は、合流も捨てられもせずに待つ別の経路（[awaitTurn]）を通る（#311）。
      */
     private suspend fun guarded(silent: Boolean, block: suspend Run.() -> RefreshResult?): RefreshResult? {
         var joined: Run? = null
-        // Run を running に入れるのと同じ synchronized の中で job を入れる（cancelAndAwait が job の無い Run を見る隙間を作らない）
         val callerJob = currentCoroutineContext()[Job]
         val run = synchronized(lock) {
             val current = running
             when {
-                current == null -> Run(silent).also {
-                    it.job = callerJob
-                    running = it
-                    if (silent) _isSyncingInBackground.value = true else _isRefreshing.value = true
-                }
+                current == null -> start(silent, callerJob)
                 !silent && current.silent -> {
                     current.silent = false
                     current.unreported?.let { _messages.tryEmit(it) }
@@ -203,6 +235,48 @@ class LibraryRefresher @Inject constructor(
         }
         joined?.let { return it.result.await() }
         if (run == null) return null
+        return runToEnd(run, block)
+    }
+
+    /**
+     * 走っている実行が終わるのを待ってから、手動の実行として [block] を走らせる（シートを閉じたときの同期。#311）。
+     * silent な実行にも合流しない。終わった直後に別の呼び出しに先を越されたら、それも待つ。
+     * 呼んでから走らせるまでの間に [cancelAndAwait] が呼ばれたら、走らせずに null を返す。
+     * [shouldSync] は走らせる直前に呼び、false なら走らせずに null を返す。
+     */
+    private suspend fun awaitTurn(shouldSync: suspend () -> Boolean, block: suspend Run.() -> RefreshResult?): RefreshResult? {
+        val callerJob = currentCoroutineContext()[Job]
+        val cancellationsAtStart = synchronized(lock) { cancellations }
+        while (true) {
+            val current = synchronized(lock) {
+                if (cancellations != cancellationsAtStart) return null
+                running
+            }
+            if (current != null) {
+                current.result.await()
+                continue
+            }
+            if (!shouldSync()) return null
+            val run = synchronized(lock) {
+                if (cancellations != cancellationsAtStart) return null
+                if (running == null) start(silent = false, callerJob) else null
+            } ?: continue
+            return runToEnd(run, block)
+        }
+    }
+
+    /**
+     * 新しい実行を [running] に入れ、表示を立てる。[lock] の中で呼ぶ。
+     * Run を running に入れるのと同じ synchronized の中で job を入れる（cancelAndAwait が job の無い Run を見る隙間を作らない）。
+     */
+    private fun start(silent: Boolean, callerJob: Job?): Run = Run(silent).also {
+        it.job = callerJob
+        running = it
+        if (silent) _isSyncingInBackground.value = true else _isRefreshing.value = true
+    }
+
+    /** [start] した実行を走らせ、終わったら（成功・失敗・取り消しのどれでも）片付けて、待っている呼び出しに結果を渡す。 */
+    private suspend fun runToEnd(run: Run, block: suspend Run.() -> RefreshResult?): RefreshResult? {
         var result: RefreshResult? = null
         try {
             result = run.execute(block)

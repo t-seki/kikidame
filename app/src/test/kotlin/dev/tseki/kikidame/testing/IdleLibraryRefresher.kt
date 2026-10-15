@@ -21,6 +21,7 @@ import kotlinx.coroutines.CoroutineScope
  * [LibraryRefresher.syncProgram] は、既定では null を返して終わるが、`orFullSync = true`（各回一覧の
  * 「引っ張って更新」）ではリポジトリが null を返すと全走査に落ちるので、同じく取り込み失敗の文言になる。
  * 更新・同期そのものは `LibraryRefresherTest` で確かめる。
+ * 1 番組の同期が呼ばれたかを見たいときは [IdleRefreshRepository] を渡し、その [IdleRefreshRepository.syncedPrograms] を見る（#311）。
  */
 fun idleLibraryRefresher(
     scope: CoroutineScope,
@@ -28,15 +29,22 @@ fun idleLibraryRefresher(
     downloads: DownloadRepository = FakeDownloadRepository(),
     settings: AppSettingsRepository = FakeAppSettingsRepository(),
     nowPlaying: NowPlaying = NowPlaying(),
-): LibraryRefresher = LibraryRefresher(IdleRefreshRepository, session, downloads, settings, UnmeteredNetwork, nowPlaying, DownloadKicker {}, scope)
+    repository: IdleRefreshRepository = IdleRefreshRepository(),
+): LibraryRefresher = LibraryRefresher(repository, session, downloads, settings, UnmeteredNetwork, nowPlaying, DownloadKicker {}, scope)
 
-private object IdleRefreshRepository : LibraryRefreshRepository {
+/** 取得元に問い合わせない [LibraryRefreshRepository]。1 番組の同期は呼ばれた番組を [syncedPrograms] に残して null を返す。 */
+class IdleRefreshRepository : LibraryRefreshRepository {
+    /** [syncProgram] に渡された番組（呼ばれた順）。 */
+    val syncedPrograms = mutableListOf<ProgramId>()
     override suspend fun refresh(
         excluded: () -> Set<EpisodeId>,
         onProgress: (ScanProgress) -> Unit,
         onEnqueued: (Int) -> Unit,
     ): RefreshResult = error("not used")
-    override suspend fun syncProgram(programId: ProgramId, excluded: Set<EpisodeId>): RefreshResult? = null
+    override suspend fun syncProgram(programId: ProgramId, excluded: Set<EpisodeId>): RefreshResult? {
+        syncedPrograms += programId
+        return null
+    }
 }
 
 private object UnmeteredNetwork : NetworkStatus {
