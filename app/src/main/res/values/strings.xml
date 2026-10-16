@@ -326,6 +326,35 @@
     <string name="settings_last_sync">Last sync</string>
     <string name="settings_section_download">Downloads</string>
     <string name="settings_storage">Files on device</string>
+    <!-- Row under "Files on device" (shown only when there are such programs). %1$d = number of programs -->
+    <plurals name="settings_remove_unmatched">
+        <item quantity="one">Remove programs not found on the source (%1$d program)</item>
+        <item quantity="other">Remove programs not found on the source (%1$d programs)</item>
+    </plurals>
+    <string name="settings_remove_unmatched_disabled">Available after the sync finishes</string>
+    <string name="settings_remove_unmatched_title">Remove programs not found on the source?</string>
+    <!-- %1$s = settings_remove_unmatched_programs, %2$s = settings_remove_unmatched_episodes(_pinned) -->
+    <string name="settings_remove_unmatched_text">%1$s %2$s Even if they come back on the source, removed ones will not come back.</string>
+    <plurals name="settings_remove_unmatched_programs">
+        <item quantity="one">%1$d program not found on the source will be removed from this device.</item>
+        <item quantity="other">%1$d programs not found on the source will be removed from this device.</item>
+    </plurals>
+    <!-- %1$d = episodes on the device -->
+    <plurals name="settings_remove_unmatched_episodes">
+        <item quantity="one">%1$d episode on the device and its playback position will be deleted too.</item>
+        <item quantity="other">%1$d episodes on the device and their playback positions will be deleted too.</item>
+    </plurals>
+    <!-- %1$d = episodes on the device, %2$d = pinned ones among them -->
+    <plurals name="settings_remove_unmatched_episodes_pinned">
+        <item quantity="one">%1$d episode on the device (%2$d pinned) and its playback position will be deleted too.</item>
+        <item quantity="other">%1$d episodes on the device (%2$d pinned) and their playback positions will be deleted too.</item>
+    </plurals>
+    <string name="settings_remove_unmatched_confirm">Remove</string>
+    <!-- %1$d = programs kept because an episode of them is Now Playing -->
+    <plurals name="settings_remove_unmatched_kept">
+        <item quantity="one">Kept %1$d program you are listening to</item>
+        <item quantity="other">Kept %1$d programs you are listening to</item>
+    </plurals>
     <string name="settings_wifi_only">Wi-Fi only</string>
     <string name="settings_wifi_only_description">Turn off to download over mobile data too</string>
     <string name="settings_section_display">Display</string>

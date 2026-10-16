@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -53,6 +54,7 @@ import dev.tseki.kikidame.domain.SelectedLibrary
 import dev.tseki.kikidame.domain.Session
 import dev.tseki.kikidame.domain.SmbConnection
 import dev.tseki.kikidame.domain.SourceItemId
+import dev.tseki.kikidame.domain.UnmatchedPrograms
 import dev.tseki.kikidame.ui.theme.KikidameTheme
 import androidx.compose.ui.tooling.preview.Preview
 import kotlin.time.Instant
@@ -76,6 +78,9 @@ fun SettingsScreen(
     val wifiOnly by viewModel.wifiOnly.collectAsStateWithLifecycle()
     val localStorage by viewModel.localStorage.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    val unmatched by viewModel.unmatched.collectAsStateWithLifecycle()
+    val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
+    val removePreview by viewModel.removePreview.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -92,10 +97,16 @@ fun SettingsScreen(
         wifiOnly = wifiOnly,
         localStorage = localStorage,
         themeMode = themeMode,
+        unmatched = unmatched,
+        isSyncing = isSyncing,
+        removePreview = removePreview,
         snackbarHostState = snackbarHostState,
         onBack = onBack,
         onChangeLibrary = onChangeLibrary,
         onOpenLicenses = onOpenLicenses,
+        onRemoveUnmatched = viewModel::requestRemoveUnmatched,
+        onConfirmRemoveUnmatched = viewModel::confirmRemoveUnmatched,
+        onCancelRemoveUnmatched = viewModel::cancelRemoveUnmatched,
         onSetWifiOnly = viewModel::setWifiOnly,
         onSetThemeMode = viewModel::setThemeMode,
         onSignOut = viewModel::signOut,
@@ -110,10 +121,16 @@ internal fun SettingsContent(
     wifiOnly: Boolean,
     localStorage: LocalStorageUsage?,
     themeMode: ThemeMode?,
+    unmatched: UnmatchedPrograms,
+    isSyncing: Boolean,
+    removePreview: UnmatchedPrograms?,
     snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
     onChangeLibrary: () -> Unit,
     onOpenLicenses: () -> Unit,
+    onRemoveUnmatched: () -> Unit,
+    onConfirmRemoveUnmatched: () -> Unit,
+    onCancelRemoveUnmatched: () -> Unit,
     onSetWifiOnly: (Boolean) -> Unit,
     onSetThemeMode: (ThemeMode) -> Unit,
     onSignOut: () -> Unit,
@@ -177,6 +194,23 @@ internal fun SettingsContent(
             SectionTitle(stringResource(R.string.settings_section_download))
             // 手元のファイルの合計（#42）。保持ルールや固定を調整する動機は容量なので、見えるようにする
             ValueRow(stringResource(R.string.settings_storage), localStorage?.toText()?.resolve() ?: "-")
+            // 取得元に見つからない番組（消失・取得元 ID 無し）をまとめて消す（#317）。無ければ行ごと出さない。同期の間は押せない
+            if (unmatched.programCount > 0) {
+                ListItem(
+                    modifier = Modifier.clickable(enabled = !isSyncing, onClick = onRemoveUnmatched),
+                    headlineContent = {
+                        Text(
+                            pluralStringResource(R.plurals.settings_remove_unmatched, unmatched.programCount, unmatched.programCount),
+                            color = if (isSyncing) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                        )
+                    },
+                    supportingContent = if (isSyncing) {
+                        { Text(stringResource(R.string.settings_remove_unmatched_disabled)) }
+                    } else {
+                        null
+                    },
+                )
+            }
             ListItem(
                 modifier = Modifier.clickable { onSetWifiOnly(!wifiOnly) },
                 headlineContent = { Text(stringResource(R.string.settings_wifi_only)) },
@@ -252,6 +286,25 @@ internal fun SettingsContent(
             dismissButton = { TextButton(onClick = { confirmSignOut = false }) { Text(stringResource(R.string.common_cancel)) } },
         )
     }
+    removePreview?.let { preview ->
+        val programs = pluralStringResource(R.plurals.settings_remove_unmatched_programs, preview.programCount, preview.programCount)
+        val episodes = if (preview.pinnedEpisodeCount > 0) {
+            pluralStringResource(R.plurals.settings_remove_unmatched_episodes_pinned, preview.localEpisodeCount, preview.localEpisodeCount, preview.pinnedEpisodeCount)
+        } else {
+            pluralStringResource(R.plurals.settings_remove_unmatched_episodes, preview.localEpisodeCount, preview.localEpisodeCount)
+        }
+        AlertDialog(
+            onDismissRequest = onCancelRemoveUnmatched,
+            title = { Text(stringResource(R.string.settings_remove_unmatched_title)) },
+            text = { Text(stringResource(R.string.settings_remove_unmatched_text, programs, episodes)) },
+            confirmButton = {
+                TextButton(onClick = onConfirmRemoveUnmatched) {
+                    Text(stringResource(R.string.settings_remove_unmatched_confirm), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = onCancelRemoveUnmatched) { Text(stringResource(R.string.common_cancel)) } },
+        )
+    }
     if (confirmReset) {
         ChangeSourceConfirmDialog(
             onConfirm = { confirmReset = false; onResetAndConnectElsewhere() },
@@ -278,10 +331,16 @@ private fun SettingsContentPreviewHost(session: SessionState) {
             wifiOnly = true,
             localStorage = LocalStorageUsage(totalBytes = 1_234_567_890L, episodeCount = 12),
             themeMode = ThemeMode.SYSTEM,
+            unmatched = UnmatchedPrograms(programCount = 2, localEpisodeCount = 5, pinnedEpisodeCount = 1),
+            isSyncing = false,
+            removePreview = null,
             snackbarHostState = remember { SnackbarHostState() },
             onBack = {},
             onChangeLibrary = {},
             onOpenLicenses = {},
+            onRemoveUnmatched = {},
+            onConfirmRemoveUnmatched = {},
+            onCancelRemoveUnmatched = {},
             onSetWifiOnly = {},
             onSetThemeMode = {},
             onSignOut = {},

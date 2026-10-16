@@ -4,7 +4,11 @@ import dev.tseki.kikidame.domain.DownloadRepository
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.LocalDeletionScope
 import dev.tseki.kikidame.domain.ProgramId
+import dev.tseki.kikidame.domain.RemovedUnmatchedPrograms
+import dev.tseki.kikidame.domain.UnmatchedPreview
+import dev.tseki.kikidame.domain.UnmatchedPrograms
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.flowOf
 
 /**
  * 何も持たない [DownloadRepository]。[reconcileMissingFiles] は [gate] を待ってから [missing] を返す。
@@ -24,6 +28,10 @@ class FakeDownloadRepository(
     override suspend fun removeProgram(programId: ProgramId) {
         removedPrograms += programId
     }
+    var unmatched = UnmatchedPrograms(0, 0, 0)
+    override suspend fun unmatchedPrograms(except: EpisodeId?) = UnmatchedPreview(unmatched, emptyList())
+    override fun observeUnmatchedPrograms() = flowOf(unmatched)
+    override suspend fun removeUnmatchedPrograms(programIds: List<ProgramId>, except: EpisodeId?) = RemovedUnmatchedPrograms(unmatched.programCount, 0)
     override suspend fun cancel(episodeId: EpisodeId) = Unit
     override suspend fun retry(episodeId: EpisodeId) = Unit
     override suspend fun pin(episodeId: EpisodeId) {
