@@ -4,7 +4,7 @@
 
 An Android app for recorded radio programs kept on a Jellyfin server, a NAS shared folder or a folder on your device (podcast files work too). It downloads and deletes episodes automatically by per-program rules, and keeps playing when the source is unreachable. Kikidame is an unofficial client with no affiliation to the Jellyfin project.
 
-https://github.com/user-attachments/assets/23b4710a-9410-4d2f-aa2b-c8faac1184e3
+https://github.com/user-attachments/assets/346c00bd-e9a7-4568-8849-70ac8e59ad58
 
 <p>
 <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" width="180" alt="Continue"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" width="180" alt="Episodes"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" width="180" alt="Player"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/4.png" width="180" alt="Sync settings">
