@@ -1,0 +1,2 @@
+- Settings > Downloads: "Remove programs not found on the source" removes every Gone program at once after a confirmation. A program you are listening to is kept
+- Closing the episode list's sync sheet syncs that program if you changed its sync settings
