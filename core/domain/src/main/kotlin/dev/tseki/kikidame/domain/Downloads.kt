@@ -1,5 +1,7 @@
 package dev.tseki.kikidame.domain
 
+import kotlinx.coroutines.flow.Flow
+
 /** 手元のファイルを消すときの範囲。 */
 enum class LocalDeletionScope {
     /** ファイルと手元の記録だけ消す。各回と再生位置は残る（取得元から落とし直せる）。 */
@@ -49,6 +51,15 @@ object EpisodeFileName {
     }
 }
 
+/**
+ * 「取得元に見つからない番組」（消失した番組と取得元 ID の無い番組。1 つずつ消す「この番組を手元から消す」と同じ範囲）の件数。
+ * 手元の回は `DONE` でパスがある回（[LocalStorageUsage] と同じ定義）で、固定はそのうちの固定した回。
+ */
+data class UnmatchedPrograms(val programCount: Int, val localEpisodeCount: Int, val pinnedEpisodeCount: Int)
+
+/** [DownloadRepository.removeUnmatchedPrograms] の結果。[kept] は聴いている回の番組なので消さずに残した数。 */
+data class RemovedUnmatchedPrograms(val removed: Int, val kept: Int)
+
 /** ダウンロードの操作（利用者側）。 */
 interface DownloadRepository {
     /** 手動ダウンロード = 固定。既に行がある回は固定にするだけ（同期分の予約を手動に格上げする）。失敗は [retry]。 */
@@ -68,6 +79,18 @@ interface DownloadRepository {
      * 取得元に在る番組を消しても次の同期で戻ってくる（再生位置だけ失う）ので、呼び出し側で出し分ける。
      */
     suspend fun removeProgram(programId: ProgramId)
+
+    /** 取得元に見つからない番組の件数。[except] の回の番組は数えない（聴いている回。null なら除かない）。 */
+    suspend fun unmatchedPrograms(except: EpisodeId?): UnmatchedPrograms
+
+    /** [unmatchedPrograms] を全部（除かずに）数えて、変わるたびに流す。設定の行の出し分けと件数に使う。 */
+    fun observeUnmatchedPrograms(): Flow<UnmatchedPrograms>
+
+    /**
+     * 取得元に見つからない番組をまとめて [removeProgram] で消す。[except] の回（聴いている回）の番組だけは消さずに残し、
+     * [RemovedUnmatchedPrograms.kept] に数える。
+     */
+    suspend fun removeUnmatchedPrograms(except: EpisodeId?): RemovedUnmatchedPrograms
 
     /** DONE 以外（PENDING / RUNNING / FAILED）の行を取り消す。書きかけのファイルも消す。 */
     suspend fun cancel(episodeId: EpisodeId)

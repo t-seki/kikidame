@@ -17,6 +17,8 @@ data class ProgramSummaryRow(
     val unplayedLocalCount: Int,
     val latestPublishedAt: Long?,
 )
+/** 取得元に見つからない番組（消失・取得元 ID 無し）の件数。手元の回は [LOCAL_FILE_PRESENT] と同じ定義。 */
+data class UnmatchedRow(val programCount: Int, val localEpisodeCount: Int, val pinnedEpisodeCount: Int)
 data class LocalUsageRow(val totalBytes: Long, val episodeCount: Int)
 /** 突合に必要な列だけ。 */
 data class ProgramKeyRow(val id: Long, val sourceItemId: String?, val publisherName: String?, val name: String)
@@ -91,6 +93,37 @@ interface ProgramDao {
     suspend fun deleteById(id: Long)
     @Query("SELECT * FROM programs WHERE id = :id")
     suspend fun findById(id: Long): ProgramEntity?
+
+    /** 取得元に見つからない番組（消失した番組と取得元 ID の無い番組）の id。 */
+    @Query("SELECT id FROM programs WHERE goneSince IS NOT NULL OR sourceItemId IS NULL")
+    suspend fun listUnmatchedIds(): List<Long>
+
+    /** 取得元に見つからない番組の件数。[exceptProgramId] の番組は数えない（除かないなら -1）。 */
+    @Query(
+        """
+        SELECT COUNT(DISTINCT p.id) AS programCount,
+               COALESCE(SUM(CASE WHEN $LOCAL_FILE_PRESENT THEN 1 ELSE 0 END), 0) AS localEpisodeCount,
+               COALESCE(SUM(CASE WHEN $LOCAL_FILE_PRESENT AND lf.pinned = 1 THEN 1 ELSE 0 END), 0) AS pinnedEpisodeCount
+        FROM programs p
+          LEFT JOIN episodes e ON e.programId = p.id
+          LEFT JOIN local_files lf ON lf.episodeId = e.id
+        WHERE (p.goneSince IS NOT NULL OR p.sourceItemId IS NULL) AND p.id != :exceptProgramId
+        """,
+    )
+    suspend fun countUnmatched(exceptProgramId: Long): UnmatchedRow
+
+    @Query(
+        """
+        SELECT COUNT(DISTINCT p.id) AS programCount,
+               COALESCE(SUM(CASE WHEN $LOCAL_FILE_PRESENT THEN 1 ELSE 0 END), 0) AS localEpisodeCount,
+               COALESCE(SUM(CASE WHEN $LOCAL_FILE_PRESENT AND lf.pinned = 1 THEN 1 ELSE 0 END), 0) AS pinnedEpisodeCount
+        FROM programs p
+          LEFT JOIN episodes e ON e.programId = p.id
+          LEFT JOIN local_files lf ON lf.episodeId = e.id
+        WHERE (p.goneSince IS NOT NULL OR p.sourceItemId IS NULL) AND p.id != :exceptProgramId
+        """,
+    )
+    fun observeUnmatched(exceptProgramId: Long): Flow<UnmatchedRow>
 }
 /** 各回とその手元の状態。`@Relation` の to-one は行が無ければ null。 */
 data class EpisodeRow(

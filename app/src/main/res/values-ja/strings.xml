@@ -246,6 +246,25 @@
     <string name="settings_last_sync">最終同期</string>
     <string name="settings_section_download">ダウンロード</string>
     <string name="settings_storage">手元のファイル</string>
+    <plurals name="settings_remove_unmatched">
+        <item quantity="other">取得元に見つからない番組を手元から消す（%1$d 番組）</item>
+    </plurals>
+    <string name="settings_remove_unmatched_disabled">同期の後に使えます</string>
+    <string name="settings_remove_unmatched_title">取得元に見つからない番組を手元から消しますか？</string>
+    <string name="settings_remove_unmatched_text">%1$s%2$s取得元に戻っても、消したものは戻りません。</string>
+    <plurals name="settings_remove_unmatched_programs">
+        <item quantity="other">取得元に見つからない %1$d 番組を手元から消します。</item>
+    </plurals>
+    <plurals name="settings_remove_unmatched_episodes">
+        <item quantity="other">手元の回 %1$d 本と再生位置も消えます。</item>
+    </plurals>
+    <plurals name="settings_remove_unmatched_episodes_pinned">
+        <item quantity="other">手元の回 %1$d 本（うち固定 %2$d 本）と再生位置も消えます。</item>
+    </plurals>
+    <string name="settings_remove_unmatched_confirm">消す</string>
+    <plurals name="settings_remove_unmatched_kept">
+        <item quantity="other">聴いている番組 %1$d 件は残しました</item>
+    </plurals>
     <string name="settings_wifi_only">Wi-Fi のみ</string>
     <string name="settings_wifi_only_description">オフにするとモバイル回線でもダウンロードします</string>
     <string name="settings_section_display">表示</string>

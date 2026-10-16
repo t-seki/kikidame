@@ -4,6 +4,7 @@ import androidx.room.withTransaction
 import dev.tseki.kikidame.data.db.EpisodeEntity
 import dev.tseki.kikidame.data.db.KikidameDatabase
 import dev.tseki.kikidame.data.db.LocalFileEntity
+import dev.tseki.kikidame.data.db.UnmatchedRow
 import dev.tseki.kikidame.data.db.toDomain
 import dev.tseki.kikidame.data.files.EpisodesDirectory
 import dev.tseki.kikidame.domain.DownloadQueue
@@ -14,8 +15,12 @@ import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.EpisodeWithState
 import dev.tseki.kikidame.domain.LocalDeletionScope
 import dev.tseki.kikidame.domain.ProgramId
+import dev.tseki.kikidame.domain.RemovedUnmatchedPrograms
+import dev.tseki.kikidame.domain.UnmatchedPrograms
 import dev.tseki.kikidame.domain.deletionScopeFor
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
@@ -136,6 +141,26 @@ class RoomDownloadRepository @Inject constructor(
         imagePath?.let { withContext(Dispatchers.IO) { File(it).delete() } }
     }
 
+    override suspend fun unmatchedPrograms(except: EpisodeId?): UnmatchedPrograms =
+        db.programDao().countUnmatched(exceptProgramId(except)).toDomain()
+
+    override fun observeUnmatchedPrograms(): Flow<UnmatchedPrograms> =
+        db.programDao().observeUnmatched(NO_PROGRAM).map { it.toDomain() }
+
+    override suspend fun removeUnmatchedPrograms(except: EpisodeId?): RemovedUnmatchedPrograms {
+        val keep = exceptProgramId(except)
+        val targets = db.programDao().listUnmatchedIds()
+        val removable = targets.filter { it != keep }
+        for (id in removable) removeProgram(ProgramId(id))
+        return RemovedUnmatchedPrograms(removed = removable.size, kept = targets.size - removable.size)
+    }
+
+    /** 聴いている回の番組の id。回が無い・指定が無ければ、どの番組にも当たらない値。 */
+    private suspend fun exceptProgramId(except: EpisodeId?): Long =
+        except?.let { db.episodeDao().findById(it.value)?.episode?.programId } ?: NO_PROGRAM
+
+    private fun UnmatchedRow.toDomain() = UnmatchedPrograms(programCount, localEpisodeCount, pinnedEpisodeCount)
+
     /** トランザクション内で呼ぶ。`local_files` / `playback_states` は cascade。各回が 0 になった取得元 ID 無しの番組も消す。 */
     private suspend fun deleteEpisodeRow(episode: EpisodeEntity) {
         val programId = episode.programId
@@ -219,5 +244,6 @@ class RoomDownloadRepository @Inject constructor(
 
     companion object {
         const val PART_SUFFIX = ".part"
+        private const val NO_PROGRAM = -1L
     }
 }

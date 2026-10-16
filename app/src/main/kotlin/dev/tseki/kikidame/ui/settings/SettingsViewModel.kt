@@ -2,9 +2,13 @@ package dev.tseki.kikidame.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.util.Log
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.AppSettingsRepository
+import dev.tseki.kikidame.domain.DownloadRepository
+import dev.tseki.kikidame.domain.UnmatchedPrograms
+import dev.tseki.kikidame.playback.NowPlaying
 import dev.tseki.kikidame.domain.ThemeMode
 import dev.tseki.kikidame.domain.LibraryRepository
 import dev.tseki.kikidame.domain.LocalStorageUsage
@@ -18,6 +22,7 @@ import dev.tseki.kikidame.text.UiText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -31,11 +36,71 @@ class SettingsViewModel @Inject constructor(
     private val syncScheduler: SyncScheduler,
     private val sourceChanger: SourceChanger,
     private val refresher: LibraryRefresher,
+    private val downloads: DownloadRepository,
+    private val nowPlaying: NowPlaying,
     library: LibraryRepository,
 ) : ViewModel() {
     /** 手元のファイルの合計（#42）。null は読み込み前。 */
     val localStorage: StateFlow<LocalStorageUsage?> = library.observeLocalStorage()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    /** 取得元に見つからない番組の件数（#317）。0 番組なら設定の行を出さない。 */
+    val unmatched: StateFlow<UnmatchedPrograms> = downloads.observeUnmatchedPrograms()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UnmatchedPrograms(0, 0, 0))
+
+    /** 同期の間（利用者の操作でも裏でも）は、取得元に見つからない番組を消す行を無効にする。 */
+    val isSyncing: StateFlow<Boolean> = combine(refresher.isRefreshing, refresher.isSyncingInBackground) { a, b -> a || b }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /** 確認のダイアログに出す件数（聴いている回の番組を除いたもの）。null なら出していない。 */
+    private val _removePreview = MutableStateFlow<UnmatchedPrograms?>(null)
+    val removePreview: StateFlow<UnmatchedPrograms?> = _removePreview
+
+    /**
+     * 行を押したとき。聴いている回の番組を除いて数え、消すものがあれば確認を出す。除くと 0 番組なら（対象が聴いている番組だけ）
+     * 確認は出さず、残したことだけ知らせる。
+     */
+    fun requestRemoveUnmatched() {
+        if (isSyncing.value) return
+        launchAction {
+            val preview = downloads.unmatchedPrograms(nowPlaying.excludedFromSync)
+            if (preview.programCount > 0) {
+                _removePreview.value = preview
+            } else {
+                val kept = downloads.unmatchedPrograms(null).programCount
+                if (kept > 0) _message.value = keptMessage(kept)
+            }
+        }
+    }
+
+    fun cancelRemoveUnmatched() {
+        _removePreview.value = null
+    }
+
+    /** 確認の後。聴いている回の番組は消さずに残し、残したことを知らせる。 */
+    fun confirmRemoveUnmatched() {
+        _removePreview.value = null
+        if (isSyncing.value) return
+        launchAction {
+            val result = downloads.removeUnmatchedPrograms(nowPlaying.excludedFromSync)
+            if (result.kept > 0) _message.value = keptMessage(result.kept)
+        }
+    }
+
+    private fun keptMessage(kept: Int) = UiText.Plural(R.plurals.settings_remove_unmatched_kept, kept)
+
+    private fun launchAction(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            try {
+                block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "remove unmatched programs", e)
+                _message.value = UiText.Res(R.string.episode_list_msg_action_failed, e::class.simpleName.orEmpty())
+            }
+        }
+    }
+
     val wifiOnly: StateFlow<Boolean> = settings.wifiOnly
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
     /** 変更したら、条件待ちの Worker（ダウンロード・定期同期）を新しい条件で組み直す（実行中の転送は切らない）。 */
@@ -92,5 +157,9 @@ class SettingsViewModel @Inject constructor(
 
     fun consumeMessage() {
         _message.value = null
+    }
+
+    private companion object {
+        const val TAG = "SettingsViewModel"
     }
 }
