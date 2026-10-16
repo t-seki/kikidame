@@ -16,6 +16,7 @@ import dev.tseki.kikidame.domain.EpisodeWithState
 import dev.tseki.kikidame.domain.LocalDeletionScope
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.RemovedUnmatchedPrograms
+import dev.tseki.kikidame.domain.UnmatchedPreview
 import dev.tseki.kikidame.domain.UnmatchedPrograms
 import dev.tseki.kikidame.domain.deletionScopeFor
 import kotlinx.coroutines.Dispatchers
@@ -141,15 +142,19 @@ class RoomDownloadRepository @Inject constructor(
         imagePath?.let { withContext(Dispatchers.IO) { File(it).delete() } }
     }
 
-    override suspend fun unmatchedPrograms(except: EpisodeId?): UnmatchedPrograms =
-        db.programDao().countUnmatched(exceptProgramId(except)).toDomain()
+    override suspend fun unmatchedPrograms(except: EpisodeId?): UnmatchedPreview {
+        val keep = exceptProgramId(except)
+        val ids = db.programDao().listUnmatchedIds().filter { it != keep }
+        return UnmatchedPreview(db.programDao().countByIds(ids).toDomain(), ids.map(::ProgramId))
+    }
 
     override fun observeUnmatchedPrograms(): Flow<UnmatchedPrograms> =
-        db.programDao().observeUnmatched(NO_PROGRAM).map { it.toDomain() }
+        db.programDao().observeUnmatched().map { it.toDomain() }
 
-    override suspend fun removeUnmatchedPrograms(except: EpisodeId?): RemovedUnmatchedPrograms {
+    override suspend fun removeUnmatchedPrograms(programIds: List<ProgramId>, except: EpisodeId?): RemovedUnmatchedPrograms {
         val keep = exceptProgramId(except)
-        val targets = db.programDao().listUnmatchedIds()
+        val stillUnmatched = db.programDao().listUnmatchedIds().toSet()
+        val targets = programIds.map { it.value }.filter { it in stillUnmatched }
         val removable = targets.filter { it != keep }
         for (id in removable) removeProgram(ProgramId(id))
         return RemovedUnmatchedPrograms(removed = removable.size, kept = targets.size - removable.size)

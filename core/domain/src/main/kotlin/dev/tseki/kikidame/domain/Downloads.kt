@@ -57,6 +57,9 @@ object EpisodeFileName {
  */
 data class UnmatchedPrograms(val programCount: Int, val localEpisodeCount: Int, val pinnedEpisodeCount: Int)
 
+/** 確認のダイアログに出す件数 [counts] と、その時点の対象の番組 [programIds]（確定ではこの中から消す）。 */
+data class UnmatchedPreview(val counts: UnmatchedPrograms, val programIds: List<ProgramId>)
+
 /** [DownloadRepository.removeUnmatchedPrograms] の結果。[kept] は聴いている回の番組なので消さずに残した数。 */
 data class RemovedUnmatchedPrograms(val removed: Int, val kept: Int)
 
@@ -77,20 +80,22 @@ interface DownloadRepository {
     /**
      * 番組を手元から消す（番組・各回・ファイル・再生位置のすべて）。消失した番組と取得元 ID の無い番組の「この番組を手元から消す」用。
      * 取得元に在る番組を消しても次の同期で戻ってくる（再生位置だけ失う）ので、呼び出し側で出し分ける。
+     * 設定からまとめて消す操作（[removeUnmatchedPrograms]）からも使う。
      */
     suspend fun removeProgram(programId: ProgramId)
 
-    /** 取得元に見つからない番組の件数。[except] の回の番組は数えない（聴いている回。null なら除かない）。 */
-    suspend fun unmatchedPrograms(except: EpisodeId?): UnmatchedPrograms
+    /** 取得元に見つからない番組の件数と id。[except] の回の番組は入れない（聴いている回。null なら除かない）。 */
+    suspend fun unmatchedPrograms(except: EpisodeId?): UnmatchedPreview
 
     /** [unmatchedPrograms] を全部（除かずに）数えて、変わるたびに流す。設定の行の出し分けと件数に使う。 */
     fun observeUnmatchedPrograms(): Flow<UnmatchedPrograms>
 
     /**
-     * 取得元に見つからない番組をまとめて [removeProgram] で消す。[except] の回（聴いている回）の番組だけは消さずに残し、
+     * [programIds]（確認を出した時点の対象）のうち、今も取得元に見つからない番組をまとめて [removeProgram] で消す
+     * （確認の後に新しく見つからなくなった番組は消さない）。[except] の回（聴いている回）の番組だけは消さずに残し、
      * [RemovedUnmatchedPrograms.kept] に数える。
      */
-    suspend fun removeUnmatchedPrograms(except: EpisodeId?): RemovedUnmatchedPrograms
+    suspend fun removeUnmatchedPrograms(programIds: List<ProgramId>, except: EpisodeId?): RemovedUnmatchedPrograms
 
     /** DONE 以外（PENDING / RUNNING / FAILED）の行を取り消す。書きかけのファイルも消す。 */
     suspend fun cancel(episodeId: EpisodeId)

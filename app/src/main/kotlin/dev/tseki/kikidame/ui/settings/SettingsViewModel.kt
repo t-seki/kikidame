@@ -7,6 +7,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.AppSettingsRepository
 import dev.tseki.kikidame.domain.DownloadRepository
+import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.UnmatchedPrograms
 import dev.tseki.kikidame.playback.NowPlaying
 import dev.tseki.kikidame.domain.ThemeMode
@@ -55,6 +56,9 @@ class SettingsViewModel @Inject constructor(
     private val _removePreview = MutableStateFlow<UnmatchedPrograms?>(null)
     val removePreview: StateFlow<UnmatchedPrograms?> = _removePreview
 
+    /** ダイアログを出した時点の対象の番組。確定ではこの中から消す（開いている間に新しく見つからなくなった番組は消さない）。 */
+    private var pendingIds: List<ProgramId> = emptyList()
+
     /**
      * 行を押したとき。聴いている回の番組を除いて数え、消すものがあれば確認を出す。除くと 0 番組なら（対象が聴いている番組だけ）
      * 確認は出さず、残したことだけ知らせる。
@@ -63,10 +67,11 @@ class SettingsViewModel @Inject constructor(
         if (isSyncing.value) return
         launchAction {
             val preview = downloads.unmatchedPrograms(nowPlaying.excludedFromSync)
-            if (preview.programCount > 0) {
-                _removePreview.value = preview
+            if (preview.counts.programCount > 0) {
+                pendingIds = preview.programIds
+                _removePreview.value = preview.counts
             } else {
-                val kept = downloads.unmatchedPrograms(null).programCount
+                val kept = downloads.unmatchedPrograms(null).counts.programCount
                 if (kept > 0) _message.value = keptMessage(kept)
             }
         }
@@ -74,14 +79,19 @@ class SettingsViewModel @Inject constructor(
 
     fun cancelRemoveUnmatched() {
         _removePreview.value = null
+        pendingIds = emptyList()
     }
 
-    /** 確認の後。聴いている回の番組は消さずに残し、残したことを知らせる。 */
+    /** 確認の後。ダイアログに出した番組だけを消し、聴いている回の番組は消さずに残して知らせる。同期中なら消さずに知らせる。 */
     fun confirmRemoveUnmatched() {
-        _removePreview.value = null
-        if (isSyncing.value) return
+        val ids = pendingIds
+        cancelRemoveUnmatched()
+        if (isSyncing.value) {
+            _message.value = UiText.Res(R.string.settings_remove_unmatched_disabled)
+            return
+        }
         launchAction {
-            val result = downloads.removeUnmatchedPrograms(nowPlaying.excludedFromSync)
+            val result = downloads.removeUnmatchedPrograms(ids, nowPlaying.excludedFromSync)
             if (result.kept > 0) _message.value = keptMessage(result.kept)
         }
     }

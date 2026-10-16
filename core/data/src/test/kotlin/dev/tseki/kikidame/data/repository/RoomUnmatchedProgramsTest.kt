@@ -6,6 +6,7 @@ import dev.tseki.kikidame.data.db.LocalFileEntity
 import dev.tseki.kikidame.data.db.ProgramEntity
 import dev.tseki.kikidame.domain.DownloadState
 import dev.tseki.kikidame.domain.EpisodeId
+import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.RemovedUnmatchedPrograms
 import dev.tseki.kikidame.domain.UnmatchedPrograms
 import kotlinx.coroutines.flow.first
@@ -43,6 +44,10 @@ class RoomUnmatchedProgramsTest : RefreshTestBase() {
         return id to file
     }
 
+    /** 確認を出す → 確定、の流れ。 */
+    private suspend fun removeAll(except: EpisodeId?) =
+        downloads.removeUnmatchedPrograms(downloads.unmatchedPrograms(null).programIds, except)
+
     @Test
     fun countsOnlyGoneAndSourceIdLessProgramsWithLocalAndPinnedEpisodes() = runTest {
         val gone = program("gone", "s1", gone = true)
@@ -56,7 +61,7 @@ class RoomUnmatchedProgramsTest : RefreshTestBase() {
         episode(live, "l1", DownloadState.DONE, pinned = true)
 
         val all = UnmatchedPrograms(programCount = 2, localEpisodeCount = 3, pinnedEpisodeCount = 1)
-        assertEquals(all, downloads.unmatchedPrograms(null))
+        assertEquals(all, downloads.unmatchedPrograms(null).counts)
         assertEquals(all, downloads.observeUnmatchedPrograms().first())
     }
 
@@ -64,13 +69,13 @@ class RoomUnmatchedProgramsTest : RefreshTestBase() {
     fun zeroWhenEveryProgramIsOnTheSource() = runTest {
         val live = program("live", "s2")
         episode(live, "l1", DownloadState.DONE)
-        assertEquals(UnmatchedPrograms(0, 0, 0), downloads.unmatchedPrograms(null))
+        assertEquals(UnmatchedPrograms(0, 0, 0), downloads.unmatchedPrograms(null).counts)
     }
 
     @Test
     fun emptyProgramStillCountsAsAProgram() = runTest {
         program("gone", "s1", gone = true)
-        assertEquals(UnmatchedPrograms(1, 0, 0), downloads.unmatchedPrograms(null))
+        assertEquals(UnmatchedPrograms(1, 0, 0), downloads.unmatchedPrograms(null).counts)
     }
 
     @Test
@@ -82,13 +87,13 @@ class RoomUnmatchedProgramsTest : RefreshTestBase() {
         val (_, noIdFile) = episode(noId, "n1", DownloadState.DONE)
         val (_, liveFile) = episode(live, "l1", DownloadState.DONE)
 
-        assertEquals(RemovedUnmatchedPrograms(removed = 2, kept = 0), downloads.removeUnmatchedPrograms(null))
+        assertEquals(RemovedUnmatchedPrograms(removed = 2, kept = 0), removeAll(null))
 
         assertEquals(listOf(live), db.programDao().listAll().map { it.id })
         assertFalse(goneFile!!.exists())
         assertFalse(noIdFile!!.exists())
         assertTrue(liveFile!!.exists())
-        assertEquals(UnmatchedPrograms(0, 0, 0), downloads.unmatchedPrograms(null))
+        assertEquals(UnmatchedPrograms(0, 0, 0), downloads.unmatchedPrograms(null).counts)
     }
 
     @Test
@@ -99,8 +104,8 @@ class RoomUnmatchedProgramsTest : RefreshTestBase() {
         val (_, otherFile) = episode(other, "o1", DownloadState.DONE)
         val (_, otherFile2) = episode(other, "o2", DownloadState.DONE, pinned = true)
 
-        assertEquals(UnmatchedPrograms(1, 2, 1), downloads.unmatchedPrograms(EpisodeId(playing)))
-        assertEquals(RemovedUnmatchedPrograms(removed = 1, kept = 1), downloads.removeUnmatchedPrograms(EpisodeId(playing)))
+        assertEquals(UnmatchedPrograms(1, 2, 1), downloads.unmatchedPrograms(EpisodeId(playing)).counts)
+        assertEquals(RemovedUnmatchedPrograms(removed = 1, kept = 1), removeAll(EpisodeId(playing)))
 
         assertEquals(listOf(gone), db.programDao().listAll().map { it.id })
         assertNotNull(db.episodeDao().findById(playing))
@@ -115,6 +120,28 @@ class RoomUnmatchedProgramsTest : RefreshTestBase() {
         val live = program("live", "s2")
         episode(gone, "g1", DownloadState.DONE)
         val (playing, _) = episode(live, "l1", DownloadState.DONE)
-        assertEquals(RemovedUnmatchedPrograms(removed = 1, kept = 0), downloads.removeUnmatchedPrograms(EpisodeId(playing)))
+        assertEquals(RemovedUnmatchedPrograms(removed = 1, kept = 0), removeAll(EpisodeId(playing)))
+    }
+
+    @Test
+    fun removeDeletesOnlyTheProgramsShownAndOnlyIfStillUnmatched() = runTest {
+        val shown = program("shown", "s1", gone = true)
+        val recovered = program("recovered", "s2", gone = true)
+        val (_, shownFile) = episode(shown, "s1", DownloadState.DONE)
+        val (_, recoveredFile) = episode(recovered, "r1", DownloadState.DONE)
+        val shownIds = downloads.unmatchedPrograms(null).programIds
+        assertEquals(setOf(ProgramId(shown), ProgramId(recovered)), shownIds.toSet())
+
+        // ダイアログを開いている間に、新しく見つからなくなった番組が増え、見せていた番組が取得元に戻った
+        val late = program("late", "s3", gone = true)
+        val (_, lateFile) = episode(late, "l1", DownloadState.DONE)
+        db.programDao().setGoneSince(recovered, null)
+
+        assertEquals(RemovedUnmatchedPrograms(removed = 1, kept = 0), downloads.removeUnmatchedPrograms(shownIds, null))
+
+        assertEquals(setOf(recovered, late), db.programDao().listAll().map { it.id }.toSet())
+        assertFalse(shownFile!!.exists())
+        assertTrue(recoveredFile!!.exists())
+        assertTrue(lateFile!!.exists())
     }
 }
