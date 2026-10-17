@@ -217,10 +217,10 @@ docs だけの PR は 1（CI）だけ。2〜6 はアプリに変更がある PR 
 1. CI（`test` job の ADR の一覧の検査（`scripts/check-adr-index.sh`）と ADR の注記の形の検査（`scripts/check-adr-notes.sh`）と `./gradlew lintKotlin`（ktlint。未使用 import と連続した空行）と `./gradlew test` と `./gradlew :app:lintDebug` と `./gradlew :core:domain:animalsnifferMain`、`release-build` job の署名なしの `./gradlew :app:assembleRelease` と `aboutlibraries.json` の鮮度の検査）が通っている
    - release ビルド（R8 の minify・resource shrink を含む）は CI の `release-build` が PR ごとに試すので、PR のたびに手元で `assembleRelease` を流して確かめなくてよい。署名と APK の配布はリリース手順（「リリース」節）で行う
    - `release-build` は `exportLibraryDefinitions` を流し、`app/src/main/res/raw/aboutlibraries.json` に差分が出ると落ちる。ログに差分と直し方（`./gradlew :app:exportLibraryDefinitions` を流して `app/src/main/res/raw/aboutlibraries.json` をコミットする）が出る。自動ではコミットしない
-   - CI の job・ステップに検査を足す PR は、「違反があると足したステップが落ちる」ことを CI の run で確かめ、次の 2 つの run の URL を PR の本文に書く（手元の再現では代えない。#326）。URL は `worker-pr-status.sh` の `check:` の行の link から取る
+   - Renovate の PR でこの検査が落ちたら、Supervisor が worker を起動し、Renovate のブランチに再生成のコミットを積ませる。`/supervise` の「bot の版更新 PR のブランチには積まない」の例外（#187・t-seki/dotfiles#349）
+   - CI の job・ステップに検査を足す PR は、「違反があると足したステップが落ちる」ことを CI の run で確かめ、次の 2 つの run の URL を PR の本文に書く（手元の再現では代えない。#326）。URL は [`worker-pr-status.sh`](https://github.com/t-seki/dotfiles/blob/main/claude/.claude/skills/supervise/scripts/worker-pr-status.sh) の `check:` の行の link から取る
      - 違反を入れた一時コミットで、足したステップが落ちる run
      - その一時コミットを revert したコミットで、全チェックが通る run
-   - Renovate の PR でこの検査が落ちたら、Supervisor が worker を起動し、Renovate のブランチに再生成のコミットを積ませる。`/supervise` の「bot の版更新 PR のブランチには積まない」の例外（#187・t-seki/dotfiles#349）
 2. 担当の fork に `./gradlew :app:assembleDebug` を頼み（「worktree の準備」の形で、`ANDROID_HOME` と `JAVA_HOME` を付けて回す）、APK のフルパス（`<worktree>/app/build/outputs/apk/debug/app-debug.apk`）を報告させる
 3. Supervisor が `$ADB install -r <APK>` で実機の **debug 版**に入れる。debug 版は applicationId が `dev.tseki.kikidame.debug`、アプリ名が「Kikidame (debug)」で、普段使いの **release 版**（`dev.tseki.kikidame`、Releases の APK）とは別アプリとして並ぶ。release 版には触らない
 4. Room のスキーマを上げる PR も入れてよい（影響は debug 版に閉じる）。その後にスキーマの古いビルドを入れてダウングレードで落ちたら、`$ADB uninstall dev.tseki.kikidame.debug` してから入れ直す（debug 版のログイン・DB・手元のファイルが消える）
