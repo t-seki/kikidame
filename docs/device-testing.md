@@ -42,6 +42,18 @@ WSL2 は USB を見られないが、LAN 上の端末には TCP で届く。Wind
    ./gradlew :app:installDebug
    ```
 
+### Linux のマシン（WSL2 でない）からつなぐとき
+
+WSL2 でない素の Linux（devbox）でも、上の 1〜4 は同じ。違いは次の 2 点（確かめた事実: 2026-10-16、devbox、Pixel 7a の issue #319 の記録。この PR では端末がなく流していない）。
+
+- マシンごとに初回は `adb pair` が要る（ペア設定は端末とマシンの組ごと）。`adb mdns services` で端末が見つからないことがあった。そのときは、端末のワイヤレスデバッグ画面に出ている IP:ポートを人に聞き、`adb connect` する
+- つないだ後は、同じ端末が「IP:ポート」と「mDNS の名前（`adb-…._adb-tls-connect._tcp`）」の 2 つで `adb devices` に出る。`adb` に `-s` を付けないと `more than one device` で失敗するので、`$ADB -s <IP:ポート> …` の形で指定する（以降の `adb` の手順も同じ）
+
+```bash
+$ADB devices
+$ADB -s <IP:ポート> shell getprop ro.product.model
+```
+
 `adb mdns services` は、adb サーバを起動した直後には何も出さず、少し待つと出たことがある（2026-10-07、素の Linux。原因は未確認）。空なら少し待って打ち直す。
 
 ### debug の署名鍵をマシン間で共有する
@@ -73,6 +85,62 @@ $APKSIGNER verify --print-certs app/build/outputs/apk/debug/app-debug.apk | grep
 ```powershell
 adb install -r \\wsl.localhost\Ubuntu\home\<you>\dev\<repo>\app\build\outputs\apk\debug\app-debug.apk
 ```
+
+## Supervisor が debug 版の画面を確かめる（#319）
+
+マージ前の検証（[development.md](development.md) の「マージ前の検証」）で、debug 版を入れた後に Supervisor が画面を自分で確かめる手順。確かめた事実は 2026-10-16、devbox（Linux）、Pixel 7a、Android CLI 1.0.16625370、#318（#317）のマージ前の検証のとき。この PR では端末がなく、下のコマンドは流していない。
+
+`$ADB`・`$PKG` は上の「接続」の節のとおり。端末は `-s <IP:ポート>` で指す（「Linux のマシンからつなぐとき」）。
+
+### 画面を撮る
+
+端末に何も入れずに PNG で撮れる（1080x2400 で約 2.4 秒）。撮った PNG は Read ツールで見る。
+
+```bash
+android screen capture --device=<IP:ポート> --output=/tmp/screen.png
+```
+
+Android CLI（`android`）が無いマシンでは、adb で代える（Android CLI のインストールは手順の前提にしない）。
+
+```bash
+$ADB -s <IP:ポート> exec-out screencap -p > /tmp/screen.png
+```
+
+### UI の文字を読み、タップする
+
+`android layout`（UI の階層）は使わない。端末に補助アプリ「Android CLI Instrumentation Server」を入れようとし、Google Play プロテクトが「有害なアプリ」としてブロックした。代わりに `uiautomator dump` で、画面の文字・`content-desc`・`bounds`・`enabled` が取れる。
+
+```bash
+$ADB -s <IP:ポート> shell uiautomator dump /sdcard/x.xml
+$ADB -s <IP:ポート> exec-out cat /sdcard/x.xml
+```
+
+目的の要素の `bounds="[x1,y1][x2,y2]"` の中心を押す。設定の画面を開き、確認のダイアログを出すところまでは Supervisor が操作できた。
+
+```bash
+$ADB -s <IP:ポート> shell input tap <x> <y>
+```
+
+### DB を読む
+
+debug 版の DB は `run-as` で読み出して数える（`-wal`・`-shm` も同じ場所にあり、一緒に出さないと最新の行が欠ける）。
+
+```bash
+mkdir -p /tmp/kikidame-db
+for f in kikidame.db kikidame.db-wal kikidame.db-shm; do
+  $ADB -s <IP:ポート> exec-out run-as $PKG cat databases/$f > /tmp/kikidame-db/$f
+done
+sqlite3 /tmp/kikidame-db/kikidame.db 'select count(*) from local_files'
+```
+
+### 取り消せない操作は人に頼む
+
+消す・書き換えるなど、取り消せない操作は auto mode の分類器に止められる前提で、Supervisor は打たずに人に頼む。#318 のときに止められて人が肩代わりしたもの:
+
+- debug 版の DB を書き換えて端末に戻すコマンド（`run-as … sh -c 'cat > databases/kikidame.db'`）
+- 確認のダイアログの「消す」を `input tap` で押すコマンド
+
+人には、押す・書き換える内容と、押した後に見てほしい画面（または Supervisor が撮り直す画面）を伝える。release 版（`dev.tseki.kikidame`）には触らない。
 
 ## 実機で試す（M2）
 
