@@ -11,6 +11,11 @@ jobs:
       # ADR を足したら docs/claude-code-handoff.md の「参照」の一覧にも足す（#211）
       - name: ADR index in handoff is complete
         run: scripts/check-adr-index.sh
+      # ADR の末尾の注記の形（段落は改名・移動の注記だけ、箇条書きの項目は句点で終わらない）を確かめる。検査自体の落ちる例・通る例も流す（#324）
+      - name: ADR notes follow the format
+        run: |
+          scripts/test-check-adr-notes.sh
+          scripts/check-adr-notes.sh
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
           distribution: temurin
