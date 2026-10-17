@@ -8,3 +8,4 @@ date: 2026-09-19
 - `PlaybackStateEntity.syncedAt` は使わないまま残す（スキーマは触らない）。`PlaybackRules` が null に戻す挙動もそのまま
 - 将来、別端末や Web で続きを聴きたくなったら、このときに ADR 0002 の送信を復活させる
 - 2026-10-10: `syncedAt` は ADR 0010（版 7）で削除した（`playback_states.syncedAt` と domain の `PlaybackState.syncedAt`、それを null に戻す処理）
+- 2026-10-18 #324: 一時コミットの違反の例。
