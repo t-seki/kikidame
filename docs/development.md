@@ -214,7 +214,7 @@ main のチェックアウトから fork subagent に並列で実装させて回
 
 docs だけの PR は 1（CI）だけ。2〜6 はアプリに変更がある PR で行う。Renovate の PR をどちらに数えるかは「マージの承認」に従う。Renovate の PR には担当の worker がいないので、2 のビルドは Supervisor が検証用の worktree で行う（`/supervise` の手順 7）。
 
-1. CI（`test` job の ADR の一覧の検査（`scripts/check-adr-index.sh`）と ADR の注記の形の検査（`scripts/check-adr-notes.sh`）と docs のインラインコードの `.sh` の検査（`scripts/check-doc-script-refs.sh`）と `./gradlew lintKotlin`（ktlint。未使用 import と連続した空行）と `./gradlew test` と `./gradlew :app:lintDebug` と `./gradlew :core:domain:animalsnifferMain`、`release-build` job の署名なしの `./gradlew :app:assembleRelease` と `aboutlibraries.json` の鮮度の検査）が通っている
+1. CI（`test` job の ADR の一覧の検査（`scripts/check-adr-index.sh`）と ADR の注記の形の検査（`scripts/check-adr-notes.sh`）と docs のインラインコードの .sh の検査（`scripts/check-doc-script-refs.sh`）と `./gradlew lintKotlin`（ktlint。未使用 import と連続した空行）と `./gradlew test` と `./gradlew :app:lintDebug` と `./gradlew :core:domain:animalsnifferMain`、`release-build` job の署名なしの `./gradlew :app:assembleRelease` と `aboutlibraries.json` の鮮度の検査）が通っている
    - release ビルド（R8 の minify・resource shrink を含む）は CI の `release-build` が PR ごとに試すので、PR のたびに手元で `assembleRelease` を流して確かめなくてよい。署名と APK の配布はリリース手順（「リリース」節）で行う
    - `release-build` は `exportLibraryDefinitions` を流し、`app/src/main/res/raw/aboutlibraries.json` に差分が出ると落ちる。ログに差分と直し方（`./gradlew :app:exportLibraryDefinitions` を流して `app/src/main/res/raw/aboutlibraries.json` をコミットする）が出る。自動ではコミットしない
    - Renovate の PR でこの検査が落ちたら、Supervisor が worker を起動し、Renovate のブランチに再生成のコミットを積ませる。`/supervise` の「bot の版更新 PR のブランチには積まない」の例外（#187・t-seki/dotfiles#349）
