@@ -203,7 +203,7 @@ main のチェックアウトから fork subagent に並列で実装させて回
 - Gradle のデーモンも `~/.gradle` 単位で、main と全 worktree が共有している。ほかの worktree でビルドが走っている間は `./gradlew --stop` を打たない（走っているビルドが `Gradle build daemon has been stopped: stop command received` で落ちる。#188）。検証用の worktree は `--stop` なしで `git worktree remove` してよい
 - issue の「触るファイル」と完了条件に、次を入れる（入れ忘れると PR のレビューで指摘されて直すことになる）
   - 画面（UI）を変える issue: `docs/ui.md` と `docs/claude-code-handoff.md` の該当箇所（#156）
-  - CI（`.github/workflows/ci.yml` の job・ステップ）を変える issue: 「マージ前の検証」の 1 の CI の列挙（#219）
+  - CI（`.github/workflows/ci.yml` の job・ステップ）を変える issue: 「マージ前の検証」の 1 の CI の列挙（#219）。検査を足す issue は、完了条件に「違反を入れた一時コミットで足したステップが落ちる run と、revert 後に全チェックが通る run の URL を PR の本文に書く」も入れる（#326）
   - 挙動を変える issue: `docs/device-checklists.md` の実機チェックリストの項目（未確認の `- [ ]`）（#294）
   - 用語の意味や利用者向けの説明が変わる issue: `CONTEXT.md` と README（`README.md` と `README.ja.md` の両方）（#294）
 - 挙動を変える issue で、既存のチェック済みの項目（`[x]`）が今の挙動と合わなくなるときは、記録の文は書き換えず、項目の末尾に当時の確認と分かる印（例: 「（当時の確認。#281 でボタンをなくした）」）を足す。これも「触るファイル」と完了条件に入れる（#297）
@@ -218,6 +218,9 @@ docs だけの PR は 1（CI）だけ。2〜6 はアプリに変更がある PR 
    - release ビルド（R8 の minify・resource shrink を含む）は CI の `release-build` が PR ごとに試すので、PR のたびに手元で `assembleRelease` を流して確かめなくてよい。署名と APK の配布はリリース手順（「リリース」節）で行う
    - `release-build` は `exportLibraryDefinitions` を流し、`app/src/main/res/raw/aboutlibraries.json` に差分が出ると落ちる。ログに差分と直し方（`./gradlew :app:exportLibraryDefinitions` を流して `app/src/main/res/raw/aboutlibraries.json` をコミットする）が出る。自動ではコミットしない
    - Renovate の PR でこの検査が落ちたら、Supervisor が worker を起動し、Renovate のブランチに再生成のコミットを積ませる。`/supervise` の「bot の版更新 PR のブランチには積まない」の例外（#187・t-seki/dotfiles#349）
+   - CI の job・ステップに検査を足す PR は、「違反があると足したステップが落ちる」ことを CI の run で確かめ、次の 2 つの run の URL を PR の本文に書く（手元の再現では代えない。#326）。URL は [`worker-pr-status.sh`](https://github.com/t-seki/dotfiles/blob/main/claude/.claude/skills/supervise/scripts/worker-pr-status.sh) の `check:` の行の link から取る
+     - 違反を入れた一時コミットで、足したステップが落ちる run
+     - その一時コミットを revert したコミットで、全チェックが通る run
 2. 担当の fork に `./gradlew :app:assembleDebug` を頼み（「worktree の準備」の形で、`ANDROID_HOME` と `JAVA_HOME` を付けて回す）、APK のフルパス（`<worktree>/app/build/outputs/apk/debug/app-debug.apk`）を報告させる
 3. Supervisor が `$ADB install -r <APK>` で実機の **debug 版**に入れる。debug 版は applicationId が `dev.tseki.kikidame.debug`、アプリ名が「Kikidame (debug)」で、普段使いの **release 版**（`dev.tseki.kikidame`、Releases の APK）とは別アプリとして並ぶ。release 版には触らない
 4. Room のスキーマを上げる PR も入れてよい（影響は debug 版に閉じる）。その後にスキーマの古いビルドを入れてダウングレードで落ちたら、`$ADB uninstall dev.tseki.kikidame.debug` してから入れ直す（debug 版のログイン・DB・手元のファイルが消える）
