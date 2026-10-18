@@ -73,6 +73,8 @@ ADR（`docs/adr/`）を足したら、`docs/claude-code-handoff.md` の「参照
 
 同じく `test` job の先頭で `scripts/check-adr-notes.sh`（#324）が、`docs/adr/*.md` の末尾の注記の形を確かめる。落とすのは、行頭が `- ` や空白でなく、行頭から「…注記（#N…）:」（コロンは半角・全角）と続く段落のうち改名の注記・移動の注記以外のもの（行の途中に現れる本文の行には当てない）（決定や事実の注記を段落で書いたもの）と、`- <日付> ` で始まる箇条書きの項目（入れ子の子項目の行を含む。項目の最後の行を見る）の末尾が句点で終わるもの。落ちる例と通る例は `scripts/test-check-adr-notes.sh` が流す（これも CI で流す）。注記の中身は確かめない。
 
+同じく `test` job で `scripts/check-doc-script-refs.sh`（#328）が、`docs/**/*.md` と `README*.md` のインラインコード（バッククォートに挟まれた範囲を前から順に拾う。span の中にバッククォートがあるとずれることがある）に書かれたシェルスクリプトのファイル名が、repo の中にもリンクの中にも無いと落とす。見るのは空白で区切った語のうち末尾が拡張子 sh のもので、repo 直下、またはその Markdown のあるフォルダからの相対パスにファイルが無く、`[…](…)` の形のリンクの中にも無いものを落とす（`~/…`・`$HOME/…`・glob のようなパスの形でない語も、ファイルが無いとして落とす。コードブロックの中は見ない）。直し方は、repo の中のスクリプトは `scripts/check-adr-index.sh` のようにパス付きで書き、ほかの repo のものは `https://…` のリンクにする。手元でも repo 直下で流せる。落ちる例と通る例は `scripts/test-check-doc-script-refs.sh` が流す（これも CI で流す）。リンク先の URL が実在するかは確かめない。
+
 既存の ADR を改めるときは、本文を書き換えず、末尾に注記を足す。改名で本文の名前が古くなるときも同じで、本文は当時の記述のまま残す（#196・#268）。すでに本文を直した ADR（0008・0010）は書き直さない（#268）。
 - 注記の形は CI の `scripts/check-adr-notes.sh` が確かめる（#324）。段落で書くのは改名の注記と移動の注記（ADR 0010 の「移動の注記（#305）:」）だけで、決定や事実の注記は下の箇条書きにする
 - 改名の注記の形: 「改名の注記（#239）: 上の本文の `X` は、その後 `Y` に改めた。本文は当時の記述のまま残している。」の段落で書き、末尾に句点を付ける（例: ADR 0010 の末尾）
@@ -214,7 +216,7 @@ main のチェックアウトから fork subagent に並列で実装させて回
 
 docs だけの PR は 1（CI）だけ。2〜6 はアプリに変更がある PR で行う。Renovate の PR をどちらに数えるかは「マージの承認」に従う。Renovate の PR には担当の worker がいないので、2 のビルドは Supervisor が検証用の worktree で行う（`/supervise` の手順 7）。
 
-1. CI（`test` job の ADR の一覧の検査（`scripts/check-adr-index.sh`）と ADR の注記の形の検査（`scripts/check-adr-notes.sh`）と `./gradlew lintKotlin`（ktlint。未使用 import と連続した空行）と `./gradlew test` と `./gradlew :app:lintDebug` と `./gradlew :core:domain:animalsnifferMain`、`release-build` job の署名なしの `./gradlew :app:assembleRelease` と `aboutlibraries.json` の鮮度の検査）が通っている
+1. CI（`test` job の ADR の一覧の検査（`scripts/check-adr-index.sh`）と ADR の注記の形の検査（`scripts/check-adr-notes.sh`）と docs のインラインコードの .sh の検査（`scripts/check-doc-script-refs.sh`）と `./gradlew lintKotlin`（ktlint。未使用 import と連続した空行）と `./gradlew test` と `./gradlew :app:lintDebug` と `./gradlew :core:domain:animalsnifferMain`、`release-build` job の署名なしの `./gradlew :app:assembleRelease` と `aboutlibraries.json` の鮮度の検査）が通っている
    - release ビルド（R8 の minify・resource shrink を含む）は CI の `release-build` が PR ごとに試すので、PR のたびに手元で `assembleRelease` を流して確かめなくてよい。署名と APK の配布はリリース手順（「リリース」節）で行う
    - `release-build` は `exportLibraryDefinitions` を流し、`app/src/main/res/raw/aboutlibraries.json` に差分が出ると落ちる。ログに差分と直し方（`./gradlew :app:exportLibraryDefinitions` を流して `app/src/main/res/raw/aboutlibraries.json` をコミットする）が出る。自動ではコミットしない
    - Renovate の PR でこの検査が落ちたら、Supervisor が worker を起動し、Renovate のブランチに再生成のコミットを積ませる。`/supervise` の「bot の版更新 PR のブランチには積まない」の例外（#187・t-seki/dotfiles#349）

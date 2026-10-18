@@ -16,6 +16,11 @@ jobs:
         run: |
           scripts/test-check-adr-notes.sh
           scripts/check-adr-notes.sh
+      # docs と README のインラインコードの .sh が repo にもリンクにも無いと落とす。検査自体の落ちる例・通る例も流す（#328）
+      - name: Doc script references resolve
+        run: |
+          scripts/test-check-doc-script-refs.sh
+          scripts/check-doc-script-refs.sh
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
           distribution: temurin
