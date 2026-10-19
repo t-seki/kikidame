@@ -326,6 +326,8 @@
     <string name="settings_last_sync">Last sync</string>
     <string name="settings_section_download">Downloads</string>
     <string name="settings_storage">Files on device</string>
+    <!-- Under the total of "Files on device". Opens the breakdown screen (#335) -->
+    <string name="settings_storage_tap">Tap to see the breakdown</string>
     <!-- Row under "Files on device" (shown only when there are such programs). %1$d = number of programs -->
     <plurals name="settings_remove_unmatched">
         <item quantity="one">Remove programs not found on the source (%1$d program)</item>
@@ -355,6 +357,55 @@
         <item quantity="one">Kept %1$d program you are listening to</item>
         <item quantity="other">Kept %1$d programs you are listening to</item>
     </plurals>
+
+    <!-- storage: breakdown of the files on the device (#335). Opened from "Files on device" in Settings -->
+    <string name="storage_tab_programs">By program</string>
+    <string name="storage_tab_episodes">All episodes</string>
+    <!-- Filter chips on "All episodes". Both selected = episodes that are pinned AND played -->
+    <string name="storage_filter_pinned">Pinned</string>
+    <string name="storage_filter_played">Played</string>
+    <string name="storage_empty">No files on this device</string>
+    <!-- Mark on an episode row: the episode has no source ID, so deleting it cannot be undone -->
+    <string name="storage_no_source">Not on the source</string>
+    <!-- Program row. %1$d = episodes on the device, %2$s = their size (e.g. "1.1 GB"), %3$d = pinned (played or not), %4$d = played and not pinned, %5$d = unplayed and not pinned. %3$d + %4$d + %5$d = %1$d -->
+    <plurals name="storage_program_summary">
+        <item quantity="one">%1$d episode · %2$s / %3$d pinned · %4$d other played · %5$d other unplayed</item>
+        <item quantity="other">%1$d episodes · %2$s / %3$d pinned · %4$d other played · %5$d other unplayed</item>
+    </plurals>
+    <!-- Button at the bottom while episodes are selected. %1$d = selected episodes, %2$s = their size -->
+    <plurals name="storage_delete_button">
+        <item quantity="one">Delete %1$d episode (%2$s)</item>
+        <item quantity="other">Delete %1$d episodes (%2$s)</item>
+    </plurals>
+    <string name="storage_delete_disabled">Available after the sync finishes</string>
+    <string name="storage_delete_title">Delete the selected episodes from this device?</string>
+    <!-- %1$d = selected episodes, %2$s = their size -->
+    <plurals name="storage_delete_text">
+        <item quantity="one">The file of %1$d episode (%2$s) will be deleted from this device.</item>
+        <item quantity="other">The files of %1$d episodes (%2$s) will be deleted from this device.</item>
+    </plurals>
+    <!-- Shown only when some selected episodes have no source ID. %1$d = such episodes -->
+    <plurals name="storage_delete_text_unrecoverable">
+        <item quantity="one">%1$d of them is not on the source, so it is removed from the list too and cannot be restored.</item>
+        <item quantity="other">%1$d of them are not on the source, so they are removed from the list too and cannot be restored.</item>
+    </plurals>
+    <!-- Shown only when some selected episodes belong to a synced program -->
+    <string name="storage_delete_text_synced">Episodes of synced programs are downloaded again at the next sync if they should be kept.</string>
+    <!-- Joins the sentences of the confirmation -->
+    <string name="storage_sentence_separator">" "</string>
+    <string name="storage_delete_confirm">Delete</string>
+    <!-- Snackbar after deleting. %1$d = deleted episodes -->
+    <plurals name="storage_msg_deleted">
+        <item quantity="one">Deleted %1$d episode</item>
+        <item quantity="other">Deleted %1$d episodes</item>
+    </plurals>
+    <!-- %1$d = episodes kept because they are Now Playing -->
+    <plurals name="storage_msg_kept">
+        <item quantity="one">Kept %1$d episode you are listening to</item>
+        <item quantity="other">Kept %1$d episodes you are listening to</item>
+    </plurals>
+    <!-- Joins the two snackbar messages above -->
+    <string name="storage_msg_separator">". "</string>
     <string name="settings_wifi_only">Wi-Fi only</string>
     <string name="settings_wifi_only_description">Turn off to download over mobile data too</string>
     <string name="settings_section_display">Display</string>
