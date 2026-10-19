@@ -1,0 +1,1 @@
+- Settings > Downloads: tapping "Files on this device" opens a breakdown of the storage used, by program and across all episodes. Select episodes and remove them from the device after a confirmation. An episode you are listening to cannot be selected
