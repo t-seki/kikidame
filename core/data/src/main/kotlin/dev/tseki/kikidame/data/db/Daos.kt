@@ -20,6 +20,29 @@ data class ProgramSummaryRow(
 /** 取得元に見つからない番組（消失・取得元 ID 無し）の件数。手元の回は [LOCAL_FILE_PRESENT] と同じ定義。 */
 data class UnmatchedRow(val programCount: Int, val localEpisodeCount: Int, val pinnedEpisodeCount: Int)
 data class LocalUsageRow(val totalBytes: Long, val episodeCount: Int)
+/** 番組ごとの手元のファイル（#335）。内訳は重ならない 3 つ（固定・固定でない再生済み・固定でない未再生）。 */
+data class ProgramStorageRow(
+    val programId: Long,
+    val programName: String,
+    val totalBytes: Long,
+    val episodeCount: Int,
+    val pinnedCount: Int,
+    val playedUnpinnedCount: Int,
+    val unplayedUnpinnedCount: Int,
+)
+/** 手元の回 1 つ（#335）。 */
+data class LocalEpisodeRow(
+    val episodeId: Long,
+    val programId: Long,
+    val programName: String,
+    val title: String,
+    val publishedAt: Instant,
+    val sizeBytes: Long,
+    val pinned: Boolean,
+    val played: Boolean,
+    val hasSourceItemId: Boolean,
+    val programSyncEnabled: Boolean,
+)
 /** 突合に必要な列だけ。 */
 data class ProgramKeyRow(val id: Long, val sourceItemId: String?, val publisherName: String?, val name: String)
 data class EpisodeKeyRow(val id: Long, val sourceItemId: String?, val programId: Long, val title: String, val publishedAt: Instant, val runtimeTicks: Long)
@@ -128,6 +151,19 @@ private const val UNMATCHED_COUNTS = """
       LEFT JOIN local_files lf ON lf.episodeId = e.id
     """
 
+/** 手元の回（#335）の行（[LocalEpisodeRow]）を返す問い合わせの本体。条件を足すときは AND で続け、並びは呼ぶ側が足す。 */
+private const val LOCAL_EPISODES = """
+    SELECT e.id AS episodeId, e.programId AS programId, p.name AS programName, e.title AS title,
+           e.publishedAt AS publishedAt, e.sizeBytes AS sizeBytes, lf.pinned AS pinned,
+           COALESCE(ps.played, 0) AS played, (e.sourceItemId IS NOT NULL) AS hasSourceItemId,
+           p.syncEnabled AS programSyncEnabled
+    FROM local_files lf
+      JOIN episodes e ON e.id = lf.episodeId
+      JOIN programs p ON p.id = e.programId
+      LEFT JOIN playback_states ps ON ps.episodeId = e.id
+    WHERE $LOCAL_FILE_PRESENT
+    """
+
 /** 「続きから」（#108）の条件と順。Auto・再開の上限付きの読み出しと、アプリの「続きから」タブ（#151）の追従する読み出しで共有する。 */
 private const val CONTINUE_LISTENING = """
     SELECT e.* FROM episodes e
@@ -210,6 +246,33 @@ interface LocalFileDao {
         """,
     )
     fun observeUsage(): Flow<LocalUsageRow>
+    /**
+     * 番組ごとの手元のファイル（#335）。[observeUsage] と同じ定義の手元の回だけを数え、手元の回の無い番組は出さない。
+     * 容量の大きい順、同じなら番組名・id の順。再生済みの行が無い回は未再生。
+     */
+    @Query(
+        """
+        SELECT p.id AS programId, p.name AS programName,
+               COALESCE(SUM(e.sizeBytes), 0) AS totalBytes, COUNT(*) AS episodeCount,
+               SUM(CASE WHEN lf.pinned = 1 THEN 1 ELSE 0 END) AS pinnedCount,
+               SUM(CASE WHEN lf.pinned = 0 AND COALESCE(ps.played, 0) = 1 THEN 1 ELSE 0 END) AS playedUnpinnedCount,
+               SUM(CASE WHEN lf.pinned = 0 AND COALESCE(ps.played, 0) = 0 THEN 1 ELSE 0 END) AS unplayedUnpinnedCount
+        FROM local_files lf
+          JOIN episodes e ON e.id = lf.episodeId
+          JOIN programs p ON p.id = e.programId
+          LEFT JOIN playback_states ps ON ps.episodeId = e.id
+        WHERE $LOCAL_FILE_PRESENT
+        GROUP BY p.id
+        ORDER BY totalBytes DESC, p.name ASC, p.id ASC
+        """,
+    )
+    fun observeProgramStorage(): Flow<List<ProgramStorageRow>>
+    /** 全番組の手元の回（#335）。[observeUsage] と同じ定義。容量の大きい順、同じなら公開日の新しい順・id の順。 */
+    @Query("$LOCAL_EPISODES ORDER BY e.sizeBytes DESC, e.publishedAt DESC, e.id ASC")
+    fun observeLocalEpisodes(): Flow<List<LocalEpisodeRow>>
+    /** [programId] の番組の手元の回（#335）。並びは呼ぶ側が決める（公開日の新しい順。タイトルの比べ方を Kotlin 側に揃えるため）。 */
+    @Query("$LOCAL_EPISODES AND e.programId = :programId")
+    fun observeLocalEpisodesByProgram(programId: Long): Flow<List<LocalEpisodeRow>>
     @Query("SELECT * FROM local_files WHERE path = :path")
     suspend fun findByPath(path: String): LocalFileEntity?
     @Query("SELECT * FROM local_files WHERE episodeId = :episodeId")

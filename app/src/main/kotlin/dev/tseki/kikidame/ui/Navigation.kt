@@ -30,6 +30,8 @@ import dev.tseki.kikidame.ui.player.PlayerScreen
 import dev.tseki.kikidame.ui.programs.ProgramListScreen
 import dev.tseki.kikidame.ui.settings.LicensesScreen
 import dev.tseki.kikidame.ui.settings.SettingsScreen
+import dev.tseki.kikidame.ui.settings.StorageProgramScreen
+import dev.tseki.kikidame.ui.settings.StorageScreen
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -37,6 +39,9 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import javax.inject.Inject
 import kotlin.reflect.KClass
+
+/** 番組ごとの手元の回の一覧（#335）で最後の回を消して戻るとき、消した後の文言を内訳の画面へ渡すキー。 */
+private const val STORAGE_RETURNED_MESSAGE = "storage_returned_message"
 
 /** 初回の取得元の選択（#198）。 */
 @Serializable
@@ -61,6 +66,14 @@ object LibraryPickRoute
 object SettingsRoute
 @Serializable
 object LicensesRoute
+
+/** 手元のファイルの内訳（#335）。設定の「手元のファイル」の行から開く。 */
+@Serializable
+object StorageRoute
+
+/** 番組ごとの手元の回の一覧（#335）。内訳の画面の番組の行から開く。番組名は、最後の回を消して番組ごと消えてもトップバーに出せるように持つ。 */
+@Serializable
+data class StorageProgramRoute(val programId: Long, val programName: String)
 
 @Serializable
 object ProgramListRoute
@@ -90,7 +103,7 @@ class SessionViewModel @Inject constructor(
 
 /**
  * 番組の画面（根。「続きから・よく聴く・番組一覧」のタブ、#151）→ 各回一覧 → 再生画面 の 3 階層に、取得元の選択（#198）・Jellyfin の接続画面・SMB の接続画面（#198）・
- * 端末のフォルダの説明と選択（#199）・ライブラリ選択・設定・各回の詳細を足したもの。
+ * 端末のフォルダの説明と選択（#199）・ライブラリ選択・設定・各回の詳細と、設定から開く手元のファイルの内訳・番組ごとの手元の回の一覧（#335）を足したもの。
  * 「続きから」タブの行からは、各回一覧を経ずに再生画面と各回の詳細へ直接行く。
  * 起動時はセッション状態で開始画面を決め、その後は状態の**変化**（ログアウト・401・ライブラリ選択）で遷移する。
  * デバッグ用に接続画面から番組一覧へ抜けても、状態が変わらない限り戻されない。
@@ -147,10 +160,32 @@ fun KikidameNavHost(sessionViewModel: SessionViewModel = hiltViewModel()) {
                 onBack = navController::popIfNotRoot,
                 onChangeLibrary = { navController.navigate(LibraryPickRoute) },
                 onOpenLicenses = { navController.navigate(LicensesRoute) },
+                onOpenStorage = { navController.navigate(StorageRoute) },
             )
         }
         composable<LicensesRoute> {
             LicensesScreen(onBack = navController::popIfNotRoot)
+        }
+        composable<StorageRoute> { entry ->
+            val returnedMessage by entry.savedStateHandle.getStateFlow<String?>(STORAGE_RETURNED_MESSAGE, null).collectAsStateWithLifecycle()
+            StorageScreen(
+                onBack = navController::popIfNotRoot,
+                onProgramClick = { navController.navigate(StorageProgramRoute(it.programId.value, it.programName)) },
+                returnedMessage = returnedMessage,
+                onReturnedMessageShown = { entry.savedStateHandle[STORAGE_RETURNED_MESSAGE] = null },
+            )
+        }
+        composable<StorageProgramRoute> { entry ->
+            val popOnce = navController.popOnce(entry)
+            StorageProgramScreen(
+                onBack = navController::popIfNotRoot,
+                onEmptied = { message ->
+                    if (navController.currentBackStackEntry == entry) {
+                        navController.previousBackStackEntry?.savedStateHandle?.set(STORAGE_RETURNED_MESSAGE, message)
+                    }
+                    popOnce()
+                },
+            )
         }
         composable<ProgramListRoute> {
             ProgramListScreen(
@@ -186,6 +221,14 @@ fun KikidameNavHost(sessionViewModel: SessionViewModel = hiltViewModel()) {
 private fun NavHostController.popIfNotRoot() {
     if (previousBackStackEntry != null) popBackStack()
 }
+
+/**
+ * [entry] の画面を 1 回だけ閉じる。画面が自分から戻るとき（番組ごとの手元の回が 0 になった、#335）に、
+ * 戻る操作と重なっても 2 画面戻らないように、[entry] が最上位のときだけポップする。
+ */
+@Composable
+private fun NavHostController.popOnce(entry: NavBackStackEntry): () -> Unit =
+    remember(entry) { { if (currentBackStackEntry == entry) popIfNotRoot() } }
 
 private fun SessionState.startDestination(): Any = when (this) {
     is SessionState.SignedOut -> signedOutDestination()

@@ -72,6 +72,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onChangeLibrary: () -> Unit,
     onOpenLicenses: () -> Unit,
+    onOpenStorage: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val session by viewModel.session.collectAsStateWithLifecycle()
@@ -104,6 +105,7 @@ fun SettingsScreen(
         onBack = onBack,
         onChangeLibrary = onChangeLibrary,
         onOpenLicenses = onOpenLicenses,
+        onOpenStorage = onOpenStorage,
         onRemoveUnmatched = viewModel::requestRemoveUnmatched,
         onConfirmRemoveUnmatched = viewModel::confirmRemoveUnmatched,
         onCancelRemoveUnmatched = viewModel::cancelRemoveUnmatched,
@@ -128,6 +130,7 @@ internal fun SettingsContent(
     onBack: () -> Unit,
     onChangeLibrary: () -> Unit,
     onOpenLicenses: () -> Unit,
+    onOpenStorage: () -> Unit,
     onRemoveUnmatched: () -> Unit,
     onConfirmRemoveUnmatched: () -> Unit,
     onCancelRemoveUnmatched: () -> Unit,
@@ -192,8 +195,13 @@ internal fun SettingsContent(
             ValueRow(stringResource(R.string.settings_last_sync), (s as? SessionState.Ready)?.lastFetchedAt?.toDateTimeText() ?: "-")
             HorizontalDivider()
             SectionTitle(stringResource(R.string.settings_section_download))
-            // 手元のファイルの合計（#42）。保持ルールや固定を調整する動機は容量なので、見えるようにする
-            ValueRow(stringResource(R.string.settings_storage), localStorage?.toText()?.resolve() ?: "-")
+            // 手元のファイルの合計（#42）。保持ルールや固定を調整する動機は容量なので、見えるようにする。押すと内訳の画面（#335）
+            ValueRow(
+                stringResource(R.string.settings_storage),
+                localStorage?.toText()?.resolve() ?: "-",
+                modifier = Modifier.clickable(onClick = onOpenStorage),
+                supporting = stringResource(R.string.settings_storage_tap),
+            )
             // 取得元に見つからない番組（消失・取得元 ID 無し）をまとめて消す（#317）。無ければ行ごと出さない。同期の間は押せない
             if (unmatched.programCount > 0) {
                 ListItem(
@@ -338,6 +346,7 @@ private fun SettingsContentPreviewHost(session: SessionState) {
             onBack = {},
             onChangeLibrary = {},
             onOpenLicenses = {},
+            onOpenStorage = {},
             onRemoveUnmatched = {},
             onConfirmRemoveUnmatched = {},
             onCancelRemoveUnmatched = {},

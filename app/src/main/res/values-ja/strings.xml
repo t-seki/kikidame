@@ -246,6 +246,7 @@
     <string name="settings_last_sync">最終同期</string>
     <string name="settings_section_download">ダウンロード</string>
     <string name="settings_storage">手元のファイル</string>
+    <string name="settings_storage_tap">タップで内訳を見る</string>
     <plurals name="settings_remove_unmatched">
         <item quantity="other">取得元に見つからない番組を手元から消す（%1$d 番組）</item>
     </plurals>
@@ -265,6 +266,38 @@
     <plurals name="settings_remove_unmatched_kept">
         <item quantity="other">聴いている番組 %1$d 件は残しました</item>
     </plurals>
+
+    <!-- storage（手元のファイルの内訳、#335） -->
+    <string name="storage_tab_programs">番組ごと</string>
+    <string name="storage_tab_episodes">すべての回</string>
+    <string name="storage_filter_pinned">固定</string>
+    <string name="storage_filter_played">再生済み</string>
+    <string name="storage_empty">手元のファイルはありません</string>
+    <string name="storage_no_source">取得元に無い</string>
+    <plurals name="storage_program_summary">
+        <item quantity="other">%1$d 回・%2$s／固定 %3$d · ほか再生済み %4$d · ほか未再生 %5$d</item>
+    </plurals>
+    <plurals name="storage_delete_button">
+        <item quantity="other">%1$d 回を消す（%2$s）</item>
+    </plurals>
+    <string name="storage_delete_disabled">同期の後に使えます</string>
+    <string name="storage_delete_title">選んだ回を手元から消しますか？</string>
+    <plurals name="storage_delete_text">
+        <item quantity="other">%1$d 回（%2$s）のファイルを手元から消します。</item>
+    </plurals>
+    <plurals name="storage_delete_text_unrecoverable">
+        <item quantity="other">うち %1$d 回は取得元に無いため、一覧からも消え、戻せません。</item>
+    </plurals>
+    <string name="storage_delete_text_synced">同期対象の番組の回は、保持すべき回なら次の同期で落とし直されます。</string>
+    <string name="storage_sentence_separator">""</string>
+    <string name="storage_delete_confirm">消す</string>
+    <plurals name="storage_msg_deleted">
+        <item quantity="other">%1$d 回を消しました</item>
+    </plurals>
+    <plurals name="storage_msg_kept">
+        <item quantity="other">聴いている回 %1$d 件は残しました</item>
+    </plurals>
+    <string name="storage_msg_separator">。</string>
     <string name="settings_wifi_only">Wi-Fi のみ</string>
     <string name="settings_wifi_only_description">オフにするとモバイル回線でもダウンロードします</string>
     <string name="settings_section_display">表示</string>
