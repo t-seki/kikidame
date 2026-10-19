@@ -1,5 +1,7 @@
 # 開発ガイド
 
+このファイルの全体で、経緯と実例（「PR #… で起きた」の列挙、決まりの根拠にした実測の値など）は issue に置き、本文には決まりの 1 文と `（#N）` だけを書く（#334）。
+
 ## 前提
 
 | 項目 | 版 | 備考 |
@@ -253,7 +255,7 @@ Renovate の PR をどちらに数えるかは「マージの承認」に従う�
 
 ### 大きさの基準
 
-`257 行・25371 バイト（d8886a9）`
+`259 行・25605 バイト（d8886a9）`
 
 この development.md の大きさの基準（測り方と値の形は [REPO-SECTION.md の「大きさの基準」](https://github.com/t-seki/dotfiles/blob/main/claude/.claude/skills/supervise/REPO-SECTION.md#大きさの基準)）。
 
