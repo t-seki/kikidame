@@ -96,10 +96,11 @@ fun StorageScreen(
     val pagerState = rememberPagerState { tabs.size }
     val scope = rememberCoroutineScope()
     // 番組ごとの一覧で最後の回を消して戻ってきたときの文言（あちらの画面では出す前に閉じるので、ここで出す）
+    // キーを消すとこの効果が作り直されて止まるので、スナックバーは画面の scope で出す
     LaunchedEffect(returnedMessage) {
-        returnedMessage?.let {
+        returnedMessage?.let { text ->
             onReturnedMessageShown()
-            selection.snackbarHostState.showSnackbar(it)
+            scope.launch { selection.snackbarHostState.showSnackbar(text) }
         }
     }
 
