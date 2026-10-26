@@ -43,6 +43,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -302,7 +303,13 @@ internal fun SettingsContent(
             // 電池の最適化の対象のときだけ出す（#347）。外すと裏の同期が遅れにくくなる。押すと OS の確認のダイアログ
             if (batteryOptimized) {
                 ListItem(
-                    modifier = Modifier.clickable { context.startActivity(ignoreBatteryOptimizationsIntent(context.packageName)) },
+                    modifier = Modifier.clickable {
+                        // その設定画面を持たない ROM では何も起きない（落とさない）
+                        try {
+                            context.startActivity(ignoreBatteryOptimizationsIntent(context.packageName))
+                        } catch (_: ActivityNotFoundException) {
+                        }
+                    },
                     headlineContent = { Text(stringResource(R.string.settings_battery_optimization)) },
                     supportingContent = { Text(stringResource(R.string.settings_battery_optimization_description)) },
                 )
