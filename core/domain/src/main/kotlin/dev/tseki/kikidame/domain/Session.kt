@@ -27,12 +27,42 @@ sealed interface SessionState {
      * 取得元に接続済みで、同期できる。[source] が取得元の種類ごとの接続の情報。
      * [lastFetchedAt] は最後に全走査が成功した時刻、[lastAttemptedAt] は最後に全走査を試みた時刻（成功・失敗を問わない。#135）。
      * 起動時同期は両方の新しい方から間をあける。
+     * [lastSyncAttempt] は全走査の最後の試みの結果と時刻（「Wi-Fi ではない」の見送りを含む。#346）。[lastAttemptedAt] とは別に持つ
+     * （[lastAttemptedAt] は見送りでは更新しない）。[syncFailureNotified] は同期の失敗の通知を出したか（成功するまで出し直さない。#346）。
      */
     data class Ready(
         val source: ConnectedSource,
         val lastFetchedAt: Instant?,
         val lastAttemptedAt: Instant? = null,
+        val lastSyncAttempt: SyncAttempt? = null,
+        val syncFailureNotified: Boolean = false,
     ) : SessionState
+}
+
+/**
+ * 全走査の最後の試み（#346）。手動（引っ張って更新・初回の取得・手動が合流した裏の同期）も裏の同期も記録し、1 番組の同期は記録しない。
+ * 401（ログアウトする）と取り消しは記録しない。
+ */
+data class SyncAttempt(val at: Instant, val outcome: SyncOutcome)
+
+/** 全走査の最後の試みの結果（#346）。 */
+sealed interface SyncOutcome {
+    data object Succeeded : SyncOutcome
+
+    /** 「Wi-Fi のみ」で従量制のネットワークだったので、取得元に問い合わせずに見送った。失敗には数えない。 */
+    data object SkippedNotOnWifi : SyncOutcome
+
+    /** 失敗。理由ごとに、同期の結果の文言（スナックバー）と同じ文言を出せるだけの値を持つ。 */
+    sealed interface Failure : SyncOutcome
+
+    /** 取得元に到達できない（[SourceException.Unreachable]）。 */
+    data object Unreachable : Failure
+
+    /** 取得に失敗（[SourceException.Failed]）。[message] は例外のメッセージ。 */
+    data class FetchFailed(val message: String) : Failure
+
+    /** 取り込みに失敗（Room / DataStore / Keystore などの例外）。[exceptionName] は例外のクラス名。 */
+    data class ImportFailed(val exceptionName: String) : Failure
 }
 
 /** 接続済みの取得元。取得元の種類ごとに持つ情報が違う。 */
@@ -204,6 +234,15 @@ interface SessionRepository {
 
     /** 認証情報だけを消す（Jellyfin のトークン、SMB のパスワード。端末のフォルダはログアウトの印を立てる）。手元のデータは残す。 */
     suspend fun signOut()
+
+    /**
+     * 全走査の最後の試み（[SessionState.Ready.lastSyncAttempt]）を記録する（#346）。成功なら、同期の失敗の通知を出した記録
+     * （[SessionState.Ready.syncFailureNotified]）も消す。ログアウトと取得元を変えたときは、同期の時刻と一緒に消える。
+     */
+    suspend fun recordSyncAttempt(attempt: SyncAttempt)
+
+    /** 同期の失敗の通知を出したことを記録する（#346）。次に全走査が成功するまで出し直さない。 */
+    suspend fun markSyncFailureNotified()
 }
 
 /**

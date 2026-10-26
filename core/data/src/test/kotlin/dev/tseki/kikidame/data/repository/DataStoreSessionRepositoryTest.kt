@@ -16,6 +16,8 @@ import java.io.IOException
 import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SessionState
+import dev.tseki.kikidame.domain.SyncAttempt
+import dev.tseki.kikidame.domain.SyncOutcome
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -117,6 +119,48 @@ class DataStoreSessionRepositoryTest {
         val keys = dataStore.data.first().asMap().keys.map { it.name }
         assertFalse("last_fetched_at" in keys)
         assertFalse("last_attempted_at" in keys)
+    }
+
+    /** 全走査の最後の試み（#346）は結果ごとに読み戻せ、成功で通知の記録が消える。ログアウト・取得元の接続し直しで消える（決定 6）。 */
+    @Test
+    fun syncAttemptRoundTripsAndIsClearedWithTheSyncTimes() = runTest {
+        val at = Instant.parse("2026-10-26T05:00:00Z")
+        repo.signIn("jellyfin.lab.example", "alice", "secret")
+        repo.selectLibrary(music)
+        for (outcome in listOf(
+            SyncOutcome.SkippedNotOnWifi,
+            SyncOutcome.Unreachable,
+            SyncOutcome.FetchFailed("HTTP 500"),
+            SyncOutcome.ImportFailed("SQLiteException"),
+            SyncOutcome.Succeeded,
+        )) {
+            repo.recordSyncAttempt(SyncAttempt(at, outcome))
+            assertEquals(SyncAttempt(at, outcome), assertIs<SessionState.Ready>(repo.state.first()).lastSyncAttempt)
+        }
+        assertNull(assertIs<SessionState.Ready>(repo.state.first()).lastAttemptedAt, "the attempt is kept apart from lastAttemptedAt")
+
+        repo.recordSyncAttempt(SyncAttempt(at, SyncOutcome.Unreachable))
+        repo.markSyncFailureNotified()
+        assertTrue(assertIs<SessionState.Ready>(repo.state.first()).syncFailureNotified)
+        repo.recordSyncAttempt(SyncAttempt(at, SyncOutcome.FetchFailed("HTTP 500")))
+        assertTrue(assertIs<SessionState.Ready>(repo.state.first()).syncFailureNotified, "another failure keeps the record")
+        repo.recordSyncAttempt(SyncAttempt(at, SyncOutcome.Succeeded))
+        assertFalse(assertIs<SessionState.Ready>(repo.state.first()).syncFailureNotified, "a success clears the record")
+
+        repo.recordSyncAttempt(SyncAttempt(at, SyncOutcome.Unreachable))
+        repo.markSyncFailureNotified()
+        repo.signOut()
+        val keys = dataStore.data.first().asMap().keys.map { it.name }
+        assertFalse(keys.any { it.startsWith("sync_attempt") || it == "sync_failure_notified" }, "sign-out clears them: $keys")
+
+        repo.connectSharedFolder(smb)
+        repo.recordSyncAttempt(SyncAttempt(at, SyncOutcome.Unreachable))
+        repo.markSyncFailureNotified()
+        repo.signIn("jellyfin.lab.example", "alice", "secret")
+        repo.selectLibrary(music)
+        val switched = assertIs<SessionState.Ready>(repo.state.first())
+        assertNull(switched.lastSyncAttempt, "connecting another source clears the attempt")
+        assertFalse(switched.syncFailureNotified)
     }
 
     @Test

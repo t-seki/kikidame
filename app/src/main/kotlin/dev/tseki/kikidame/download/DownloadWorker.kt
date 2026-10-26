@@ -14,11 +14,12 @@ import dev.tseki.kikidame.domain.DownloadQueue
 import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
+import dev.tseki.kikidame.sync.SyncFailureNotifier
 import kotlinx.coroutines.flow.first
 
 /**
  * `local_files` の PENDING を 1 本ずつ落とす（順序は `LocalFileDao.nextPending`: 手動が先、その中はキューに入れた順）。並列にはしない。
- * 1 本の失敗は行に記録して次へ進む。401 はログアウトして止まる。
+ * 1 本の失敗は行に記録して次へ進む。401 はログアウトして止まる（同期の失敗の通知も消す。#346）。
  * 進捗は `setProgress` で各回 ID と割合を流す（一覧の進捗リング）。
  */
 @HiltWorker
@@ -28,6 +29,7 @@ class DownloadWorker @AssistedInject constructor(
     private val queue: DownloadQueue,
     private val downloader: EpisodeDownloader,
     private val sessionRepository: SessionRepository,
+    private val syncFailureNotifier: SyncFailureNotifier,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -47,6 +49,8 @@ class DownloadWorker @AssistedInject constructor(
                 }
             } catch (e: SourceException.Unauthorized) {
                 Log.w(TAG, "download unauthorized; signing out")
+                // ログアウトでは同期の失敗の通知も消す（記録はセッションと一緒に消える。#346 の決定 6）
+                syncFailureNotifier.cancel()
                 sessionRepository.signOut()
                 return Result.success()
             }

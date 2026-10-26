@@ -9,6 +9,8 @@ import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.domain.SmbConnection
 import dev.tseki.kikidame.domain.SourceItemId
+import dev.tseki.kikidame.domain.SyncAttempt
+import dev.tseki.kikidame.domain.SyncOutcome
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.time.Instant
 
@@ -47,5 +49,23 @@ class FakeSessionRepository(initial: SessionState = jellyfinReady()) : SessionRe
     override suspend fun signOut() {
         signedOut = true
         state.value = SessionState.SignedOut(null, null)
+    }
+
+    /** 記録した全走査の最後の試み（記録した順。#346）。 */
+    val syncAttempts = mutableListOf<SyncAttempt>()
+
+    /** 接続済みなら状態にも反映する（成功なら通知を出した記録も消す。`SessionStore` と同じ）。 */
+    override suspend fun recordSyncAttempt(attempt: SyncAttempt) {
+        syncAttempts += attempt
+        val ready = state.value as? SessionState.Ready ?: return
+        state.value = ready.copy(
+            lastSyncAttempt = attempt,
+            syncFailureNotified = ready.syncFailureNotified && attempt.outcome != SyncOutcome.Succeeded,
+        )
+    }
+
+    override suspend fun markSyncFailureNotified() {
+        val ready = state.value as? SessionState.Ready ?: return
+        state.value = ready.copy(syncFailureNotified = true)
     }
 }

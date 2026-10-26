@@ -6,7 +6,8 @@ import androidx.annotation.StringRes
 /**
  * Composable の外で作る文言（ADR 0009）。ViewModel・`LibraryRefresher`・`NowPlaying`・`EpisodeDetails` は `String` ではなく
  * これを返し、表示する Composable が `ui/` の `resolve()` で `strings.xml` から引く。文字列に解決するのは `ui/` の中だけで、
- * `Context.getString` を ViewModel や Service に書かない（例外は `PlaybackService`。通知と Android Auto へは `String` を渡すしかない）。
+ * `Context.getString` を ViewModel や Service に書かない（例外は `PlaybackService` と、同期の失敗の通知を組み立てる
+ * `sync/SyncFailureNotifier.kt` の `AndroidSyncFailureNotifier`（#346）。通知と Android Auto へは `String` を渡すしかない。ADR 0009 の末尾の注記）。
  * 書式引数（[Res.args] / [Plural.args]）は `String` / `Int` などの値だけで、[UiText] は入れない（文言の入れ子は [Joined] で表す）。
  * data class なので、テストは `assertEquals(UiText.Res(R.string.x, 12), actual)` で「どの文言が、どの引数で選ばれたか」を比較できる。
  */

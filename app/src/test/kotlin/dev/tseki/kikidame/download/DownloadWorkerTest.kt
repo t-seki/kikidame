@@ -26,6 +26,10 @@ import dev.tseki.kikidame.domain.SourceSnapshot
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.testing.FakeSessionRepository
+import dev.tseki.kikidame.testing.RecordingSyncFailureNotifier
+import dev.tseki.kikidame.R
+import dev.tseki.kikidame.text.UiText
+import kotlin.test.assertNull
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -77,11 +81,16 @@ class DownloadWorkerTest {
         playback = null,
     )
 
-    private fun build(queue: DownloadQueue, source: SourceGateway, sessions: SessionRepository): DownloadWorker =
+    private fun build(
+        queue: DownloadQueue,
+        source: SourceGateway,
+        sessions: SessionRepository,
+        notifier: RecordingSyncFailureNotifier = RecordingSyncFailureNotifier(),
+    ): DownloadWorker =
         TestListenableWorkerBuilder<DownloadWorker>(ApplicationProvider.getApplicationContext())
             .setWorkerFactory(object : WorkerFactory() {
                 override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters): ListenableWorker =
-                    DownloadWorker(appContext, workerParameters, queue, EpisodeDownloader(source, queue), sessions)
+                    DownloadWorker(appContext, workerParameters, queue, EpisodeDownloader(source, queue), sessions, notifier)
             })
             .build()
 
@@ -109,10 +118,12 @@ class DownloadWorkerTest {
     fun unauthorizedSignsOutAndStops() = runTest {
         val queue = MemoryQueue(listOf(item(1, "a1"), item(2, "a2")))
         val sessions = FakeSessionRepository()
-        val result = build(queue, Source(emptyMap(), unauthorized = true), sessions).doWork()
+        val notifier = RecordingSyncFailureNotifier().apply { show(UiText.Res(R.string.sync_error_unreachable)) }
+        val result = build(queue, Source(emptyMap(), unauthorized = true), sessions, notifier).doWork()
 
         assertEquals(ListenableWorker.Result.success(), result)
         assertTrue(sessions.signedOut)
+        assertNull(notifier.showing, "signing out clears the sync failure notification (#346)")
         assertEquals(DownloadState.PENDING, queue.state[EpisodeId(1)], "row goes back to PENDING for next time")
         assertEquals(DownloadState.PENDING, queue.state[EpisodeId(2)])
     }

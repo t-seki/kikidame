@@ -16,6 +16,9 @@ import dev.tseki.kikidame.playback.NowPlayingState
 import dev.tseki.kikidame.testing.FakeAppSettingsRepository
 import dev.tseki.kikidame.testing.FakeDownloadRepository
 import dev.tseki.kikidame.testing.FakeSessionRepository
+import dev.tseki.kikidame.testing.RecordingSyncFailureNotifier
+import dev.tseki.kikidame.domain.SyncAttempt
+import dev.tseki.kikidame.domain.SyncOutcome
 import dev.tseki.kikidame.testing.deviceFolderReady
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -31,6 +34,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -39,7 +43,8 @@ class LibraryRefresherTest {
 
     private class FakeRefreshRepository : LibraryRefreshRepository {
         var result: RefreshResult? = null
-        var error: SourceException? = null
+        /** 投げる例外。取得元の失敗（[SourceException]）のほか、取り込みの失敗（それ以外の例外）も試せる。 */
+        var error: Exception? = null
         var gate: CompletableDeferred<Unit>? = null
         var calls = 0
         var lastExcluded: Set<EpisodeId> = emptySet()
@@ -98,7 +103,13 @@ class LibraryRefresherTest {
         network: FakeNetwork = FakeNetwork(),
         nowPlaying: NowPlaying = NowPlaying(),
         kicker: FakeKicker = FakeKicker(),
-    ) = LibraryRefresher(repo, session, downloads, settings, network, nowPlaying, kicker, this)
+        notifier: RecordingSyncFailureNotifier = RecordingSyncFailureNotifier(),
+        clock: Clock = FixedClock(now),
+    ) = LibraryRefresher(repo, session, downloads, settings, network, nowPlaying, kicker, notifier, clock, this)
+
+    private class FixedClock(var at: Instant) : Clock {
+        override fun now() = at
+    }
 
     private fun nowPlaying(episodeId: Long, ended: Boolean = false) =
         NowPlayingState(EpisodeId(episodeId), "title", "program", isPlaying = !ended, isEnded = ended)
@@ -897,5 +908,187 @@ class LibraryRefresherTest {
 
         assertEquals(1, repo.calls)
         assertEquals(1, repo.syncProgramCalls)
+    }
+
+    // ===== 全走査の最後の試みの記録と、同期の失敗の通知を消すこと（#346） =====
+
+    /** 手動の全走査の成功を時刻と一緒に記録し、同期の失敗の通知を消す（決定 3・5）。 */
+    @Test
+    fun aSuccessfulFullSyncIsRecordedAndClearsTheNotification() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now) }
+        val session = FakeSessionRepository()
+        val notifier = RecordingSyncFailureNotifier().apply { show(UiText.Res(R.string.sync_error_unreachable)) }
+        val refresher = refresher(repo, session = session, notifier = notifier)
+
+        refresher.refresh()
+
+        assertEquals(listOf(SyncAttempt(now, SyncOutcome.Succeeded)), session.syncAttempts)
+        assertNull(notifier.showing, "a success clears the notification")
+    }
+
+    /** 裏の同期でも同じように記録する。成功なら通知を消す（手動と裏を区別しない。決定 3・5）。 */
+    @Test
+    fun aBackgroundFullSyncIsRecordedToo() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now) }
+        val session = FakeSessionRepository()
+        val notifier = RecordingSyncFailureNotifier().apply { show(UiText.Res(R.string.sync_error_unreachable)) }
+        val refresher = refresher(repo, session = session, notifier = notifier)
+
+        val background = refresher.refreshInBackground()
+
+        assertEquals(1, background.result?.programs)
+        assertNull(background.failure)
+        assertEquals(listOf(SyncAttempt(now, SyncOutcome.Succeeded)), session.syncAttempts)
+        assertNull(notifier.showing)
+    }
+
+    /** 失敗の 3 種類を、スナックバーと同じ文言を出せる値と一緒に記録する（決定 2・3）。裏の同期なら失敗を返す。 */
+    @Test
+    fun failuresAreRecordedWithTheirReasons() = runTest(StandardTestDispatcher()) {
+        val cases = listOf(
+            SourceException.Unreachable() to SyncOutcome.Unreachable,
+            SourceException.Failed("HTTP 500") to SyncOutcome.FetchFailed("HTTP 500"),
+            IllegalStateException("db") to SyncOutcome.ImportFailed("IllegalStateException"),
+        )
+        for ((error, outcome) in cases) {
+            val repo = FakeRefreshRepository().apply { this.error = error }
+            val session = FakeSessionRepository()
+            val notifier = RecordingSyncFailureNotifier()
+            val refresher = refresher(repo, session = session, notifier = notifier)
+
+            refresher.messages.test {
+                assertNull(refresher.refresh())
+                assertEquals(outcome.reason(), awaitItem(), "the snackbar shows the same reason")
+            }
+            assertEquals(listOf(SyncAttempt(now, outcome)), session.syncAttempts)
+
+            val background = refresher.refreshInBackground()
+            assertEquals(outcome, background.failure)
+            assertEquals(2, session.syncAttempts.size)
+            assertEquals(0, notifier.cancels, "a failure keeps the notification")
+        }
+    }
+
+    /** 「Wi-Fi ではない」は見送りとして記録する。取得元には問い合わせない（lastAttemptedAt は今どおり更新されない）。失敗としては返さない（決定 2・3）。 */
+    @Test
+    fun skippingOnAMeteredNetworkIsRecordedAsSkipped() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now) }
+        val session = FakeSessionRepository()
+        val refresher = refresher(repo, session = session, network = FakeNetwork(metered = true))
+
+        assertNull(refresher.refreshInBackground().failure)
+
+        assertEquals(listOf(SyncAttempt(now, SyncOutcome.SkippedNotOnWifi)), session.syncAttempts)
+        assertEquals(0, repo.calls)
+        assertNull((session.state.value as SessionState.Ready).lastAttemptedAt)
+    }
+
+    /** 1 番組の同期は、成功も失敗も「Wi-Fi ではない」も記録しない（決定 3）。 */
+    @Test
+    fun syncingOneProgramIsNotRecorded() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { syncProgramResult = RefreshResult(1, 6, 0, 0, now) }
+        val session = FakeSessionRepository()
+        val network = FakeNetwork()
+        val notifier = RecordingSyncFailureNotifier()
+        val refresher = refresher(repo, session = session, network = network, notifier = notifier)
+
+        refresher.syncProgram(ProgramId(1))
+        refresher.syncProgram(ProgramId(1), orFullSync = true)
+        repo.error = SourceException.Unreachable()
+        refresher.syncProgram(ProgramId(1), orFullSync = true)
+        repo.error = null
+        network.metered = true
+        refresher.syncProgram(ProgramId(1), orFullSync = true)
+        network.metered = false
+        refresher.launchSyncProgramAfterRunning(ProgramId(1))
+        runCurrent()
+
+        assertEquals(emptyList(), session.syncAttempts)
+        assertEquals(0, notifier.cancels, "a program sync does not clear the notification")
+    }
+
+    /** 各回一覧の引っ張って更新が全走査に切り替えたら、それは全走査なので記録する（#279）。 */
+    @Test
+    fun aProgramSyncThatFallsBackToAFullSyncIsRecorded() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { syncProgramResult = null; result = RefreshResult(2, 9, 0, 0, now) }
+        val session = FakeSessionRepository()
+        val refresher = refresher(repo, session = session)
+
+        refresher.syncProgram(ProgramId(1), orFullSync = true)
+
+        assertEquals(listOf(SyncAttempt(now, SyncOutcome.Succeeded)), session.syncAttempts)
+    }
+
+    /** 401 は失敗として記録せず（ログアウトで記録ごと消える）、同期の失敗の通知を消す（決定 2・6）。 */
+    @Test
+    fun unauthorizedIsNotRecordedAndClearsTheNotification() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply { error = SourceException.Unauthorized() }
+        val session = FakeSessionRepository()
+        val notifier = RecordingSyncFailureNotifier().apply { show(UiText.Res(R.string.sync_error_unreachable)) }
+        val refresher = refresher(repo, session = session, notifier = notifier)
+
+        assertNull(refresher.refreshInBackground().failure)
+
+        assertEquals(emptyList(), session.syncAttempts)
+        assertNull(notifier.showing)
+        assertTrue(session.signedOut)
+    }
+
+    /** 取り消し（ログアウト・取得元を変える前）は記録しない。[LibraryRefresher.cancelAndAwait] は同期の失敗の通知を消す（決定 2・6）。 */
+    @Test
+    fun cancellingIsNotRecordedAndCancelAndAwaitClearsTheNotification() = runTest(StandardTestDispatcher()) {
+        val repo = FakeRefreshRepository().apply {
+            error = SourceException.Unreachable()
+            gate = CompletableDeferred()
+            ignoresCancellation = true
+        }
+        val session = FakeSessionRepository()
+        val notifier = RecordingSyncFailureNotifier().apply { show(UiText.Res(R.string.sync_error_unreachable)) }
+        val refresher = refresher(repo, session = session, notifier = notifier)
+
+        val running = async { refresher.refreshInBackground() }
+        runCurrent()
+        val cancelling = async { refresher.cancelAndAwait() }
+        runCurrent()
+        assertEquals(0, notifier.cancels, "the notification is cleared only after the run has finished (#198)")
+        repo.gate!!.complete(Unit)
+        cancelling.await()
+
+        assertTrue(running.isCancelled)
+        assertEquals(emptyList(), session.syncAttempts)
+        assertNull(notifier.showing)
+    }
+
+    /** 手動が合流した裏の同期は手動として扱い、失敗しても通知のための失敗を返さない（記録はする。決定 3・5）。 */
+    @Test
+    fun aBackgroundSyncJoinedByAManualOneDoesNotReturnTheFailure() = runTest(StandardTestDispatcher()) {
+        val gate = CompletableDeferred<Unit>()
+        val repo = FakeRefreshRepository().apply { error = SourceException.Unreachable(); this.gate = gate }
+        val session = FakeSessionRepository()
+        val refresher = refresher(repo, session = session)
+
+        val background = async { refresher.refreshInBackground() }
+        runCurrent()
+        val joined = async { refresher.refresh() }
+        runCurrent()
+        gate.complete(Unit)
+        assertNull(joined.await())
+
+        assertNull(background.await().failure)
+        assertEquals(listOf(SyncAttempt(now, SyncOutcome.Unreachable)), session.syncAttempts)
+    }
+
+    /** ほかの実行が走っていて裏の同期が何もしなかったときは、その実行の失敗を返さない（決定 5）。 */
+    @Test
+    fun aBackgroundCallIgnoredDuringAManualRefreshReturnsNoFailure() = runTest(StandardTestDispatcher()) {
+        val gate = CompletableDeferred<Unit>()
+        val repo = FakeRefreshRepository().apply { error = SourceException.Unreachable(); this.gate = gate }
+        val refresher = refresher(repo)
+
+        val manual = async { refresher.refresh() }
+        runCurrent()
+        assertEquals(BackgroundRefresh(null, null), refresher.refreshInBackground())
+        gate.complete(Unit)
+        manual.await()
     }
 }

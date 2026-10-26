@@ -13,6 +13,7 @@ import dev.tseki.kikidame.playback.NowPlaying
 import dev.tseki.kikidame.sync.LibraryRefresher
 import dev.tseki.kikidame.sync.NetworkStatus
 import kotlinx.coroutines.CoroutineScope
+import kotlin.time.Clock
 
 /**
  * 画面の ViewModel に渡すための [LibraryRefresher]。取得元には問い合わせず、ダウンロードも起こさない。
@@ -30,7 +31,9 @@ fun idleLibraryRefresher(
     settings: AppSettingsRepository = FakeAppSettingsRepository(),
     nowPlaying: NowPlaying = NowPlaying(),
     repository: IdleRefreshRepository = IdleRefreshRepository(),
-): LibraryRefresher = LibraryRefresher(repository, session, downloads, settings, UnmeteredNetwork, nowPlaying, DownloadKicker {}, scope)
+): LibraryRefresher = LibraryRefresher(
+    repository, session, downloads, settings, UnmeteredNetwork, nowPlaying, DownloadKicker {}, RecordingSyncFailureNotifier(), Clock.System, scope,
+)
 
 /** 取得元に問い合わせない [LibraryRefreshRepository]。1 番組の同期は呼ばれた番組を [syncedPrograms] に残して null を返す。 */
 class IdleRefreshRepository : LibraryRefreshRepository {

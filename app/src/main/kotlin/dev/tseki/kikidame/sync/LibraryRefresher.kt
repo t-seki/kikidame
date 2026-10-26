@@ -12,6 +12,8 @@ import dev.tseki.kikidame.domain.ScanProgress
 import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
+import dev.tseki.kikidame.domain.SyncAttempt
+import dev.tseki.kikidame.domain.SyncOutcome
 import dev.tseki.kikidame.domain.isDeviceFolder
 import dev.tseki.kikidame.domain.wifiOnlyApplies
 import dev.tseki.kikidame.download.DownloadKicker
@@ -34,6 +36,7 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.time.Clock
 
 /**
  * 更新と同期の唯一の入口。同時に 1 つしか走らせず、結果を文言にして画面へ流す。
@@ -55,6 +58,9 @@ import javax.inject.Singleton
  * - 全走査でタグを読む回がある間は、読んだ数を [tagProgress] に流す（silent でも手動でも。#209）
  * - 全走査が途中で失敗しても、それまでに番組ごとの同期が予約していればダウンロードの Worker を起こす。取り消し・認証の失敗では起こさない（#209）
  * - 再生中の回（削除から外す回）は、全走査の中で番組ごとに読み直す（#209）
+ * - 全走査の最後の試みの結果（成功・失敗とその理由・「Wi-Fi ではない」の見送り）と時刻を記録する（手動でも裏でも。#346 の決定 3）。
+ *   1 番組の同期、401（ログアウトする）、取り消しは記録しない。全走査が成功したら、同期の失敗の通知（[SyncFailureNotifier]）を消す
+ * - ログアウトと取得元を変える前（[cancelAndAwait]）と 401 でも、同期の失敗の通知を消す（記録はログアウト・取得元を変えるときにセッションと一緒に消える。#346 の決定 6）
  */
 @Singleton
 class LibraryRefresher @Inject constructor(
@@ -65,6 +71,8 @@ class LibraryRefresher @Inject constructor(
     private val network: NetworkStatus,
     private val nowPlaying: NowPlaying,
     private val kicker: DownloadKicker,
+    private val notifier: SyncFailureNotifier,
+    private val clock: Clock,
     @ApplicationScope private val applicationScope: CoroutineScope,
 ) {
     private val lock = Any()
@@ -125,16 +133,29 @@ class LibraryRefresher @Inject constructor(
 
     /**
      * 全走査して同期する。[silent] ならクルクルを出さず（定期・起動時）、代わりに [isSyncingInBackground] を立てて細いバーを出す（#138）。
-     * silent でも手元に変化があれば結果の文言を出す（#142）。変化が無い結果と失敗は出さない。
+     * silent でも手元に変化があれば結果の文言を出す（#142）。変化が無い結果と失敗は出さない（スナックバーの話。失敗も最後の試みとして記録し、
+     * 設定の「最終同期」の行に出る。裏の同期の失敗が続いたときの通知は [refreshInBackground]。#346）。
      * ただし手動の操作が合流したら、そこからバーを消してクルクルを出し、結果の文言（変化が無ければ「最新の状態です」）を出す。
      */
-    suspend fun refresh(silent: Boolean = false): RefreshResult? = guarded(silent) { sync() }
+    suspend fun refresh(silent: Boolean = false): RefreshResult? = guarded(silent, scansAll = true) { sync() }
+
+    /**
+     * 裏の同期（[SyncWorker]）の全走査。中身は silent な [refresh] と同じで、加えて、この実行が失敗で終わり、最後まで手動の操作が
+     * 合流しなかったとき（手動が合流したら結果の文言がスナックバーに出るので、手動として扱う。#346 の決定 5）の失敗を返す。
+     * ほかの実行が走っていて何もしなかったときと、見送り・成功では [BackgroundRefresh.failure] は null。
+     */
+    suspend fun refreshInBackground(): BackgroundRefresh {
+        var started: Run? = null
+        val result = guarded(silent = true, scansAll = true, onStart = { started = it }) { sync() }
+        val failure = started?.let { run -> synchronized(lock) { run.failure.takeIf { run.silent } } }
+        return BackgroundRefresh(result, failure)
+    }
 
     /**
      * 1 番組だけ同期する。番組の行が無いか取得元 ID の無い番組は、[orFullSync] なら全走査（同期）に切り替え（各回一覧の
      * 「引っ張って更新」。#279）、そうでなければ何もしない（シート側でスイッチを無効にしている）。
      */
-    suspend fun syncProgram(programId: ProgramId, orFullSync: Boolean = false): RefreshResult? = guarded(silent = false) {
+    suspend fun syncProgram(programId: ProgramId, orFullSync: Boolean = false): RefreshResult? = guarded(silent = false, scansAll = false) {
         syncOne(programId) ?: if (orFullSync) sync() else null
     }
 
@@ -142,13 +163,21 @@ class LibraryRefresher @Inject constructor(
     private suspend fun Run.syncOne(programId: ProgramId): RefreshResult? =
         refreshRepository.syncProgram(programId, excluded = excluded())?.also { report(it.toProgramSyncMessage()) }
 
-    /** 全走査して結果の文言を出す。手元に変化があれば silent でも出す（#142）。 */
-    private suspend fun Run.sync(): RefreshResult =
-        refreshRepository.refresh(
+    /**
+     * 全走査して結果の文言を出す。手元に変化があれば silent でも出す（#142）。成功を最後の試みとして記録し、同期の失敗の通知を消す（#346）。
+     * 各回一覧の引っ張って更新が全走査に切り替えたとき（#279）も全走査なので、ここから先の失敗は記録する。
+     */
+    private suspend fun Run.sync(): RefreshResult {
+        scansAll = true
+        return refreshRepository.refresh(
             excluded = { excluded() },
             onProgress = { _tagProgress.value = it },
             onEnqueued = { enqueuedSoFar.addAndGet(it) },
-        ).also { report(it.toSyncMessage(), evenIfSilent = it.hasChanges) }
+        ).also {
+            report(it.toSyncMessage(), evenIfSilent = it.hasChanges)
+            record(SyncOutcome.Succeeded)
+        }
+    }
 
     /** 聴いている回は削除から外す。ただし聴き終えて止まっている回は「再生済みなら削除」に任せる（#27）。 */
     private fun excluded(): Set<EpisodeId> = setOfNotNull(nowPlaying.excludedFromSync)
@@ -157,9 +186,15 @@ class LibraryRefresher @Inject constructor(
      * 1 回の実行。手動の操作が合流すると [silent] が外れ、まだ出していない結果の文言があればそこで出る。
      * 手元に変化があった結果は silent でも合流を待たずに出しているので、合流しても二度は出ない（#142）。
      */
-    private inner class Run(silent: Boolean) {
-        /** [silent] と [unreported] は [lock] の中で読み書きする。 */
+    private inner class Run(silent: Boolean, scansAll: Boolean) {
+        /** [silent] と [unreported] と [failure] は [lock] の中で読み書きする。 */
         var silent: Boolean = silent
+
+        /** 全走査の実行か（最後の試みとして記録するか。#346）。1 番組の同期が全走査に切り替えたら立てる。 */
+        var scansAll: Boolean = scansAll
+
+        /** この実行が全走査の失敗で終わったときの失敗（#346）。[refreshInBackground] が通知を出すかを決めるのに使う。 */
+        var failure: SyncOutcome.Failure? = null
 
         /** silent なうちに出しそびれた結果の文言。合流した時点で出す。 */
         var unreported: UiText? = null
@@ -190,20 +225,48 @@ class LibraryRefresher @Inject constructor(
                 if (silent && !evenIfSilent) unreported = message else _messages.tryEmit(message)
             }
         }
+
+        /**
+         * 全走査の最後の試みとして [outcome] を記録する（#346 の決定 3）。全走査でない実行（1 番組の同期）では何もしない。
+         * 記録に失敗しても同期の結果は変えない（ログに残す）。成功なら同期の失敗の通知を消す（出したことの記録は記録と一緒に消える）。
+         */
+        suspend fun record(outcome: SyncOutcome) {
+            if (!scansAll) return
+            if (outcome is SyncOutcome.Failure) synchronized(lock) { failure = outcome }
+            try {
+                sessionRepository.recordSyncAttempt(SyncAttempt(clock.now(), outcome))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "could not record the sync attempt", e)
+            }
+            if (outcome == SyncOutcome.Succeeded) notifier.cancel()
+        }
+
+        /** 失敗の文言（スナックバー）を出し、全走査なら最後の試みとして記録する。 */
+        suspend fun fail(outcome: SyncOutcome.Failure) {
+            report(outcome.reason())
+            record(outcome)
+        }
     }
 
     /**
      * 走っている実行（定期・手動・初回のどれでも）を取り消し、終わるのを待つ。「取得元を変える」とログアウトの前に呼ぶ
      * （取得元を変えた後に古い取得元の走査が走り続けたり、結果が新しい取得元の DB に書かれたり、「同時に 1 つ」で新しい取得元の同期が
      * 捨てられたりしないように。#198）。実行が無ければ何もしない。走査はフォルダごと・ファイルごとに取り消しを見るので、待ちは短い。
+     * 取り消しが終わってから、同期の失敗の通知を消す（ログアウト・取得元を変えるときに消す。#346 の決定 6。先に消すと、待っている間に
+     * 終わった実行の後に通知が残りうるので、#198 と同じく取り消しを待ってから切り替える）。
      */
     suspend fun cancelAndAwait() {
         val run = synchronized(lock) {
             cancellations++
             running
-        } ?: return
-        run.job?.cancel(CancellationException("source changed"))
-        run.result.await()
+        }
+        if (run != null) {
+            run.job?.cancel(CancellationException("source changed"))
+            run.result.await()
+        }
+        notifier.cancel()
     }
 
     /**
@@ -213,14 +276,24 @@ class LibraryRefresher @Inject constructor(
      * - それ以外 → 何もせず null
      *
      * シートを閉じたときの同期は、合流も捨てられもせずに待つ別の経路（[awaitTurn]）を通る（#311）。
+     *
+     * [scansAll] は新しく始める実行が全走査か（最後の試みとして記録するか。#346）。[refresh] は true、[syncProgram] は false
+     * （全走査に切り替えたら [sync] の中で立つ）。合流したときと何もしなかったときは使わない。
+     * [onStart] は新しく実行を始めたときだけ、その実行を渡して [lock] の中で呼ぶ（[refreshInBackground] が、最後まで手動が合流しなかったかと
+     * 失敗を後から読むため）。合流したときと何もしなかったときは呼ばない。
      */
-    private suspend fun guarded(silent: Boolean, block: suspend Run.() -> RefreshResult?): RefreshResult? {
+    private suspend fun guarded(
+        silent: Boolean,
+        scansAll: Boolean,
+        onStart: (Run) -> Unit = {},
+        block: suspend Run.() -> RefreshResult?,
+    ): RefreshResult? {
         var joined: Run? = null
         val callerJob = currentCoroutineContext()[Job]
         val run = synchronized(lock) {
             val current = running
             when {
-                current == null -> start(silent, callerJob)
+                current == null -> start(silent, scansAll, callerJob).also(onStart)
                 !silent && current.silent -> {
                     current.silent = false
                     current.unreported?.let { _messages.tryEmit(it) }
@@ -259,7 +332,7 @@ class LibraryRefresher @Inject constructor(
             if (!askShouldSync(shouldSync)) return null
             val run = synchronized(lock) {
                 if (cancellations != cancellationsAtStart) return null
-                if (running == null) start(silent = false, callerJob) else null
+                if (running == null) start(silent = false, scansAll = false, callerJob) else null
             } ?: continue
             return runToEnd(run, block)
         }
@@ -284,7 +357,7 @@ class LibraryRefresher @Inject constructor(
      * 新しい実行を [running] に入れ、表示を立てる。[lock] の中で呼ぶ。
      * Run を running に入れるのと同じ synchronized の中で job を入れる（cancelAndAwait が job の無い Run を見る隙間を作らない）。
      */
-    private fun start(silent: Boolean, callerJob: Job?): Run = Run(silent).also {
+    private fun start(silent: Boolean, scansAll: Boolean, callerJob: Job?): Run = Run(silent, scansAll).also {
         it.job = callerJob
         running = it
         if (silent) _isSyncingInBackground.value = true else _isRefreshing.value = true
@@ -315,6 +388,8 @@ class LibraryRefresher @Inject constructor(
             if (reconciled > 0) say(UiText.Plural(R.plurals.sync_reconciled, reconciled))
             if (wifiOnlyApplies(settings.wifiOnly.first(), state) && network.isMetered()) {
                 report(UiText.Res(R.string.sync_not_on_wifi))
+                // 見送りも最後の試みとして記録する。取得元に問い合わせていないので lastAttemptedAt は更新しない（#346 の決定 3）
+                record(SyncOutcome.SkippedNotOnWifi)
                 return null
             }
             val result = block() ?: return null
@@ -325,15 +400,17 @@ class LibraryRefresher @Inject constructor(
             // ログアウトすると画面が接続画面へ移るので、文言を先に出す。端末のフォルダはアクセスが切れた（#199 の決定 5）
             val deviceFolder = sessionRepository.state.first().isDeviceFolder
             report(UiText.Res(if (deviceFolder) R.string.sync_error_device_folder_lost else R.string.sync_error_session_expired))
+            // 失敗としては記録しない。最後の試みの記録はログアウトで消え、同期の失敗の通知もここで消す（#346 の決定 2・6）
+            notifier.cancel()
             sessionRepository.signOut()
             return null
         } catch (e: SourceException.Unreachable) {
             kickIfEnqueuedBeforeFailure()
-            report(UiText.Res(R.string.sync_error_unreachable))
+            fail(SyncOutcome.Unreachable)
             return null
         } catch (e: SourceException.Failed) {
             kickIfEnqueuedBeforeFailure()
-            report(UiText.Res(R.string.sync_error_fetch_failed, e.message.orEmpty()))
+            fail(SyncOutcome.FetchFailed(e.message.orEmpty()))
             return null
         } catch (e: CancellationException) {
             // 取り消し（取得元を変える・ログアウトの前の cancelAndAwait）では起こさない。取得元を変える処理（SourceChanger）は
@@ -343,7 +420,7 @@ class LibraryRefresher @Inject constructor(
             // Room / DataStore / Keystore の失敗。落とさずに文言にする
             Log.e(TAG, "refresh failed", e)
             kickIfEnqueuedBeforeFailure()
-            report(UiText.Res(R.string.sync_error_import_failed, e::class.simpleName.orEmpty()))
+            fail(SyncOutcome.ImportFailed(e::class.simpleName.orEmpty()))
             return null
         }
     }
@@ -374,3 +451,9 @@ class LibraryRefresher @Inject constructor(
         const val TAG = "LibraryRefresher"
     }
 }
+
+/**
+ * 裏の同期（[LibraryRefresher.refreshInBackground]）の結果。[result] は [LibraryRefresher.refresh] と同じ。[failure] は、この実行が全走査の
+ * 失敗で終わり、最後まで手動の操作が合流しなかったときの失敗（#346 の決定 5）。
+ */
+data class BackgroundRefresh(val result: RefreshResult?, val failure: SyncOutcome.Failure?)

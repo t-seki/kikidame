@@ -59,6 +59,10 @@ import dev.tseki.kikidame.ui.theme.KikidameTheme
 import androidx.compose.ui.tooling.preview.Preview
 import kotlin.time.Instant
 import dev.tseki.kikidame.domain.SessionState
+import dev.tseki.kikidame.domain.SyncAttempt
+import dev.tseki.kikidame.domain.SyncOutcome
+import dev.tseki.kikidame.sync.reason
+import dev.tseki.kikidame.text.UiText
 import dev.tseki.kikidame.ui.SectionTitle
 import dev.tseki.kikidame.ui.ValueRow
 import dev.tseki.kikidame.ui.connect.displayPath
@@ -66,6 +70,59 @@ import dev.tseki.kikidame.ui.resolve
 import dev.tseki.kikidame.ui.source.ChangeSourceConfirmDialog
 import dev.tseki.kikidame.ui.toDateTimeText
 import dev.tseki.kikidame.ui.toText
+
+/**
+ * 設定の「最終同期」の補足の行（#346 の決定 4）。全走査の最後の試みが最終同期（[SessionState.Ready.lastFetchedAt]）より新しく、
+ * しかも成功でないときだけ出す。
+ */
+internal sealed interface LastSyncNote {
+    val at: Instant
+
+    /** 失敗。[reason] は同期の結果のスナックバーと同じ文言。 */
+    data class Failed(override val at: Instant, val reason: UiText) : LastSyncNote
+
+    /** 「Wi-Fi のみ」で従量制だったので見送った。 */
+    data class Skipped(override val at: Instant) : LastSyncNote
+}
+
+/** [LastSyncNote] を決める。最後の試みが無い・成功・最終同期より新しくないときは null（補足の行を出さない）。 */
+internal fun SessionState.Ready.lastSyncNote(): LastSyncNote? {
+    val attempt = lastSyncAttempt ?: return null
+    val fetchedAt = lastFetchedAt
+    if (fetchedAt != null && attempt.at <= fetchedAt) return null
+    return when (val outcome = attempt.outcome) {
+        SyncOutcome.Succeeded -> null
+        SyncOutcome.SkippedNotOnWifi -> LastSyncNote.Skipped(attempt.at)
+        is SyncOutcome.Failure -> LastSyncNote.Failed(attempt.at, outcome.reason())
+    }
+}
+
+/**
+ * 「最終同期」の行。値は最後に成功した時刻（[SessionState.Ready.lastFetchedAt]）。[LastSyncNote] があれば補足の行を 1 行足す
+ * （失敗は `error` の色で「<時刻> に失敗: <理由>」、見送りは通常の色で「<時刻> は Wi-Fi ではないため見送り」。#346 の決定 4）。
+ */
+@Composable
+private fun LastSyncRow(ready: SessionState.Ready?) {
+    val note = ready?.lastSyncNote()
+    ListItem(
+        overlineContent = { Text(stringResource(R.string.settings_last_sync)) },
+        headlineContent = { Text(ready?.lastFetchedAt?.toDateTimeText() ?: "-") },
+        supportingContent = when (note) {
+            null -> null
+            is LastSyncNote.Failed -> {
+                {
+                    Text(
+                        stringResource(R.string.settings_last_sync_failed, note.at.toDateTimeText(), note.reason.resolve()),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+            is LastSyncNote.Skipped -> {
+                { Text(stringResource(R.string.settings_last_sync_skipped, note.at.toDateTimeText())) }
+            }
+        },
+    )
+}
 
 @Composable
 fun SettingsScreen(
@@ -192,7 +249,7 @@ internal fun SettingsContent(
                     supporting = stringResource(R.string.settings_library_tap),
                 )
             }
-            ValueRow(stringResource(R.string.settings_last_sync), (s as? SessionState.Ready)?.lastFetchedAt?.toDateTimeText() ?: "-")
+            LastSyncRow(s as? SessionState.Ready)
             HorizontalDivider()
             SectionTitle(stringResource(R.string.settings_section_download))
             // 手元のファイルの合計（#42）。保持ルールや固定を調整する動機は容量なので、見えるようにする。押すと内訳の画面（#335）
@@ -382,6 +439,8 @@ private fun SettingsContentSmbPreview() {
         SessionState.Ready(
             ConnectedSource.Smb(SmbConnection(host = "nas.local", share = "radio", path = "録音/2026", userName = "alice", password = "")),
             lastFetchedAt = Instant.fromEpochSeconds(1_760_000_000),
+            // 最終同期の後の全走査が失敗した（「最終同期」の補足の行が赤字で出る。#346）
+            lastSyncAttempt = SyncAttempt(Instant.fromEpochSeconds(1_760_090_000), SyncOutcome.Unreachable),
         ),
     )
 }
