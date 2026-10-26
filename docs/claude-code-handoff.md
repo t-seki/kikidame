@@ -494,7 +494,8 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   それが `lastFetchedAt` より新しく成功でないときに補足の行（失敗は赤字）を出す。裏の同期（`SyncWorker` → `LibraryRefresher.refreshInBackground`。手動が合流したら手動として扱う）が失敗で終わり、
   `lastFetchedAt` から 24 時間（`SyncWorker.NOTIFY_AFTER`）以上たっていれば、同期の失敗の通知（`sync/SyncFailureNotifier.kt`、チャンネル `sync`、`IMPORTANCE_LOW`）を 1 回出す。
   出したことを記録し（`syncFailureNotified`）、全走査が成功するまで出し直さない。成功すると通知と記録を消す。ログアウトと取得元を変えるときも消す（記録は同期の時刻と一緒に `SessionStore` で消え、
-  通知は `LibraryRefresher.cancelAndAwait` と 401 の分岐で消す。ダウンロードの 401 でログアウトしたときは、次の `SyncWorker` が記録の無いのを見て消す）
+  通知は `LibraryRefresher.cancelAndAwait`（走っている実行の取り消しを待った後）と、401 でログアウトする 3 か所（`LibraryRefresher`・`DownloadWorker`・`LibraryPickViewModel`）で消す。
+  `SyncWorker` も頭で、記録が無いのに通知が残っていれば消す）
 - **#12 番組単位の更新**: `SourceGateway.fetchProgramEpisodes(programId)`（Jellyfin では `JellyfinGateway.fetchProgramEpisodes(credentials, programSourceId)`）、
   `LibraryRefreshRepository.refreshProgram(programId)`（突合は「番組 1 つ + その各回」のスナップショットで `LibraryMatching.match`、削除なし）。
   `sourceItemId` の無い番組は手動同期にフォールバック。**#279 で `refreshProgram` は無くし**、各回一覧の更新は `syncProgram`（取り込み → この番組だけの `planSync`）にそろえた。フォールバックは `LibraryRefresher.syncProgram(orFullSync = true)`

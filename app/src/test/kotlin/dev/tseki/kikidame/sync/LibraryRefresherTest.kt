@@ -1050,6 +1050,7 @@ class LibraryRefresherTest {
         runCurrent()
         val cancelling = async { refresher.cancelAndAwait() }
         runCurrent()
+        assertEquals(0, notifier.cancels, "the notification is cleared only after the run has finished (#198)")
         repo.gate!!.complete(Unit)
         cancelling.await()
 

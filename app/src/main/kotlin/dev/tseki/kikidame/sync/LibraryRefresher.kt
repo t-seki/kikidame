@@ -254,16 +254,19 @@ class LibraryRefresher @Inject constructor(
      * 走っている実行（定期・手動・初回のどれでも）を取り消し、終わるのを待つ。「取得元を変える」とログアウトの前に呼ぶ
      * （取得元を変えた後に古い取得元の走査が走り続けたり、結果が新しい取得元の DB に書かれたり、「同時に 1 つ」で新しい取得元の同期が
      * 捨てられたりしないように。#198）。実行が無ければ何もしない。走査はフォルダごと・ファイルごとに取り消しを見るので、待ちは短い。
-     * 同期の失敗の通知も消す（ログアウト・取得元を変えるときに消す。#346 の決定 6）。
+     * 取り消しが終わってから、同期の失敗の通知を消す（ログアウト・取得元を変えるときに消す。#346 の決定 6。先に消すと、待っている間に
+     * 終わった実行の後に通知が残りうるので、#198 と同じく取り消しを待ってから切り替える）。
      */
     suspend fun cancelAndAwait() {
-        notifier.cancel()
         val run = synchronized(lock) {
             cancellations++
             running
-        } ?: return
-        run.job?.cancel(CancellationException("source changed"))
-        run.result.await()
+        }
+        if (run != null) {
+            run.job?.cancel(CancellationException("source changed"))
+            run.result.await()
+        }
+        notifier.cancel()
     }
 
     /**
@@ -273,6 +276,11 @@ class LibraryRefresher @Inject constructor(
      * - それ以外 → 何もせず null
      *
      * シートを閉じたときの同期は、合流も捨てられもせずに待つ別の経路（[awaitTurn]）を通る（#311）。
+     *
+     * [scansAll] は新しく始める実行が全走査か（最後の試みとして記録するか。#346）。[refresh] は true、[syncProgram] は false
+     * （全走査に切り替えたら [sync] の中で立つ）。合流したときと何もしなかったときは使わない。
+     * [onStart] は新しく実行を始めたときだけ、その実行を渡して [lock] の中で呼ぶ（[refreshInBackground] が、最後まで手動が合流しなかったかと
+     * 失敗を後から読むため）。合流したときと何もしなかったときは呼ばない。
      */
     private suspend fun guarded(
         silent: Boolean,

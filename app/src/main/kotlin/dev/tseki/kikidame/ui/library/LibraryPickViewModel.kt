@@ -10,6 +10,7 @@ import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.sync.LibraryRefresher
+import dev.tseki.kikidame.sync.SyncFailureNotifier
 import dev.tseki.kikidame.ui.connect.toUserMessage
 import dev.tseki.kikidame.text.UiText
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,6 +35,7 @@ data class LibraryPickUiState(
 class LibraryPickViewModel @Inject constructor(
     private val sessionRepository: SessionRepository,
     private val refresher: LibraryRefresher,
+    private val syncFailureNotifier: SyncFailureNotifier,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(LibraryPickUiState())
     val uiState: StateFlow<LibraryPickUiState> = _uiState
@@ -56,6 +58,8 @@ class LibraryPickViewModel @Inject constructor(
             } catch (e: SourceException.Unauthorized) {
                 // 401 はログアウトと同じ扱い。セッション状態が変わり、NavHost が接続画面へ導く
                 _uiState.update { it.copy(isLoading = false, error = e.toUserMessage()) }
+                // ライブラリを選び直しに来た接続済みの人もいるので、同期の失敗の通知も消す（#346 の決定 6）
+                syncFailureNotifier.cancel()
                 sessionRepository.signOut()
             } catch (e: SourceException) {
                 _uiState.update { it.copy(isLoading = false, error = e.toUserMessage()) }

@@ -53,13 +53,9 @@ class SyncWorker @AssistedInject constructor(
         return Result.success()
     }
 
-    /** 裏の同期の失敗が [NOTIFY_AFTER] 続いていて、まだ出していなければ通知を出し、出したことを記録する（#346 の決定 5）。 */
     private suspend fun notifyIfLong(failure: SyncOutcome.Failure) {
         try {
-            val ready = sessionRepository.state.first() as? SessionState.Ready ?: return
-            if (!shouldNotifyFailure(ready.lastFetchedAt, ready.syncFailureNotified, clock.now())) return
-            notifier.show(failure.reason())
-            sessionRepository.markSyncFailureNotified()
+            notifyFailureIfLong(failure, sessionRepository, notifier, clock.now())
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -81,6 +77,23 @@ class SyncWorker @AssistedInject constructor(
          * 一度も成功していない（[lastFetchedAt] が null）ときは出さない（接続した直後の取り込みは画面を開いたまま走り、失敗がその場でスナックバーに出るため）。
          * 出したら、次に全走査が成功するまで（利用者が通知を払っても）出し直さない。
          */
+        /**
+         * 裏の同期の失敗が [NOTIFY_AFTER] 続いていて、まだ出していなければ通知を出し、実際に出せたときだけ出したことを記録する
+         * （#346 の決定 5。通知の許可が無くて出せなかったときは記録せず、後で許可されたら次の失敗で出る）。出したら true。
+         */
+        internal suspend fun notifyFailureIfLong(
+            failure: SyncOutcome.Failure,
+            sessionRepository: SessionRepository,
+            notifier: SyncFailureNotifier,
+            now: Instant,
+        ): Boolean {
+            val ready = sessionRepository.state.first() as? SessionState.Ready ?: return false
+            if (!shouldNotifyFailure(ready.lastFetchedAt, ready.syncFailureNotified, now)) return false
+            if (!notifier.show(failure.reason())) return false
+            sessionRepository.markSyncFailureNotified()
+            return true
+        }
+
         internal fun shouldNotifyFailure(lastFetchedAt: Instant?, notified: Boolean, now: Instant): Boolean {
             if (notified || lastFetchedAt == null) return false
             return now - lastFetchedAt >= NOTIFY_AFTER

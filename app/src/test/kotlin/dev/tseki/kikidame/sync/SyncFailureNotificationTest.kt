@@ -1,5 +1,13 @@
 package dev.tseki.kikidame.sync
 
+import dev.tseki.kikidame.R
+import dev.tseki.kikidame.domain.SessionState
+import dev.tseki.kikidame.domain.SyncOutcome
+import dev.tseki.kikidame.testing.FakeSessionRepository
+import dev.tseki.kikidame.testing.RecordingSyncFailureNotifier
+import dev.tseki.kikidame.testing.jellyfinReady
+import dev.tseki.kikidame.text.UiText
+import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -38,5 +46,33 @@ class SyncFailureNotificationTest {
     @Test
     fun doesNotNotifyBeforeTheFirstSuccess() {
         assertFalse(SyncWorker.shouldNotifyFailure(null, notified = false, now = now))
+    }
+
+    /** 出せたら通知を出し、出したことを記録する。2 回目は出し直さない。 */
+    @Test
+    fun aLongFailureIsNotifiedOnceAndRecorded() = runTest {
+        val session = FakeSessionRepository(jellyfinReady(lastFetchedAt = now - 25.hours))
+        val notifier = RecordingSyncFailureNotifier()
+
+        assertTrue(SyncWorker.notifyFailureIfLong(SyncOutcome.Unreachable, session, notifier, now))
+        assertEquals(listOf<UiText>(UiText.Res(R.string.sync_error_unreachable)), notifier.shown)
+        assertTrue((session.state.value as SessionState.Ready).syncFailureNotified)
+
+        assertFalse(SyncWorker.notifyFailureIfLong(SyncOutcome.Unreachable, session, notifier, now))
+        assertEquals(1, notifier.shown.size)
+    }
+
+    /** 通知の許可が無くて出せなかったときは「出した」と記録しない。後で許可されたら次の失敗で出る（PR #349 の 1 周目 #1）。 */
+    @Test
+    fun aNotificationThatCouldNotBeShownIsNotRecorded() = runTest {
+        val session = FakeSessionRepository(jellyfinReady(lastFetchedAt = now - 25.hours))
+        val notifier = RecordingSyncFailureNotifier(allowed = false)
+
+        assertFalse(SyncWorker.notifyFailureIfLong(SyncOutcome.Unreachable, session, notifier, now))
+        assertFalse((session.state.value as SessionState.Ready).syncFailureNotified)
+
+        notifier.allowed = true
+        assertTrue(SyncWorker.notifyFailureIfLong(SyncOutcome.Unreachable, session, notifier, now))
+        assertTrue((session.state.value as SessionState.Ready).syncFailureNotified)
     }
 }

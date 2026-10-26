@@ -34,11 +34,15 @@ fun SyncOutcome.Failure.reason(): UiText = when (this) {
 
 /**
  * 同期の失敗の通知（#346 の決定 5）を出す・消す口。出すかどうかの判断は [SyncWorker.shouldNotifyFailure]、消すのは全走査が成功したとき・
- * ログアウトと取得元を変える前（[LibraryRefresher]）。テストでは偽物に差し替える。
+ * ログアウトと取得元を変える前・401 でログアウトするとき
+ * （[LibraryRefresher]・`DownloadWorker`・`LibraryPickViewModel`）。テストでは偽物に差し替える。
  */
 interface SyncFailureNotifier {
-    /** 通知を出す（出ていれば置き換える）。[reason] は失敗の理由（[SyncOutcome.Failure.reason]）。通知が許可されていなければ何もしない。 */
-    fun show(reason: UiText)
+    /**
+     * 通知を出す（出ていれば置き換える）。[reason] は失敗の理由（[SyncOutcome.Failure.reason]）。出したら true。
+     * 通知が許可されていない（出せなかった）ときは何もせず false（呼び出し側は「出した」と記録しない。後で許可されたら次の失敗で出る）。
+     */
+    fun show(reason: UiText): Boolean
 
     /** 出ている通知を消す。出ていなければ何もしない。 */
     fun cancel()
@@ -56,8 +60,8 @@ interface SyncFailureNotifier {
 class AndroidSyncFailureNotifier @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : SyncFailureNotifier {
-    override fun show(reason: UiText) {
-        if (!canPost()) return
+    override fun show(reason: UiText): Boolean {
+        if (!canPost()) return false
         ensureChannel()
         val open = PendingIntent.getActivity(
             context,
@@ -80,10 +84,12 @@ class AndroidSyncFailureNotifier @Inject constructor(
             .setContentIntent(open)
             .setAutoCancel(true)
             .build()
-        try {
+        return try {
             NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
+            true
         } catch (e: SecurityException) {
             // 確かめた直後に許可が取り消されたとき。出さないままにする
+            false
         }
     }
 
