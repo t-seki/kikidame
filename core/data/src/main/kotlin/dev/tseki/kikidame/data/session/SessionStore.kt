@@ -14,6 +14,8 @@ import dev.tseki.kikidame.domain.SmbConnection
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.Session
 import dev.tseki.kikidame.domain.SessionState
+import dev.tseki.kikidame.domain.SyncAttempt
+import dev.tseki.kikidame.domain.SyncOutcome
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -95,6 +97,30 @@ class SessionStore(
     }
 
     /**
+     * 全走査の最後の試みの結果と時刻（#346）。[LAST_ATTEMPTED_AT] とは別のキーに置く。成功なら、同期の失敗の通知を出した記録も消す。
+     */
+    suspend fun saveSyncAttempt(attempt: SyncAttempt) {
+        val (kind, detail) = when (val outcome = attempt.outcome) {
+            SyncOutcome.Succeeded -> OUTCOME_SUCCEEDED to null
+            SyncOutcome.SkippedNotOnWifi -> OUTCOME_NOT_ON_WIFI to null
+            SyncOutcome.Unreachable -> OUTCOME_UNREACHABLE to null
+            is SyncOutcome.FetchFailed -> OUTCOME_FETCH_FAILED to outcome.message
+            is SyncOutcome.ImportFailed -> OUTCOME_IMPORT_FAILED to outcome.exceptionName
+        }
+        dataStore.edit {
+            it[SYNC_ATTEMPT_AT] = attempt.at.toEpochMilliseconds()
+            it[SYNC_ATTEMPT_OUTCOME] = kind
+            if (detail != null) it[SYNC_ATTEMPT_DETAIL] = detail else it.remove(SYNC_ATTEMPT_DETAIL)
+            if (attempt.outcome == SyncOutcome.Succeeded) it.remove(SYNC_FAILURE_NOTIFIED)
+        }
+    }
+
+    /** 同期の失敗の通知を出した記録（#346）。全走査が成功したとき（[saveSyncAttempt]）と、同期の時刻を消すときに消える。 */
+    suspend fun saveSyncFailureNotified() {
+        dataStore.edit { it[SYNC_FAILURE_NOTIFIED] = true }
+    }
+
+    /**
      * ログアウト。サーバ URL とユーザー名（SMB はホスト・共有名・パス・ユーザー名）は次回の入力補助として残す。
      * 端末のフォルダは、URI と名前を残してログアウトの印を立てる（アクセスが切れたフォルダを選び直させる。#199）。
      */
@@ -141,10 +167,32 @@ class SessionStore(
         remove(DEVICE_SIGNED_OUT)
     }
 
-    /** 取得元が変わったときとログアウトのときに、同期の時刻（最終同期・最終の試み）を消す。 */
+    /**
+     * 取得元が変わったときとログアウトのときに、同期の時刻（最終同期・最終の試み）を消す。全走査の最後の試みの結果と、
+     * 同期の失敗の通知を出した記録も一緒に消す（#346 の決定 6）。
+     */
     private fun MutablePreferences.removeSyncTimes() {
         remove(LAST_FETCHED_AT)
         remove(LAST_ATTEMPTED_AT)
+        remove(SYNC_ATTEMPT_AT)
+        remove(SYNC_ATTEMPT_OUTCOME)
+        remove(SYNC_ATTEMPT_DETAIL)
+        remove(SYNC_FAILURE_NOTIFIED)
+    }
+
+    /** 全走査の最後の試み。時刻か結果が無い、結果の値を読めない（新しい版で足した値を古い版が読んだなど）ときは null。 */
+    private fun Preferences.toSyncAttempt(): SyncAttempt? {
+        val at = this[SYNC_ATTEMPT_AT]?.let(Instant::fromEpochMilliseconds) ?: return null
+        val detail = this[SYNC_ATTEMPT_DETAIL].orEmpty()
+        val outcome = when (this[SYNC_ATTEMPT_OUTCOME]) {
+            OUTCOME_SUCCEEDED -> SyncOutcome.Succeeded
+            OUTCOME_NOT_ON_WIFI -> SyncOutcome.SkippedNotOnWifi
+            OUTCOME_UNREACHABLE -> SyncOutcome.Unreachable
+            OUTCOME_FETCH_FAILED -> SyncOutcome.FetchFailed(detail)
+            OUTCOME_IMPORT_FAILED -> SyncOutcome.ImportFailed(detail)
+            else -> return null
+        }
+        return SyncAttempt(at, outcome)
     }
 
     /** 接続済みの状態。同期の時刻は取得元によらず同じキーから読む。 */
@@ -152,6 +200,8 @@ class SessionStore(
         source = source,
         lastFetchedAt = this[LAST_FETCHED_AT]?.let(Instant::fromEpochMilliseconds),
         lastAttemptedAt = this[LAST_ATTEMPTED_AT]?.let(Instant::fromEpochMilliseconds),
+        lastSyncAttempt = toSyncAttempt(),
+        syncFailureNotified = this[SYNC_FAILURE_NOTIFIED] ?: false,
     )
 
     /** 暗号化して置いた値を戻す。無いとき・復号できないとき（鍵が変わったなど）は null。 */
@@ -208,6 +258,15 @@ class SessionStore(
         val LIBRARY_NAME = stringPreferencesKey("library_name")
         val LAST_FETCHED_AT = longPreferencesKey("last_fetched_at")
         val LAST_ATTEMPTED_AT = longPreferencesKey("last_attempted_at")
+        val SYNC_ATTEMPT_AT = longPreferencesKey("sync_attempt_at")
+        val SYNC_ATTEMPT_OUTCOME = stringPreferencesKey("sync_attempt_outcome")
+        val SYNC_ATTEMPT_DETAIL = stringPreferencesKey("sync_attempt_detail")
+        val SYNC_FAILURE_NOTIFIED = booleanPreferencesKey("sync_failure_notified")
+        const val OUTCOME_SUCCEEDED = "succeeded"
+        const val OUTCOME_NOT_ON_WIFI = "not_on_wifi"
+        const val OUTCOME_UNREACHABLE = "unreachable"
+        const val OUTCOME_FETCH_FAILED = "fetch_failed"
+        const val OUTCOME_IMPORT_FAILED = "import_failed"
         val SMB_HOST = stringPreferencesKey("smb_host")
         val SMB_SHARE = stringPreferencesKey("smb_share")
         val SMB_PATH = stringPreferencesKey("smb_path")

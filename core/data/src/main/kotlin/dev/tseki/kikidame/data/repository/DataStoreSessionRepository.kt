@@ -20,6 +20,7 @@ import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.Session
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
+import dev.tseki.kikidame.domain.SyncAttempt
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -105,6 +106,10 @@ class DataStoreSessionRepository @Inject constructor(
     }
 
     override suspend fun signOut() = store.clearCredentials()
+
+    override suspend fun recordSyncAttempt(attempt: SyncAttempt) = store.saveSyncAttempt(attempt)
+
+    override suspend fun markSyncFailureNotified() = store.saveSyncFailureNotified()
 
     private suspend fun requireSession(): Session = when (val s = store.current()) {
         is SessionState.NeedsLibrary -> s.session

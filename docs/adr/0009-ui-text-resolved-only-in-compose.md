@@ -10,3 +10,4 @@ UI の文言は `res/values*/strings.xml` に置き、**文字列に解決する
 - 言語の切替は OS の「アプリの言語」（Android 13+、`generateLocaleConfig = true`）だけ。アプリ内の切替は AppCompat を足すことになるので置かない。Android 12 はシステム言語に従う
 - 翻訳の受け入れ体制（Weblate 等）は需要が見えてから。`values-<lang>/strings.xml` が唯一の入口である形だけ守る
 - 日付・時刻・尺・容量の書式（`2026-08-02`、`08-02`、`1:02:03`、`12.3 MB`）はロケールに依らず固定。資源化するのは日本語の句読点と単位（「、」区切り、「（123 回）」）だけで、数+単位は `<plurals>` にする
+- 2026-10-26 #346: 例外に、同期の失敗の通知（`sync/SyncFailureNotifier.kt` の `AndroidSyncFailureNotifier`）を足す。通知もプロセスの外（システムの UI）へ `String` を渡すしかないため、通知を組み立てる 1 か所で `getString` する。そこまでは `UiText` で持つ（`LibraryRefresher` と `SyncWorker` は失敗の理由を `UiText` で渡す）。文字列に解決するのは Compose だけ、という核は変わらず、例外が 1 つ増えるだけ

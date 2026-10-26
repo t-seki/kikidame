@@ -244,6 +244,8 @@
     <string name="settings_library_none">未選択</string>
     <string name="settings_library_tap">タップで選び直す</string>
     <string name="settings_last_sync">最終同期</string>
+    <string name="settings_last_sync_failed">%1$s に失敗: %2$s</string>
+    <string name="settings_last_sync_skipped">%1$s は Wi-Fi ではないため見送り</string>
     <string name="settings_section_download">ダウンロード</string>
     <string name="settings_storage">手元のファイル</string>
     <string name="settings_storage_tap">タップで内訳を見る</string>
@@ -357,6 +359,9 @@
     <string name="sync_error_unauthorized">ユーザー名またはパスワードが違います</string>
     <string name="sync_error_unreachable_connect">サーバに接続できません。URL とネットワークを確認してください</string>
     <string name="sync_error_server_failed">取得元がエラーを返しました: %1$s</string>
+    <string name="sync_failure_channel_name">同期</string>
+    <string name="sync_failure_notification_title">同期できていません</string>
+    <string name="sync_failure_notification_text">%1$d 時間以上、新しい回を取得できていません（%2$s）</string>
 
     <!-- playback -->
     <string name="playback_skip_back">10 秒戻る</string>

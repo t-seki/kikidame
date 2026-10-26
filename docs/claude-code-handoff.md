@@ -488,6 +488,13 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   #142（2026-09-24）で取得件数をやめ、変化だけを出すようにした:「新しい回 N 件。Z 回をダウンロード予約、W 回を削除」（新しい回 = 取り込みで
   手元に新しく増えた各回。突合で結び直した回は数えない。`RefreshResult.newEpisodes`）。手動は変化が無ければ「最新の状態です」、
   裏の同期（定期・起動時）は変化があったときだけ同じ文言を出す（`messages` を collect している番組一覧・各回一覧を開いているときだけ。それ以外の画面にいる間や、閉じている間の結果は後から出さない）
+  #346（2026-10-26）で失敗に限って改めた。上の「通知は出さない」と「閉じている間の結果は後から出さない」は当時の記述で、成功した裏の同期の結果は今も後から出さない。
+  全走査の最後の試み（成功・失敗とその理由・「Wi-Fi ではない」の見送り）と時刻を、手動でも裏でも `LibraryRefresher` が `SessionRepository.recordSyncAttempt` で DataStore に記録する
+  （`SessionState.Ready.lastSyncAttempt`。`lastAttemptedAt` とは別の値で、`SyncScheduler.isStale` は変えない。1 番組の同期・401・取り消しは記録しない）。設定の「最終同期」の行は、
+  それが `lastFetchedAt` より新しく成功でないときに補足の行（失敗は赤字）を出す。裏の同期（`SyncWorker` → `LibraryRefresher.refreshInBackground`。手動が合流したら手動として扱う）が失敗で終わり、
+  `lastFetchedAt` から 24 時間（`SyncWorker.NOTIFY_AFTER`）以上たっていれば、同期の失敗の通知（`sync/SyncFailureNotifier.kt`、チャンネル `sync`、`IMPORTANCE_LOW`）を 1 回出す。
+  出したことを記録し（`syncFailureNotified`）、全走査が成功するまで出し直さない。成功すると通知と記録を消す。ログアウトと取得元を変えるときも消す（記録は同期の時刻と一緒に `SessionStore` で消え、
+  通知は `LibraryRefresher.cancelAndAwait` と 401 の分岐で消す。ダウンロードの 401 でログアウトしたときは、次の `SyncWorker` が記録の無いのを見て消す）
 - **#12 番組単位の更新**: `SourceGateway.fetchProgramEpisodes(programId)`（Jellyfin では `JellyfinGateway.fetchProgramEpisodes(credentials, programSourceId)`）、
   `LibraryRefreshRepository.refreshProgram(programId)`（突合は「番組 1 つ + その各回」のスナップショットで `LibraryMatching.match`、削除なし）。
   `sourceItemId` の無い番組は手動同期にフォールバック。**#279 で `refreshProgram` は無くし**、各回一覧の更新は `syncProgram`（取り込み → この番組だけの `planSync`）にそろえた。フォールバックは `LibraryRefresher.syncProgram(orFullSync = true)`
