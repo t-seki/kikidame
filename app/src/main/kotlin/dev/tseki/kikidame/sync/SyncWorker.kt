@@ -53,6 +53,7 @@ class SyncWorker @AssistedInject constructor(
         return Result.success()
     }
 
+    /** [notifyFailureIfLong] を呼ぶ。失敗しても同期の結果は変えない（ログに残す。#346）。 */
     private suspend fun notifyIfLong(failure: SyncOutcome.Failure) {
         try {
             notifyFailureIfLong(failure, sessionRepository, notifier, clock.now())
@@ -72,12 +73,6 @@ class SyncWorker @AssistedInject constructor(
         val NOTIFY_AFTER: Duration = 24.hours
 
         /**
-         * 裏の同期（最後まで手動が合流しなかった全走査）が失敗で終わったときに、同期の失敗の通知を出すか（#346 の決定 5）。
-         * 最終同期（[lastFetchedAt]）から [NOTIFY_AFTER] 以上たっていて、まだ出していない（[notified] でない）ときだけ出す。
-         * 一度も成功していない（[lastFetchedAt] が null）ときは出さない（接続した直後の取り込みは画面を開いたまま走り、失敗がその場でスナックバーに出るため）。
-         * 出したら、次に全走査が成功するまで（利用者が通知を払っても）出し直さない。
-         */
-        /**
          * 裏の同期の失敗が [NOTIFY_AFTER] 続いていて、まだ出していなければ通知を出し、実際に出せたときだけ出したことを記録する
          * （#346 の決定 5。通知の許可が無くて出せなかったときは記録せず、後で許可されたら次の失敗で出る）。出したら true。
          */
@@ -94,6 +89,12 @@ class SyncWorker @AssistedInject constructor(
             return true
         }
 
+        /**
+         * 裏の同期（最後まで手動が合流しなかった全走査）が失敗で終わったときに、同期の失敗の通知を出すか（#346 の決定 5）。
+         * 最終同期（[lastFetchedAt]）から [NOTIFY_AFTER] 以上たっていて、まだ出していない（[notified] でない）ときだけ出す。
+         * 一度も成功していない（[lastFetchedAt] が null）ときは出さない（接続した直後の取り込みは画面を開いたまま走り、失敗がその場でスナックバーに出るため）。
+         * 出したら、次に全走査が成功するまで（利用者が通知を払っても）出し直さない。
+         */
         internal fun shouldNotifyFailure(lastFetchedAt: Instant?, notified: Boolean, now: Instant): Boolean {
             if (notified || lastFetchedAt == null) return false
             return now - lastFetchedAt >= NOTIFY_AFTER
