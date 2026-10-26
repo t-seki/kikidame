@@ -412,6 +412,8 @@
     <string name="storage_msg_separator">". "</string>
     <string name="settings_wifi_only">Wi-Fi only</string>
     <string name="settings_wifi_only_description">Turn off to download over mobile data too</string>
+    <string name="settings_battery_optimization">Turn off battery optimization</string>
+    <string name="settings_battery_optimization_description">Background sync runs closer to schedule. May use a little more battery.</string>
     <string name="settings_section_display">Display</string>
     <string name="settings_theme">Theme</string>
     <string name="settings_theme_system">System</string>

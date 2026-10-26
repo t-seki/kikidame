@@ -191,14 +191,14 @@ $ADB logcat -d | grep JellyfinGateway   # download <id> from 5000000 -> HTTP 206
 
 同期の入口は 1 つ（`LibraryRefresher`）。番組一覧を引っ張る＝ライブラリ全体の同期（153 番組 / 6,003 回で約 45 秒）、
 各回一覧を引っ張る＝その番組だけ同期（1〜2 秒。シートの「この番組を今すぐ同期」は #281 でなくした。取り込み → この番組だけの `planSync`。#279）。
-定期同期は WorkManager の `sync-periodic`（6 時間）、起動時同期は `sync-once`。状態は次で見える:
+定期同期は WorkManager の `sync-periodic`（3 時間。#347 で 6 時間から縮めた）、起動時同期は `sync-once`。状態は次で見える:
 
 ```bash
 $ADB shell dumpsys jobscheduler | grep -A3 "$PKG" | head -40
 $ADB logcat -d | grep -E "SyncWorker|LibraryRefresher"   # "sync: programs=N episodes=M new=… enqueued=… deleted=… onHold=…"
 ```
 
-起動時同期は前回の全走査から 1 時間以上あけないと積まれない。前回の全走査は成功（`lastFetchedAt`）と試み（`lastAttemptedAt`。
+起動時同期は前回の全走査から 15 分以上あけないと積まれない（#347 で 1 時間から縮めた）。前回の全走査は成功（`lastFetchedAt`）と試み（`lastAttemptedAt`。
 サーバに届かず失敗した回も含む）の新しい方で見る（#135。外出中に前面に出すたびサーバへ接続し直さないため）。
 手動・定期の全走査も試みとして数える。「Wi-Fi のみ」で打ち切った回と 1 番組の同期は数えない。
 ログイン直後の初回取得も同期なので、ログインし直しでは試せない。
@@ -233,7 +233,7 @@ $ADB logcat -d | grep -E "SyncWorker|LibraryRefresher"
 - ジョブ ID はアプリを前面に出すたびに（WorkManager が登録を `UPDATE` し直すので）変わる。打つ直前に見直す
 - 定期同期（`sync-periodic`）は次の時刻より前だと、走っても WorkManager が
   `Delaying execution for SyncWorker because it is being executed before schedule.` で見送る
-- 起動時同期（`sync-once`）は上の 1 時間の条件を満たさないとそもそも積まれない
+- 起動時同期（`sync-once`）は上の 15 分の条件を満たさないとそもそも積まれない
 
 ワイヤレス ADB のまま Wi-Fi を切って外出中を再現すると ADB も切れる。ログは Wi-Fi を戻して接続し直してから
 `logcat -d` で後から読む。繋ぎ直すときはポートが変わっていることがあるので `$ADB mdns services` で見直す。
