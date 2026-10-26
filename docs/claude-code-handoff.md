@@ -289,9 +289,9 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 
 運用パラメータ:
 
-- 定期同期: `PeriodicWorkRequest` 6 時間ごと、`Constraints` は `DownloadWorker` と同じ（Wi-Fi のみなら UNMETERED、
+- 定期同期: `PeriodicWorkRequest` 3 時間ごと（#347 で 6 時間から縮めた）、`Constraints` は `DownloadWorker` と同じ（Wi-Fi のみなら UNMETERED、
   そうでなければ CONNECTED。取得元が端末のフォルダならネットワークの条件をかけない（NOT_REQUIRED。#199。`work.requiredNetworkType`））。充電中の条件は課さない（同期自体の通信は一覧の JSON だけで軽く、転送は `DownloadWorker` の制約で守られる）
-- アプリ起動時: 前回同期から 1 時間以上経っていれば実行（同じ制約で待つ。#135 で「前回同期（`lastFetchedAt`）と前回の試み（`lastAttemptedAt`。失敗した全走査も数える）の新しい方から 1 時間」に）。番組一覧の手動プルは同期そのもの（M3-b の範囲を参照）
+- アプリ起動時: 前回同期から 15 分以上経っていれば実行（同じ制約で待つ。#135 で「前回同期（`lastFetchedAt`）と前回の試み（`lastAttemptedAt`。失敗した全走査も数える）の新しい方から」に。閾値は #347 で 1 時間から 15 分に縮めた）。番組一覧の手動プルは同期そのもの（M3-b の範囲を参照）
 - ダウンロード: Worker 内で HTTP ストリームを `.part` ファイルへ書き、完了後にリネーム。
   再開は `Range` ヘッダ。進捗は `setProgress` で UI へ
 - 置き場所: `getExternalFilesDir("episodes")/<配信元>/<番組>/<ファイル>`（rajikura の Jellyfin プリセットの出力と同じ階層）
@@ -365,7 +365,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
     グレーアウト。音楽が 1 つなら選択済みにして「決定」だけ。0 なら決定不可
   - 設定画面（番組一覧の歯車）: サーバ URL・ユーザー名・ライブラリ名（タップで選び直し）・最終取得日時、
     **ログアウト**（認証情報だけ消す。手元のデータは残る）、**別のサーバに接続**（確認の上ローカルデータを全部消す。#50 で音声ファイルも消すように）。
-    （後で「ダウンロード」節が増え、M3-a で「Wi-Fi のみ」、#42 で「手元のファイル」の合計容量が入った。#335 でその行を押すと内訳の画面が開くようになった）
+    （後で「ダウンロード」節が増え、M3-a で「Wi-Fi のみ」、#42 で「手元のファイル」の合計容量が入った。#335 でその行を押すと内訳の画面が開くようになった。#347 で「Wi-Fi のみ」の下に、電池の最適化の対象のときだけ「電池の最適化を外す」の行が入った）
     デバッグ用シードはここに移す（接続画面にもデバッグ節として置く。M3-c で削除）
   - 401 はログアウトと同じ処理をして接続画面へ（URL とユーザー名は入力済み）
   - **取得元の選択と SMB（#198、ADR 0010）**: 取得元は同時に 1 つ。一度も接続していなければ取得元の選択（「Jellyfin に接続」「NAS の共有フォルダ（SMB）」、#199 から「端末のフォルダ」も）から始まり、ログアウトした後は直前の取得元の接続画面へ戻る。設定の「別のサーバに接続」は「取得元を変える」（中身は同じ）。ログアウトした後の接続画面（Jellyfin・SMB とも）と端末のフォルダの選択画面（#199）にも同じ入口と確認がある（処理は `SourceChanger`、確認のダイアログは `ChangeSourceConfirmDialog` で共有。3 つの画面の枠（戻るボタン・スクロール・末尾の「取得元を変える」）は `SourceConnectScaffold`、#237）。文言は `source_pick_*`・`smb_connect_*`・`smb_error_*`・`settings_source*`・`settings_smb_*`、各回の詳細の「サーバ ID」は「取得元 ID」（`episode_details_source_id`）
@@ -446,8 +446,9 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
   手動は `LibraryRefresher` で `ConnectivityManager.isActiveNetworkMetered` を見て、従量制ならスナックバー
   「Wi-Fi に接続していないため更新しません」で終える（裏で待たせない）。判定は全走査・番組単位・起動時・定期のすべてが通るが、
   **ゲートは取得元への取得だけを包む**: 先頭の `reconcileMissingFiles()`（#5、ローカル I/O のみ）は従量制でも走らせる
-- **起点**: 定期は `PeriodicWorkRequest` 6 時間（`UPDATE` で起動時に登録し直す）。起動時は `ProcessLifecycleOwner` の `ON_START` で
-  前回同期から 1 時間以上（#135 で `lastFetchedAt` と `lastAttemptedAt` の新しい方から 1 時間に。`lastAttemptedAt` は全走査が取得元に問い合わせる直前に成功・失敗を問わず記録）なら `OneTimeWorkRequest`（ユニーク `sync-once`、`KEEP`）。定期・起動時の失敗は `Result.success()` で終え次回を待つ
+- **起点**: 定期は `PeriodicWorkRequest` 3 時間（`UPDATE` で起動時に登録し直す）。起動時は `ProcessLifecycleOwner` の `ON_START` で
+  前回同期から 15 分以上（#135 で `lastFetchedAt` と `lastAttemptedAt` の新しい方から数える形に。`lastAttemptedAt` は全走査が取得元に問い合わせる直前に成功・失敗を問わず記録）なら `OneTimeWorkRequest`（ユニーク `sync-once`、`KEEP`）。定期・起動時の失敗は `Result.success()` で終え次回を待つ。
+  周期と閾値の根拠と電池の最適化の行（#347）: 周期は 6 時間から 3 時間、起動時の閾値は 1 時間から 15 分に縮めた。必須の要求は「アプリを開いたら、新しい回が手元に来ている（来はじめる）」で、開かずに手元に来るまでの遅れも縮めたいため。2026-10-26 に Pixel 7a（Android 17）の release 版 0.7.0 で、読み取りだけで測った事実: App Standby のバケットは RARE（開いてから 1〜2 時間で ACTIVE から落ちた）、定期のジョブの最短の待ちは約 6 時間、電池の最適化の対象外リスト（`dumpsys deviceidle whitelist`）に入っていない、jobscheduler の記録（7 日分）の間隔はおおむね 6〜9 時間で 1 回だけ約 12 時間（定期・起動時・ダウンロードのジョブは区別できていない）。未確認: RARE で定期の同期がどれだけ遅らされるか（一般には最大 24 時間遅れ、1 日の実行時間に上限がかかるとされるが、この端末では測っていない）、周期を短くして OS がどこまで守るか、電池の最適化を外したときのバケットとジョブの間隔の変わり方（対象外リストのアプリは App Standby の制限を受けないとされるが、この端末では確かめていない）。そのため設定の「ダウンロード」の節に、電池の最適化の対象のときだけ「電池の最適化を外す」の行を出す（`PowerManager.isIgnoringBatteryOptimizations`。`ON_RESUME` のたびに判定し直す。押すと `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` で OS の確認を出す。`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` を Manifest に足した。Play を通さずに配るので方針の縛りは受けない。ADR 0008）。やらないこと: 録音時刻に合わせて起こす・取得元からの知らせ（webhook）を受ける（端末に外から届く経路が要り、FCM は非目標。ADR 0008）、「次の予定」の時刻の表示（RARE では予定どおりに走らないことがあり誤解を招く）、同期の試みを数日分残す記録（#346 の「最終同期」の行に任せる）
   （スナックバー無し、Log のみ）。成功したときは、手元に変化があったときだけ手動と同じ文言をスナックバーに出し、変化が無ければ出さない（#142）。走っている間は番組の画面（#151 からはタブの下）・各回一覧のトップバーの下に細いバーと「バックグラウンドで同期中…」を出し、
   手動の操作が合流したらクルクルに切り替える（#134・#138。`LibraryRefresher.isSyncingInBackground`）。共有フォルダの全走査でタグを読んでいる間は、裏でも手動でも、番組の画面のバーを目盛りのあるものにして「タグを読み込み中 1,234 / 6,090」を出す（#209。`LibraryRefresher.tagProgress`）。401 は `DownloadWorker` と同じくログアウト
 - **`planSync`**（`:core:domain`、純粋、JUnit 5）: 入力は番組ごとの `{ syncEnabled, retentionRule, source: Known(list) | Unavailable | Gone,

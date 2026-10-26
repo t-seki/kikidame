@@ -19,13 +19,14 @@ import javax.inject.Singleton
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlin.time.toJavaDuration
 
 /**
  * 同期の起点を WorkManager に登録する。
- * - 定期: 6 時間ごと。起動のたびに `UPDATE` で登録し直し、「Wi-Fi のみ」の変更を拾う
- * - 起動時: 前回同期（または前回の試み。失敗を含む）から 1 時間以上なら一度だけ（`KEEP`）。制約を満たすまで待つ
+ * - 定期: 3 時間ごと（#347）。起動のたびに `UPDATE` で登録し直し、「Wi-Fi のみ」の変更を拾う
+ * - 起動時: 前回同期（または前回の試み。失敗を含む）から 15 分以上なら一度だけ（`KEEP`）。制約を満たすまで待つ
  * 制約は `DownloadWorker` と同じ（Wi-Fi のみなら UNMETERED、そうでなければ CONNECTED。取得元が端末のフォルダならネットワークの条件をかけない
  * （NOT_REQUIRED）。[dev.tseki.kikidame.work.requiredNetworkType]）。充電中は課さない。取得元によって制約が変わるので、取得元を接続したら [schedulePeriodic] で組み直す（#199）。
  */
@@ -69,8 +70,8 @@ class SyncScheduler @Inject constructor(
         networkConstraints(settings.wifiOnly.first(), sessionRepository.state.first())
 
     companion object {
-        val PERIOD: Duration = 6.hours
-        val STALE_AFTER: Duration = 1.hours
+        val PERIOD: Duration = 3.hours
+        val STALE_AFTER: Duration = 15.minutes
 
         /**
          * 起動時同期を積むか。前回同期（成功）と前回の試み（失敗を含む）の新しい方から [STALE_AFTER] たっていれば積む。

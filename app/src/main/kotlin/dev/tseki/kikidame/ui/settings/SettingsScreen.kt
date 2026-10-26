@@ -29,6 +29,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,9 +43,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.provider.Settings
 import dev.tseki.kikidame.BuildConfig
 import dev.tseki.kikidame.R
@@ -97,6 +102,14 @@ internal fun SessionState.Ready.lastSyncNote(): LastSyncNote? {
     }
 }
 
+/** 電池の最適化の対象から外す OS の確認のダイアログを出す Intent（#347）。`package:` の URI 付き。 */
+internal fun ignoreBatteryOptimizationsIntent(packageName: String): Intent =
+    Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.fromParts("package", packageName, null))
+
+/** このアプリが電池の最適化の対象のとき true（対象外なら行ごと出さない。#347）。 */
+internal fun isBatteryOptimized(context: Context): Boolean =
+    !context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
+
 /**
  * 「最終同期」の行。値は最後に成功した時刻（[SessionState.Ready.lastFetchedAt]）。[LastSyncNote] があれば補足の行を 1 行足す
  * （失敗は `error` の色で「<時刻> に失敗: <理由>」、見送りは通常の色で「<時刻> は Wi-Fi ではないため見送り」。#346 の決定 4）。
@@ -143,6 +156,9 @@ fun SettingsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val context = LocalContext.current
+    // 電池の最適化の判定は、画面に戻るたびにやり直す（OS の確認のダイアログから戻ったとき、行を消すため。#347）
+    var batteryOptimized by remember { mutableStateOf(isBatteryOptimized(context)) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { batteryOptimized = isBatteryOptimized(context) }
     LaunchedEffect(message) {
         message?.let {
             snackbarHostState.showSnackbar(it.resolve(context))
@@ -158,6 +174,7 @@ fun SettingsScreen(
         unmatched = unmatched,
         isSyncing = isSyncing,
         removePreview = removePreview,
+        batteryOptimized = batteryOptimized,
         snackbarHostState = snackbarHostState,
         onBack = onBack,
         onChangeLibrary = onChangeLibrary,
@@ -183,6 +200,7 @@ internal fun SettingsContent(
     unmatched: UnmatchedPrograms,
     isSyncing: Boolean,
     removePreview: UnmatchedPrograms?,
+    batteryOptimized: Boolean,
     snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
     onChangeLibrary: () -> Unit,
@@ -282,6 +300,20 @@ internal fun SettingsContent(
                 supportingContent = { Text(stringResource(R.string.settings_wifi_only_description)) },
                 trailingContent = { Switch(checked = wifiOnly, onCheckedChange = onSetWifiOnly) },
             )
+            // 電池の最適化の対象のときだけ出す（#347）。外すと裏の同期が遅れにくくなる。押すと OS の確認のダイアログ
+            if (batteryOptimized) {
+                ListItem(
+                    modifier = Modifier.clickable {
+                        // その設定画面を持たない ROM では何も起きない（落とさない）
+                        try {
+                            context.startActivity(ignoreBatteryOptimizationsIntent(context.packageName))
+                        } catch (_: ActivityNotFoundException) {
+                        }
+                    },
+                    headlineContent = { Text(stringResource(R.string.settings_battery_optimization)) },
+                    supportingContent = { Text(stringResource(R.string.settings_battery_optimization_description)) },
+                )
+            }
             HorizontalDivider()
             SectionTitle(stringResource(R.string.settings_section_display))
             // テーマ（#62）。ラベル上・選択肢下。選んだ瞬間に MainActivity 側で切り替わる（再起動不要）
@@ -399,6 +431,7 @@ private fun SettingsContentPreviewHost(session: SessionState) {
             unmatched = UnmatchedPrograms(programCount = 2, localEpisodeCount = 5, pinnedEpisodeCount = 1),
             isSyncing = false,
             removePreview = null,
+            batteryOptimized = true,
             snackbarHostState = remember { SnackbarHostState() },
             onBack = {},
             onChangeLibrary = {},
