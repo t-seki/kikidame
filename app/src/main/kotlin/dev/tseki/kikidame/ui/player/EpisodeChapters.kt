@@ -1,6 +1,7 @@
 package dev.tseki.kikidame.ui.player
 
 import androidx.annotation.OptIn
+import androidx.media3.common.C
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.extractor.metadata.Chapter
@@ -12,13 +13,14 @@ import androidx.media3.extractor.metadata.Chapter
 data class EpisodeChapter(val startMs: Long, val title: String)
 
 /**
- * [Tracks] の音声トラックの `Format.metadata` からチャプターを取り出す。`isHidden` は除き、開始の順に並べる。
+ * [Tracks] の音声トラック（`C.TRACK_TYPE_AUDIO`）の `Format.metadata` からチャプターを取り出す。`isHidden` は除き、開始の順に並べる。
  * チャプターが無ければ空。
  */
 @OptIn(UnstableApi::class)
 internal fun chaptersOf(tracks: Tracks): List<EpisodeChapter> {
     val chapters = buildList {
         for (group in tracks.groups) {
+            if (group.type != C.TRACK_TYPE_AUDIO) continue
             for (i in 0 until group.length) {
                 val metadata = group.getTrackFormat(i).metadata ?: continue
                 for (j in 0 until metadata.length()) {

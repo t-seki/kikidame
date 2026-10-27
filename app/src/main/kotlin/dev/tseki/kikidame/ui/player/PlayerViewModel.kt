@@ -229,10 +229,18 @@ class PlayerViewModel @Inject constructor(
     }
     private var chaptersTracks: Tracks? = null
     private var chapters: List<EpisodeChapter> = emptyList()
+    private var chaptersEpisodeId: EpisodeId? = null
     private fun refresh(player: Player) {
+        // 回が替わったら前の回のチャプターを捨てる（新しい回の位置と組み合わさらないように。Tracks が追いつくまでは空）
+        val episodeId = EpisodeMediaItems.episodeId(player.currentMediaItem)
+        if (episodeId != chaptersEpisodeId) {
+            chaptersEpisodeId = episodeId
+            chaptersTracks = null
+            chapters = emptyList()
+        }
         // currentTracks は同じ値のうちは同じオブジェクトで返る見込み（未確認）。違っても結果は同じなので、変わったときだけ読み直す
         val tracks = player.currentTracks
-        if (tracks != chaptersTracks) {
+        if (chaptersEpisodeId != null && tracks != chaptersTracks) {
             chaptersTracks = tracks
             chapters = chaptersOf(tracks)
         }

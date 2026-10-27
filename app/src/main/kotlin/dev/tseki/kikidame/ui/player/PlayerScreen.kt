@@ -272,7 +272,7 @@ internal fun PlayerContent(
         )
     }
 }
-/** シークバー下の 3〜4 列の 1 つ。アイコン＋短いラベル。左右のパディングを詰めて、狭い画面（360dp）でも `1.75×` `再生済み` `1:00:00` が並ぶ。 */
+/** シークバー下の 3〜4 列の 1 つ。アイコン＋短いラベル。左右のパディングを詰めて、3 列のときは、狭い画面（360dp）でも `1.75×` `再生済み` `1:00:00` が並ぶことを確かめた。4 列（チャプターのある回）は 360dp でも英語でも収まるか未確認（#348 の実機チェックリスト）。 */
 @Composable
 private fun SubAction(icon: ImageVector, contentDescription: String?, label: String, enabled: Boolean = true, onClick: () -> Unit) {
     TextButton(onClick = onClick, enabled = enabled, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)) {

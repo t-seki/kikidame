@@ -51,6 +51,13 @@ class EpisodeChaptersTest {
     }
 
     @Test
+    fun ignoresChaptersOnNonAudioTracks() {
+        val format = Format.Builder().setSampleMimeType(MimeTypes.TEXT_VTT).setMetadata(Metadata(chapter(0, "字幕側"))).build()
+        val tracks = Tracks(listOf(Tracks.Group(TrackGroup(format), false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(false))))
+        assertEquals(emptyList(), chaptersOf(tracks))
+    }
+
+    @Test
     fun noChapterIsCurrentWhenThereAreNone() {
         assertNull(currentChapter(emptyList(), 10_000))
     }
