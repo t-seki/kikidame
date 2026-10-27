@@ -63,6 +63,7 @@ import dev.tseki.kikidame.domain.UnmatchedPrograms
 import dev.tseki.kikidame.ui.theme.KikidameTheme
 import androidx.compose.ui.tooling.preview.Preview
 import kotlin.time.Instant
+import dev.tseki.kikidame.domain.PlaybackShareStatus
 import dev.tseki.kikidame.domain.SessionState
 import dev.tseki.kikidame.domain.SyncAttempt
 import dev.tseki.kikidame.domain.SyncOutcome
@@ -137,6 +138,33 @@ private fun LastSyncRow(ready: SessionState.Ready?) {
     )
 }
 
+/**
+ * 「再生の共有」の行（ADR 0013 の決定 8、#355）。値は最後に共有できた時刻（無ければ「まだ共有していません」）。
+ * 最後に送れなかったのがそれより新しければ、`error` の色で「<時刻> に送れませんでした: <理由>。送れなかった分は次の同期で送ります」を足す。
+ * 理由は同期の失敗と同じ文言（[reason]）。通知は出さない。
+ */
+@Composable
+private fun PlaybackSharingRow(status: PlaybackShareStatus) {
+    val failure = status.currentFailure
+    ListItem(
+        overlineContent = { Text(stringResource(R.string.settings_playback_sharing)) },
+        headlineContent = {
+            Text(
+                status.lastSucceededAt?.let { stringResource(R.string.settings_playback_sharing_ok, it.toDateTimeText()) }
+                    ?: stringResource(R.string.settings_playback_sharing_none),
+            )
+        },
+        supportingContent = failure?.let { (at, reason) ->
+            {
+                Text(
+                    stringResource(R.string.settings_playback_sharing_failed, at.toDateTimeText(), reason.reason().resolve()),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        },
+    )
+}
+
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
@@ -151,6 +179,7 @@ fun SettingsScreen(
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val unmatched by viewModel.unmatched.collectAsStateWithLifecycle()
     val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
+    val playbackShare by viewModel.playbackShare.collectAsStateWithLifecycle()
     val removePreview by viewModel.removePreview.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -176,6 +205,7 @@ fun SettingsScreen(
         removePreview = removePreview,
         batteryOptimized = batteryOptimized,
         snackbarHostState = snackbarHostState,
+        playbackShare = playbackShare,
         onBack = onBack,
         onChangeLibrary = onChangeLibrary,
         onOpenLicenses = onOpenLicenses,
@@ -213,6 +243,7 @@ internal fun SettingsContent(
     onSetThemeMode: (ThemeMode) -> Unit,
     onSignOut: () -> Unit,
     onResetAndConnectElsewhere: () -> Unit,
+    playbackShare: PlaybackShareStatus? = null,
 ) {
     var confirmSignOut by remember { mutableStateOf(false) }
     var confirmReset by remember { mutableStateOf(false) }
@@ -268,6 +299,8 @@ internal fun SettingsContent(
                 )
             }
             LastSyncRow(s as? SessionState.Ready)
+            // 再生の共有（ADR 0013 の決定 8、#355）: Jellyfin のブックのライブラリのときだけ（ほかでは null で出さない）
+            playbackShare?.let { PlaybackSharingRow(it) }
             HorizontalDivider()
             SectionTitle(stringResource(R.string.settings_section_download))
             // 手元のファイルの合計（#42）。保持ルールや固定を調整する動機は容量なので、見えるようにする。押すと内訳の画面（#335）

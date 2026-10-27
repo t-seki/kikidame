@@ -1,7 +1,9 @@
 package dev.tseki.kikidame.playback
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.PlaybackRules
+import dev.tseki.kikidame.domain.PlaybackState
 import dev.tseki.kikidame.domain.PlaybackStateRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -10,11 +12,16 @@ import kotlinx.coroutines.launch
  * Media3 のプレイリストは先頭の回にしか開始位置を持てないので、遷移時に補う。
  * プレイリスト差し替え時（[Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED]）は
  * 呼び出し側が開始位置を渡しているので触らない。
+ *
+ * 再生の共有（ADR 0013 の決定 5、#355）: 新しい回に入ったら、手元の保存位置へ移った後に [refresh] で取得元の値を 1 回だけ読み、
+ * 取得元の値を採ると決まったらその位置へ移り直す（回の再生を始める直前の読み込み。鳴り始めは止めず、読めた後に移る）。
+ * 共有しない取得元では [refresh] がすぐ null を返す。
  */
 class ResumeOnTransition(
     private val player: Player,
     private val repository: PlaybackStateRepository,
     private val scope: CoroutineScope,
+    private val refresh: suspend (EpisodeId) -> PlaybackState? = { null },
 ) : Player.Listener {
     fun attach() = player.addListener(this)
     fun detach() = player.removeListener(this)
@@ -23,11 +30,16 @@ class ResumeOnTransition(
         val episodeId = EpisodeMediaItems.episodeId(mediaItem) ?: return
         val runtime = EpisodeMediaItems.runtimeOf(mediaItem) ?: return
         scope.launch {
-            val saved = repository.get(episodeId) ?: return@launch
-            val resume = PlaybackRules.resumePosition(saved.position, runtime)
-            // 遷移後に別の回へ移っていたら何もしない
-            if (EpisodeMediaItems.episodeId(player.currentMediaItem) != episodeId) return@launch
-            if (resume.inWholeMilliseconds > 0) player.seekTo(resume.inWholeMilliseconds)
+            repository.get(episodeId)?.let { saved -> seekTo(episodeId, saved.position, runtime) }
+            val taken = runCatching { refresh(episodeId) }.getOrNull() ?: return@launch
+            seekTo(episodeId, taken.position, runtime)
         }
+    }
+
+    /** [episodeId] の [position] の規則（[PlaybackRules.resumePosition]）の再開位置へ移る。遷移後に別の回へ移っていたら何もしない。 */
+    private fun seekTo(episodeId: EpisodeId, position: kotlin.time.Duration, runtime: kotlin.time.Duration) {
+        if (EpisodeMediaItems.episodeId(player.currentMediaItem) != episodeId) return
+        val resume = PlaybackRules.resumePosition(position, runtime)
+        if (resume.inWholeMilliseconds > 0) player.seekTo(resume.inWholeMilliseconds)
     }
 }

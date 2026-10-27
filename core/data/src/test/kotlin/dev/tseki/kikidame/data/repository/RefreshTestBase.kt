@@ -5,6 +5,7 @@ import dev.tseki.kikidame.data.db.LocalFileEntity
 import dev.tseki.kikidame.data.device.MemoryDeviceDocuments
 import dev.tseki.kikidame.data.files.EpisodesDirectory
 import dev.tseki.kikidame.data.files.ProgramImageFiles
+import dev.tseki.kikidame.data.jellyfin.JellyfinGateway
 import dev.tseki.kikidame.data.jellyfin.JellyfinSource
 import dev.tseki.kikidame.data.source.SourceGateway
 import dev.tseki.kikidame.domain.DownloadState
@@ -43,7 +44,13 @@ abstract class RefreshTestBase : RoomTestBase() {
     @After
     fun cancelScope() = scope.cancel()
 
-    protected fun refreshRepository(source: SourceGateway) = RoomLibraryRefreshRepository(db, store, source, downloads, clock, images)
+    /** 再生の共有（#355）が UserData を読み書きする先。Jellyfin のテストでは [JellyfinRefreshTestBase.gateway] と同じもの。 */
+    protected open val sharingGateway: JellyfinGateway get() = defaultSharingGateway
+    private val defaultSharingGateway by lazy { FakeJellyfinGateway() }
+    protected val shareStatus by lazy { PlaybackShareStatusStore(testDataStore(File(tmp.root, "share").apply { mkdirs() }, scope), store) }
+    protected val sharing by lazy { PlaybackSharing(db, sharingGateway, store, clock, shareStatus) }
+
+    protected fun refreshRepository(source: SourceGateway) = RoomLibraryRefreshRepository(db, store, source, downloads, clock, images, sharing)
 
     /**
      * 取得元の回。[published] は日付だけ（その日の 0 時 UTC）か Instant の形。
@@ -80,6 +87,7 @@ abstract class RefreshTestBase : RoomTestBase() {
 /** 取得元が Jellyfin（[FakeJellyfinGateway]）の [RefreshTestBase]。[repo] は Jellyfin から取り込む。 */
 abstract class JellyfinRefreshTestBase : RefreshTestBase() {
     protected val gateway = FakeJellyfinGateway()
+    override val sharingGateway: JellyfinGateway get() = gateway
     protected val session by lazy { DataStoreSessionRepository(store, gateway, FakeFolderTreeFactory(), MemoryDeviceDocuments()) }
     protected val repo by lazy { refreshRepository(JellyfinSource(gateway, store)) }
 

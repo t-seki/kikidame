@@ -79,6 +79,7 @@ interface PlaybackStateRepository {
      * 行が無ければ [PlaybackState.initial] から始めて [transform] を適用し保存する。
      * 読み取り・変換・書き込みは 1 トランザクション。ただし [PlaybackRules.isWorthRecording] が
      * false（行が無く、結果も聴き始めていない）なら書かずに結果だけ返す。
+     * 位置か再生済みが変わったら、再生の共有の「未送信」の印を立てる（ADR 0013 の決定 5。送るのは共有する取得元のときだけ）。
      */
     suspend fun update(episodeId: EpisodeId, transform: (PlaybackState) -> PlaybackState): PlaybackState
 }

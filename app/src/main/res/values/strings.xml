@@ -328,6 +328,14 @@
     <string name="settings_last_sync_failed">Failed at %1$s: %2$s</string>
     <!-- Line under "Last sync" when the latest full sync was skipped because "Wi-Fi only" is on and the network is metered (#346). %1$s = date and time -->
     <string name="settings_last_sync_skipped">Skipped at %1$s: not on Wi-Fi</string>
+    <!-- Row under "Last sync", shown only for a Jellyfin book library: sharing the playback position and played state with the server (ADR 0013, #355) -->
+    <string name="settings_playback_sharing">Playback sharing</string>
+    <!-- Value of "Playback sharing": the last time positions were exchanged with the server. %1$s = date and time like "2026-10-26 14:00" -->
+    <string name="settings_playback_sharing_ok">Shared at %1$s</string>
+    <!-- Value of "Playback sharing" before anything was exchanged with the server in this library -->
+    <string name="settings_playback_sharing_none">Not shared yet</string>
+    <!-- Line under "Playback sharing" when the latest send failed. %1$s = date and time, %2$s = the reason (one of the sync_error_* texts). Playback on this device is not affected -->
+    <string name="settings_playback_sharing_failed">Failed to send at %1$s: %2$s. Unsent positions are sent on the next sync</string>
     <string name="settings_section_download">Downloads</string>
     <string name="settings_storage">Files on device</string>
     <!-- Under the total of "Files on device". Opens the breakdown screen (#335) -->

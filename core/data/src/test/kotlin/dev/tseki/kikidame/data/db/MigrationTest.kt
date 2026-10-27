@@ -15,7 +15,7 @@ import kotlin.test.assertNull
 import kotlin.time.Instant
 
 /**
- * 過去のスキーマ（`schemas/` の JSON）から最新まで AutoMigration で上がること。v4→v5・v5→v6・v7→v8・v8→v9 は既存の行の既定値まで、
+ * 過去のスキーマ（`schemas/` の JSON）から最新まで AutoMigration で上がること。v4→v5・v5→v6・v7→v8・v8→v9・v9→v10 は既存の行の既定値まで、
  * v6→v7 は改名した列の値まで見る。
  * 古い版への INSERT は、その版の列名（`serverItemId`・`stationName`・`airedAt` など）で書く。
  */
@@ -191,11 +191,49 @@ class MigrationTest {
         }
     }
 
+    /**
+     * v9→v10: playback_states.sharePending / sharedPositionTicks / sharedPlayed / sharedLastPlayedAt（再生の共有、ADR 0013、#355）。
+     * 既存の行は未送信でなく、最後に見た取得元の値なし（null）で読め、位置・再生済み・更新時刻は残る。
+     */
+    @Test
+    fun v9ToV10AddsShareColumns() {
+        helper.createDatabase(DB_NAME, 9).use { db ->
+            db.execSQL(
+                "INSERT INTO programs (id, sourceItemId, name, publisherName, syncEnabled, keepLatest, deleteAfterPlayed, goneSince, starred) " +
+                    "VALUES (1, 'srv-1', 'ハライチのターン！', 'TBSラジオ', 1, 3, 0, NULL, 1)",
+            )
+            db.execSQL(
+                "INSERT INTO episodes (id, sourceItemId, programId, title, publishedAt, addedAt, runtimeTicks, sizeBytes, container, performers) " +
+                    "VALUES (10, 'ep-1', 1, '2026-09-18', 1789300800000, NULL, 36000000000, 1234, 'm4a', '')",
+            )
+            db.execSQL("INSERT INTO playback_states (episodeId, positionTicks, played, updatedAt) VALUES (10, 6000000000, 1, 1789300900000)")
+        }
+        helper.runMigrationsAndValidate(DB_NAME, 10, true).close()
+
+        val migrated = Room.databaseBuilder(
+            ApplicationProvider.getApplicationContext(),
+            KikidameDatabase::class.java,
+            DB_NAME,
+        ).allowMainThreadQueries().build()
+        try {
+            val state = runBlocking { migrated.playbackStateDao().findByEpisode(10) }!!
+            assertFalse(state.sharePending)
+            assertNull(state.sharedPositionTicks)
+            assertNull(state.sharedPlayed)
+            assertNull(state.sharedLastPlayedAt)
+            assertEquals(6000000000L, state.positionTicks)
+            assertEquals(true, state.played)
+            assertEquals(Instant.fromEpochMilliseconds(1789300900000), state.updatedAt)
+        } finally {
+            migrated.close()
+        }
+    }
+
     /** 最初のスキーマからの通し。列追加が nullable か既定値付きで、途中のどこも手書きマイグレーションを要さないこと。 */
     @Test
     fun v1MigratesAllTheWayToLatest() {
         helper.createDatabase(DB_NAME, 1).close()
-        helper.runMigrationsAndValidate(DB_NAME, 9, true).close()
+        helper.runMigrationsAndValidate(DB_NAME, 10, true).close()
     }
 
     companion object {

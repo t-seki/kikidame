@@ -40,6 +40,11 @@ data class SourceEpisode(
     val sourceFileSize: Long? = null,
     /** 共有フォルダでの、取得元のファイルの更新日時。Jellyfin では null。 */
     val sourceModifiedAt: Instant? = null,
+    /**
+     * 取得元に置かれた再生位置と再生済み（**再生の共有**、ADR 0013）。共有する取得元（Jellyfin のブックのライブラリ）でだけ値があり、
+     * 音楽のライブラリと共有フォルダでは null（読まない）。
+     */
+    val shared: SharedPlayState? = null,
 )
 
 /**
