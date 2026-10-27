@@ -1,0 +1,4 @@
+- Jellyfin: you can now pick a book library as well as a music library as the source. Switching the library keeps your files on the device and re-links them on the next sync
+- Playback position and played state are shared through the book library's user data on the server
+- Background sync now runs every 3 hours, and the on-launch sync only runs if the last one was over 15 minutes ago. Settings has a row for turning off battery optimization
+- A failed sync is now shown in the "Last sync" row in Settings and in a notification
