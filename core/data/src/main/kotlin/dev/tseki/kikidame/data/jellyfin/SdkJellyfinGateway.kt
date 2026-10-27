@@ -4,7 +4,9 @@ import android.content.Context
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.tseki.kikidame.data.source.DownloadStream
+import dev.tseki.kikidame.domain.LibraryKind
 import dev.tseki.kikidame.domain.LibraryView
+import dev.tseki.kikidame.domain.SelectedLibrary
 import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceItemId
@@ -46,6 +48,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Duration
@@ -53,7 +56,8 @@ import kotlin.time.Instant
 import kotlin.time.toKotlinInstant
 
 /**
- * jellyfin-sdk-kotlin による [JellyfinGateway]。Jellyfin 12 の `Authorization: MediaBrowser …` 形式のみを使う。
+ * jellyfin-sdk-kotlin による [JellyfinGateway]。音楽のライブラリとブックのライブラリ（#354）を読む。
+ * Jellyfin 12 の `Authorization: MediaBrowser …` 形式のみを使う。
  * `DeviceId` は SDK の Android 既定（`ANDROID_ID` 由来）、`Device` は端末のモデル名。
  */
 @Singleton
@@ -95,15 +99,24 @@ class SdkJellyfinGateway @Inject constructor(
                 id = SourceItemId(view.id.toString()),
                 name = view.name ?: view.id.toString(),
                 collectionType = view.collectionType?.serialName,
-                isMusic = view.collectionType == CollectionType.MUSIC,
+                kind = when (view.collectionType) {
+                    CollectionType.MUSIC -> LibraryKind.MUSIC
+                    CollectionType.BOOKS -> LibraryKind.BOOKS
+                    else -> null
+                },
             )
         }
     }
 
-    override suspend fun fetchLibrary(credentials: ServerCredentials, libraryId: SourceItemId): SourceSnapshot = call {
+    override suspend fun fetchLibrary(credentials: ServerCredentials, library: SelectedLibrary): SourceSnapshot = call {
         val api = api(credentials.serverUrl, credentials.accessToken)
-        val parent = UUID.fromString(libraryId.value)
+        when (library.kind) {
+            LibraryKind.MUSIC -> fetchMusicLibrary(api, UUID.fromString(library.id.value))
+            LibraryKind.BOOKS -> fetchBooks(api, credentials, library).let { SourceSnapshot(it.programs, it.episodes) }
+        }
+    }
 
+    private suspend fun fetchMusicLibrary(api: ApiClient, parent: UUID): SourceSnapshot {
         val albums by api.libraryApi.getItems(
             GetItemsRequest(
                 parentId = parent,
@@ -114,63 +127,153 @@ class SdkJellyfinGateway @Inject constructor(
         val programs = albums.items.map { it.toSourceProgram() }
         val programIds = programs.map { it.sourceId }.toSet()
         // 取得した番組のどれにも属さない各回は取り込まない
-        SourceSnapshot(programs, fetchAudio(api, parent).filter { it.programSourceId in programIds })
-    }
-
-    override suspend fun fetchProgramEpisodes(credentials: ServerCredentials, programSourceId: SourceItemId): List<SourceEpisode> = call {
-        val api = api(credentials.serverUrl, credentials.accessToken)
-        fetchAudio(api, UUID.fromString(programSourceId.value)).filter { it.programSourceId == programSourceId }
+        return SourceSnapshot(programs, fetchAudio(api, parent).filter { it.programSourceId in programIds })
     }
 
     /**
-     * `getItem` ではなく `getItems(ids=…)` で引く。`getItem` は項目の全フィールド（`MediaSources` 含む）を返すので、
+     * ブックのライブラリでは、`albums=` の絞り込みが AudioBook に効かない版がある（10.11.11 では全件が返った。#352）ので、
+     * ライブラリ全体を取ってタグでまとめた中から選ぶ（ADR 0013 の決定 2）。
+     */
+    override suspend fun fetchProgramEpisodes(
+        credentials: ServerCredentials,
+        library: SelectedLibrary,
+        programSourceId: SourceItemId,
+    ): List<SourceEpisode> = call {
+        val api = api(credentials.serverUrl, credentials.accessToken)
+        when (library.kind) {
+            LibraryKind.MUSIC -> {
+                // ブックのライブラリの番組 ID（UUID でない）を音楽のライブラリで引いたときは、その番組は無い
+                val album = programSourceId.toUuidOrNull() ?: return@call emptyList()
+                fetchAudio(api, album).filter { it.programSourceId == programSourceId }
+            }
+            LibraryKind.BOOKS -> fetchBooks(api, credentials, library).episodes.filter { it.programSourceId == programSourceId }
+        }
+    }
+
+    /**
+     * 音楽のライブラリでは `getItem` ではなく `getItems(ids=…)` で引く。`getItem` は項目の全フィールド（`MediaSources` 含む）を返すので、
      * 番組 ID が各回（Audio）を指していたとき 10.10 では `MediaStream.IsOriginal` 欠落でデコードに失敗する（#97）。
      * `getItems` は [fetchAudio] と同じ基本フィールドだけを返し、無い ID・番組でない ID は空の一覧になる。
+     * ブックのライブラリでは番組のアイテムが無いので、ライブラリ全体を取ってタグでまとめた中から選ぶ。
      */
-    override suspend fun fetchProgram(credentials: ServerCredentials, programSourceId: SourceItemId): SourceProgram? = call {
+    override suspend fun fetchProgram(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId): SourceProgram? = call {
         val api = api(credentials.serverUrl, credentials.accessToken)
-        val result by api.libraryApi.getItems(
-            GetItemsRequest(
-                ids = listOf(UUID.fromString(programSourceId.value)),
-                includeItemTypes = listOf(BaseItemKind.MUSIC_ALBUM),
-            ),
-        )
-        result.items.firstOrNull { it.type == BaseItemKind.MUSIC_ALBUM }?.toSourceProgram()
+        when (library.kind) {
+            LibraryKind.MUSIC -> {
+                val album = programSourceId.toUuidOrNull() ?: return@call null
+                val result by api.libraryApi.getItems(
+                    GetItemsRequest(
+                        ids = listOf(album),
+                        includeItemTypes = listOf(BaseItemKind.MUSIC_ALBUM),
+                    ),
+                )
+                result.items.firstOrNull { it.type == BaseItemKind.MUSIC_ALBUM }?.toSourceProgram()
+            }
+            LibraryKind.BOOKS -> fetchBooks(api, credentials, library).programs.firstOrNull { it.sourceId == programSourceId }
+        }
     }
 
     private fun BaseItemDto.toSourceProgram() = SourceProgram(
         sourceId = SourceItemId(id.toString()),
         name = name.orEmpty(),
-        publisherName = albumArtist ?: albumArtists?.firstOrNull()?.name,
-        // 番組の画像（#282）。Primary の ImageTag が版。Primary が無ければ画像なし
-        image = imageTags?.get(ImageType.PRIMARY)?.takeIf { it.isNotBlank() }?.let(::SourceImage),
+        publisherName = publisher(),
+        image = primaryImage(),
     )
 
-    /** `parent` 配下の Audio を 500 件ずつ全部。ライブラリでも番組（MusicAlbum）でも同じ形。 */
-    private suspend fun fetchAudio(api: ApiClient, parent: UUID): List<SourceEpisode> {
-        val episodes = ArrayList<SourceEpisode>()
+    /** 配信元。AlbumArtist、無ければ AlbumArtists の 1 人目。 */
+    private fun BaseItemDto.publisher(): String? = albumArtist ?: albumArtists?.firstOrNull()?.name
+
+    /** 番組の画像（#282）。Primary の ImageTag が版。Primary が無ければ画像なし。 */
+    private fun BaseItemDto.primaryImage(): SourceImage? = imageTags?.get(ImageType.PRIMARY)?.takeIf { it.isNotBlank() }?.let(::SourceImage)
+
+    /** `parent` 配下の Audio を全部。ライブラリでも番組（MusicAlbum）でも同じ形。 */
+    private suspend fun fetchAudio(api: ApiClient, parent: UUID): List<SourceEpisode> =
+        fetchAll(
+            api,
+            GetItemsRequest(
+                parentId = parent,
+                recursive = true,
+                includeItemTypes = listOf(BaseItemKind.AUDIO),
+                // MediaSources は要求しない: SDK 1.9（Jellyfin 12 向け）は MediaStream.IsOriginal を必須と
+                // 見なすが、10.11 はそれを返さずデコードに失敗する。サイズは M3 のダウンロード時に取る
+                fields = listOf(ItemFields.DATE_CREATED, ItemFields.PARENT_ID),
+                sortBy = listOf(ItemSortBy.DATE_CREATED),
+                sortOrder = listOf(SortOrder.DESCENDING),
+            ),
+        ).mapNotNull { item -> item.albumId?.let { item.toSourceEpisode(SourceItemId(it.toString())) } }
+
+    /** [request] の一覧を [PAGE_SIZE] 件ずつ全部。 */
+    private suspend fun fetchAll(api: ApiClient, request: GetItemsRequest): List<BaseItemDto> {
+        val items = ArrayList<BaseItemDto>()
         var start = 0
         while (true) {
-            val page by api.libraryApi.getItems(
-                GetItemsRequest(
-                    parentId = parent,
-                    recursive = true,
-                    includeItemTypes = listOf(BaseItemKind.AUDIO),
-                    // MediaSources は要求しない: SDK 1.9（Jellyfin 12 向け）は MediaStream.IsOriginal を必須と
-                    // 見なすが、10.11 はそれを返さずデコードに失敗する。サイズは M3 のダウンロード時に取る
-                    fields = listOf(ItemFields.DATE_CREATED, ItemFields.PARENT_ID),
-                    sortBy = listOf(ItemSortBy.DATE_CREATED),
-                    sortOrder = listOf(SortOrder.DESCENDING),
-                    startIndex = start,
-                    limit = PAGE_SIZE,
-                ),
-            )
-            for (item in page.items) episodes += item.toSourceEpisode() ?: continue
+            val page by api.libraryApi.getItems(request.copy(startIndex = start, limit = PAGE_SIZE))
+            items += page.items
             start += page.items.size
             if (page.items.isEmpty() || start >= page.totalRecordCount) break
         }
-        return episodes
+        return items
     }
+
+    /** ブックのライブラリを番組・各回にまとめたもの。[folders] は番組 ID → 番組のフォルダ（画像を持つ Folder）の id。 */
+    private class BookListing(val programs: List<SourceProgram>, val episodes: List<SourceEpisode>, val folders: Map<SourceItemId, UUID>)
+
+    /**
+     * ブックのライブラリ全体を取り、各回（AudioBook）を Album と AlbumArtist のタグで番組にまとめる（ADR 0013 の決定 2）。
+     * Album の無い各回は、どの番組にも属さないので取り込まない。番組の取得元 ID は `<AlbumArtist>/<Album>`（AlbumArtist が無ければ `/<Album>`）。
+     *
+     * 番組の画像は番組のフォルダ（Folder）の Primary。番組のフォルダとみなすのは、その番組の各回の親がどれも同じ Folder で、
+     * そのフォルダの名前が Album と同じときだけ。各回が 1 本だけの番組は、各回の親が配信元のフォルダになる（#352 のコメントの確かめ）ので、
+     * 名前で外し、配信元の画像を番組の画像にしない。見分けられなければ画像なし（ADR 0012）。
+     * 番組のフォルダは [bookFolders] に覚え、[fetchProgramImage] で使う。
+     */
+    private suspend fun fetchBooks(api: ApiClient, credentials: ServerCredentials, library: SelectedLibrary): BookListing {
+        val parent = UUID.fromString(library.id.value)
+        val folders = fetchAll(
+            api,
+            GetItemsRequest(parentId = parent, recursive = true, includeItemTypes = listOf(BaseItemKind.FOLDER), fields = listOf(ItemFields.PARENT_ID)),
+        ).associateBy { it.id }
+        val books = fetchAll(
+            api,
+            GetItemsRequest(
+                parentId = parent,
+                recursive = true,
+                includeItemTypes = listOf(BaseItemKind.AUDIO_BOOK),
+                // AudioBook は Container を返さない（10.10.7・12.0 で確かめた）ので、拡張子を Path から取る
+                fields = listOf(ItemFields.DATE_CREATED, ItemFields.PARENT_ID, ItemFields.PATH),
+                sortBy = listOf(ItemSortBy.DATE_CREATED),
+                sortOrder = listOf(SortOrder.DESCENDING),
+            ),
+        )
+        val byProgram = LinkedHashMap<SourceItemId, MutableList<BaseItemDto>>()
+        for (book in books) byProgram.getOrPut(book.bookProgramId() ?: continue) { ArrayList() } += book
+
+        val programFolders = HashMap<SourceItemId, UUID>()
+        val programs = byProgram.map { (programId, items) ->
+            val first = items.first()
+            val album = first.album.orEmpty()
+            val folder = items.map { it.parentId }.distinct().singleOrNull()?.let(folders::get)?.takeIf { it.name == album }
+            if (folder != null) programFolders[programId] = folder.id
+            SourceProgram(sourceId = programId, name = album, publisherName = first.publisher(), image = folder?.primaryImage())
+        }
+        val episodes = books.mapNotNull { book -> book.bookProgramId()?.let { book.toSourceEpisode(it) } }
+        bookFolders[BookLibraryKey(credentials.serverUrl, credentials.userId, library.id)] = programFolders
+        return BookListing(programs, episodes, programFolders)
+    }
+
+    /** ブックのライブラリの番組 ID（`<AlbumArtist>/<Album>`）。Album が無ければ null。分けて読み戻すことはしない（AlbumArtist に `/` が入りうる）。 */
+    private fun BaseItemDto.bookProgramId(): SourceItemId? {
+        val album = album?.takeIf { it.isNotBlank() } ?: return null
+        return SourceItemId("${publisher().orEmpty()}/$album")
+    }
+
+    private data class BookLibraryKey(val serverUrl: String, val userId: String, val libraryId: SourceItemId)
+
+    /**
+     * ブックのライブラリごとの、最後に取った一覧の番組 ID → 番組のフォルダの id。画像の取得（[fetchProgramImage]）は、同期の一覧の直後に
+     * 番組ごとに呼ばれるので、番組ごとにライブラリ全体を取り直さないために覚える。覚えていない番組だけ一覧を取り直す。
+     */
+    private val bookFolders = ConcurrentHashMap<BookLibraryKey, Map<SourceItemId, UUID>>()
 
     /**
      * SDK にはストリーミング取得の API が無い（`getDownload` は本文を `byte[]` に全部読む）ので、
@@ -220,12 +323,18 @@ class SdkJellyfinGateway @Inject constructor(
     }
 
     /**
-     * 番組（MusicAlbum）の Primary の画像を全部読む（#282）。URL と認証ヘッダは SDK に作らせ、転送は OkHttp で行う（[openDownload] と同じ）。
-     * 画像が無い（404）・[MAX_PROGRAM_IMAGE_BYTES] を超えるときは null。
+     * 番組の Primary の画像を全部読む（#282）。音楽のライブラリは MusicAlbum、ブックのライブラリは番組のフォルダ（[fetchBooks]。#354）の画像。
+     * URL と認証ヘッダは SDK に作らせ、転送は OkHttp で行う（[openDownload] と同じ）。
+     * 画像が無い（404）・番組のフォルダが無い・[MAX_PROGRAM_IMAGE_BYTES] を超えるときは null。
      */
-    override suspend fun fetchProgramImage(credentials: ServerCredentials, programSourceId: SourceItemId): ByteArray? = call {
+    override suspend fun fetchProgramImage(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId): ByteArray? = call {
         val api = api(credentials.serverUrl, credentials.accessToken)
-        val url = api.imageApi.getItemImageUrl(UUID.fromString(programSourceId.value), ImageType.PRIMARY)
+        val item = when (library.kind) {
+            LibraryKind.MUSIC -> programSourceId.toUuidOrNull()
+            LibraryKind.BOOKS -> bookFolders[BookLibraryKey(credentials.serverUrl, credentials.userId, library.id)]?.get(programSourceId)
+                ?: fetchBooks(api, credentials, library).folders[programSourceId]
+        } ?: return@call null
+        val url = api.imageApi.getItemImageUrl(item, ImageType.PRIMARY)
         val request = Request.Builder().url(url).header("Authorization", authorizationHeader(api, credentials)).build()
         withContext(Dispatchers.IO) {
             downloadClient.newCall(request).execute().use { response ->
@@ -252,19 +361,20 @@ class SdkJellyfinGateway @Inject constructor(
             .build()
     }
 
-    private fun BaseItemDto.toSourceEpisode(): SourceEpisode? {
-        val albumId = albumId ?: return null
+    /** 各回（音楽は Audio、ブックは AudioBook）。取り込まれた日時が無ければ null。 */
+    private fun BaseItemDto.toSourceEpisode(programSourceId: SourceItemId): SourceEpisode? {
         val created = dateCreated ?: return null
         return SourceEpisode(
             sourceId = SourceItemId(id.toString()),
-            programSourceId = SourceItemId(albumId.toString()),
+            programSourceId = programSourceId,
             title = name.orEmpty(),
             publishedAt = PublishedAt.of(premiereDate?.toKotlinLocalDate(), created.toKotlinLocalDate()),
             addedAt = created.toInstantUtc(),
             runtime = runTimeTicks?.let(Ticks::toDuration) ?: Duration.ZERO,
             // ファイルサイズは基本フィールドに無い（MediaSources を避けるため）。M3 のダウンロードで確定する
             sizeBytes = null,
-            container = container ?: "",
+            // AudioBook は Container を返さないので、Path（ブックのライブラリでだけ要求する）の拡張子で代える
+            container = container ?: path?.substringAfterLast('/')?.substringAfterLast('.', missingDelimiterValue = "")?.lowercase() ?: "",
             // 出演者（#70）。`Artists` は基本フィールドで返る（`ItemFields` に無く、要求の有無に依らない）。名前だけの一覧が無い・空なら `ArtistItems` から拾う
             performers = (artists?.takeIf { it.isNotEmpty() } ?: artistItems?.mapNotNull { it.name }).orEmpty().filter { it.isNotBlank() },
         )
@@ -289,6 +399,9 @@ class SdkJellyfinGateway @Inject constructor(
             else -> SourceException.Failed(e.message ?: e::class.simpleName ?: "error", e)
         }
     }
+
+    /** 音楽のライブラリの番組 ID（アイテムの id）として読む。ブックのライブラリの番組 ID など、UUID でなければ null。 */
+    private fun SourceItemId.toUuidOrNull(): UUID? = runCatching { UUID.fromString(value) }.getOrNull()
 
     private fun Throwable.causeChain(): String =
         generateSequence(this) { it.cause }.joinToString(" <- ") { "${it::class.simpleName}: ${it.message}" }

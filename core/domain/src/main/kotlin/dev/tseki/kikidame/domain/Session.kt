@@ -181,16 +181,29 @@ data class SmbConnection(
     override fun toString(): String = "SmbConnection(host=$host, share=$share, path=$path, userName=$userName, guest=$guest)"
 }
 
-data class SelectedLibrary(val id: SourceItemId, val name: String)
+/**
+ * 選んだ Jellyfin のライブラリ。[kind] で番組と各回の組み方が変わる（ADR 0013 の決定 2）。
+ * [kind] を保存していなかった前の版で選んだライブラリは音楽（前の版は音楽のライブラリだけを選べた）。
+ */
+data class SelectedLibrary(val id: SourceItemId, val name: String, val kind: LibraryKind = LibraryKind.MUSIC)
 
-/** サーバ上のライブラリ（`/UserViews` の 1 件）。音楽ライブラリだけが選べる。 */
+/**
+ * 取得元に選べる Jellyfin のライブラリの種類（#354）。
+ * 音楽は番組を MusicAlbum・各回を Audio で、ブックは各回を AudioBook・番組を各回の Album と AlbumArtist のタグで表す（CONTEXT.md）。
+ */
+enum class LibraryKind { MUSIC, BOOKS }
+
+/** サーバ上のライブラリ（`/UserViews` の 1 件）。音楽とブックのライブラリだけが選べる（[kind] が null でないもの。#354）。 */
 data class LibraryView(
     val id: SourceItemId,
     val name: String,
     /** 表示用の種別名（"music" / "movies" など）。不明なら null。 */
     val collectionType: String?,
-    val isMusic: Boolean,
-)
+    /** 取得元に選べる種類。音楽とブックのほか（映画など）は null。 */
+    val kind: LibraryKind?,
+) {
+    val isSelectable: Boolean get() = kind != null
+}
 
 /** 取得元とのやり取りの失敗。UI はこれで文言を決める。 */
 sealed class SourceException(message: String, cause: Throwable? = null) : Exception(message, cause) {

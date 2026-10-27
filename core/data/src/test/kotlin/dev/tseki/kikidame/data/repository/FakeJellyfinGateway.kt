@@ -4,6 +4,7 @@ import dev.tseki.kikidame.data.jellyfin.JellyfinGateway
 import dev.tseki.kikidame.data.jellyfin.ServerCredentials
 import dev.tseki.kikidame.data.source.DownloadStream
 import dev.tseki.kikidame.domain.LibraryView
+import dev.tseki.kikidame.domain.SelectedLibrary
 import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceItemId
@@ -17,6 +18,9 @@ class FakeJellyfinGateway : JellyfinGateway {
     var failWith: SourceException? = null
     var acceptedPassword: String = "secret"
     val fetchedLibraries = ArrayList<SourceItemId>()
+
+    /** 番組・各回の取得に渡されたライブラリ（呼ばれた順）。 */
+    val usedLibraries = ArrayList<SelectedLibrary>()
     /** 番組・各回の取得とダウンロードに渡された認証の情報（呼ばれた順）。 */
     val usedCredentials = ArrayList<ServerCredentials>()
 
@@ -31,26 +35,29 @@ class FakeJellyfinGateway : JellyfinGateway {
         return libraries
     }
 
-    override suspend fun fetchLibrary(credentials: ServerCredentials, libraryId: SourceItemId): SourceSnapshot {
+    override suspend fun fetchLibrary(credentials: ServerCredentials, library: SelectedLibrary): SourceSnapshot {
         failWith?.let { throw it }
         usedCredentials += credentials
-        fetchedLibraries += libraryId
+        fetchedLibraries += library.id
+        usedLibraries += library
         return snapshot
     }
 
     val fetchedPrograms = ArrayList<SourceItemId>()
 
     /** [snapshot] の番組一覧に無ければ null（404 相当）。 */
-    override suspend fun fetchProgram(credentials: ServerCredentials, programSourceId: SourceItemId): SourceProgram? {
+    override suspend fun fetchProgram(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId): SourceProgram? {
         failWith?.let { throw it }
         usedCredentials += credentials
+        usedLibraries += library
         return snapshot.programs.firstOrNull { it.sourceId == programSourceId }
     }
 
     /** [snapshot] のうちその番組に属する各回。 */
-    override suspend fun fetchProgramEpisodes(credentials: ServerCredentials, programSourceId: SourceItemId): List<SourceEpisode> {
+    override suspend fun fetchProgramEpisodes(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId): List<SourceEpisode> {
         failWith?.let { throw it }
         usedCredentials += credentials
+        usedLibraries += library
         fetchedPrograms += programSourceId
         return snapshot.episodes.filter { it.programSourceId == programSourceId }
     }
@@ -62,9 +69,10 @@ class FakeJellyfinGateway : JellyfinGateway {
     /** 画像の取得だけが投げる。 */
     var imageFailure: SourceException? = null
 
-    override suspend fun fetchProgramImage(credentials: ServerCredentials, programSourceId: SourceItemId): ByteArray? {
+    override suspend fun fetchProgramImage(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId): ByteArray? {
         failWith?.let { throw it }
         usedCredentials += credentials
+        usedLibraries += library
         fetchedImages += programSourceId
         imageFailure?.let { throw it }
         return programImages[programSourceId]

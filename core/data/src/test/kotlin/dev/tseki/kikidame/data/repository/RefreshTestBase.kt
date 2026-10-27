@@ -8,6 +8,7 @@ import dev.tseki.kikidame.data.files.ProgramImageFiles
 import dev.tseki.kikidame.data.jellyfin.JellyfinSource
 import dev.tseki.kikidame.data.source.SourceGateway
 import dev.tseki.kikidame.domain.DownloadState
+import dev.tseki.kikidame.domain.LibraryKind
 import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceItemId
@@ -84,6 +85,6 @@ abstract class JellyfinRefreshTestBase : RefreshTestBase() {
 
     protected suspend fun signInAndSelect() {
         session.signIn("jellyfin.lab.example", "alice", "secret")
-        session.selectLibrary(LibraryView(SourceItemId("lib-1"), "Radio", "music", isMusic = true))
+        session.selectLibrary(LibraryView(SourceItemId("lib-1"), "Radio", "music", LibraryKind.MUSIC))
     }
 }

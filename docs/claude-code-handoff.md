@@ -68,11 +68,14 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 ## ライブラリ構造のマッピング
 
 サーバ側の音声は**音楽ライブラリ**として取り込まれている。アプリ内では自前モデルに正規化する。
+#354 で**ブックのライブラリ**も取得元に選べるようにした（ADR 0013 の決定 2）。ブックのライブラリには MusicAlbum が無いので、各回（AudioBook）の
+`Album` のタグを番組、`AlbumArtist` のタグを配信元としてアプリがまとめ、番組の取得元 ID は `<AlbumArtist>/<Album>` の文字列にする（下の表の Audio・MusicAlbum の行の読み替え）。
+番組の画像は番組のフォルダ（`Folder`）の Primary で、各回の親がどれも同じ Folder で、その名前が `Album` と同じときだけ使う（各回が 1 本だけの番組は、各回の親が配信元のフォルダになるため）。
 
 | Jellyfin | アプリ内の概念（`CONTEXT.md` 参照） |
 | --- | --- |
-| MusicAlbum | 番組 (Program) |
-| Audio | 各回 (Episode) |
+| MusicAlbum（ブックでは各回の `Album`） | 番組 (Program) |
+| Audio（ブックでは AudioBook） | 各回 (Episode) |
 | `AlbumArtist` | 配信元 (Publisher) — ラジオ録音なら配信元（rajikura の Jellyfin プリセットが albumartist に書く）、ポッドキャストなら配信者やネットワーク |
 | `PremiereDate` → `DateCreated` → ファイル更新日時 | 公開日 (Published At) — 並び順・「最新 N 回」の基準。この順でフォールバック |
 | `DateCreated` | 取り込み日時 (Added At) — 保存するが新しさの判定には使わない。公開日の代用として並び順に効くのは上の行の経路（差分取得は ADR 0004 で見送り） |
@@ -80,7 +83,11 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 
 主に使う取得パス（SDK 経由で呼ぶ）:
 
-- ライブラリ一覧: `/UserViews`。`CollectionType = music` のものだけ選択できる（他は理由付きでグレーアウト）
+- ライブラリ一覧: `/UserViews`。`CollectionType = music` と `books`（#354）のものだけ選択できる（他は理由付きでグレーアウト）
+- ブックのライブラリ（#354）: `/Items?ParentId={libraryId}&IncludeItemTypes=Folder&Recursive=true&Fields=ParentId` で番組のフォルダを、
+  `/Items?ParentId={libraryId}&IncludeItemTypes=AudioBook&Recursive=true&Fields=DateCreated,ParentId,Path&SortBy=DateCreated&SortOrder=Descending`（500 件ずつ）で各回を取り、タグでまとめる。
+  `albums=` の絞り込みは使わない（10.10.7 では効き、12.0 では 0 件、10.11.11 では全件が返った。#352・#354）。1 番組の各回・番組の存在確認もライブラリ全体を取ってまとめた中から選ぶ。
+  AudioBook は `Container` を返さない（10.10.7・12.0）ので、保存先の拡張子は `Path` から取る。番組の画像の中身は、番組のフォルダの `/Items/{folderId}/Images/Primary`
 - 番組一覧: `/Items?ParentId={libraryId}&IncludeItemTypes=MusicAlbum&Recursive=true`（1 回。`Fields` は付けない）。
   番組の画像の版は、返る `ImageTags.Primary`（`SourceProgram.image`）。`Fields` を付けなくても返ることを、Jellyfin 10.10.7 の実サーバ（`scripts/jellyfin-testserver.sh up 1010`）で確かめた（`folder.jpg` のあるアルバムだけ `ImageTags` に `Primary` が出た）。Jellyfin 12 では未確認（#282）
 - 各回一覧: `/Items?ParentId={libraryId}&IncludeItemTypes=Audio&Recursive=true&Fields=DateCreated,ParentId&SortBy=DateCreated&SortOrder=Descending&StartIndex=…&Limit=500`
@@ -185,11 +192,11 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 
 ```kotlin
 @Entity(indices = [Index("sourceItemId", unique = true), Index("publisherName", "name")])
-data class ProgramEntity(          // 番組（Jellyfin では MusicAlbum）。(配信元, 番組名) は突合のキーだが一意ではない（v2）
+data class ProgramEntity(          // 番組（Jellyfin では MusicAlbum、ブックでは各回の `Album` のタグ）。(配信元, 番組名) は突合のキーだが一意ではない（v2）
   @PrimaryKey(autoGenerate = true) val id: Long = 0,
   val sourceItemId: String?,       // 取得元 ID（ADR 0001・0010）
   val name: String,
-  val publisherName: String?,      // 配信元（Jellyfin では MusicAlbum.AlbumArtist）
+  val publisherName: String?,      // 配信元（Jellyfin では MusicAlbum.AlbumArtist、ブックでは各回の `AlbumArtist` のタグ）
   val syncEnabled: Boolean,        // 同期対象か（既定 false）
   val keepLatest: Int?,            // 最新 N 回まで保持（null = 上限なし）
   val deleteAfterPlayed: Boolean,
@@ -200,7 +207,7 @@ data class ProgramEntity(          // 番組（Jellyfin では MusicAlbum）。(
 )
 
 @Entity(indices = [Index("sourceItemId", unique = true), Index("programId")])
-data class EpisodeEntity(          // 各回（Jellyfin では Audio）
+data class EpisodeEntity(          // 各回（Jellyfin では Audio、ブックでは AudioBook）
   @PrimaryKey(autoGenerate = true) val id: Long = 0,
   val sourceItemId: String?,       // 取得元 ID
   val programId: Long,
@@ -363,6 +370,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 - **画面**: 未ログインなら 接続画面（URL・ユーザー名・パスワード）→ ライブラリ選択。ログイン済みなら M1 の番組一覧
   - ライブラリ選択は**常に出す**。`/UserViews` の全ライブラリを列挙し、音楽以外は「音楽ライブラリのみ選べます」で
     グレーアウト。音楽が 1 つなら選択済みにして「決定」だけ。0 なら決定不可
+    （#354 でブックのライブラリも選べるようにし、文言を「音楽とブックのライブラリだけを選べます」に改めた。選べるライブラリが 1 つなら選択済み）
   - 設定画面（番組一覧の歯車）: サーバ URL・ユーザー名・ライブラリ名（タップで選び直し）・最終取得日時、
     **ログアウト**（認証情報だけ消す。手元のデータは残る）、**別のサーバに接続**（確認の上ローカルデータを全部消す。#50 で音声ファイルも消すように）。
     （後で「ダウンロード」節が増え、M3-a で「Wi-Fi のみ」、#42 で「手元のファイル」の合計容量が入った。#335 でその行を押すと内訳の画面が開くようになった。#347 で「Wi-Fi のみ」の下に、電池の最適化の対象のときだけ「電池の最適化を外す」の行が入った）
@@ -569,6 +577,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 - `docs/adr/0010-add-file-shares-as-sources.md` — ファイル共有（SMB・端末のフォルダ）を取得元に加える。サーバ ID を取得元 ID に改めた
 - `docs/adr/0011-no-autoplay-on-bluetooth-connect.md` — Bluetooth の接続では自動で再生しない（ロック画面の再開のカードの ▶ で足りる）
 - `docs/adr/0012-show-images-only-from-source-data.md` — 画像はデータにあるときだけ出す。番組の画像は同期で取って手元に持ち、回の画像は再生のときに手元のファイルから読む
+- `docs/adr/0013-share-playback-state-via-jellyfin-book-library.md` — ブックのライブラリでは、再生位置と再生済みを UserData を通してほかの端末や Jellyfin Web と分け合う（再生の共有）。ADR 0002・0007 を置き換える
 - Jellyfin 12 認証仕様: https://gist.github.com/nielsvanvelzen/ea047d9028f676185832e51ffaf12a6f
 - jellyfin-sdk-kotlin Releases: https://github.com/jellyfin/jellyfin-sdk-kotlin/releases
 - Jellyfin OpenAPI (stable): https://api.jellyfin.org/openapi/jellyfin-openapi-stable.json

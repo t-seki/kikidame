@@ -2,6 +2,7 @@ package dev.tseki.kikidame.data.jellyfin
 
 import dev.tseki.kikidame.data.source.DownloadStream
 import dev.tseki.kikidame.domain.LibraryView
+import dev.tseki.kikidame.domain.SelectedLibrary
 import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceItemId
@@ -18,6 +19,11 @@ fun Session.credentials(): ServerCredentials = ServerCredentials(serverUrl, acce
  * Jellyfin サーバとの境界。SDK への依存はこの実装にだけ閉じ込め、Repository のテストはフェイクで行う。
  * 失敗はすべて [SourceException] に正規化する。同期とダウンロードはこれを直接使わず、
  * 取得元の境界（[dev.tseki.kikidame.data.source.SourceGateway]）の Jellyfin の実装（[JellyfinSource]）を通す（ADR 0010）。
+ *
+ * 番組の組み方はライブラリの種類（[SelectedLibrary.kind]）で変わる（ADR 0013 の決定 2）。
+ * 音楽のライブラリは番組が MusicAlbum、各回が Audio で、番組の取得元 ID は MusicAlbum の id。
+ * ブックのライブラリは各回が AudioBook で、番組は各回の Album と AlbumArtist のタグでまとめ、番組の取得元 ID は `<AlbumArtist>/<Album>`。
+ * そのため番組についての呼び出しは、ライブラリ（id と種類）を受け取る。
  */
 interface JellyfinGateway {
     suspend fun signIn(serverUrl: String, userName: String, password: String): Session
@@ -25,26 +31,27 @@ interface JellyfinGateway {
     suspend fun listLibraries(credentials: ServerCredentials): List<LibraryView>
 
     /** ライブラリ全体を取得する。番組に属さない各回は含めない。 */
-    suspend fun fetchLibrary(credentials: ServerCredentials, libraryId: SourceItemId): SourceSnapshot
+    suspend fun fetchLibrary(credentials: ServerCredentials, library: SelectedLibrary): SourceSnapshot
 
-    /** 1 番組（MusicAlbum）の各回だけを取得する（#12）。他の番組に属する各回は含めない。 */
-    suspend fun fetchProgramEpisodes(credentials: ServerCredentials, programSourceId: SourceItemId): List<SourceEpisode>
+    /** 1 番組の各回だけを取得する（#12）。他の番組に属する各回は含めない。 */
+    suspend fun fetchProgramEpisodes(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId): List<SourceEpisode>
 
     /**
      * 番組そのものを取得する。サーバに無ければ null（消失）。
-     * `ParentId` での各回取得は番組が無くても空の一覧を返すので、1 番組の同期はこれで存在を確かめてから行う。
+     * 音楽のライブラリでは `ParentId` での各回取得は番組が無くても空の一覧を返すので、1 番組の同期はこれで存在を確かめてから行う。
      */
-    suspend fun fetchProgram(credentials: ServerCredentials, programSourceId: SourceItemId): SourceProgram?
+    suspend fun fetchProgram(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId): SourceProgram?
 
     /**
-     * 番組（MusicAlbum）の Primary の画像の中身を取る（#282、ADR 0012）。画像が無い・大きすぎるときは null。
-     * 版は [SourceProgram.image]（Primary の ImageTag）で、取り直すかは呼び出し側が決める。
+     * 番組の画像の中身を取る（#282、ADR 0012）。音楽のライブラリは MusicAlbum の Primary、ブックのライブラリは番組のフォルダ（Folder）の
+     * Primary（#354）。画像が無い・大きすぎるときは null。版は [SourceProgram.image]（Primary の ImageTag）で、取り直すかは呼び出し側が決める。
      */
-    suspend fun fetchProgramImage(credentials: ServerCredentials, programSourceId: SourceItemId): ByteArray?
+    suspend fun fetchProgramImage(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId): ByteArray?
 
     /**
      * 原本のストリームを開く。[rangeStart] > 0 なら `Range` で続きを要求するが、サーバが無視して
      * 全体を返すこともある（[DownloadStream.resumedFrom] で判別）。使い終わったら [DownloadStream.close]。
+     * 各回の取得元 ID はどちらの種類のライブラリでもアイテムの id なので、ライブラリは要らない。
      */
     suspend fun openDownload(credentials: ServerCredentials, episodeSourceId: SourceItemId, rangeStart: Long): DownloadStream
 }

@@ -58,7 +58,7 @@
     <string name="source_pick_title">Choose a source</string>
     <string name="source_pick_description">Where do your programs come from? You can change this later in Settings</string>
     <string name="source_pick_jellyfin">Connect to Jellyfin</string>
-    <string name="source_pick_jellyfin_description">Use a music library on a Jellyfin server</string>
+    <string name="source_pick_jellyfin_description">Use a books or music library on a Jellyfin server</string>
     <string name="source_pick_smb">Shared folder on a NAS (SMB)</string>
     <string name="source_pick_smb_description">Read recordings straight from a shared folder. Folders are laid out as publisher / program / episode files</string>
     <string name="source_pick_device">Folder on this device</string>
@@ -99,12 +99,12 @@
 
     <!-- ===== library_pick: choose which Jellyfin library to use ===== -->
     <string name="library_pick_title">Choose a library</string>
-    <string name="library_pick_no_music">There is no music library. Add your recordings to Jellyfin as a music library, then reload</string>
+    <string name="library_pick_none_selectable">There is no music or books library. Add your recordings to Jellyfin as a books library (or a music library), then reload</string>
     <!-- Button that confirms the selection -->
     <string name="library_pick_confirm">Done</string>
     <string name="library_pick_reload">Reload</string>
-    <!-- Note above the list when non-music libraries are greyed out -->
-    <string name="library_pick_music_only">Only music libraries can be selected</string>
+    <!-- Note above the list when libraries other than music and books are greyed out -->
+    <string name="library_pick_selectable_only">Only music and books libraries can be selected</string>
     <!-- Jellyfin collection types shown under each library name -->
     <string name="library_pick_type_music">Music</string>
     <string name="library_pick_type_movies">Movies</string>

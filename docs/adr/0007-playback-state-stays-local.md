@@ -8,3 +8,4 @@ date: 2026-09-19
 - `PlaybackStateEntity.syncedAt` は使わないまま残す（スキーマは触らない）。`PlaybackRules` が null に戻す挙動もそのまま
 - 将来、別端末や Web で続きを聴きたくなったら、このときに ADR 0002 の送信を復活させる
 - 2026-10-10: `syncedAt` は ADR 0010（版 7）で削除した（`playback_states.syncedAt` と domain の `PlaybackState.syncedAt`、それを null に戻す処理）
+- 2026-10-27 ADR 0013: ブックのライブラリでは、再生位置と再生済みを `POST /UserItems/{itemId}/UserData` で送り、同期のたびに読む。音楽のライブラリと共有フォルダでは、この ADR のまま送らない

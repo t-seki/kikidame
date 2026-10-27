@@ -11,7 +11,9 @@
 #
 # up は、ffmpeg で無音の m4a を作った合成ライブラリ（番組 2 × 各回 3。番組 A のフォルダにだけ folder.jpg を置く（番組の画像、#282））をマウントし、
 # 初期セットアップ（言語・ユーザー・リモートアクセス・完了）と音楽ライブラリ「radio」の作成を REST で済ませ、
-# スキャンが終わるまで待つ。終わると統合テスト用の環境変数を表示する:
+# スキャンが終わるまで待つ。ブックのライブラリ「radio-book」（#354）も作る。中身は音楽と同じ 6 本と folder.jpg に、各回が 1 本だけの番組 C を足したもので、
+# 音楽とは別のディレクトリ（/media-book）に置く（同じパスを 2 つのライブラリに入れると、アイテムが使い回されて Audio のまま見えるため。#352）。
+# 終わると統合テスト用の環境変数を表示する:
 #
 #   KIKIDAME_JELLYFIN_URL=http://localhost:8097 KIKIDAME_JELLYFIN_USER=kikidame KIKIDAME_JELLYFIN_PASSWORD=kikidame-test \
 #     ./gradlew :core:data:testDebugUnitTest --tests dev.tseki.kikidame.data.jellyfin.SdkJellyfinGatewayIntegrationTest
@@ -21,6 +23,7 @@ set -euo pipefail
 
 DIR="${KIKIDAME_JF_DIR:-/tmp/kikidame-jf}"
 MEDIA="$DIR/media"
+BOOK_MEDIA="$DIR/media-book"
 USER_NAME="kikidame"
 PASSWORD="kikidame-test"
 AUTH_HEADER='Authorization: MediaBrowser Client="kikidame-testserver", Device="script", DeviceId="kikidame-testserver", Version="1"'
@@ -82,7 +85,8 @@ make_showcase_media() {
 }
 
 make_media() {
-  rm -rf "$MEDIA"
+  rm -rf "$MEDIA" "$BOOK_MEDIA"
+  mkdir -p "$BOOK_MEDIA"
   if [ "${KIKIDAME_JF_LIBRARY:-}" = "showcase" ]; then
     make_showcase_media
     echo "media: $MEDIA ($(find "$MEDIA" -name '*.m4a' | wc -l) tracks, showcase)"
@@ -99,6 +103,12 @@ make_media() {
   make_track "$MEDIA/TBSラジオ/テスト番組B/2026-08-31.m4a" "2026-08-31" "テスト番組B" "TBSラジオ" "2026-08-31" ""
   make_track "$MEDIA/TBSラジオ/テスト番組B/2026-08-24.m4a" "2026-08-24" "テスト番組B" "TBSラジオ" "2026-08-24" "出演者丙"
   echo "media: $MEDIA ($(find "$MEDIA" -name '*.m4a' | wc -l) tracks)"
+  # ブックのライブラリ（#354）: 音楽と同じ 6 本と folder.jpg に、各回が 1 本だけの番組 C（ニッポン放送）を足す。
+  # 各回が 1 本だけの番組は、各回の親が配信元のフォルダになる。配信元のフォルダにも folder.jpg を置き、それが番組 C の画像にならないことを見る
+  cp -R "$MEDIA/." "$BOOK_MEDIA/"
+  make_track "$BOOK_MEDIA/ニッポン放送/テスト番組C/2026-09-01.m4a" "2026-09-01" "テスト番組C" "ニッポン放送" "2026-09-01" "出演者丁"
+  ffmpeg -loglevel error -y -f lavfi -i color=c=blue:s=64x64 -frames:v 1 "$BOOK_MEDIA/ニッポン放送/folder.jpg"
+  echo "media: $BOOK_MEDIA ($(find "$BOOK_MEDIA" -name '*.m4a' | wc -l) tracks, books)"
 }
 
 # 引数: 版（1010 | 12）。コンテナ名・ポート・イメージを決める
@@ -122,16 +132,29 @@ wait_for() {
   echo "timed out: $*"; exit 1
 }
 
+# スキャンが終わるまで待つ（ライブラリの作成は非同期でスキャンする）。引数: アイテムの種類（Audio | AudioBook） 数える元のディレクトリ 認証ヘッダ ユーザー ID
+wait_scan() {
+  local kind="$1" dir="$2" token_header="$3" user_id="$4" expected count=0 scanned=0
+  expected=$(find "$dir" -name '*.m4a' | wc -l)
+  for _ in $(seq 1 60); do
+    count=$(curl -sf -H "$token_header" "$URL/Items?userId=$user_id&IncludeItemTypes=$kind&Recursive=true&Limit=0" | python3 -c 'import json,sys; print(json.load(sys.stdin)["TotalRecordCount"])' 2>/dev/null || echo 0)
+    if [ "$count" -ge "$expected" ]; then scanned=1; break; fi
+    sleep 2
+  done
+  if [ "$scanned" -ne 1 ]; then echo "timed out: scan $kind ($count / $expected tracks)"; exit 1; fi
+  echo "scan: $kind $count / $expected tracks"
+}
+
 post_json() { curl -sf --show-error -X POST -H 'Content-Type: application/json' -H "$AUTH_HEADER" "$@"; }
 
 up() {
   resolve "$1"
-  [ -d "$MEDIA" ] || make_media
+  { [ -d "$MEDIA" ] && [ -d "$BOOK_MEDIA" ]; } || make_media
   mkdir -p "$CONFIG"
   if docker ps -a --format '{{.Names}}' | grep -qx "$NAME"; then
     echo "container $NAME already exists; run 'down' first"; exit 1
   fi
-  docker run -d --name "$NAME" -p "$PORT:8096" -v "$MEDIA:/media:ro" -v "$CONFIG:/config" "$IMAGE" >/dev/null
+  docker run -d --name "$NAME" -p "$PORT:8096" -v "$MEDIA:/media:ro" -v "$BOOK_MEDIA:/media-book:ro" -v "$CONFIG:/config" "$IMAGE" >/dev/null
   echo "started $NAME ($IMAGE) on $URL"
   # 12 系は本体が起動するまで SetupServer が /System/Info/Public だけ 200 で返し、他は 503 なので、公開の /Users/Public で待つ
   wait_for 90 curl -sf "$URL/Users/Public"
@@ -156,15 +179,15 @@ up() {
       -d '{"LibraryOptions":{"PathInfos":[{"Path":"/media"}],"EnableEmbeddedTitles":true,"SaveLocalMetadata":false,"MetadataSavers":[],"TypeOptions":[{"Type":"MusicAlbum","MetadataFetchers":[],"ImageFetchers":[]},{"Type":"MusicArtist","MetadataFetchers":[],"ImageFetchers":[]},{"Type":"Audio","MetadataFetchers":[],"ImageFetchers":[]}]}}'
     echo "library: radio created, scanning"
   fi
-  local expected count scanned=0
-  expected=$(find "$MEDIA" -name '*.m4a' | wc -l)
-  for _ in $(seq 1 60); do
-    count=$(curl -sf -H "$token_header" "$URL/Items?userId=$user_id&IncludeItemTypes=Audio&Recursive=true&Limit=0" | python3 -c 'import json,sys; print(json.load(sys.stdin)["TotalRecordCount"])' 2>/dev/null || echo 0)
-    if [ "$count" -ge "$expected" ]; then scanned=1; break; fi
-    sleep 2
-  done
-  if [ "$scanned" -ne 1 ]; then echo "timed out: scan ($count / $expected tracks)"; exit 1; fi
-  echo "scan: $count / $expected tracks"
+  # ブックのライブラリ radio-book（#354）。メタデータ取得は同じく全部切る
+  if ! curl -sf -H "$token_header" "$URL/Library/VirtualFolders" | grep -q '"Name":"radio-book"'; then
+    curl -sf -X POST -H 'Content-Type: application/json' -H "$token_header" \
+      "$URL/Library/VirtualFolders?name=radio-book&collectionType=books&refreshLibrary=true" \
+      -d '{"LibraryOptions":{"PathInfos":[{"Path":"/media-book"}],"EnableEmbeddedTitles":true,"SaveLocalMetadata":false,"MetadataSavers":[],"TypeOptions":[{"Type":"AudioBook","MetadataFetchers":[],"ImageFetchers":[]},{"Type":"Book","MetadataFetchers":[],"ImageFetchers":[]}]}}'
+    echo "library: radio-book created, scanning"
+  fi
+  wait_scan Audio "$MEDIA" "$token_header" "$user_id"
+  wait_scan AudioBook "$BOOK_MEDIA" "$token_header" "$user_id"
   echo
   echo "KIKIDAME_JELLYFIN_URL=$URL KIKIDAME_JELLYFIN_USER=$USER_NAME KIKIDAME_JELLYFIN_PASSWORD=$PASSWORD"
 }
