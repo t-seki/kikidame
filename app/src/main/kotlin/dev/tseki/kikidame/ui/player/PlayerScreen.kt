@@ -188,7 +188,7 @@ internal fun PlayerContent(
                 Text(it.resolve(), color = MaterialTheme.colorScheme.error)
             }
             Spacer(Modifier.height(8.dp))
-            // スワイプ中は差分と目標位置（primary）、普段は今のチャプターの題（#348。控えめな色で 1 行。1 行に収まらないときだけ `basicMarquee` で横に流す。スワイプ中は流さない）。
+            // スワイプ中は差分と目標位置（primary）、普段は今のチャプターの題（#348。控えめな色で 1 行。1 行に収まらないときだけ `basicMarquee` で横に流す（回数は限らず、各回の間に 2.5 秒止まる）。スワイプ中は流さない）。
             // チャプターの無い回・最初のチャプターの前は空白。場所は常に確保してレイアウトが跳ねないようにする
             val chapterTitle = currentChapter(state.chapters, state.positionMs)?.title
             Text(
@@ -201,7 +201,7 @@ internal fun PlayerContent(
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .alpha(if (swipeTargetMs != null || !chapterTitle.isNullOrEmpty()) 1f else 0f)
-                    .then(if (swipeTargetMs == null) Modifier.basicMarquee() else Modifier),
+                    .then(if (swipeTargetMs == null) Modifier.basicMarquee(iterations = Int.MAX_VALUE, repeatDelayMillis = 2_500) else Modifier),
             )
             Spacer(Modifier.height(24.dp))
             SeekBar(
