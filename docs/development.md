@@ -219,7 +219,7 @@ main のチェックアウトから fork subagent に並列で実装させて回
   - 画面（UI）を変える issue: `docs/ui.md` と `docs/claude-code-handoff.md` の該当箇所（#156）
   - CI（`.github/workflows/ci.yml` の job・ステップ）を変える issue: 「マージ前の検証」の 1 の CI の列挙（#219）。検査を足す issue は、完了条件に「違反を入れた一時コミットで足したステップが落ちる run と、revert 後に全チェックが通る run の URL を PR の本文に書く」も入れる（#326）。また、このファイルの「ビルド・テスト」節の検査の説明の段落（`scripts/check-doc-script-refs.sh` の段落と同じ形。何を落とすか、手元でも repo 直下で流せること、テストも CI で流すこと）も「触るファイル」と完了条件に入れる（#330）
   - 挙動を変える issue: `docs/device-checklists.md` の実機チェックリストの項目（未確認の `- [ ]`）（#294）
-  - 用語の意味や利用者向けの説明が変わる issue: `CONTEXT.md` と README（`README.md` と `README.ja.md` の両方）（#294）
+  - 用語の意味や利用者向けの説明が変わる issue: `CONTEXT.md` と README（`README.md` と `README.ja.md` の両方）（#294）と、ストアの説明文 `fastlane/metadata/android/*/full_description.txt`（`en-US` と `ja-JP` の両方）（#359）
 - 挙動を変える issue で、既存のチェック済みの項目（`[x]`）が今の挙動と合わなくなるときは、記録の文は書き換えず、項目の末尾に当時の確認と分かる印（例: 「（当時の確認。#281 でボタンをなくした）」）を足す。これも「触るファイル」と完了条件に入れる（#297）
 - チェックリストの最後の未確認の項目（`- [ ]`）を `[x]` にした（または見送りの印を足した）PR は、同じ PR でそのチェックリストを `docs/device-checklists.md` から `docs/device-checklists-archive.md` へ、文を変えずに移す（前置きの、確認した日・端末・サーバの版も一緒に移す）。実機では確かめないと決めた項目は、箱は `[ ]` のまま変えず、末尾に「（実機では見送り: <理由・担保しているテスト>）」の印を足す。この印の付いた `[ ]` は済んだと数える（#305）
 - 担当は「同じファイルを触らない」単位で分ける（#81）
