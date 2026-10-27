@@ -32,12 +32,13 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tseki.kikidame.R
+import dev.tseki.kikidame.domain.LibraryKind
 import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.ui.resolve
 
 /**
- * ライブラリ選択。全ライブラリを列挙し、音楽ライブラリだけ選べる（他はグレーアウトし、理由は一覧の上に 1 回）。
- * 音楽ライブラリが 1 つでも画面は出す。
+ * ライブラリ選択。全ライブラリを列挙し、音楽とブックのライブラリだけ選べる（#354。他はグレーアウトし、理由は一覧の上に 1 回）。
+ * 選べるライブラリが 1 つでも画面は出す。同じサーバ・同じユーザーのまま選び直しても、手元は消さない（ADR 0013 の決定 7）。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,9 +62,9 @@ fun LibraryPickScreen(
         },
         bottomBar = {
             Column(Modifier.padding(16.dp)) {
-                if (state.libraries != null && state.musicCount == 0) {
+                if (state.libraries != null && state.selectableCount == 0) {
                     Text(
-                        stringResource(R.string.library_pick_no_music),
+                        stringResource(R.string.library_pick_none_selectable),
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(bottom = 8.dp),
@@ -89,11 +90,11 @@ fun LibraryPickScreen(
                 TextButton(onClick = viewModel::load) { Text(stringResource(R.string.library_pick_reload)) }
             }
             else -> LazyColumn(Modifier.padding(padding)) {
-                // 選べない理由は行ごとに繰り返さず、一覧の上に 1 回だけ（#71）。音楽以外が無ければ出さない
-                if (state.libraries.orEmpty().any { !it.isMusic }) {
+                // 選べない理由は行ごとに繰り返さず、一覧の上に 1 回だけ（#71）。選べないライブラリ（音楽とブックのほか。#354）が無ければ出さない
+                if (state.libraries.orEmpty().any { !it.isSelectable }) {
                     item(key = "note") {
                         Text(
-                            stringResource(R.string.library_pick_music_only),
+                            stringResource(R.string.library_pick_selectable_only),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -113,15 +114,19 @@ fun LibraryPickScreen(
 private fun LibraryRow(library: LibraryView, selected: Boolean, onClick: () -> Unit) {
     val disabledColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
     ListItem(
-        modifier = Modifier.clickable(enabled = library.isMusic, onClick = onClick),
-        leadingContent = { RadioButton(selected = selected, onClick = onClick, enabled = library.isMusic) },
+        modifier = Modifier.clickable(enabled = library.isSelectable, onClick = onClick),
+        leadingContent = { RadioButton(selected = selected, onClick = onClick, enabled = library.isSelectable) },
         headlineContent = {
-            Text(library.name, color = if (library.isMusic) MaterialTheme.colorScheme.onSurface else disabledColor)
+            Text(library.name, color = if (library.isSelectable) MaterialTheme.colorScheme.onSurface else disabledColor)
         },
         supportingContent = {
-            // 補足は種類だけ（種類が取れない音楽ライブラリは「音楽」、それ以外で取れなければ何も出さない）
-            val type = library.collectionType?.let { collectionTypeLabel(it) } ?: if (library.isMusic) stringResource(R.string.library_pick_type_music) else null
-            if (type != null) Text(type, color = if (library.isMusic) MaterialTheme.colorScheme.onSurfaceVariant else disabledColor)
+            // 補足は種類だけ（種類が取れない音楽・ブックのライブラリは「音楽」「本」、それ以外で取れなければ何も出さない）
+            val type = library.collectionType?.let { collectionTypeLabel(it) } ?: when (library.kind) {
+                LibraryKind.MUSIC -> stringResource(R.string.library_pick_type_music)
+                LibraryKind.BOOKS -> stringResource(R.string.library_pick_type_books)
+                null -> null
+            }
+            if (type != null) Text(type, color = if (library.isSelectable) MaterialTheme.colorScheme.onSurfaceVariant else disabledColor)
         },
     )
 }

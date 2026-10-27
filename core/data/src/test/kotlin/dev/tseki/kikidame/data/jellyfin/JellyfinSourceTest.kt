@@ -3,6 +3,7 @@ package dev.tseki.kikidame.data.jellyfin
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tseki.kikidame.data.repository.FakeJellyfinGateway
 import dev.tseki.kikidame.data.repository.testSessionStore
+import dev.tseki.kikidame.domain.LibraryKind
 import dev.tseki.kikidame.domain.SelectedLibrary
 import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.Session
@@ -47,6 +48,24 @@ class JellyfinSourceTest {
         assertEquals(gateway.snapshot, source.fetchAll())
         assertEquals(listOf(SourceItemId("lib-music")), gateway.fetchedLibraries)
         assertEquals(listOf(credentials), gateway.usedCredentials)
+        // 種類を指定せずに保存したライブラリは音楽
+        assertEquals(listOf(SelectedLibrary(SourceItemId("lib-music"), "Radio", LibraryKind.MUSIC)), gateway.usedLibraries)
+    }
+
+    /** ブックのライブラリ（#354）は、一覧も 1 番組の取得もライブラリの種類と一緒に渡す。 */
+    @Test
+    fun programCallsPassTheSelectedBookLibrary() = runTest {
+        store.saveSession(session)
+        val books = SelectedLibrary(SourceItemId("lib-books"), "Radio", LibraryKind.BOOKS)
+        store.saveLibrary(books)
+        val program = SourceItemId("TBSラジオ/番組")
+        gateway.snapshot = SourceSnapshot(listOf(SourceProgram(program, "番組", "TBSラジオ")), emptyList())
+
+        source.fetchAll()
+        assertEquals(program, source.fetchProgram(program)?.sourceId)
+        source.fetchProgramEpisodes(program)
+        source.fetchProgramImage(program)
+        assertEquals(List(4) { books }, gateway.usedLibraries)
     }
 
     @Test
@@ -68,15 +87,29 @@ class JellyfinSourceTest {
         assertEquals(listOf(credentials), gateway.usedCredentials)
     }
 
-    /** 番組の画像（#282）もライブラリを選ぶ前から取れる（番組の取得と同じ認証の情報）。 */
+    /** 番組の画像（#282）は、番組の取得と同じ認証の情報で取る。 */
     @Test
     fun fetchProgramImageUsesTheStoredCredentials() = runTest {
         store.saveSession(session)
+        store.saveLibrary(SelectedLibrary(SourceItemId("lib-music"), "Radio"))
         gateway.programImages[SourceItemId("album-1")] = byteArrayOf(9, 8)
 
         assertEquals(listOf<Byte>(9, 8), source.fetchProgramImage(SourceItemId("album-1"))?.toList())
         assertEquals(null, source.fetchProgramImage(SourceItemId("album-2")))
         assertEquals(listOf(credentials, credentials), gateway.usedCredentials)
+    }
+
+    /**
+     * ライブラリを選ぶ前は、番組の組み方（ライブラリの種類。#354）が決まらないので、番組についての呼び出しは失敗にする。
+     * ログアウトにはしない（[SourceException.Unauthorized] ではない）。
+     */
+    @Test
+    fun programCallsBeforeALibraryIsSelectedFail() = runTest {
+        store.saveSession(session)
+        assertFailsWith<SourceException.Failed> { source.fetchProgramImage(SourceItemId("album-1")) }
+        assertFailsWith<SourceException.Failed> { source.fetchProgram(SourceItemId("album-1")) }
+        assertFailsWith<SourceException.Failed> { source.fetchProgramEpisodes(SourceItemId("album-1")) }
+        assertEquals(emptyList(), gateway.usedCredentials)
     }
 
     @Test

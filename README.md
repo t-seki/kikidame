@@ -24,7 +24,7 @@ Existing Jellyfin clients (the official app, Findroid, Finamp) are built around 
 - **Offline first** — playback always uses the files on the device. Playback position and played state live on the device only and are never sent to the server
 - **Retention rules** — per program, choose "Keep latest N" and "Delete after played"; sync then downloads what is missing and removes what is no longer needed
 
-It assumes one source at a time (one Jellyfin server, user and library, or one NAS shared folder or folder on the device) and that this app is the only place you listen. Changing the source deletes the programs, episodes, playback positions and files on the device and starts over. Sharing with other devices or the web player is not a goal.
+It assumes one source at a time (one Jellyfin server, user and library, or one NAS shared folder or folder on the device) and that this app is the only place you listen. Changing the source deletes the programs, episodes, playback positions and files on the device and starts over. Choosing another library on the same Jellyfin server with the same user does not count as changing the source: nothing on the device is deleted, and the next sync links the programs and episodes again ([ADR 0013](./docs/adr/0013-share-playback-state-via-jellyfin-book-library.md), decision 7). Sharing with other devices or the web player is not a goal.
 
 ## What it does
 
@@ -56,19 +56,27 @@ The app connects to **Jellyfin**, a **shared folder on a NAS (SMB)** or a **fold
 ### Jellyfin
 
 - Jellyfin **10.10 or later** (10.10.7 and 12.0.0 verified with containers and the integration test, 10.11 on a real server; see `scripts/jellyfin-testserver.sh` and "テスト用 Jellyfin サーバ" in `docs/development.md`, Japanese. Legacy authentication is not used)
-- The audio must be in a **music library**. The app maps it like this:
+- The audio must be in a **books library** (content type "Books") or a **music library**. A books library is recommended: sharing the playback position and played state with other devices and Jellyfin Web through Jellyfin (playback sharing) is planned for books libraries only (#355; not in this version yet. [ADR 0013](./docs/adr/0013-share-playback-state-via-jellyfin-book-library.md)). Music libraries keep working as before. The app maps them like this:
 
-  | Jellyfin | In the app |
-  | --- | --- |
-  | MusicAlbum | Program |
-  | Audio | Episode |
-  | AlbumArtist | Publisher |
-  | Artists of the Audio | Performers (display only) |
-  | PremiereDate (DateCreated if missing) | Published At (ordering and the basis of "Keep latest N") |
+  | Jellyfin (books library) | Jellyfin (music library) | In the app |
+  | --- | --- | --- |
+  | The Album tag of the episodes | MusicAlbum | Program |
+  | AudioBook | Audio | Episode |
+  | The AlbumArtist tag of the episodes | AlbumArtist of the MusicAlbum | Publisher |
+  | Artists of the AudioBook | Artists of the Audio | Performers (display only) |
+  | PremiereDate (DateCreated if missing) | PremiereDate (DateCreated if missing) | Published At (ordering and the basis of "Keep latest N") |
+  | The image of the program's folder (none for a program with a single episode) | The image of the MusicAlbum | Program image |
 
-- In other words, the file tags need `album` = program, `albumartist` = publisher, the date (`©day` in M4A) = published at, and `artist` = performers. Jellyfin builds the structure above from them. Whether MP3 date tags yield a published date is unverified
+- In other words, the file tags need `album` = program, `albumartist` = publisher, the date (`©day` in M4A) = published at, and `artist` = performers. In a books library the app groups the episodes into programs by the `album` and `albumartist` tags; in a music library Jellyfin builds the structure above. Whether MP3 date tags yield a published date is unverified
   - For radio recordings, set the tags `album` = program, `albumartist` = station, and the date (`©day` in M4A) = broadcast date, using a general-purpose tag editor such as Mp3tag
-  - For podcasts, tag the files you fetched from the feed with `album` = program name, `albumartist` = the publisher or network, and the date = release date, then put them in the music library. One folder per program helps Jellyfin group them into a MusicAlbum
+  - For podcasts, tag the files you fetched from the feed with `album` = program name, `albumartist` = the publisher or network, and the date = release date, then put them in the library. In a music library, one folder per program helps Jellyfin group them into a MusicAlbum
+  - Books libraries were checked with the 10.10.7 and 12.0 containers (the integration test) and a 10.11.11 container ([#352](https://github.com/t-seki/kikidame/issues/352)): every episode is listed as an AudioBook. Moving a real server over has not been checked yet
+- To move from a music library to a books library (the programs, episodes, playback positions, played state and downloaded files on the device are linked again by the sync after you choose the new library, matching on publisher, program name and title. [ADR 0005](./docs/adr/0005-rematch-unlinked-rows-before-sync-deletes.md)):
+  1. Update Kikidame to a version that can use books libraries (one that includes [#354](https://github.com/t-seki/kikidame/issues/354))
+  2. In the Jellyfin dashboard, remove the music library. If the same folder is in both a music and a books library, Jellyfin reuses the items and the books library still shows them as Audio and MusicAlbum ("確かめた事実" in [ADR 0013](./docs/adr/0013-share-playback-state-via-jellyfin-book-library.md), Japanese)
+  3. Add a library with the content type "Books" for the same folder and wait for the scan to finish
+  4. In Kikidame, tap "Library" in Settings and choose the books library, then tap "Done". The sync starts
+  5. Check that the programs and episodes are still there, and that the in-progress positions and played marks are kept. Programs that could not be linked again (for example when the publisher or program name changed) stay on the device and are counted in "Remove programs not found on the source" in Settings
 
 ### Shared folder on a NAS (SMB)
 

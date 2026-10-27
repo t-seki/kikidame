@@ -7,7 +7,7 @@ import androidx.room.PrimaryKey
 import dev.tseki.kikidame.domain.DownloadState
 import kotlin.time.Instant
 /**
- * 番組 = MusicAlbum。主キーはローカル代理キー、取得元 ID は nullable unique（ADR 0001）。
+ * 番組 = MusicAlbum（Jellyfin のブックのライブラリでは各回の Album のタグ。#354）。主キーはローカル代理キー、取得元 ID は nullable unique（ADR 0001）。
  * (配信元, 番組名) は突合のキーだが一意ではない（取得元に同名の番組が複数あり得る）。
  */
 @Entity(
@@ -18,7 +18,7 @@ data class ProgramEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val sourceItemId: String?,
     val name: String,
-    /** 配信元（MusicAlbum.AlbumArtist）。保存先では番組フォルダの親フォルダ名になる。 */
+    /** 配信元（MusicAlbum.AlbumArtist。ブックのライブラリでは各回の AlbumArtist のタグ）。保存先では番組フォルダの親フォルダ名になる。 */
     val publisherName: String?,
     val syncEnabled: Boolean = false,
     /** 最新 N 回まで保持（null = 上限なし）。 */
@@ -36,7 +36,7 @@ data class ProgramEntity(
     val imageVersion: String? = null,
     val imagePath: String? = null,
 )
-/** 各回 = Audio。 */
+/** 各回 = Audio（Jellyfin のブックのライブラリでは AudioBook。#354）。 */
 @Entity(
     tableName = "episodes",
     indices = [Index("sourceItemId", unique = true), Index("programId")],
@@ -62,7 +62,7 @@ data class EpisodeEntity(
     val runtimeTicks: Long,
     val sizeBytes: Long,
     val container: String,
-    /** 出演者（Audio.Artists、#70）。[Converters] で 1 列に畳む。v6 で追加 */
+    /** 出演者（Audio・AudioBook の Artists、#70）。[Converters] で 1 列に畳む。v6 で追加 */
     @ColumnInfo(defaultValue = "") val performers: List<String> = emptyList(),
     /**
      * 共有フォルダでの、取得元のファイルのサイズと更新日時（#197）。Jellyfin の行と、v8 より前に取り込んだ行は null。

@@ -10,7 +10,9 @@ import dev.tseki.kikidame.data.device.MemoryDeviceDocuments
 import dev.tseki.kikidame.domain.ConnectedSource
 import dev.tseki.kikidame.domain.DeviceFolder
 import dev.tseki.kikidame.domain.UnsupportedFolderException
+import dev.tseki.kikidame.domain.LibraryKind
 import dev.tseki.kikidame.domain.LibraryView
+import dev.tseki.kikidame.domain.SelectedLibrary
 import dev.tseki.kikidame.domain.SmbConnection
 import java.io.IOException
 import dev.tseki.kikidame.domain.SourceException
@@ -52,8 +54,9 @@ class DataStoreSessionRepositoryTest {
     private val repo by lazy { DataStoreSessionRepository(store, gateway, trees, documents) }
     private val folderUri = MemoryDeviceDocuments.TREE_URI
     private val smb = SmbConnection("nas.local", "recordings", "radio", "alice", "pw")
-    private val music = LibraryView(SourceItemId("lib-music"), "Radio", "music", isMusic = true)
-    private val movies = LibraryView(SourceItemId("lib-movies"), "Movies", "movies", isMusic = false)
+    private val music = LibraryView(SourceItemId("lib-music"), "Radio", "music", LibraryKind.MUSIC)
+    private val books = LibraryView(SourceItemId("lib-books"), "Radio (books)", "books", LibraryKind.BOOKS)
+    private val movies = LibraryView(SourceItemId("lib-movies"), "Movies", "movies", kind = null)
 
     @After
     fun tearDown() = scope.cancel()
@@ -82,9 +85,59 @@ class DataStoreSessionRepositoryTest {
     }
 
     @Test
-    fun nonMusicLibraryCannotBeSelected() = runTest {
+    fun onlyMusicAndBookLibrariesCanBeSelected() = runTest {
         repo.signIn("jellyfin.lab.example", "alice", "secret")
         assertFailsWith<IllegalArgumentException> { repo.selectLibrary(movies) }
+        assertIs<SessionState.NeedsLibrary>(repo.state.first())
+
+        // ブックのライブラリも選べ、種類が読み戻せる（#354）
+        repo.selectLibrary(books)
+        val library = assertIs<ConnectedSource.Jellyfin>(assertIs<SessionState.Ready>(repo.state.first()).source).library
+        assertEquals(SelectedLibrary(SourceItemId("lib-books"), "Radio (books)", LibraryKind.BOOKS), library)
+    }
+
+    /**
+     * 同じサーバ・同じユーザーのままライブラリを選び直すのは、取得元を変えることに当たらない（ADR 0013 の決定 7）。
+     * 同期の時刻は消さない（手元の番組・各回は次の同期の突合で結び直す。[RoomLibrarySwitchTest]）。
+     */
+    @Test
+    fun reselectingALibraryKeepsTheSyncTimes() = runTest {
+        val at = Instant.parse("2026-10-27T00:00:00Z")
+        repo.signIn("jellyfin.lab.example", "alice", "secret")
+        repo.selectLibrary(music)
+        store.saveLastFetchedAt(at)
+
+        repo.selectLibrary(books)
+        val ready = assertIs<SessionState.Ready>(repo.state.first())
+        assertEquals(LibraryKind.BOOKS, assertIs<ConnectedSource.Jellyfin>(ready.source).library.kind)
+        assertEquals(at, ready.lastFetchedAt)
+
+        repo.selectLibrary(music)
+        assertEquals(LibraryKind.MUSIC, assertIs<ConnectedSource.Jellyfin>(assertIs<SessionState.Ready>(repo.state.first()).source).library.kind)
+    }
+
+    /** ログアウトと再ログインで、ライブラリの種類もライブラリと一緒に消える（#354）。 */
+    @Test
+    fun libraryKindIsClearedWithTheLibrary() = runTest {
+        repo.signIn("jellyfin.lab.example", "alice", "secret")
+        repo.selectLibrary(books)
+        repo.signOut()
+        assertFalse("library_kind" in dataStore.data.first().asMap().keys.map { it.name })
+
+        repo.signIn("jellyfin.lab.example", "alice", "secret")
+        repo.selectLibrary(books)
+        repo.signIn("jellyfin.lab.example", "alice", "secret")
+        assertIs<SessionState.NeedsLibrary>(repo.state.first())
+        assertFalse("library_kind" in dataStore.data.first().asMap().keys.map { it.name })
+    }
+
+    /** 読めない種類（新しい版が書いた値など）は、ライブラリを選び直させる（#354）。 */
+    @Test
+    fun unknownLibraryKindNeedsALibrary() = runTest {
+        repo.signIn("jellyfin.lab.example", "alice", "secret")
+        repo.selectLibrary(music)
+        dataStore.edit { it[stringPreferencesKey("library_kind")] = "podcasts" }
+        assertIs<SessionState.NeedsLibrary>(repo.state.first())
     }
 
     @Test
@@ -191,6 +244,8 @@ class DataStoreSessionRepositoryTest {
         assertEquals("https://jellyfin.lab.example/", jellyfin.session.serverUrl)
         assertEquals("token-alice", jellyfin.session.accessToken)
         assertEquals(SourceItemId("lib-music"), jellyfin.library.id)
+        // 前の版は種類を書いていない（音楽のライブラリだけを選べた）。音楽として読む（#354）
+        assertEquals(LibraryKind.MUSIC, jellyfin.library.kind)
         assertEquals(Instant.fromEpochMilliseconds(1_000L), ready.lastFetchedAt)
         assertEquals(Instant.fromEpochMilliseconds(2_000L), ready.lastAttemptedAt)
     }

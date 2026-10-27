@@ -100,9 +100,13 @@ class DataStoreSessionRepository @Inject constructor(
     override suspend fun listLibraries(): List<LibraryView> =
         gateway.listLibraries(requireSession().credentials())
 
+    /**
+     * 音楽かブックのライブラリだけを受け付ける（#354）。選び直しても手元は消さず（ADR 0013 の決定 7）、
+     * 次の同期で未結合になった番組・各回を突合で結び直す（ADR 0005）。
+     */
     override suspend fun selectLibrary(library: LibraryView) {
-        require(library.isMusic) { "only music libraries can be selected" }
-        store.saveLibrary(SelectedLibrary(library.id, library.name))
+        val kind = requireNotNull(library.kind) { "only music and book libraries can be selected" }
+        store.saveLibrary(SelectedLibrary(library.id, library.name, kind))
     }
 
     override suspend fun signOut() = store.clearCredentials()

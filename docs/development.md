@@ -108,6 +108,10 @@ KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTe
 - `up` は ffmpeg で無音の m4a を作った合成ライブラリ（番組 2 × 各回 3。同じ公開日の 2 本、タイトルが日付でない回、出演者の無い回を含む。番組 A のフォルダにだけ `folder.jpg` を置く（#282））を
   `/media` にマウントし、初期セットアップと音楽ライブラリ `radio` の作成を REST で済ませ、スキャンが終わるまで待つ。
   置き場は `$KIKIDAME_JF_DIR`（既定 `/tmp/kikidame-jf`）。ユーザーは `kikidame` / `kikidame-test`
+- ブックのライブラリ `radio-book`（#354）も作る。中身は音楽と同じ 6 本と `folder.jpg` に、各回が 1 本だけの番組 C を足したもので、
+  別のディレクトリ（`$KIKIDAME_JF_DIR/media-book` を `/media-book` にマウント）に置く。同じパスを 2 つのライブラリに入れると、
+  アイテムが使い回されてブックのライブラリでも Audio のまま見える（#352）ため。配信元のフォルダ（ニッポン放送）にも `folder.jpg` を置き、
+  各回が 1 本だけの番組（各回の親が配信元のフォルダになる）の画像にならないことを見る
 - `KIKIDAME_JF_LIBRARY=showcase` を付けて `media` / `up` すると、ストア向けスクリーンショット用の英語の架空ライブラリ
   （Example FM / Example Public Radio の 5 番組、45 回。#95）になる。統合テストの期待値は日本語ライブラリ前提なので、
   そのときは統合テストを回さない
@@ -115,6 +119,8 @@ KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTe
   付いているときはキャッシュを使わず毎回走る（`core/data/build.gradle.kts`）
 - `JellyfinGateway` の全メソッド（ログイン・ライブラリ一覧・番組と各回の取得・1 番組の各回・番組の存在確認・ダウンロードと `Range`・
   認証切れ・到達不能）を 1 回ずつ呼ぶ。`fetchProgramImage` も呼び、番組 A は `ImageTags.Primary` と JPEG の中身、番組 B は画像なし（null）を見る。新しい版が出たら `resolve()` にタグを足して同じテストを当てる
+- ブックのライブラリ（`radio-book`）でも、一覧（AudioBook が `Album`・`AlbumArtist` のタグで 3 番組・7 本にまとまること）・1 番組の各回・番組の存在確認・
+  番組の画像（番組 A は番組のフォルダの画像、番組 B と番組 C は画像なし）・ダウンロードと `Range` を呼ぶ（#354）
 - 認証は SDK が付ける `Authorization: MediaBrowser Client="Kikidame", Version="…", DeviceId="…", Device="…"` の 1 形式だけ
   （レガシーの `X-Emby-Authorization` は送らない。2026-09-21 に記録用サーバで確認）
 - 実機（Android）からコンテナに繋ぐには、Tailscale の HTTPS（`tailscale serve`）で出す。アプリは `http://` の URL を受け付けない（`normalizeServerUrl` が `plain http is not supported` で弾く）ので、`adb reverse` で `http://localhost` につなぐ形は使えない。実機は tailnet 経由でつなぐ。
