@@ -1,5 +1,9 @@
 package dev.tseki.kikidame.playback
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
+import android.media.AudioManager
 import android.content.Intent
 import android.util.Log
 import androidx.annotation.OptIn
@@ -65,6 +69,7 @@ class PlaybackService : MediaLibraryService() {
     private var sharePusher: PlaybackSharePusher<SharedPlaybackRow>? = null
     /** セッションに渡した包み（[ReadBeforePlayPlayer]）の中の ExoPlayer。リスナーはこちらに付ける。 */
     private var exoPlayer: ExoPlayer? = null
+    private var noisyReceiver: BroadcastReceiver? = null
     private var nowPlayingListener: Player.Listener? = null
     private var episodeImageAttacher: EpisodeImageAttacher? = null
     private var speedJob: Job? = null
@@ -117,6 +122,13 @@ class PlaybackService : MediaLibraryService() {
         )
         // 再生の共有（ADR 0013、#355）: セッションには ▶ の直前に取得元の値を読むプレイヤーを渡す。ほかの部品は ExoPlayer を直接見る
         val sessionPlayer = ReadBeforePlayPlayer(player, scope, playbackSharing::refreshBeforePlay)
+        // ▶ の直前の読み込みを待っている間に出力先が外れたら、待っていた ▶ を取り消す（#358）。鳴っている最中は ExoPlayer の
+        // setHandleAudioBecomingNoisy(true) に任せる（sessionPlayer は待っていなければ何もしない）
+        noisyReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) sessionPlayer.cancelPendingPlay()
+            }
+        }.also { registerReceiver(it, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY)) }
         session = MediaLibrarySession.Builder(this, sessionPlayer, LibrarySessionCallback())
             .setSessionActivity(sessionActivity)
             .setMediaButtonPreferences(
@@ -172,6 +184,8 @@ class PlaybackService : MediaLibraryService() {
         positionPersister?.detach()
         resumeOnTransition?.detach()
         sharePusher?.detach()
+        noisyReceiver?.let(::unregisterReceiver)
+        noisyReceiver = null
         scope.cancel()
         exoPlayer?.run {
             nowPlayingListener?.let(::removeListener)

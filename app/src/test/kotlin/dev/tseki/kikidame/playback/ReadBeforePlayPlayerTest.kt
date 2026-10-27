@@ -125,4 +125,53 @@ class ReadBeforePlayPlayerTest {
         assertFalse(inner.playWhenReady)
         assertEquals(emptyList(), reads)
     }
+
+    /** 待っている間に出力先が外れたら、待っていた ▶ を取り消す（#358）。 */
+    @Test
+    fun cancelWhileReadingDoesNotPlayAndReturnsToPaused() = runTest(StandardTestDispatcher()) {
+        val answer = CompletableDeferred<PlaybackState?>()
+        val player = setup { answer.await() }
+
+        player.play()
+        settle()
+        assertTrue(player.playWhenReady, "the pending play shows as playing")
+        player.cancelPendingPlay()
+        settle()
+        answer.complete(PlaybackState(ep1, 12.minutes, played = false, updatedAt = now))
+        settle()
+
+        assertFalse(inner.playWhenReady)
+        assertFalse(player.playWhenReady, "the session state is back to paused")
+        assertEquals(3.minutes.inWholeMilliseconds, inner.currentPosition)
+    }
+
+    @Test
+    fun playingAgainAfterACancelPlaysNormally() = runTest(StandardTestDispatcher()) {
+        val answer = CompletableDeferred<PlaybackState?>()
+        var first = true
+        val player = setup { if (first) { first = false; answer.await() } else PlaybackState(ep1, 12.minutes, played = false, updatedAt = now) }
+
+        player.play()
+        settle()
+        player.cancelPendingPlay()
+        settle()
+        player.play()
+        settle()
+
+        assertTrue(inner.playWhenReady)
+        assertEquals(12.minutes.inWholeMilliseconds, inner.currentPosition)
+    }
+
+    @Test
+    fun cancelWhenNotReadingChangesNothing() = runTest(StandardTestDispatcher()) {
+        val player = setup { null }
+        player.play()
+        settle()
+
+        player.cancelPendingPlay()
+        settle()
+
+        assertTrue(inner.playWhenReady)
+        assertTrue(player.playWhenReady)
+    }
 }
