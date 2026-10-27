@@ -183,6 +183,7 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
   通知・ロック画面・Auto の再生中の表示と、再生画面（`PlayerViewModel.episodeImage`。Coil に ByteArray を渡す `EpisodeImageView`）は、この `artworkData` を読む。ContentProvider は足さない。
   Auto のブラウズツリーの各項目（`BrowseTree`）には画像を出さない。Media3 が再生中のファイルの埋め込み画像を自分で `Player.mediaMetadata` に載せるかは確かめていない（未確認）。
   差し替えで音が途切れず再生位置も戻らないことは、2026-10-13 に人が release 版 v0.5.0 で確かめた（`docs/device-checklists.md` の「実機チェックリスト（#283: 回の画像）」）。ExoPlayer が同じ URI の項目の更新を作り直しなしで受けているか（内部の挙動）は確かめていない
+- **チャプター（#348）**: 各回のファイルに埋め込まれたチャプターは、`PlayerViewModel` が `MediaController.currentTracks` の音声トラックの `Format.metadata`（media3 の `Chapter`、`@UnstableApi`）から読み、`PlayerUiState.chapters` に載せる（ADR 0006 が、再生画面は従来どおり `MediaController` を購読するとしている範囲。`PlaybackService` 側では読まない）。取り出す処理は純粋な関数に分けた（`ui/player/EpisodeChapters.kt`）: `chaptersOf(Tracks)` は `isHidden` を除き開始の順に返し、`currentChapter(chapters, positionMs)` は開始が位置以下のうちで最後のもの（最初の開始より前なら無し）を返す。再生画面は同じプロセスの controller なので `Format.metadata` がオブジェクトのまま届く見込みだが、実機では確かめていない（未確認。`docs/device-checklists.md` の「実機チェックリスト（#348: チャプター）」で確かめる）。
 
 ## Room スキーマ（この形で作る）
 
