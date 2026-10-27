@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.microseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
@@ -23,6 +24,18 @@ class PlaybackSharingRulesTest {
         val seen = shared(10.minutes, at = t0)
         val record = SharedPlaybackRecord(local(10.minutes, at = t0), pending = false, lastSeen = seen)
         assertEquals(Decision.Keep, PlaybackSharingRules.decide(record, seen))
+    }
+
+    /** サーバの `LastPlayedDate` のミリ秒未満の端数は、ミリ秒で持つ最後に見た値と比べる前に切り捨てる（#357 の 1 周目 3）。 */
+    @Test
+    fun `a sub-millisecond fraction of the server time is not a change`() {
+        val seen = shared(10.minutes, at = t0)
+        val server = shared(10.minutes, at = t0 + 300.microseconds)
+        assertEquals(Decision.Keep, PlaybackSharingRules.decide(SharedPlaybackRecord(local(10.minutes, at = t0), pending = false, lastSeen = seen), server))
+        // 手元だけが変わったとみなされ、送る（両方変わったとはみなさない）
+        val record = SharedPlaybackRecord(local(15.minutes, at = t0 - 1.minutes), pending = true, lastSeen = seen)
+        assertEquals(Decision.SendLocal(shared(15.minutes, at = t0 - 1.minutes)), PlaybackSharingRules.decide(record, server))
+        assertEquals(t0, server.toMillis().lastPlayedAt)
     }
 
     @Test

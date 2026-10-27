@@ -9,6 +9,9 @@ import kotlin.time.Instant
  * `PlaybackPositionTicks`・`Played`・`LastPlayedDate`。[lastPlayedAt] は、その値を最後に書いた（再生した）時刻で、書かれていなければ null。
  */
 data class SharedPlayState(val position: Duration, val played: Boolean, val lastPlayedAt: Instant?) {
+    /** [lastPlayedAt] をミリ秒にそろえた値（手元の記録はミリ秒。サーバの端数を切り捨てる）。 */
+    fun toMillis(): SharedPlayState = copy(lastPlayedAt = lastPlayedAt?.let { Instant.fromEpochMilliseconds(it.toEpochMilliseconds()) })
+
     /** 位置と再生済みが同じか（[lastPlayedAt] は見ない）。 */
     fun sameProgress(other: SharedPlayState): Boolean = position == other.position && played == other.played
 
@@ -42,6 +45,7 @@ data class SharedPlaybackRecord(
  * - 手元が変わった: 未送信の印がある（[SharedPlaybackRecord.pending]）
  * - 取得元だけが変わったら取得元の値を採り、手元だけが変わったら手元を送る。両方なら、手元の更新時刻と取得元の
  *   `LastPlayedDate` の新しい方（取得元の時刻が無ければ手元。同じ時刻なら手元）
+ * - `LastPlayedDate` はミリ秒にそろえてから比べる（手元の記録はミリ秒。[SharedPlayState.toMillis]）
  * - 位置と再生済みは 1 組で扱う。手元で未再生に戻した回も、手元の変化として同じ規則に乗る
  */
 object PlaybackSharingRules {
@@ -56,8 +60,10 @@ object PlaybackSharingRules {
         data class SendLocal(val state: SharedPlayState) : Decision
     }
 
-    fun decide(record: SharedPlaybackRecord, shared: SharedPlayState): Decision {
-        val seen = record.lastSeen ?: SharedPlayState.EMPTY
+    fun decide(record: SharedPlaybackRecord, server: SharedPlayState): Decision {
+        // 手元は時刻をミリ秒で持つ（Room）。サーバの端数で「変わった」と誤らないよう、比べる前にそろえる
+        val shared = server.toMillis()
+        val seen = (record.lastSeen ?: SharedPlayState.EMPTY).toMillis()
         val sharedChanged = shared != seen
         val local = record.local?.takeIf { record.pending }
         return when {

@@ -307,6 +307,85 @@ class RoomPlaybackSharingTest : JellyfinRefreshTestBase() {
         assertFalse(row("e1")!!.sharePending)
     }
 
+    /**
+     * 一時停止などの後の送信も、送る前に取得元の値を読んで衝突の規則を通す（ADR 0013 の決定 4、#357 の 1 周目 1）。
+     * v10 に上げた直後（未送信・最後に見た値なし）に、ほかで聴き進めた値の方が新しければ、手元の古い値で上書きしない。
+     */
+    @Test
+    fun sendPendingDoesNotOverwriteANewerServerValueAfterTheUpgrade() = runTest {
+        selectBooks()
+        gateway.snapshot = snapshot()
+        repo.refresh()
+        db.playbackStateDao().upsert(
+            PlaybackStateEntity(id("e1").value, dev.tseki.kikidame.domain.Ticks.fromDuration(8.minutes), played = false, updatedAt = t1, sharePending = true),
+        )
+        gateway.playStates[SourceItemId("e1")] = SharedPlayState(30.minutes, false, t2)
+
+        assertTrue(sharing.sendPending(sharing.observePending().first(), emptySet()))
+
+        assertEquals(emptyList(), gateway.writtenPlayStates)
+        assertEquals(30.minutes, episode("e1").playback?.position)
+        assertFalse(row("e1")!!.sharePending)
+    }
+
+    /** 手元の方が新しければ、v10 に上げた直後でも送る。 */
+    @Test
+    fun sendPendingSendsALocalValueNewerThanTheServer() = runTest {
+        selectBooks()
+        gateway.snapshot = snapshot()
+        repo.refresh()
+        db.playbackStateDao().upsert(
+            PlaybackStateEntity(id("e1").value, dev.tseki.kikidame.domain.Ticks.fromDuration(8.minutes), played = false, updatedAt = t2, sharePending = true),
+        )
+        gateway.playStates[SourceItemId("e1")] = SharedPlayState(30.minutes, false, t1)
+
+        sharing.sendPending(sharing.observePending().first(), emptySet())
+
+        assertEquals(listOf(SourceItemId("e1") to SharedPlayState(8.minutes, false, t2)), gateway.writtenPlayStates)
+        assertFalse(row("e1")!!.sharePending)
+    }
+
+    /** 結び直しの直後も同じ。前の ID で見た値は忘れているので、取得元の値が新しければそれを採る。 */
+    @Test
+    fun sendPendingAfterRelinkTakesANewerServerValue() = runTest {
+        signInAndSelect()
+        gateway.snapshot = SourceSnapshot(
+            listOf(SourceProgram(SourceItemId("music-album"), program.name, program.publisherName)),
+            listOf(sourceEpisode("audio-1", "2026-09-01", "2026-09-01", program = "music-album", runtime = runtime)),
+        )
+        repo.refresh()
+        now = t1
+        playback.update(id("audio-1")) { PlaybackRules.advance(it, 12.minutes, runtime, now) }
+        session.selectLibrary(LibraryView(SourceItemId("lib-books"), "Radio (books)", "books", LibraryKind.BOOKS))
+        // 一覧の UserData が無い（読めなかった）ことにして、同期では突き合わせない。結び直しだけが起きる
+        gateway.snapshot = SourceSnapshot(listOf(program), listOf(se("book-1", "2026-09-01", shared = null)))
+        repo.refresh()
+        assertTrue(row("book-1")!!.sharePending)
+        gateway.playStates[SourceItemId("book-1")] = SharedPlayState(40.minutes, false, t2)
+
+        sharing.sendPending(sharing.observePending().first(), emptySet())
+
+        assertEquals(emptyList(), gateway.writtenPlayStates)
+        assertEquals(40.minutes, episode("book-1").playback?.position)
+    }
+
+    /** 送る前に読めなかった回は、送らずに未送信のまま残す（再生は止めない）。 */
+    @Test
+    fun sendPendingKeepsPendingWhenTheReadFails() = runTest {
+        selectBooks()
+        gateway.snapshot = snapshot()
+        repo.refresh()
+        now = t1
+        playback.update(id("e1")) { PlaybackRules.advance(it, 3.minutes, runtime, now) }
+        gateway.playStateReadFailure = SourceException.Unreachable()
+
+        sharing.sendPending(sharing.observePending().first(), emptySet())
+
+        assertEquals(emptyList(), gateway.writtenPlayStates)
+        assertTrue(row("e1")!!.sharePending)
+        assertEquals(t1 to SyncOutcome.Unreachable, shareStatus.status.first()?.currentFailure)
+    }
+
     @Test
     fun sendPendingSkipsTheEpisodeBeingPlayed() = runTest {
         selectBooks()
@@ -332,8 +411,11 @@ class RoomPlaybackSharingTest : JellyfinRefreshTestBase() {
         now = t1
         playback.update(id("e1")) { PlaybackRules.advance(it, 3.minutes, runtime, now) }
         val rows = sharing.observePending().first()
-        now = t2
-        playback.update(id("e1")) { PlaybackRules.advance(it, 4.minutes, runtime, now) }
+        val e1 = id("e1")
+        gateway.duringWrite = {
+            now = t2
+            playback.update(e1) { PlaybackRules.advance(it, 4.minutes, runtime, now) }
+        }
 
         sharing.sendPending(rows, emptySet())
 
@@ -357,7 +439,7 @@ class RoomPlaybackSharingTest : JellyfinRefreshTestBase() {
         assertEquals(30.minutes, taken?.position)
         assertEquals(30.minutes, episode("e1").playback?.position)
         assertFalse(row("e1")!!.sharePending)
-        assertEquals(listOf(SourceItemId("e1")), gateway.readPlayStates)
+        assertEquals(SourceItemId("e1"), gateway.readPlayStates.last())
     }
 
     @Test

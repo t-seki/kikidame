@@ -30,16 +30,20 @@ class ResumeOnTransition(
         val episodeId = EpisodeMediaItems.episodeId(mediaItem) ?: return
         val runtime = EpisodeMediaItems.runtimeOf(mediaItem) ?: return
         scope.launch {
-            repository.get(episodeId)?.let { saved -> seekTo(episodeId, saved.position, runtime) }
+            repository.get(episodeId)?.let { saved -> seekTo(episodeId, saved.position, runtime, evenToStart = false) }
             val taken = runCatching { refresh(episodeId) }.getOrNull() ?: return@launch
-            seekTo(episodeId, taken.position, runtime)
+            // 取得元の値を採ったら、先頭（ほかで聴き終えた・先頭に戻した）でも移る（手元の位置へ移った後なので）
+            seekTo(episodeId, taken.position, runtime, evenToStart = true)
         }
     }
 
-    /** [episodeId] の [position] の規則（[PlaybackRules.resumePosition]）の再開位置へ移る。遷移後に別の回へ移っていたら何もしない。 */
-    private fun seekTo(episodeId: EpisodeId, position: kotlin.time.Duration, runtime: kotlin.time.Duration) {
+    /**
+     * [episodeId] の [position] の規則（[PlaybackRules.resumePosition]）の再開位置へ移る。遷移後に別の回へ移っていたら何もしない。
+     * [evenToStart] が false なら先頭（0）へは移らない（遷移した直後は先頭にいる）。
+     */
+    private fun seekTo(episodeId: EpisodeId, position: kotlin.time.Duration, runtime: kotlin.time.Duration, evenToStart: Boolean) {
         if (EpisodeMediaItems.episodeId(player.currentMediaItem) != episodeId) return
         val resume = PlaybackRules.resumePosition(position, runtime)
-        if (resume.inWholeMilliseconds > 0) player.seekTo(resume.inWholeMilliseconds)
+        if (evenToStart || resume.inWholeMilliseconds > 0) player.seekTo(resume.inWholeMilliseconds)
     }
 }

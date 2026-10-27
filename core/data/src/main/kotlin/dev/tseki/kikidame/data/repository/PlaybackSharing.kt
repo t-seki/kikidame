@@ -37,6 +37,8 @@ import dev.tseki.kikidame.domain.Ticks
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Clock
@@ -48,7 +50,7 @@ import kotlin.time.Instant
  *
  * - 同期（[reconcile]）: 一覧と一緒に読んだ UserData（[SourceEpisode.shared]）を、各回ごとに衝突の規則（[PlaybackSharingRules]）で
  *   手元と突き合わせ、取得元の値を採るか、手元を送る。聴いている回は手元のまま（決定 5）
- * - 送る（[sendPending]）: 一時停止・停止・回の終わり・再生済みの手動切替の後、未送信の回を送る（再生中の回を除く）
+ * - 送る（[sendPending]）: 一時停止・停止・回の終わり・再生済みの手動切替の後、未送信の回を、取得元の値を読んで衝突の規則を通してから送る（再生中の回を除く）
  * - ▶ の直前（[refreshBeforePlay]）: 1 回だけ短い時間で読み、取得元の値を採るなら手元に入れて返す
  *
  * 送るときは手元の位置・再生済みと、`LastPlayedDate` に手元の更新時刻を書き、サーバが返した値を「最後に見た値」にする。
@@ -63,6 +65,9 @@ class PlaybackSharing @Inject constructor(
     private val statusStore: PlaybackShareStatusStore,
 ) {
     private val dao get() = db.playbackStateDao()
+
+    /** 取得元への送信を 1 つずつ行う（同期の突き合わせと、一時停止などの後の送信が重なっても、順に送る）。 */
+    private val sendLock = Mutex()
 
     /** 再生の共有の最後の送受信（今のライブラリのものだけ。ほかのライブラリのものや共有しない取得元では null）。 */
     val status: Flow<PlaybackShareStatus?> = statusStore.status
@@ -98,20 +103,57 @@ class PlaybackSharing @Inject constructor(
                 }
             }
         }
-        val failure = send(target, toSend)
+        val failure = sendLock.withLock { send(target, toSend) }
         statusStore.record(target.libraryId, clock.now(), failure)
     }
 
     /**
      * 未送信の回を送る（一時停止・停止・回の終わり・再生済みの手動切替の後。決定 5）。[except]（再生中の回）は送らない。
-     * 共有しない取得元では何もしない。送る前に取得元の値は読まない（送るのは手元でたった今変わった値なので、新しい方を採る規則でも手元になる）。
-     * 何かを送ろうとしたら true。
+     * 共有しない取得元では何もしない。何かを送ろうとしたら true。
+     *
+     * 送る前に 1 回ずつ取得元の値を読み、衝突の規則（[PlaybackSharingRules.decide]、決定 4）を通す。取得元が最後に見た値から変わっていれば
+     * （v10 に上げた直後や結び直しの直後で、ほかで聴き進めた回など）、新しい方を採る。取得元の方が新しければ送らずに手元に入れる。
+     * 読めなかった回は未送信のまま残す（次の機会か同期で送る。再生は止めない、決定 8）。
+     * 送信は同期の突き合わせの送信とも直列にする（[sendLock]。後から届いた古い送信で取得元が古い値に戻らないように）。
+     * 行は送る直前に読み直す（[rows] は見張りの時点のもので、古いことがある）。
      */
     suspend fun sendPending(rows: List<SharedPlaybackRow>, except: Set<EpisodeId>): Boolean {
-        val pending = rows.filter { EpisodeId(it.episodeId) !in except && it.state?.sharePending == true }
-        if (pending.isEmpty()) return false
+        val ids = rows.filter { EpisodeId(it.episodeId) !in except && it.state?.sharePending == true }.map { it.episodeId }
+        if (ids.isEmpty()) return false
         val target = target() ?: return false
-        val failure = send(target, pending.mapNotNull { row -> row.state?.let { row to SharedPlayState.of(it.toDomain()) } })
+        val failure = sendLock.withLock {
+            var failure: SyncOutcome.Failure? = null
+            for (id in ids) {
+                val row = dao.findShared(id)?.takeIf { it.state?.sharePending == true } ?: continue
+                val server = try {
+                    gateway.fetchPlayState(target.credentials, SourceItemId(row.sourceItemId))
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w(TAG, "play state read before send failed: ${row.sourceItemId}", e)
+                    failure = failure ?: e.toFailure()
+                    if (e is SourceException.Unreachable || e is SourceException.Unauthorized) break
+                    continue
+                }
+                val toSend = db.withTransaction {
+                    val current = dao.findShared(id) ?: return@withTransaction null
+                    when (val decision = PlaybackSharingRules.decide(current.toRecord(), server)) {
+                        is PlaybackSharingRules.Decision.TakeShared -> {
+                            take(current, decision.shared)
+                            null
+                        }
+                        is PlaybackSharingRules.Decision.SendLocal -> current to decision.state
+                        PlaybackSharingRules.Decision.Keep -> null
+                    }
+                } ?: continue
+                val sendFailure = send(target, listOf(toSend))
+                if (sendFailure != null) {
+                    failure = failure ?: sendFailure
+                    if (sendFailure == SyncOutcome.Unreachable) break
+                }
+            }
+            failure
+        }
         statusStore.record(target.libraryId, clock.now(), failure)
         return true
     }

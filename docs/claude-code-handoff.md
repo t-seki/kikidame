@@ -100,7 +100,7 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 - 原本ダウンロード: `/Items/{itemId}/Download`（トランスコードは使わない。direct play 前提）
 - 再生位置・再生済みの送信（再生の共有。ブックのライブラリだけ、ADR 0013、#355）: **`POST /UserItems/{itemId}/UserData`**（`UpdateUserItemDataDto` の
   `PlaybackPositionTicks` / `Played` / `LastPlayedDate`。`LastPlayedDate` は手元の更新時刻を UTC のナイーブな日時で）。`/Sessions/Playing/*` は使わない。
-  応答の `UserItemDataDto` を「最後に見たサーバの値」にする。10.10.7・12.0.0 のコンテナで、書いた 7 秒の位置・再生済み・ミリ秒までの `LastPlayedDate` が、
+  応答の `UserItemDataDto` を「最後に見たサーバの値」にする（`LastPlayedDate` はミリ秒にそろえてから比べ・記録する。手元はミリ秒で持つため）。10.10.7・12.0.0 のコンテナで、書いた 7 秒の位置・再生済み・ミリ秒までの `LastPlayedDate` が、
   応答・`GET /UserItems/{itemId}/UserData`・一覧（`/Items` の `UserData`）のどれでも同じ値で読み戻せた（統合テスト `bookUserDataKeepsWrittenPositionPlayedAndLastPlayedDate`）
 - 再生位置・再生済みの読み込み（同じくブックのライブラリだけ）: 同期では、ブックの一覧（`/Items`）に `userId` と `enableUserData` を付けて各回の `UserData` を一緒に読む（回ごとに問い合わせない）。
   ▶ の直前は `GET /UserItems/{itemId}/UserData` を 1 回だけ、2 秒で打ち切る
@@ -263,7 +263,8 @@ data class PlaybackStateEntity(    // ブックのライブラリでは再生の
     （サーバの時刻が無い・同じ時刻なら手元）。最後に見た値が無い回は、誰も再生していない値（位置 0・未再生・時刻なし）を見たとみなす
   - 未送信の印は、手元で位置か再生済みが変わると立つ（`RoomPlaybackStateRepository.update`）。突合で取得元 ID が変わった回も立て、前の ID で見た値は忘れる。v10 に上げた時点で手元にある行も立つ（列の既定が 1）
   - 送る: 一時停止・停止・回の終わり・再生済みの手動切替の後（`PlaybackSharePusher`。未送信の回のうち鳴っている回を除いたもの。再生サービスが動いている間だけ）。
-    送れなかった分は次の同期で送る
+    送る前に 1 回ずつサーバの値を読んで衝突の規則を通し（サーバの方が新しければ送らずに採る）、送信は同期の送信とも直列にする（`PlaybackSharing.sendPending`）。
+    読めなかった・送れなかった分は次の同期で送る
   - 読む: 同期のたび（取り込みの後、`SyncPlanner` の前。ほかで再生済みになった回も保持ルールの対象）。聴いている回（`NowPlaying.excludedFromSync`）は手元のまま。
     ▶ の直前（`ReadBeforePlayPlayer`。一時停止からの再開を含む）と、次／前・自動遷移で別の回に入ったとき（`ResumeOnTransition`）にも 1 回だけ読み、サーバの値を採るならその位置へ移る
   - 状態の 1 行: 設定の「最終同期」の下に「再生の共有」（最後に共有できた時刻と、それより新しい送信の失敗）。通知は出さない
@@ -582,12 +583,12 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 
 - `CONTEXT.md` — 用語集（番組／各回／公開日／同期対象／保持ルール／固定／判断保留／再生済み）
 - `docs/adr/0001-local-surrogate-key.md` — 主キーは取得元 ID（当時の呼び名はサーバ ID）ではなく代理キー
-- `docs/adr/0002-playback-position-local-authority.md` — 再生位置・再生済みはローカル正
+- `docs/adr/0002-playback-position-local-authority.md` — 再生位置・再生済みはローカル正（ADR 0013 で置き換え）
 - `docs/adr/0003-download-without-media3-downloadmanager.md` — DownloadManager を使わない
 - `docs/adr/0004-sync-deletes-only-from-full-listing.md` — 同期の削除の権限は全走査の一覧だけ
 - `docs/adr/0005-rematch-unlinked-rows-before-sync-deletes.md` — 突合の対象を未結合に広げ、同期の削除判断の前に走らせる
 - `docs/adr/0006-now-playing-from-in-process-state-not-media-controller.md` — 聴いている回はプロセス内の状態から取る
-- `docs/adr/0007-playback-state-stays-local.md` — 再生位置と再生済みはサーバへ送らない
+- `docs/adr/0007-playback-state-stays-local.md` — 再生位置と再生済みはサーバへ送らない（ADR 0013 で置き換え）
 - `docs/adr/0008-open-source-distributed-outside-play.md` — MPL-2.0 の OSS として Play を通さず配布する
 - `docs/adr/0009-ui-text-resolved-only-in-compose.md` — UI の文言は strings.xml、文字列に解決するのは Compose だけ（`UiText`）。既定は英語
 - `docs/adr/0010-add-file-shares-as-sources.md` — ファイル共有（SMB・端末のフォルダ）を取得元に加える。サーバ ID を取得元 ID に改めた

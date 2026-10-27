@@ -104,11 +104,16 @@ class FakeJellyfinGateway : JellyfinGateway {
     val writtenPlayStates = ArrayList<Pair<SourceItemId, SharedPlayState>>()
     /** UserData の読み書きだけが投げる。 */
     var playStateFailure: SourceException? = null
+    /** UserData の読み込みだけが投げる（書き込みは通る）。 */
+    var playStateReadFailure: SourceException? = null
+    /** UserData を書く途中（受け取った後、覚える前）に呼ぶ。送っている間の手元の変化を作る。 */
+    var duringWrite: (suspend () -> Unit)? = null
 
     override suspend fun fetchPlayState(credentials: ServerCredentials, episodeSourceId: SourceItemId, timeout: Duration?): SharedPlayState {
         failWith?.let { throw it }
         readPlayStates += episodeSourceId
         playStateFailure?.let { throw it }
+        playStateReadFailure?.let { throw it }
         return playStates[episodeSourceId] ?: SharedPlayState.EMPTY
     }
 
@@ -116,6 +121,7 @@ class FakeJellyfinGateway : JellyfinGateway {
         failWith?.let { throw it }
         writtenPlayStates += episodeSourceId to state
         playStateFailure?.let { throw it }
+        duringWrite?.invoke()
         playStates[episodeSourceId] = state
         return state
     }

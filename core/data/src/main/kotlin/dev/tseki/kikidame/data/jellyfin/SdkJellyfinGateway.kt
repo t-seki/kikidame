@@ -390,11 +390,12 @@ class SdkJellyfinGateway @Inject constructor(
         written.toSharedPlayState()
     }
 
+    /** `LastPlayedDate` はミリ秒にそろえる（手元の「最後に見た値」はミリ秒で持つので、サーバの端数で「変わった」と誤らないように）。 */
     private fun UserItemDataDto.toSharedPlayState() = SharedPlayState(
         position = Ticks.toDuration(playbackPositionTicks),
         played = played,
         lastPlayedAt = lastPlayedDate?.toInstantUtc(),
-    )
+    ).toMillis()
 
     private fun authorizationHeader(api: ApiClient, credentials: ServerCredentials): String =
         AuthorizationHeaderBuilder.buildHeader(

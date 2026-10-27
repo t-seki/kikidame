@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
  * 再生中の定期保存（鳴っている回）では送られない。
  *
  * 同じ顔ぶれ（[key] の一覧）では 1 回しか送らない。送れなかったときも、顔ぶれが変わるまでは送り直さない（次の同期が送る）。
- * 送ったかどうか・失敗の記録は [send] の側（`PlaybackSharing.sendPending`）が持つ。
+ * 送ったかどうか・失敗の記録と、取得元の値を読んでから送ること・送信を直列にすることは、[send] の側（`PlaybackSharing.sendPending`）が持つ。
  * 動くのは再生サービスが生きている間だけ。サービスが無いときに切り替えた再生済みは、次の同期で送る。
  *
  * [scope] は [player] のアプリケーションスレッドで動くこと（Player はスレッド拘束）。[send] は [sendScope] で動かす
