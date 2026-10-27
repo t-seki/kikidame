@@ -327,6 +327,13 @@ interface LocalFileDao {
     @Query("UPDATE local_files SET state = 'FAILED', attemptCount = attemptCount + 1, lastAttemptAt = :at WHERE episodeId = :episodeId")
     suspend fun markFailed(episodeId: Long, at: Instant)
 }
+/** 再生の共有（ADR 0013）の突き合わせに使う、各回の取得元 ID とその再生の状態の行（無ければ null）。 */
+data class SharedPlaybackRow(
+    val episodeId: Long,
+    val sourceItemId: String,
+    @Embedded(prefix = "ps_") val state: PlaybackStateEntity?,
+)
+
 @Dao
 interface PlaybackStateDao {
     @Query("SELECT * FROM playback_states WHERE episodeId = :episodeId")
@@ -335,4 +342,64 @@ interface PlaybackStateDao {
     fun observeByEpisode(episodeId: Long): Flow<PlaybackStateEntity?>
     @Upsert
     suspend fun upsert(state: PlaybackStateEntity)
+
+    /** 取得元 ID を持つ各回すべてと、その再生の状態（再生の共有の突き合わせ。#355）。 */
+    @Query(
+        """SELECT e.id AS episodeId, e.sourceItemId AS sourceItemId,
+            ps.episodeId AS ps_episodeId, ps.positionTicks AS ps_positionTicks, ps.played AS ps_played, ps.updatedAt AS ps_updatedAt,
+            ps.sharePending AS ps_sharePending, ps.sharedPositionTicks AS ps_sharedPositionTicks, ps.sharedPlayed AS ps_sharedPlayed,
+            ps.sharedLastPlayedAt AS ps_sharedLastPlayedAt
+        FROM episodes e LEFT JOIN playback_states ps ON ps.episodeId = e.id
+        WHERE e.sourceItemId IS NOT NULL""",
+    )
+    suspend fun listShared(): List<SharedPlaybackRow>
+
+    /** 1 つの各回の [listShared] の行。取得元 ID が無ければ null。 */
+    @Query(
+        """SELECT e.id AS episodeId, e.sourceItemId AS sourceItemId,
+            ps.episodeId AS ps_episodeId, ps.positionTicks AS ps_positionTicks, ps.played AS ps_played, ps.updatedAt AS ps_updatedAt,
+            ps.sharePending AS ps_sharePending, ps.sharedPositionTicks AS ps_sharedPositionTicks, ps.sharedPlayed AS ps_sharedPlayed,
+            ps.sharedLastPlayedAt AS ps_sharedLastPlayedAt
+        FROM episodes e LEFT JOIN playback_states ps ON ps.episodeId = e.id
+        WHERE e.id = :episodeId AND e.sourceItemId IS NOT NULL""",
+    )
+    suspend fun findShared(episodeId: Long): SharedPlaybackRow?
+
+    /** 未送信の各回（取得元 ID を持つものだけ）。再生の状態が書かれるたびに流れる。 */
+    @Query(
+        """SELECT e.id AS episodeId, e.sourceItemId AS sourceItemId,
+            ps.episodeId AS ps_episodeId, ps.positionTicks AS ps_positionTicks, ps.played AS ps_played, ps.updatedAt AS ps_updatedAt,
+            ps.sharePending AS ps_sharePending, ps.sharedPositionTicks AS ps_sharedPositionTicks, ps.sharedPlayed AS ps_sharedPlayed,
+            ps.sharedLastPlayedAt AS ps_sharedLastPlayedAt
+        FROM playback_states ps JOIN episodes e ON ps.episodeId = e.id
+        WHERE ps.sharePending = 1 AND e.sourceItemId IS NOT NULL
+        ORDER BY ps.updatedAt""",
+    )
+    fun observePending(): Flow<List<SharedPlaybackRow>>
+
+    /**
+     * 送った後。最後に見た取得元の値を [position]・[played]・[lastPlayedAt]（サーバが返した値）にし、送った後に手元が変わっていなければ
+     * （位置・再生済み・更新時刻が送ったときのまま）未送信の印を下ろす。変わっていれば印は残し、次に送る。
+     */
+    @Query(
+        """UPDATE playback_states SET sharedPositionTicks = :position, sharedPlayed = :played, sharedLastPlayedAt = :lastPlayedAt,
+            sharePending = CASE WHEN positionTicks = :sentPosition AND played = :sentPlayed AND updatedAt = :sentUpdatedAt THEN 0 ELSE sharePending END
+        WHERE episodeId = :episodeId""",
+    )
+    suspend fun markSent(
+        episodeId: Long,
+        position: Long,
+        played: Boolean,
+        lastPlayedAt: Instant?,
+        sentPosition: Long,
+        sentPlayed: Boolean,
+        sentUpdatedAt: Instant,
+    )
+
+    /** 突合で取得元 ID が変わった回（ADR 0013 の決定 7、#352 の決定 8）。未送信にし、前の ID で見た値は忘れる。 */
+    @Query(
+        """UPDATE playback_states SET sharePending = 1, sharedPositionTicks = NULL, sharedPlayed = NULL, sharedLastPlayedAt = NULL
+        WHERE episodeId = :episodeId""",
+    )
+    suspend fun markRelinked(episodeId: Long)
 }

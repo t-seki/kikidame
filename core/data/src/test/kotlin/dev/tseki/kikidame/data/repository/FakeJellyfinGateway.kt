@@ -5,12 +5,14 @@ import dev.tseki.kikidame.data.jellyfin.ServerCredentials
 import dev.tseki.kikidame.data.source.DownloadStream
 import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.SelectedLibrary
+import dev.tseki.kikidame.domain.SharedPlayState
 import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SourceProgram
 import dev.tseki.kikidame.domain.SourceSnapshot
 import dev.tseki.kikidame.domain.Session
+import kotlin.time.Duration
 
 class FakeJellyfinGateway : JellyfinGateway {
     var snapshot: SourceSnapshot = SourceSnapshot(emptyList(), emptyList())
@@ -92,5 +94,35 @@ class FakeJellyfinGateway : JellyfinGateway {
         } else {
             DownloadStream(resumedFrom = null, totalBytes = bytes.size.toLong(), body = bytes.inputStream())
         }
+    }
+
+    /** 各回 ID → サーバの UserData（再生の共有）。無ければ [SharedPlayState.EMPTY]。 */
+    val playStates = HashMap<SourceItemId, SharedPlayState>()
+    /** UserData を読んだ各回（呼ばれた順）。 */
+    val readPlayStates = ArrayList<SourceItemId>()
+    /** UserData に書いた各回と値（呼ばれた順）。 */
+    val writtenPlayStates = ArrayList<Pair<SourceItemId, SharedPlayState>>()
+    /** UserData の読み書きだけが投げる。 */
+    var playStateFailure: SourceException? = null
+    /** UserData の読み込みだけが投げる（書き込みは通る）。 */
+    var playStateReadFailure: SourceException? = null
+    /** UserData を書く途中（受け取った後、覚える前）に呼ぶ。送っている間の手元の変化を作る。 */
+    var duringWrite: (suspend () -> Unit)? = null
+
+    override suspend fun fetchPlayState(credentials: ServerCredentials, episodeSourceId: SourceItemId, timeout: Duration?): SharedPlayState {
+        failWith?.let { throw it }
+        readPlayStates += episodeSourceId
+        playStateFailure?.let { throw it }
+        playStateReadFailure?.let { throw it }
+        return playStates[episodeSourceId] ?: SharedPlayState.EMPTY
+    }
+
+    override suspend fun writePlayState(credentials: ServerCredentials, episodeSourceId: SourceItemId, state: SharedPlayState): SharedPlayState {
+        failWith?.let { throw it }
+        writtenPlayStates += episodeSourceId to state
+        playStateFailure?.let { throw it }
+        duringWrite?.invoke()
+        playStates[episodeSourceId] = state
+        return state
     }
 }

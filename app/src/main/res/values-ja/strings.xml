@@ -246,6 +246,10 @@
     <string name="settings_last_sync">最終同期</string>
     <string name="settings_last_sync_failed">%1$s に失敗: %2$s</string>
     <string name="settings_last_sync_skipped">%1$s は Wi-Fi ではないため見送り</string>
+    <string name="settings_playback_sharing">再生の共有</string>
+    <string name="settings_playback_sharing_ok">%1$s に共有</string>
+    <string name="settings_playback_sharing_none">まだ共有していません</string>
+    <string name="settings_playback_sharing_failed">%1$s に送れませんでした: %2$s。送れなかった分は次の同期で送ります</string>
     <string name="settings_section_download">ダウンロード</string>
     <string name="settings_storage">手元のファイル</string>
     <string name="settings_storage_tap">タップで内訳を見る</string>

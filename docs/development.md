@@ -121,6 +121,9 @@ KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTe
   認証切れ・到達不能）を 1 回ずつ呼ぶ。`fetchProgramImage` も呼び、番組 A は `ImageTags.Primary` と JPEG の中身、番組 B は画像なし（null）を見る。新しい版が出たら `resolve()` にタグを足して同じテストを当てる
 - ブックのライブラリ（`radio-book`）でも、一覧（AudioBook が `Album`・`AlbumArtist` のタグで 3 番組・7 本にまとまること）・1 番組の各回・番組の存在確認・
   番組の画像（番組 A は番組のフォルダの画像、番組 B と番組 C は画像なし）・ダウンロードと `Range` を呼ぶ（#354）
+- ブックの各回の UserData（再生の共有、#355）: `writePlayState` で位置（尺の中の 7 秒）・再生済み・`LastPlayedDate` を書き、書き込みの応答・`fetchPlayState`（時間の上限なしと上限つき）・
+  一覧（`fetchLibrary` の各回の `shared`）のどれでも同じ値で読み戻せること、再生済みにする・未再生に戻すのも同じことを見る。音楽のライブラリの一覧は UserData を載せない（`shared` が null）ことも見る。
+  書いた回は最後に位置 0・未再生に書き戻す
 - 認証は SDK が付ける `Authorization: MediaBrowser Client="Kikidame", Version="…", DeviceId="…", Device="…"` の 1 形式だけ
   （レガシーの `X-Emby-Authorization` は送らない。2026-09-21 に記録用サーバで確認）
 - 実機（Android）からコンテナに繋ぐには、Tailscale の HTTPS（`tailscale serve`）で出す。アプリは `http://` の URL を受け付けない（`normalizeServerUrl` が `plain http is not supported` で弾く）ので、`adb reverse` で `http://localhost` につなぐ形は使えない。実機は tailnet 経由でつなぐ。

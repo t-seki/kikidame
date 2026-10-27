@@ -7,6 +7,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tseki.kikidame.domain.LibraryKind
 import dev.tseki.kikidame.domain.PublishedAt
 import dev.tseki.kikidame.domain.SelectedLibrary
+import dev.tseki.kikidame.domain.SharedPlayState
 import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceItemId
@@ -24,12 +25,15 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 /**
  * 実サーバに対する [SdkJellyfinGateway] の統合テスト（#97）。`scripts/jellyfin-testserver.sh up 1010|12` で立てた
  * 合成ライブラリ（音楽の `radio` は番組 2 × 各回 3、ブックの `radio-book` はそれに各回が 1 本だけの番組 C を足したもの。#354）を前提に、
  * [JellyfinGateway] の全メソッドを、音楽とブックのライブラリでそれぞれ 1 回ずつ呼ぶ。
+ * ブックの各回の UserData の書き込みと読み戻し（再生の共有、#355）も見る。
  *
  * 環境変数 `KIKIDAME_JELLYFIN_URL`（と `KIKIDAME_JELLYFIN_USER` / `KIKIDAME_JELLYFIN_PASSWORD`、既定は
  * スクリプトと同じ `kikidame` / `kikidame-test`）が無ければスキップするので、CI と普段の `./gradlew test` には影響しない:
@@ -294,6 +298,44 @@ class SdkJellyfinGatewayIntegrationTest {
         val snapshot = gateway.fetchLibrary(credentials, radioBook(credentials))
         assertDownloads(credentials, snapshot.episodes.first { it.title == "2026-09-07" })
         assertDownloads(credentials, snapshot.episodes.first { it.title == "2026-09-01" })
+    }
+
+    /**
+     * 再生の共有（#355、ADR 0013 の決定 3）: ブックの各回の UserData に `POST /UserItems/{itemId}/UserData` で書いた位置・再生済み・
+     * `LastPlayedDate` が、そのまま読み戻せる。5 分未満の位置（テストのファイルは 12 秒なので尺の中の 7 秒）も 0 に戻されずに残る。
+     * 書いた後の値は、書き込みの応答・1 件の読み込み・一覧（同期で読む経路）のどれでも同じ（「最後に見たサーバの値」と比べるため）。
+     */
+    @Test
+    fun bookUserDataKeepsWrittenPositionPlayedAndLastPlayedDate() = runTest {
+        val credentials = signIn()
+        val book = radioBook(credentials)
+        val episode = gateway.fetchLibrary(credentials, book).episodes.first { it.title == "2026-08-24" }
+        try {
+            val at = Instant.parse("2026-10-27T01:02:03.456Z")
+            val written = gateway.writePlayState(credentials, episode.sourceId, SharedPlayState(7.seconds, played = false, lastPlayedAt = at))
+            assertEquals(SharedPlayState(7.seconds, played = false, lastPlayedAt = at), written, "書き込みの応答")
+            assertEquals(written, gateway.fetchPlayState(credentials, episode.sourceId), "1 件の読み込み")
+            assertEquals(written, gateway.fetchPlayState(credentials, episode.sourceId, timeout = 5.seconds), "時間の上限つきの読み込み")
+            assertEquals(written, gateway.fetchLibrary(credentials, book).episodes.first { it.sourceId == episode.sourceId }.shared, "一覧")
+
+            // 再生済みにする（位置はそのまま送る）。未再生に戻すのも同じ書き方
+            val later = Instant.parse("2026-10-27T02:00:00Z")
+            val played = gateway.writePlayState(credentials, episode.sourceId, SharedPlayState(7.seconds, played = true, lastPlayedAt = later))
+            assertEquals(SharedPlayState(7.seconds, played = true, lastPlayedAt = later), played)
+            assertEquals(played, gateway.fetchPlayState(credentials, episode.sourceId))
+            val unplayed = gateway.writePlayState(credentials, episode.sourceId, SharedPlayState(3.seconds, played = false, lastPlayedAt = later + 1.seconds))
+            assertEquals(SharedPlayState(3.seconds, played = false, lastPlayedAt = later + 1.seconds), unplayed)
+            assertEquals(unplayed, gateway.fetchLibrary(credentials, book).episodes.first { it.sourceId == episode.sourceId }.shared)
+        } finally {
+            gateway.writePlayState(credentials, episode.sourceId, SharedPlayState(Duration.ZERO, played = false, lastPlayedAt = null))
+        }
+    }
+
+    /** 再生の共有は音楽のライブラリではしない（ADR 0013 の決定 1）。一覧は UserData を読まない。 */
+    @Test
+    fun musicLibraryDoesNotCarryUserData() = runTest {
+        val credentials = signIn()
+        assertTrue(gateway.fetchLibrary(credentials, radio(credentials)).episodes.all { it.shared == null })
     }
 
     private fun ByteArray.isJpeg(): Boolean = size > 2 && this[0] == 0xFF.toByte() && this[1] == 0xD8.toByte()

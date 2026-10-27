@@ -3,12 +3,14 @@ package dev.tseki.kikidame.data.jellyfin
 import dev.tseki.kikidame.data.source.DownloadStream
 import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.SelectedLibrary
+import dev.tseki.kikidame.domain.SharedPlayState
 import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SourceProgram
 import dev.tseki.kikidame.domain.SourceSnapshot
 import dev.tseki.kikidame.domain.Session
+import kotlin.time.Duration
 
 /** 認証済みの呼び出しに必要な最小限。 */
 data class ServerCredentials(val serverUrl: String, val accessToken: String, val userId: String)
@@ -24,6 +26,8 @@ fun Session.credentials(): ServerCredentials = ServerCredentials(serverUrl, acce
  * 音楽のライブラリは番組が MusicAlbum、各回が Audio で、番組の取得元 ID は MusicAlbum の id。
  * ブックのライブラリは各回が AudioBook で、番組は各回の Album と AlbumArtist のタグでまとめ、番組の取得元 ID は `<AlbumArtist>/<Album>`。
  * そのため番組についての呼び出しは、ライブラリ（id と種類）を受け取る。
+ * ブックのライブラリの一覧は、各回の UserData を [SourceEpisode.shared] に載せる（再生の共有、ADR 0013）。各回の UserData の 1 件ずつの読み書きは
+ * [fetchPlayState] と [writePlayState]（`PlaybackSharing` が使う。同期とダウンロードの境界 [dev.tseki.kikidame.data.source.SourceGateway] は通らない）。
  */
 interface JellyfinGateway {
     suspend fun signIn(serverUrl: String, userName: String, password: String): Session
@@ -54,4 +58,16 @@ interface JellyfinGateway {
      * 各回の取得元 ID はどちらの種類のライブラリでもアイテムの id なので、ライブラリは要らない。
      */
     suspend fun openDownload(credentials: ServerCredentials, episodeSourceId: SourceItemId, rangeStart: Long): DownloadStream
+
+    /**
+     * 各回の UserData（再生位置・再生済み・`LastPlayedDate`）を読む（**再生の共有**、ADR 0013 の決定 5）。ブックのライブラリの各回にだけ使う。
+     * [timeout] があれば、それまでに返らなければ [SourceException.Unreachable]（▶ の直前の読み込み。失敗したら手元の値で鳴らす）。
+     */
+    suspend fun fetchPlayState(credentials: ServerCredentials, episodeSourceId: SourceItemId, timeout: Duration? = null): SharedPlayState
+
+    /**
+     * 各回の UserData に [state] を `POST /UserItems/{itemId}/UserData` で書き（ADR 0013 の決定 3。再生の報告は使わない）、
+     * サーバが返した書いた後の値を返す。呼び出し側は、返した値を「最後に見たサーバの値」にする（送った値ではなく）。
+     */
+    suspend fun writePlayState(credentials: ServerCredentials, episodeSourceId: SourceItemId, state: SharedPlayState): SharedPlayState
 }

@@ -7,6 +7,7 @@ import dev.tseki.kikidame.data.source.DownloadStream
 import dev.tseki.kikidame.domain.LibraryKind
 import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.domain.SelectedLibrary
+import dev.tseki.kikidame.domain.SharedPlayState
 import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceItemId
@@ -28,6 +29,7 @@ import org.jellyfin.sdk.api.client.extensions.authenticateUserByName
 import org.jellyfin.sdk.api.client.extensions.authenticationApi
 import org.jellyfin.sdk.api.client.extensions.imageApi
 import org.jellyfin.sdk.api.client.extensions.libraryApi
+import org.jellyfin.sdk.api.client.extensions.userDataApi
 import org.jellyfin.sdk.api.client.extensions.userViewApi
 import org.jellyfin.sdk.api.client.util.AuthorizationHeaderBuilder
 import org.jellyfin.sdk.createJellyfin
@@ -39,12 +41,15 @@ import org.jellyfin.sdk.model.api.ImageType
 import org.jellyfin.sdk.model.api.ItemFields
 import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.SortOrder
+import org.jellyfin.sdk.model.api.UpdateUserItemDataDto
+import org.jellyfin.sdk.model.api.UserItemDataDto
 import org.jellyfin.sdk.model.api.request.GetItemsRequest
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.UUID
@@ -53,10 +58,12 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Duration
 import kotlin.time.Instant
+import kotlin.time.toJavaInstant
 import kotlin.time.toKotlinInstant
 
 /**
  * jellyfin-sdk-kotlin による [JellyfinGateway]。音楽のライブラリとブックのライブラリ（#354）を読む。
+ * ブックのライブラリでは、各回の UserData（再生位置・再生済み・`LastPlayedDate`）を一覧と一緒に読み、1 件ずつ読み書きもする（再生の共有、ADR 0013、#355）。
  * Jellyfin 12 の `Authorization: MediaBrowser …` 形式のみを使う。
  * `DeviceId` は SDK の Android 既定（`ANDROID_ID` 由来）、`Device` は端末のモデル名。
  */
@@ -241,6 +248,9 @@ class SdkJellyfinGateway @Inject constructor(
                 includeItemTypes = listOf(BaseItemKind.AUDIO_BOOK),
                 // AudioBook は Container を返さない（10.10.7・12.0 で確かめた）ので、拡張子を Path から取る
                 fields = listOf(ItemFields.DATE_CREATED, ItemFields.PARENT_ID, ItemFields.PATH),
+                // 再生の共有（ADR 0013）: 各回の UserData を一覧と一緒に読む（回ごとに問い合わせない。#355）
+                userId = UUID.fromString(credentials.userId),
+                enableUserData = true,
                 sortBy = listOf(ItemSortBy.DATE_CREATED),
                 sortOrder = listOf(SortOrder.DESCENDING),
             ),
@@ -256,7 +266,9 @@ class SdkJellyfinGateway @Inject constructor(
             if (folder != null) programFolders[programId] = folder.id
             SourceProgram(sourceId = programId, name = album, publisherName = first.publisher(), image = folder?.primaryImage())
         }
-        val episodes = books.mapNotNull { book -> book.bookProgramId()?.let { book.toSourceEpisode(it) } }
+        val episodes = books.mapNotNull { book ->
+            book.bookProgramId()?.let { book.toSourceEpisode(it)?.copy(shared = book.userData?.toSharedPlayState()) }
+        }
         bookFolders[BookLibraryKey(credentials.serverUrl, credentials.userId, library.id)] = programFolders
         return BookListing(programs, episodes, programFolders)
     }
@@ -344,6 +356,46 @@ class SdkJellyfinGateway @Inject constructor(
             }
         }
     }
+
+    override suspend fun fetchPlayState(credentials: ServerCredentials, episodeSourceId: SourceItemId, timeout: Duration?): SharedPlayState = call {
+        val api = api(credentials.serverUrl, credentials.accessToken)
+        val read: suspend () -> SharedPlayState = {
+            val data by api.userDataApi.getItemUserData(UUID.fromString(episodeSourceId.value), UUID.fromString(credentials.userId))
+            data.toSharedPlayState()
+        }
+        // withTimeout の取り消しは CancellationException なので call が包まずに通してしまう。ここで到達不能に直す。
+        // 時間は IO のディスパッチャで計る（呼び出し側の仮想の時計（テストの runTest）で計ると、通信を待たずに切れる）
+        if (timeout == null) {
+            read()
+        } else {
+            withContext(Dispatchers.IO) { withTimeoutOrNull(timeout) { read() } } ?: throw SourceException.Unreachable()
+        }
+    }
+
+    /**
+     * `LastPlayedDate` はタイムゾーンを持たない `LocalDateTime` で送る。サーバの日時は UTC のナイーブな値なので（[toInstantUtc]）、UTC で作る。
+     * 送るのは位置・再生済み・`LastPlayedDate` だけ（ほかの項目は null。null の項目をサーバが変えずに残すかは、サーバのコードを読んでおらず未確認）。
+     */
+    override suspend fun writePlayState(credentials: ServerCredentials, episodeSourceId: SourceItemId, state: SharedPlayState): SharedPlayState = call {
+        val api = api(credentials.serverUrl, credentials.accessToken)
+        val written by api.userDataApi.updateItemUserData(
+            UUID.fromString(episodeSourceId.value),
+            UUID.fromString(credentials.userId),
+            UpdateUserItemDataDto(
+                playbackPositionTicks = Ticks.fromDuration(state.position),
+                played = state.played,
+                lastPlayedDate = state.lastPlayedAt?.let { java.time.LocalDateTime.ofInstant(it.toJavaInstant(), java.time.ZoneOffset.UTC) },
+            ),
+        )
+        written.toSharedPlayState()
+    }
+
+    /** `LastPlayedDate` はミリ秒にそろえる（手元の「最後に見た値」はミリ秒で持つので、サーバの端数で「変わった」と誤らないように）。 */
+    private fun UserItemDataDto.toSharedPlayState() = SharedPlayState(
+        position = Ticks.toDuration(playbackPositionTicks),
+        played = played,
+        lastPlayedAt = lastPlayedDate?.toInstantUtc(),
+    ).toMillis()
 
     private fun authorizationHeader(api: ApiClient, credentials: ServerCredentials): String =
         AuthorizationHeaderBuilder.buildHeader(
