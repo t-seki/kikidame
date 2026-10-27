@@ -14,8 +14,8 @@ android {
         applicationId = "dev.tseki.kikidame"
         minSdk = 31
         targetSdk = 37
-        versionCode = 8
-        versionName = "0.8.0"
+        versionCode = 9
+        versionName = "0.9.0"
     }
     // release の署名（#94）。鍵とパスフレーズは repo に置かず環境変数から読む。
     // 無ければ署名設定を付けずにビルドする（CI の test、CI の release-build（署名なしで assembleRelease）、鍵を持たない人の assembleRelease を通すため）。

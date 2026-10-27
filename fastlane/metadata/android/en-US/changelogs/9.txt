@@ -1,0 +1,3 @@
+- The player shows the current chapter's title, plus a chapter list; pick a chapter to jump to it
+- The elapsed time on the player now ticks evenly, one second at a time
+- If the audio output disconnects (e.g. Bluetooth turned off) while play is still loading, the pending play is cancelled
