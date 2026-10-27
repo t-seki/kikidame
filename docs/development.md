@@ -187,6 +187,7 @@ release APK をビルドし、`kikidame-<version>.apk` と R8 の `mapping-<vers
 
 1. `app/build.gradle.kts` の `versionCode`（単調増加の整数。F-Droid はこれを見る）と `versionName`（`X.Y.Z`）を上げる PR をマージする
    - 版を上げる PR では、`fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` と `ja-JP` の同名のファイルを足す。書き方は既存のファイルに合わせ、前の版からマージされた利用者から見える変更を箇条書きにする（#339）
+   - changelog の長さは 1 ファイル 500 文字までにする。F-Droid の fastlane 構造の説明に `changelogs/<versionCode>.txt` の `max 500 chars` とある（<https://f-droid.org/docs/All_About_Descriptions_Graphics_and_Screenshots/>）。単位は文字で、数えるのは `wc -m <ファイル>`（バイトを数える `wc -c` は日本語で文字数より大きくなるが、500 以内なら文字でも超えない）。F-Droid が実際に文字とバイトのどちらで切るかは未確認。Google Play は配布していないので上限を調べていない（#363）
    - 版を上げる PR では、リリースした版に何が入っているかを述べた記述（例:「まだリリースした版には入っていない」「debug 版だけ」「not in the released builds」「debug build only」）を README（英日）と `docs/` で探し、出す版に合わせて直す。当たった行は人が読み、出す版と食い違う記述だけを直す（この項自身、経緯の記録、直った後の文にも当たる）（#223）
      ```bash
      grep -rnE "リリースした版|リリース版|released build|release build|debug 版だけ|debug 版のみ|debug build only|debug builds? only" README*.md docs
