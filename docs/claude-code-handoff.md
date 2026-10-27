@@ -68,11 +68,14 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 ## ライブラリ構造のマッピング
 
 サーバ側の音声は**音楽ライブラリ**として取り込まれている。アプリ内では自前モデルに正規化する。
+#354 で**ブックのライブラリ**も取得元に選べるようにした（ADR 0013 の決定 2）。ブックのライブラリには MusicAlbum が無いので、各回（AudioBook）の
+`Album` のタグを番組、`AlbumArtist` のタグを配信元としてアプリがまとめ、番組の取得元 ID は `<AlbumArtist>/<Album>` の文字列にする（下の表の Audio・MusicAlbum の行の読み替え）。
+番組の画像は番組のフォルダ（`Folder`）の Primary で、各回の親がどれも同じ Folder で、その名前が `Album` と同じときだけ使う（各回が 1 本だけの番組は、各回の親が配信元のフォルダになるため）。
 
 | Jellyfin | アプリ内の概念（`CONTEXT.md` 参照） |
 | --- | --- |
-| MusicAlbum | 番組 (Program) |
-| Audio | 各回 (Episode) |
+| MusicAlbum（ブックでは各回の `Album`） | 番組 (Program) |
+| Audio（ブックでは AudioBook） | 各回 (Episode) |
 | `AlbumArtist` | 配信元 (Publisher) — ラジオ録音なら配信元（rajikura の Jellyfin プリセットが albumartist に書く）、ポッドキャストなら配信者やネットワーク |
 | `PremiereDate` → `DateCreated` → ファイル更新日時 | 公開日 (Published At) — 並び順・「最新 N 回」の基準。この順でフォールバック |
 | `DateCreated` | 取り込み日時 (Added At) — 保存するが新しさの判定には使わない。公開日の代用として並び順に効くのは上の行の経路（差分取得は ADR 0004 で見送り） |
@@ -80,7 +83,11 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 
 主に使う取得パス（SDK 経由で呼ぶ）:
 
-- ライブラリ一覧: `/UserViews`。`CollectionType = music` のものだけ選択できる（他は理由付きでグレーアウト）
+- ライブラリ一覧: `/UserViews`。`CollectionType = music` と `books`（#354）のものだけ選択できる（他は理由付きでグレーアウト）
+- ブックのライブラリ（#354）: `/Items?ParentId={libraryId}&IncludeItemTypes=Folder&Recursive=true&Fields=ParentId` で番組のフォルダを、
+  `/Items?ParentId={libraryId}&IncludeItemTypes=AudioBook&Recursive=true&Fields=DateCreated,ParentId,Path&SortBy=DateCreated&SortOrder=Descending`（500 件ずつ）で各回を取り、タグでまとめる。
+  `albums=` の絞り込みは使わない（10.10.7 では効き、12.0 では 0 件、10.11.11 では全件が返った。#352・#354）。1 番組の各回・番組の存在確認もライブラリ全体を取ってまとめた中から選ぶ。
+  AudioBook は `Container` を返さない（10.10.7・12.0）ので、保存先の拡張子は `Path` から取る。番組の画像の中身は、番組のフォルダの `/Items/{folderId}/Images/Primary`
 - 番組一覧: `/Items?ParentId={libraryId}&IncludeItemTypes=MusicAlbum&Recursive=true`（1 回。`Fields` は付けない）。
   番組の画像の版は、返る `ImageTags.Primary`（`SourceProgram.image`）。`Fields` を付けなくても返ることを、Jellyfin 10.10.7 の実サーバ（`scripts/jellyfin-testserver.sh up 1010`）で確かめた（`folder.jpg` のあるアルバムだけ `ImageTags` に `Primary` が出た）。Jellyfin 12 では未確認（#282）
 - 各回一覧: `/Items?ParentId={libraryId}&IncludeItemTypes=Audio&Recursive=true&Fields=DateCreated,ParentId&SortBy=DateCreated&SortOrder=Descending&StartIndex=…&Limit=500`
@@ -91,9 +98,12 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
   404（Primary が無い）と 10 MiB（`SdkJellyfinGateway.MAX_PROGRAM_IMAGE_BYTES`。共有フォルダの上限と同じ値で、根拠は無い）超えは null（画像なし）。サイズ指定・変換は付けず、サーバの原本をそのまま持つ。
   10.10.7 の画像の API は、無効なトークンでも画像を返した（認証を求めない）。ヘッダは付けるが、認証の失敗の経路（401/403 → `Unauthorized`）は実サーバでは確かめていない
 - 原本ダウンロード: `/Items/{itemId}/Download`（トランスコードは使わない。direct play 前提）
-- 再生位置・再生済みの送信: **`POST /UserItems/{itemId}/UserData`**（`UpdateUserItemDataDto` の
-  `PlaybackPositionTicks` / `Played` / `LastPlayedDate`）。`/Sessions/Playing/*` は使わない
-- 再生位置の初期取得: `GET /UserItems/{itemId}/UserData`（ローカルに行が無いときだけ）
+- 再生位置・再生済みの送信（再生の共有。ブックのライブラリだけ、ADR 0013、#355）: **`POST /UserItems/{itemId}/UserData`**（`UpdateUserItemDataDto` の
+  `PlaybackPositionTicks` / `Played` / `LastPlayedDate`。`LastPlayedDate` は手元の更新時刻を UTC のナイーブな日時で）。`/Sessions/Playing/*` は使わない。
+  応答の `UserItemDataDto` を「最後に見たサーバの値」にする（`LastPlayedDate` はミリ秒にそろえてから比べ・記録する。手元はミリ秒で持つため）。10.10.7・12.0.0 のコンテナで、書いた 7 秒の位置・再生済み・ミリ秒までの `LastPlayedDate` が、
+  応答・`GET /UserItems/{itemId}/UserData`・一覧（`/Items` の `UserData`）のどれでも同じ値で読み戻せた（統合テスト `bookUserDataKeepsWrittenPositionPlayedAndLastPlayedDate`）
+- 再生位置・再生済みの読み込み（同じくブックのライブラリだけ）: 同期では、ブックの一覧（`/Items`）に `userId` と `enableUserData` を付けて各回の `UserData` を一緒に読む（回ごとに問い合わせない）。
+  ▶ の直前は `GET /UserItems/{itemId}/UserData` を 1 回だけ、2 秒で打ち切る
 
 取得は毎回フル走査（実機 153 番組 / 6,004 回で約 12 秒）。差分取得（`DateCreated` 降順で取り、ローカルの最大取り込み日時に
 到達したら打ち切る）は**作らない**（ADR 0004）: 不完全な一覧を同期の入力にすると載っていないだけの各回を削除してしまい、
@@ -182,14 +192,15 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 版 7（#196、ADR 0010）で、列 `serverItemId` を `sourceItemId` に、`stationName` / `airedAt` を `publisherName` / `publishedAt` に改め、`playback_states.syncedAt` を削除した。
 版 8（#197）で、`episodes` に共有フォルダのファイルのサイズと更新日時（`sourceFileSize` / `sourceModifiedAt`、nullable）を足した（「共有フォルダの走査」節）。
 版 9（#264、ADR 0012）で、`programs` に番組の画像の版とファイルのパス（`imageVersion` / `imagePath`、nullable）を足した（「番組の画像」節）。
+版 10（#355、ADR 0013）で、`playback_states` に未送信の印（`sharePending`。列の既定は 1 で、上げた時点の行は未送信として最初の同期で送る）と最後に見たサーバの値（`sharedPositionTicks` / `sharedPlayed` / `sharedLastPlayedAt`、nullable）を足した（「再生位置と再生済み」節）。
 
 ```kotlin
 @Entity(indices = [Index("sourceItemId", unique = true), Index("publisherName", "name")])
-data class ProgramEntity(          // 番組（Jellyfin では MusicAlbum）。(配信元, 番組名) は突合のキーだが一意ではない（v2）
+data class ProgramEntity(          // 番組（Jellyfin では MusicAlbum、ブックでは各回の `Album` のタグ）。(配信元, 番組名) は突合のキーだが一意ではない（v2）
   @PrimaryKey(autoGenerate = true) val id: Long = 0,
   val sourceItemId: String?,       // 取得元 ID（ADR 0001・0010）
   val name: String,
-  val publisherName: String?,      // 配信元（Jellyfin では MusicAlbum.AlbumArtist）
+  val publisherName: String?,      // 配信元（Jellyfin では MusicAlbum.AlbumArtist、ブックでは各回の `AlbumArtist` のタグ）
   val syncEnabled: Boolean,        // 同期対象か（既定 false）
   val keepLatest: Int?,            // 最新 N 回まで保持（null = 上限なし）
   val deleteAfterPlayed: Boolean,
@@ -200,7 +211,7 @@ data class ProgramEntity(          // 番組（Jellyfin では MusicAlbum）。(
 )
 
 @Entity(indices = [Index("sourceItemId", unique = true), Index("programId")])
-data class EpisodeEntity(          // 各回（Jellyfin では Audio）
+data class EpisodeEntity(          // 各回（Jellyfin では Audio、ブックでは AudioBook）
   @PrimaryKey(autoGenerate = true) val id: Long = 0,
   val sourceItemId: String?,       // 取得元 ID
   val programId: Long,
@@ -227,11 +238,15 @@ data class LocalFileEntity(        // ダウンロード状態の唯一の正（
 )
 
 @Entity
-data class PlaybackStateEntity(    // ローカル正（ADR 0002）
+data class PlaybackStateEntity(    // ブックのライブラリでは再生の共有（ADR 0013。ADR 0002 を置き換えた）
   @PrimaryKey val episodeId: Long,
   val positionTicks: Long,         // 1 tick = 100ns
   val played: Boolean,
-  val updatedAt: Instant
+  val updatedAt: Instant,
+  val sharePending: Boolean,       // 未送信（v10、#355）
+  val sharedPositionTicks: Long?,  // 最後に見たサーバの値（v10）。一度も見ていなければ 3 つとも null
+  val sharedPlayed: Boolean?,
+  val sharedLastPlayedAt: Instant?
 )
 ```
 
@@ -240,12 +255,21 @@ data class PlaybackStateEntity(    // ローカル正（ADR 0002）
   （取得元に各回が存在する限り）で生存させる
 - ticks は Entity と取得元の境界にだけ現れる。ドメイン型は `Duration`
 
-### 再生位置と再生済み（重要、ADR 0002）
+### 再生位置と再生済み（重要、ADR 0013）
 
-- `PlaybackState` を**ローカル正**とする。ローカルに行があればローカルが常に勝つ。
-  サーバの `UserData` は再インストール・初回取得で行が無いときの初期値としてのみ読む
+- 取得元が Jellyfin の**ブックのライブラリ**のときは、**再生の共有**（ADR 0013。ADR 0002・0007 を置き換えた、#355）。それ以外の取得元では手元だけで持ち、送らない
+  - 衝突の規則（`:core:domain` の `PlaybackSharingRules`）: 各回ごとに「最後に見たサーバの値」（位置・再生済み・`LastPlayedDate`）を手元に持つ。
+    サーバが変わっていればサーバの値、サーバが変わらず手元が変わって（未送信の印が立って）いれば手元を送る。両方なら手元の更新時刻とサーバの `LastPlayedDate` の新しい方
+    （サーバの時刻が無い・同じ時刻なら手元）。最後に見た値が無い回は、誰も再生していない値（位置 0・未再生・時刻なし）を見たとみなす
+  - 未送信の印は、手元で位置か再生済みが変わると立つ（`RoomPlaybackStateRepository.update`）。突合で取得元 ID が変わった回も立て、前の ID で見た値は忘れる。v10 に上げた時点で手元にある行も立つ（列の既定が 1）
+  - 送る: 一時停止・停止・回の終わり・再生済みの手動切替の後（`PlaybackSharePusher`。未送信の回のうち鳴っている回を除いたもの。再生サービスが動いている間だけ）。
+    送る前に 1 回ずつサーバの値を読んで衝突の規則を通し（サーバの方が新しければ送らずに採る）、送信は同期の送信とも直列にする（`PlaybackSharing.sendPending`）。
+    読めなかった・送れなかった分は次の同期で送る
+  - 読む: 同期のたび（取り込みの後、`SyncPlanner` の前。ほかで再生済みになった回も保持ルールの対象）。聴いている回（`NowPlaying.excludedFromSync`）は手元のまま。
+    ▶ の直前（`ReadBeforePlayPlayer`。一時停止からの再開を含む）と、次／前・自動遷移で別の回に入ったとき（`ResumeOnTransition`）にも 1 回だけ読み、サーバの値を採るならその位置へ移る
+  - 状態の 1 行: 設定の「最終同期」の下に「再生の共有」（最後に共有できた時刻と、それより新しい送信の失敗）。通知は出さない
 - ~~`syncedAt` が null のレコードだけを、オンライン復帰時に `POST /UserItems/{itemId}/UserData` へ送る~~ —
-  **送らない**（ADR 0007、2026-09-19）。`syncedAt` は使わないまま残し、版 7 で削除した（ADR 0010）
+  **送らない**（ADR 0007、2026-09-19）。`syncedAt` は使わないまま残し、版 7 で削除した（ADR 0010）。ブックのライブラリでは、上の再生の共有で送る（ADR 0013）
 - **再生済み**の判定（`:core:domain` の純粋関数）:
   - 再生位置が **末尾から残り 2 分以内**に達したら自動で `played = true`。ただし位置 0 では判定しない
     （尺が 2 分以下の回は「再生が少しでも進んだら再生済み」。閾値を尺でスケールさせない）
@@ -302,7 +326,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
   Jellyfin への接続は一切含めない。詳細は次節
 - M2: Jellyfin 認証（サーバ URL → ログイン → 音楽ライブラリを 1 つ選ぶ）とライブラリ一覧の取得・表示
 - M3: 同期エンジン + WorkManager による自動ダウンロード／削除、番組ごとの保持ルール編集画面
-- M4: 倍速・スリープタイマー・位置 0 行の抑止（epic #34）。再生位置のサーバ同期は **やらない**（ADR 0007）
+- M4: 倍速・スリープタイマー・位置 0 行の抑止（epic #34）。再生位置のサーバ同期は **やらない**（ADR 0007。後にブックのライブラリでだけ再生の共有として行うことにした、ADR 0013・#355）
   - スリープタイマー（#36）は「一時停止中は減らず、再開すると続きから」。grilling では「一時停止で解除」だったが、
     実機で「トイレに立つ間の一時停止で消えるのは不便」となり 2026-09-19 に変更。「この回の終わりまで」は
     ExoPlayer の `pauseAtEndOfMediaItems` で、回の終わりで止めたら解除（次の回に持ち越さない）。
@@ -363,6 +387,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 - **画面**: 未ログインなら 接続画面（URL・ユーザー名・パスワード）→ ライブラリ選択。ログイン済みなら M1 の番組一覧
   - ライブラリ選択は**常に出す**。`/UserViews` の全ライブラリを列挙し、音楽以外は「音楽ライブラリのみ選べます」で
     グレーアウト。音楽が 1 つなら選択済みにして「決定」だけ。0 なら決定不可
+    （#354 でブックのライブラリも選べるようにし、文言を「音楽とブックのライブラリだけを選べます」に改めた。選べるライブラリが 1 つなら選択済み）
   - 設定画面（番組一覧の歯車）: サーバ URL・ユーザー名・ライブラリ名（タップで選び直し）・最終取得日時、
     **ログアウト**（認証情報だけ消す。手元のデータは残る）、**別のサーバに接続**（確認の上ローカルデータを全部消す。#50 で音声ファイルも消すように）。
     （後で「ダウンロード」節が増え、M3-a で「Wi-Fi のみ」、#42 で「手元のファイル」の合計容量が入った。#335 でその行を押すと内訳の画面が開くようになった。#347 で「Wi-Fi のみ」の下に、電池の最適化の対象のときだけ「電池の最適化を外す」の行が入った）
@@ -548,7 +573,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 - サーバ管理機能
 - キャスト（Chromecast）
 - 複数サーバ・複数ユーザー・複数ライブラリ
-- 他端末・Web との再生位置の共有（ローカル正。送信もしない、ADR 0007）
+- ブックのライブラリのほか（音楽のライブラリ・共有フォルダ・端末のフォルダ）での、他端末・Web との再生位置の共有（ADR 0013 の決定 1。共有フォルダは #353）
 - Media3 DownloadManager / SimpleCache によるダウンロード
 - `/Sessions/Playing/*` による「再生中」のサーバ通知（必要になれば M4 以降で検討）
 - オーディオブック（古い章から順に聴くので「最新 N 回」が合わない。番組に「向き」を足す設計が要る。CONTEXT.md「番組型の音声」）
@@ -558,17 +583,18 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 
 - `CONTEXT.md` — 用語集（番組／各回／公開日／同期対象／保持ルール／固定／判断保留／再生済み）
 - `docs/adr/0001-local-surrogate-key.md` — 主キーは取得元 ID（当時の呼び名はサーバ ID）ではなく代理キー
-- `docs/adr/0002-playback-position-local-authority.md` — 再生位置・再生済みはローカル正
+- `docs/adr/0002-playback-position-local-authority.md` — 再生位置・再生済みはローカル正（ADR 0013 で置き換え）
 - `docs/adr/0003-download-without-media3-downloadmanager.md` — DownloadManager を使わない
 - `docs/adr/0004-sync-deletes-only-from-full-listing.md` — 同期の削除の権限は全走査の一覧だけ
 - `docs/adr/0005-rematch-unlinked-rows-before-sync-deletes.md` — 突合の対象を未結合に広げ、同期の削除判断の前に走らせる
 - `docs/adr/0006-now-playing-from-in-process-state-not-media-controller.md` — 聴いている回はプロセス内の状態から取る
-- `docs/adr/0007-playback-state-stays-local.md` — 再生位置と再生済みはサーバへ送らない
+- `docs/adr/0007-playback-state-stays-local.md` — 再生位置と再生済みはサーバへ送らない（ADR 0013 で置き換え）
 - `docs/adr/0008-open-source-distributed-outside-play.md` — MPL-2.0 の OSS として Play を通さず配布する
 - `docs/adr/0009-ui-text-resolved-only-in-compose.md` — UI の文言は strings.xml、文字列に解決するのは Compose だけ（`UiText`）。既定は英語
 - `docs/adr/0010-add-file-shares-as-sources.md` — ファイル共有（SMB・端末のフォルダ）を取得元に加える。サーバ ID を取得元 ID に改めた
 - `docs/adr/0011-no-autoplay-on-bluetooth-connect.md` — Bluetooth の接続では自動で再生しない（ロック画面の再開のカードの ▶ で足りる）
 - `docs/adr/0012-show-images-only-from-source-data.md` — 画像はデータにあるときだけ出す。番組の画像は同期で取って手元に持ち、回の画像は再生のときに手元のファイルから読む
+- `docs/adr/0013-share-playback-state-via-jellyfin-book-library.md` — ブックのライブラリでは、再生位置と再生済みを UserData を通してほかの端末や Jellyfin Web と分け合う（再生の共有）。ADR 0002・0007 を置き換える
 - Jellyfin 12 認証仕様: https://gist.github.com/nielsvanvelzen/ea047d9028f676185832e51ffaf12a6f
 - jellyfin-sdk-kotlin Releases: https://github.com/jellyfin/jellyfin-sdk-kotlin/releases
 - Jellyfin OpenAPI (stable): https://api.jellyfin.org/openapi/jellyfin-openapi-stable.json

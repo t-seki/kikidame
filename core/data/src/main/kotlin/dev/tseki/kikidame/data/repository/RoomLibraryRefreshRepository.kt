@@ -45,12 +45,16 @@ import kotlin.time.Instant
 /**
  * 取得元の一覧を [SourceGateway] から取得し、突合（[LibraryMatching]）して Room に 1 トランザクションで適用する。
  * 取得元由来の各回は取得元の値で上書きし（取得元が返さないサイズだけ手元の値を残す。出演者は空でも上書き。
- * 共有フォルダのファイルのサイズ・更新日時（`sourceFileSize` / `sourceModifiedAt`、#197）も取得元の値で書く）、`LocalFile` / `PlaybackState` は触らない。
+ * 共有フォルダのファイルのサイズ・更新日時（`sourceFileSize` / `sourceModifiedAt`、#197）も取得元の値で書く）、`LocalFile` は触らない。`PlaybackState` は再生の共有（下）のときだけ書く。
  *
  * 全走査（[refresh]）は同期そのもの: 取り込んだ後に [SyncPlanner] を回し、保持ルールによる削除・取得元から消えた各回の除去・
  * ダウンロードの予約まで行う（ADR 0004）。1 番組の同期（[syncProgram]）は、その番組だけを取り込んで同期する。
  * 共有フォルダの全走査では、取得元がタグを読み終えた番組から先に 1 番組ずつ取り込んで同期し（[syncProgram] と同じ範囲）、
  * 全部を読み終えたら全体を取り込み直して消失を判断する（#209 の決定 1）。どの取り込みも、それぞれ 1 トランザクション。
+ *
+ * 再生の共有（ADR 0013、#355）: 全走査と 1 番組の同期では、取り込みの後・同期（削除・予約）の前に、一覧と一緒に読んだ UserData を
+ * 手元と突き合わせる（[PlaybackSharing.reconcile]。共有する取得元（Jellyfin のブックのライブラリ）だけ）。[excluded]（聴いている回）は手元のまま。
+ * 結び直した各回の再生の状態は未送信にする。
  *
  * 番組の画像（ADR 0012、#264）も、取り込みのたびに取得元にそろえる（[updateImages]）。番組ごとの取り込み・全走査の最後の取り込み・
  * 1 番組の同期のどれでも、同期（削除・予約）の後に行う。取り直すのは版（[dev.tseki.kikidame.domain.SourceImage.version]）が
@@ -64,6 +68,7 @@ class RoomLibraryRefreshRepository @Inject constructor(
     private val downloads: DownloadRepository,
     private val clock: Clock,
     private val images: ProgramImageFiles,
+    private val sharing: PlaybackSharing,
 ) : LibraryRefreshRepository {
     /** 画像のファイルの書き込み・消去と、行の版・パスの更新を 1 つずつ行う（全走査と 1 番組の同期が重なっても、書いたばかりのファイルを掃除で消さない）。 */
     private val imageLock = Mutex()
@@ -80,6 +85,8 @@ class RoomLibraryRefreshRepository @Inject constructor(
         val snapshot = source.fetchAll(scanned)
         // 番組ごとに取り込み済みの回は、ここでは変化にならない（予約・削除も済んでいる）。消失の判断と結び直しはここで全体を相手に行う
         val result = apply(snapshot)
+        // 再生の共有（ADR 0013）: 取り込んだ再生済みも保持ルールに効くよう、同期（削除・予約）より前に突き合わせる
+        sharing.reconcile(snapshot.episodes, excluded())
         val outcome = synchronize(snapshot, excluded())
         // 番組ごとに取り込んだ番組は、もう版がそろっているので取り直さない。タグを読まなかった番組（新しい回が無い）の画像はここで取る
         updateImages(snapshot.programs)
@@ -133,6 +140,7 @@ class RoomLibraryRefreshRepository @Inject constructor(
             ProgramFetch.Gone -> goneProgramResult()
             is ProgramFetch.Found -> {
                 val result = apply(fetched.snapshot)
+                sharing.reconcile(fetched.snapshot.episodes, excluded)
                 val outcome = synchronize(fetched.snapshot, excluded)
                 updateImages(fetched.snapshot.programs)
                 result.copy(enqueued = outcome.enqueued, deleted = outcome.deleted, removed = outcome.removed, onHold = outcome.onHold)
@@ -274,6 +282,8 @@ class RoomLibraryRefreshRepository @Inject constructor(
 
         for ((episodeId, sourceId) in match.episodeLinks) {
             episodeDao.setSourceItemId(episodeId.value, sourceId.value)
+            // 取得元 ID が変わった回の再生の状態は未送信にし、次の突き合わせで新しい ID に書く（ADR 0013 の決定 7）
+            db.playbackStateDao().markRelinked(episodeId.value)
         }
         // 結び直した回は上で取得元 ID を得ているので、ここで挿入されるのは手元に無かった回だけ（#142 の「新しい回」）
         var newEpisodes = 0

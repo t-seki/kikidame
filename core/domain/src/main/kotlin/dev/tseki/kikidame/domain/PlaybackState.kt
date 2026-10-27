@@ -3,7 +3,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
-/** 再生位置と再生済み。ローカルが正（ADR 0002）。 */
+/** 再生位置と再生済み。手元で持ち、取得元が Jellyfin のブックのライブラリのときだけ取得元と分け合う（再生の共有、ADR 0013。[PlaybackSharingRules]）。 */
 data class PlaybackState(
     val episodeId: EpisodeId,
     val position: Duration,

@@ -5,7 +5,9 @@ import androidx.lifecycle.viewModelScope
 import android.util.Log
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.tseki.kikidame.R
+import dev.tseki.kikidame.data.repository.PlaybackSharing
 import dev.tseki.kikidame.domain.AppSettingsRepository
+import dev.tseki.kikidame.domain.PlaybackShareStatus
 import dev.tseki.kikidame.domain.DownloadRepository
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.UnmatchedPrograms
@@ -40,7 +42,12 @@ class SettingsViewModel @Inject constructor(
     private val downloads: DownloadRepository,
     private val nowPlaying: NowPlaying,
     library: LibraryRepository,
+    playbackSharing: PlaybackSharing,
 ) : ViewModel() {
+    /** 再生の共有の最後の送受信（ADR 0013 の決定 8、#355）。Jellyfin のブックのライブラリでないときは null（行を出さない）。 */
+    val playbackShare: StateFlow<PlaybackShareStatus?> = playbackSharing.status
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     /** 手元のファイルの合計（#42）。null は読み込み前。 */
     val localStorage: StateFlow<LocalStorageUsage?> = library.observeLocalStorage()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)

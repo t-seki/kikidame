@@ -8,7 +8,7 @@ import androidx.room.TypeConverters
 import androidx.room.migration.AutoMigrationSpec
 @Database(
     entities = [ProgramEntity::class, EpisodeEntity::class, LocalFileEntity::class, PlaybackStateEntity::class],
-    version = 9,
+    version = 10,
     exportSchema = true,
     autoMigrations = [
         // v2: programs の (publisherName, name) を unique でなくした（サーバに同名の番組があり得る）
@@ -27,6 +27,8 @@ import androidx.room.migration.AutoMigrationSpec
         AutoMigration(from = 7, to = 8),
         // v9: programs.imageVersion / imagePath（番組の画像、ADR 0012、#264）
         AutoMigration(from = 8, to = 9),
+        // v10: playback_states.sharePending / sharedPositionTicks / sharedPlayed / sharedLastPlayedAt（再生の共有、ADR 0013、#355）
+        AutoMigration(from = 9, to = 10),
     ],
 )
 @TypeConverters(Converters::class)

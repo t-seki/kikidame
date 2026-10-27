@@ -36,7 +36,7 @@
     <string name="source_pick_title">取得元を選ぶ</string>
     <string name="source_pick_description">番組をどこから取ってきますか？ あとで設定から変えられます</string>
     <string name="source_pick_jellyfin">Jellyfin に接続</string>
-    <string name="source_pick_jellyfin_description">Jellyfin サーバの音楽ライブラリを使う</string>
+    <string name="source_pick_jellyfin_description">Jellyfin サーバのブックか音楽のライブラリを使う</string>
     <string name="source_pick_smb">NAS の共有フォルダ（SMB）</string>
     <string name="source_pick_smb_description">共有フォルダの録音を直接読む。フォルダは 配信元 / 番組 / 各回のファイル の構成</string>
     <string name="source_pick_device">端末のフォルダ</string>
@@ -71,10 +71,10 @@
 
     <!-- library_pick -->
     <string name="library_pick_title">ライブラリを選ぶ</string>
-    <string name="library_pick_no_music">音楽ライブラリがありません。Jellyfin 側でラジオ録音を音楽ライブラリとして追加してから再読み込みしてください</string>
+    <string name="library_pick_none_selectable">音楽ライブラリもブックのライブラリもありません。Jellyfin 側でラジオ録音をブックのライブラリ（または音楽ライブラリ）として追加してから再読み込みしてください</string>
     <string name="library_pick_confirm">決定</string>
     <string name="library_pick_reload">再読み込み</string>
-    <string name="library_pick_music_only">音楽ライブラリのみ選べます</string>
+    <string name="library_pick_selectable_only">音楽とブックのライブラリだけを選べます</string>
     <string name="library_pick_type_music">音楽</string>
     <string name="library_pick_type_movies">映画</string>
     <string name="library_pick_type_tvshows">番組（TV）</string>
@@ -246,6 +246,10 @@
     <string name="settings_last_sync">最終同期</string>
     <string name="settings_last_sync_failed">%1$s に失敗: %2$s</string>
     <string name="settings_last_sync_skipped">%1$s は Wi-Fi ではないため見送り</string>
+    <string name="settings_playback_sharing">再生の共有</string>
+    <string name="settings_playback_sharing_ok">%1$s に共有</string>
+    <string name="settings_playback_sharing_none">まだ共有していません</string>
+    <string name="settings_playback_sharing_failed">%1$s に送れませんでした: %2$s。送れなかった分は次の同期で送ります</string>
     <string name="settings_section_download">ダウンロード</string>
     <string name="settings_storage">手元のファイル</string>
     <string name="settings_storage_tap">タップで内訳を見る</string>

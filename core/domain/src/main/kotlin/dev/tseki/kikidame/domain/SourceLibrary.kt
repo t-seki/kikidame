@@ -3,11 +3,11 @@ package dev.tseki.kikidame.domain
 import kotlin.time.Duration
 import kotlin.time.Instant
 
-/** 取得元（CONTEXT.md）上の番組の、取り込みに必要な部分だけのスナップショット。Jellyfin では MusicAlbum。 */
+/** 取得元（CONTEXT.md）上の番組の、取り込みに必要な部分だけのスナップショット。Jellyfin の音楽のライブラリでは MusicAlbum、ブックのライブラリでは各回の Album のタグ（#354）。 */
 data class SourceProgram(
     val sourceId: SourceItemId,
     val name: String,
-    /** 配信元。Jellyfin では MusicAlbum の AlbumArtist。無ければ null。 */
+    /** 配信元。Jellyfin の音楽のライブラリでは MusicAlbum の AlbumArtist、ブックのライブラリでは各回の AlbumArtist のタグ。無ければ null。 */
     val publisherName: String?,
     /** 番組の画像（CONTEXT.md）。取得元に無ければ null。中身は `SourceGateway.fetchProgramImage` で別に取る（ADR 0012）。 */
     val image: SourceImage? = null,
@@ -15,11 +15,11 @@ data class SourceProgram(
 
 /**
  * 取得元にある番組の画像の目印（ADR 0012、#264）。[version] が前の同期と同じなら、画像を取り直さない。
- * 共有フォルダでは `folder.jpg` の大きさと更新日時から作る。Jellyfin ではアルバムの Primary の ImageTag を使う（#282）。
+ * 共有フォルダでは `folder.jpg` の大きさと更新日時から作る。Jellyfin ではアルバム（ブックのライブラリでは番組のフォルダ。#354）の Primary の ImageTag を使う（#282）。
  */
 data class SourceImage(val version: String)
 
-/** 取得元上の各回。Jellyfin では Audio。 */
+/** 取得元上の各回。Jellyfin の音楽のライブラリでは Audio、ブックのライブラリでは AudioBook（#354）。 */
 data class SourceEpisode(
     val sourceId: SourceItemId,
     val programSourceId: SourceItemId,
@@ -40,6 +40,11 @@ data class SourceEpisode(
     val sourceFileSize: Long? = null,
     /** 共有フォルダでの、取得元のファイルの更新日時。Jellyfin では null。 */
     val sourceModifiedAt: Instant? = null,
+    /**
+     * 取得元に置かれた再生位置と再生済み（**再生の共有**、ADR 0013）。共有する取得元（Jellyfin のブックのライブラリ）でだけ値があり、
+     * 音楽のライブラリと共有フォルダでは null（読まない）。
+     */
+    val shared: SharedPlayState? = null,
 )
 
 /**

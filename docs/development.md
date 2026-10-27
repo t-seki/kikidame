@@ -108,6 +108,10 @@ KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTe
 - `up` は ffmpeg で無音の m4a を作った合成ライブラリ（番組 2 × 各回 3。同じ公開日の 2 本、タイトルが日付でない回、出演者の無い回を含む。番組 A のフォルダにだけ `folder.jpg` を置く（#282））を
   `/media` にマウントし、初期セットアップと音楽ライブラリ `radio` の作成を REST で済ませ、スキャンが終わるまで待つ。
   置き場は `$KIKIDAME_JF_DIR`（既定 `/tmp/kikidame-jf`）。ユーザーは `kikidame` / `kikidame-test`
+- ブックのライブラリ `radio-book`（#354）も作る。中身は音楽と同じ 6 本と `folder.jpg` に、各回が 1 本だけの番組 C を足したもので、
+  別のディレクトリ（`$KIKIDAME_JF_DIR/media-book` を `/media-book` にマウント）に置く。同じパスを 2 つのライブラリに入れると、
+  アイテムが使い回されてブックのライブラリでも Audio のまま見える（#352）ため。配信元のフォルダ（ニッポン放送）にも `folder.jpg` を置き、
+  各回が 1 本だけの番組（各回の親が配信元のフォルダになる）の画像にならないことを見る
 - `KIKIDAME_JF_LIBRARY=showcase` を付けて `media` / `up` すると、ストア向けスクリーンショット用の英語の架空ライブラリ
   （Example FM / Example Public Radio の 5 番組、45 回。#95）になる。統合テストの期待値は日本語ライブラリ前提なので、
   そのときは統合テストを回さない
@@ -115,6 +119,11 @@ KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTe
   付いているときはキャッシュを使わず毎回走る（`core/data/build.gradle.kts`）
 - `JellyfinGateway` の全メソッド（ログイン・ライブラリ一覧・番組と各回の取得・1 番組の各回・番組の存在確認・ダウンロードと `Range`・
   認証切れ・到達不能）を 1 回ずつ呼ぶ。`fetchProgramImage` も呼び、番組 A は `ImageTags.Primary` と JPEG の中身、番組 B は画像なし（null）を見る。新しい版が出たら `resolve()` にタグを足して同じテストを当てる
+- ブックのライブラリ（`radio-book`）でも、一覧（AudioBook が `Album`・`AlbumArtist` のタグで 3 番組・7 本にまとまること）・1 番組の各回・番組の存在確認・
+  番組の画像（番組 A は番組のフォルダの画像、番組 B と番組 C は画像なし）・ダウンロードと `Range` を呼ぶ（#354）
+- ブックの各回の UserData（再生の共有、#355）: `writePlayState` で位置（尺の中の 7 秒）・再生済み・`LastPlayedDate` を書き、書き込みの応答・`fetchPlayState`（時間の上限なしと上限つき）・
+  一覧（`fetchLibrary` の各回の `shared`）のどれでも同じ値で読み戻せること、再生済みにする・未再生に戻すのも同じことを見る。音楽のライブラリの一覧は UserData を載せない（`shared` が null）ことも見る。
+  書いた回は最後に位置 0・未再生に書き戻す
 - 認証は SDK が付ける `Authorization: MediaBrowser Client="Kikidame", Version="…", DeviceId="…", Device="…"` の 1 形式だけ
   （レガシーの `X-Emby-Authorization` は送らない。2026-09-21 に記録用サーバで確認）
 - 実機（Android）からコンテナに繋ぐには、Tailscale の HTTPS（`tailscale serve`）で出す。アプリは `http://` の URL を受け付けない（`normalizeServerUrl` が `plain http is not supported` で弾く）ので、`adb reverse` で `http://localhost` につなぐ形は使えない。実機は tailnet 経由でつなぐ。
@@ -210,7 +219,7 @@ main のチェックアウトから fork subagent に並列で実装させて回
   - 画面（UI）を変える issue: `docs/ui.md` と `docs/claude-code-handoff.md` の該当箇所（#156）
   - CI（`.github/workflows/ci.yml` の job・ステップ）を変える issue: 「マージ前の検証」の 1 の CI の列挙（#219）。検査を足す issue は、完了条件に「違反を入れた一時コミットで足したステップが落ちる run と、revert 後に全チェックが通る run の URL を PR の本文に書く」も入れる（#326）。また、このファイルの「ビルド・テスト」節の検査の説明の段落（`scripts/check-doc-script-refs.sh` の段落と同じ形。何を落とすか、手元でも repo 直下で流せること、テストも CI で流すこと）も「触るファイル」と完了条件に入れる（#330）
   - 挙動を変える issue: `docs/device-checklists.md` の実機チェックリストの項目（未確認の `- [ ]`）（#294）
-  - 用語の意味や利用者向けの説明が変わる issue: `CONTEXT.md` と README（`README.md` と `README.ja.md` の両方）（#294）
+  - 用語の意味や利用者向けの説明が変わる issue: `CONTEXT.md` と README（`README.md` と `README.ja.md` の両方）（#294）と、ストアの説明文 `fastlane/metadata/android/*/full_description.txt`（`en-US` と `ja-JP` の両方）（#359）
 - 挙動を変える issue で、既存のチェック済みの項目（`[x]`）が今の挙動と合わなくなるときは、記録の文は書き換えず、項目の末尾に当時の確認と分かる印（例: 「（当時の確認。#281 でボタンをなくした）」）を足す。これも「触るファイル」と完了条件に入れる（#297）
 - チェックリストの最後の未確認の項目（`- [ ]`）を `[x]` にした（または見送りの印を足した）PR は、同じ PR でそのチェックリストを `docs/device-checklists.md` から `docs/device-checklists-archive.md` へ、文を変えずに移す（前置きの、確認した日・端末・サーバの版も一緒に移す）。実機では確かめないと決めた項目は、箱は `[ ]` のまま変えず、末尾に「（実機では見送り: <理由・担保しているテスト>）」の印を足す。この印の付いた `[ ]` は済んだと数える（#305）
 - 担当は「同じファイルを触らない」単位で分ける（#81）

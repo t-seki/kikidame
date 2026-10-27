@@ -1,11 +1,11 @@
 package dev.tseki.kikidame.domain
 import kotlin.time.Instant
-/** 番組。Jellyfin の MusicAlbum に対応する。 */
+/** 番組。Jellyfin の音楽のライブラリでは MusicAlbum、ブックのライブラリでは各回の Album のタグに対応する（#354）。 */
 data class Program(
     val id: ProgramId,
     val sourceItemId: SourceItemId?,
     val name: String,
-    /** 配信元。MusicAlbum の AlbumArtist、手元では番組フォルダの親フォルダ名。 */
+    /** 配信元。MusicAlbum の AlbumArtist（ブックのライブラリでは各回の AlbumArtist のタグ）、手元では番組フォルダの親フォルダ名。 */
     val publisherName: String?,
     val syncEnabled: Boolean = false,
     val retentionRule: RetentionRule = RetentionRule(),

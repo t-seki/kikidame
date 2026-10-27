@@ -27,7 +27,8 @@ data class LibraryPickUiState(
     val isSaving: Boolean = false,
     val error: UiText? = null,
 ) {
-    val musicCount: Int get() = libraries.orEmpty().count { it.isMusic }
+    /** 選べる（音楽かブックの）ライブラリの数（#354）。 */
+    val selectableCount: Int get() = libraries.orEmpty().count { it.isSelectable }
     val canConfirm: Boolean get() = !isSaving && selectedId != null
 }
 
@@ -50,10 +51,10 @@ class LibraryPickViewModel @Inject constructor(
             try {
                 val libraries = sessionRepository.listLibraries()
                 val current = ((sessionRepository.state.first() as? SessionState.Ready)?.source as? ConnectedSource.Jellyfin)?.library?.id
-                val music = libraries.filter { it.isMusic }
-                // 音楽ライブラリが 1 つならそれを選択済みにする。画面自体は常に出す
-                val preselected = current?.takeIf { id -> music.any { it.id == id } }
-                    ?: music.singleOrNull()?.id
+                val selectable = libraries.filter { it.isSelectable }
+                // 選べる（音楽かブックの。#354）ライブラリが 1 つならそれを選択済みにする。画面自体は常に出す
+                val preselected = current?.takeIf { id -> selectable.any { it.id == id } }
+                    ?: selectable.singleOrNull()?.id
                 _uiState.update { it.copy(libraries = libraries, selectedId = preselected, isLoading = false) }
             } catch (e: SourceException.Unauthorized) {
                 // 401 はログアウトと同じ扱い。セッション状態が変わり、NavHost が接続画面へ導く
@@ -68,7 +69,7 @@ class LibraryPickViewModel @Inject constructor(
     }
 
     fun select(library: LibraryView) {
-        if (!library.isMusic) return
+        if (!library.isSelectable) return
         _uiState.update { it.copy(selectedId = library.id) }
     }
 

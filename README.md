@@ -21,10 +21,10 @@ The name comes from the Japanese *kiki-dame* ("listen to what you have saved up"
 
 Existing Jellyfin clients (the official app, Findroid, Finamp) are built around video or music. Two things are weak there: "keep episodes on the device, program by program, and remove them automatically" and "work fully even when the server is unreachable". Kikidame is built for exactly those two, for audio where episodes pile up.
 
-- **Offline first** — playback always uses the files on the device. Playback position and played state live on the device only and are never sent to the server
+- **Offline first** — playback always uses the files on the device. Playback position and played state are kept on the device, and playback does not stop when the server is unreachable (with a Jellyfin books library they are also shared with the server when it can be reached; see "Playback sharing" below)
 - **Retention rules** — per program, choose "Keep latest N" and "Delete after played"; sync then downloads what is missing and removes what is no longer needed
 
-It assumes one source at a time (one Jellyfin server, user and library, or one NAS shared folder or folder on the device) and that this app is the only place you listen. Changing the source deletes the programs, episodes, playback positions and files on the device and starts over. Sharing with other devices or the web player is not a goal.
+It assumes one source at a time (one Jellyfin server, user and library, or one NAS shared folder or folder on the device). With a Jellyfin books library, the playback position and played state are shared with other devices and Jellyfin Web through the server (**playback sharing**; see "Playback sharing" under "Jellyfin" below). With the other sources (a music library, a shared folder, a folder on the device) they stay on the device only, and this app is assumed to be the only place you listen. Changing the source deletes the programs, episodes, playback positions and files on the device and starts over. Choosing another library on the same Jellyfin server with the same user does not count as changing the source: nothing on the device is deleted, and the next sync links the programs and episodes again ([ADR 0013](./docs/adr/0013-share-playback-state-via-jellyfin-book-library.md), decision 7).
 
 ## What it does
 
@@ -56,19 +56,37 @@ The app connects to **Jellyfin**, a **shared folder on a NAS (SMB)** or a **fold
 ### Jellyfin
 
 - Jellyfin **10.10 or later** (10.10.7 and 12.0.0 verified with containers and the integration test, 10.11 on a real server; see `scripts/jellyfin-testserver.sh` and "テスト用 Jellyfin サーバ" in `docs/development.md`, Japanese. Legacy authentication is not used)
-- The audio must be in a **music library**. The app maps it like this:
+- The audio must be in a **books library** (content type "Books") or a **music library**. A books library is recommended: sharing the playback position and played state with other devices and Jellyfin Web through Jellyfin (playback sharing, below) is done for books libraries only ([ADR 0013](./docs/adr/0013-share-playback-state-via-jellyfin-book-library.md), Japanese). Music libraries keep working as before, with the playback position and played state kept on the device only. The app maps them like this:
 
-  | Jellyfin | In the app |
-  | --- | --- |
-  | MusicAlbum | Program |
-  | Audio | Episode |
-  | AlbumArtist | Publisher |
-  | Artists of the Audio | Performers (display only) |
-  | PremiereDate (DateCreated if missing) | Published At (ordering and the basis of "Keep latest N") |
+  | Jellyfin (books library) | Jellyfin (music library) | In the app |
+  | --- | --- | --- |
+  | The Album tag of the episodes | MusicAlbum | Program |
+  | AudioBook | Audio | Episode |
+  | The AlbumArtist tag of the episodes | AlbumArtist of the MusicAlbum | Publisher |
+  | Artists of the AudioBook | Artists of the Audio | Performers (display only) |
+  | PremiereDate (DateCreated if missing) | PremiereDate (DateCreated if missing) | Published At (ordering and the basis of "Keep latest N") |
+  | The image of the program's folder (none for a program with a single episode) | The image of the MusicAlbum | Program image |
 
-- In other words, the file tags need `album` = program, `albumartist` = publisher, the date (`©day` in M4A) = published at, and `artist` = performers. Jellyfin builds the structure above from them. Whether MP3 date tags yield a published date is unverified
+- In other words, the file tags need `album` = program, `albumartist` = publisher, the date (`©day` in M4A) = published at, and `artist` = performers. In a books library the app groups the episodes into programs by the `album` and `albumartist` tags; in a music library Jellyfin builds the structure above. Whether MP3 date tags yield a published date is unverified
   - For radio recordings, set the tags `album` = program, `albumartist` = station, and the date (`©day` in M4A) = broadcast date, using a general-purpose tag editor such as Mp3tag
-  - For podcasts, tag the files you fetched from the feed with `album` = program name, `albumartist` = the publisher or network, and the date = release date, then put them in the music library. One folder per program helps Jellyfin group them into a MusicAlbum
+  - For podcasts, tag the files you fetched from the feed with `album` = program name, `albumartist` = the publisher or network, and the date = release date, then put them in the library. In a music library, one folder per program helps Jellyfin group them into a MusicAlbum
+  - Books libraries were checked with the 10.10.7 and 12.0 containers (the integration test) and a 10.11.11 container ([#352](https://github.com/t-seki/kikidame/issues/352)): every episode is listed as an AudioBook. Moving a real server over has not been checked yet
+- **Playback sharing** (books libraries only. [ADR 0013](./docs/adr/0013-share-playback-state-via-jellyfin-book-library.md), Japanese): the playback position and played state of each episode are written to Jellyfin's UserData (each item's playback position, played state and last played date), and values written elsewhere are taken in
+  - **Sign in with the same Jellyfin user in Kikidame and in Jellyfin Web or any other client.** UserData is stored in the server's database per Jellyfin user and item (it is not written to the audio files), so listening as another user is not shared
+  - Kikidame sends on pause, stop, the end of an episode, and when you mark an episode played or unplayed (marks changed while nothing is playing are sent when playback starts or on the next sync). It reads at every sync and just before an episode starts playing (including resuming from pause; it waits up to 2 seconds and plays from the position on the device if the read fails). During a sync, the episode you are listening to keeps the position on the device
+  - If both sides changed, the newer one wins (the time of the change on the device against the server's last played date)
+  - When the server cannot be reached, playback on the device does not stop. What could not be sent is sent on the next sync. "Playback sharing" under "Last sync" in Settings shows the last time sharing worked and whether sending failed (no notification is shown)
+  - Episodes that became played elsewhere are also removed by "Delete after played" once a sync has taken them in
+  - Jellyfin Web and other clients decide the position and played state by the server's rules. As far as checked by sending playback reports to a 10.11.11 container, a position stopped before 5 minutes is not kept, and an episode becomes played with less than 5 minutes left (the server settings `MinAudiobookResume` and `MaxAudiobookResume`, 5 minutes by default; [#352](https://github.com/t-seki/kikidame/issues/352)). This differs from Kikidame's own played rule (the last 2 minutes). The web rules on 10.10 and 12 are not verified
+  - Kikidame's playback does not appear in "Now playing" or the play counts on the Jellyfin dashboard (it writes UserData directly and sends no playback reports)
+  - Writing and reading back were verified with 10.10.7 and 12.0.0 containers (the integration test). Verification on a real 10.11 server and how it looks in Jellyfin Web are not done yet
+  - Whether the server carries the UserData over when it recreates an episode's item (for example after a file rename) is not verified. What Kikidame has on the device is written again to the new item after the sync links it again
+- To move from a music library to a books library (the programs, episodes, playback positions, played state and downloaded files on the device are linked again by the sync after you choose the new library, matching on publisher, program name and title. [ADR 0005](./docs/adr/0005-rematch-unlinked-rows-before-sync-deletes.md)):
+  1. Update Kikidame to a version that can use books libraries (one that includes [#354](https://github.com/t-seki/kikidame/issues/354))
+  2. In the Jellyfin dashboard, remove the music library. If the same folder is in both a music and a books library, Jellyfin reuses the items and the books library still shows them as Audio and MusicAlbum ("確かめた事実" in [ADR 0013](./docs/adr/0013-share-playback-state-via-jellyfin-book-library.md), Japanese)
+  3. Add a library with the content type "Books" for the same folder and wait for the scan to finish
+  4. In Kikidame, tap "Library" in Settings and choose the books library, then tap "Done". The sync starts
+  5. Check that the programs and episodes are still there, and that the in-progress positions and played marks are kept. The same sync writes the positions and played marks of the linked episodes to the server (if the server has other values, the newer ones win). Programs that could not be linked again (for example when the publisher or program name changed) stay on the device and are counted in "Remove programs not found on the source" in Settings
 
 ### Shared folder on a NAS (SMB)
 
@@ -102,7 +120,7 @@ The app connects to **Jellyfin**, a **shared folder on a NAS (SMB)** or a **fold
 ## How it works
 
 - **The source (the Jellyfin server or the shared folder) is the source of truth for which episodes exist; the device is a cache.** Sync deletes only when it has obtained the source's full listing ([ADR 0004](./docs/adr/0004-sync-deletes-only-from-full-listing.md), Japanese). If it cannot, the program is On Hold: nothing is downloaded and nothing is deleted
-- **Playback position and played state are owned by the device.** They are never sent to the server, and the server's values are never used ([ADR 0002](./docs/adr/0002-playback-position-local-authority.md), [ADR 0007](./docs/adr/0007-playback-state-stays-local.md), Japanese)
+- **Playback position and played state are kept on the device and shared with the server only for a Jellyfin books library.** For each episode the device keeps "the server value last seen": if only the server changed, its value is taken; if only the device changed, the device's value is sent; only when both changed are the times compared. With a music library and shared folders nothing is sent and the server's values are not used ([ADR 0013](./docs/adr/0013-share-playback-state-via-jellyfin-book-library.md), Japanese; it replaces ADR 0002 and 0007)
 - **Identity in the app does not depend on source IDs** (a Jellyfin id, or the relative path inside a shared folder). If the library is rebuilt on the server and IDs change, or a file is renamed in a shared folder, programs and episodes are matched again by publisher, program name, and title, keeping files and playback positions ([ADR 0001](./docs/adr/0001-local-surrogate-key.md), [ADR 0005](./docs/adr/0005-rematch-unlinked-rows-before-sync-deletes.md), Japanese)
 - **Retention rules apply only at sync time.** Nothing is deleted the moment you mark an episode played. Nothing is deleted while you change a program's sync settings either; when you close the settings, that program is synced and the rules are applied
 
@@ -137,7 +155,7 @@ The stack is Kotlin / Jetpack Compose (Material 3) / Media3 / Room / WorkManager
 
 - Video, transcoding, casting
 - Multiple servers, users, or libraries
-- Syncing playback position or played state to the server, or sharing them with other devices
+- Sharing the playback position and played state with anything other than a Jellyfin books library (a music library, a shared folder, a folder on the device; shared folders are handled in [#353](https://github.com/t-seki/kikidame/issues/353))
 - Server administration
 - Audiobooks (you listen from the oldest chapter, so "Keep latest N" does not fit; supporting them would need a "direction" per program)
 - Distribution and payments on Google Play (if demand appears, the option of selling a paid build on Play while Releases stay free is kept open; [ADR 0008](./docs/adr/0008-open-source-distributed-outside-play.md), Japanese)

@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dev.tseki.kikidame.domain.ConnectedSource
 import dev.tseki.kikidame.domain.DeviceFolder
+import dev.tseki.kikidame.domain.LibraryKind
 import dev.tseki.kikidame.domain.SelectedLibrary
 import dev.tseki.kikidame.domain.SmbConnection
 import dev.tseki.kikidame.domain.SourceItemId
@@ -47,6 +48,7 @@ class SessionStore(
             it.removeDevice()
             it.remove(LIBRARY_ID)
             it.remove(LIBRARY_NAME)
+            it.remove(LIBRARY_KIND)
             it.removeSyncTimes()
         }
     }
@@ -80,10 +82,15 @@ class SessionStore(
         }
     }
 
+    /**
+     * ライブラリを保存する。同じサーバ・同じユーザーのままライブラリを変えるのは取得元を変えることに当たらないので（ADR 0013 の決定 7）、
+     * 同期の時刻も手元のデータも消さない。手元の番組・各回は次の同期の突合で結び直す（ADR 0005）。
+     */
     suspend fun saveLibrary(library: SelectedLibrary) {
         dataStore.edit {
             it[LIBRARY_ID] = library.id.value
             it[LIBRARY_NAME] = library.name
+            it[LIBRARY_KIND] = library.kind.storedName
         }
     }
 
@@ -134,6 +141,7 @@ class SessionStore(
             if (it[DEVICE_TREE_URI] != null) it[DEVICE_SIGNED_OUT] = true
             it.remove(LIBRARY_ID)
             it.remove(LIBRARY_NAME)
+            it.remove(LIBRARY_KIND)
             it.removeSyncTimes()
         }
     }
@@ -149,6 +157,7 @@ class SessionStore(
         remove(TOKEN)
         remove(LIBRARY_ID)
         remove(LIBRARY_NAME)
+        remove(LIBRARY_KIND)
     }
 
     private fun MutablePreferences.removeSmb() {
@@ -246,8 +255,18 @@ class SessionStore(
         val libraryId = this[LIBRARY_ID]
         val libraryName = this[LIBRARY_NAME]
         if (libraryId == null || libraryName == null) return SessionState.NeedsLibrary(session)
-        return toReady(ConnectedSource.Jellyfin(session, SelectedLibrary(SourceItemId(libraryId), libraryName)))
+        // 種類のキーが無いのは、前の版（音楽のライブラリだけを選べた）で選んだライブラリ。読めない値（新しい版が書いた種類など）なら選び直させる
+        val kind = this[LIBRARY_KIND]?.let { stored -> LibraryKind.entries.firstOrNull { it.storedName == stored } ?: return SessionState.NeedsLibrary(session) }
+            ?: LibraryKind.MUSIC
+        return toReady(ConnectedSource.Jellyfin(session, SelectedLibrary(SourceItemId(libraryId), libraryName, kind)))
     }
+
+    /** DataStore に置く種類の名前。enum の名前に頼らず固定する。 */
+    private val LibraryKind.storedName: String
+        get() = when (this) {
+            LibraryKind.MUSIC -> "music"
+            LibraryKind.BOOKS -> "books"
+        }
 
     private companion object {
         val SERVER_URL = stringPreferencesKey("server_url")
@@ -256,6 +275,9 @@ class SessionStore(
         val TOKEN = stringPreferencesKey("access_token")
         val LIBRARY_ID = stringPreferencesKey("library_id")
         val LIBRARY_NAME = stringPreferencesKey("library_name")
+
+        /** ライブラリの種類（#354）。`music` か `books`。前の版は書いていない（無ければ音楽）。 */
+        val LIBRARY_KIND = stringPreferencesKey("library_kind")
         val LAST_FETCHED_AT = longPreferencesKey("last_fetched_at")
         val LAST_ATTEMPTED_AT = longPreferencesKey("last_attempted_at")
         val SYNC_ATTEMPT_AT = longPreferencesKey("sync_attempt_at")

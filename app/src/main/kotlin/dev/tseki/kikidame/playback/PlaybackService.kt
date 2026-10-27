@@ -1,5 +1,9 @@
 package dev.tseki.kikidame.playback
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
+import android.media.AudioManager
 import android.content.Intent
 import android.util.Log
 import androidx.annotation.OptIn
@@ -22,7 +26,10 @@ import dev.tseki.kikidame.MainActivity
 import dev.tseki.kikidame.R
 import dev.tseki.kikidame.text.UiText
 import dev.tseki.kikidame.di.ApplicationScope
+import dev.tseki.kikidame.data.db.SharedPlaybackRow
+import dev.tseki.kikidame.data.repository.PlaybackSharing
 import dev.tseki.kikidame.domain.AppSettingsRepository
+import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.EpisodeWithState
 import dev.tseki.kikidame.domain.LibraryRepository
 import dev.tseki.kikidame.domain.PlaybackRules
@@ -54,10 +61,15 @@ class PlaybackService : MediaLibraryService() {
     @Inject lateinit var sleepTimer: SleepTimer
     @Inject lateinit var programQueue: ProgramQueue
     @Inject lateinit var episodeImage: EpisodeImage
+    @Inject lateinit var playbackSharing: PlaybackSharing
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var session: MediaLibrarySession? = null
     private var positionPersister: PositionPersister? = null
     private var resumeOnTransition: ResumeOnTransition? = null
+    private var sharePusher: PlaybackSharePusher<SharedPlaybackRow>? = null
+    /** セッションに渡した包み（[ReadBeforePlayPlayer]）の中の ExoPlayer。リスナーはこちらに付ける。 */
+    private var exoPlayer: ExoPlayer? = null
+    private var noisyReceiver: BroadcastReceiver? = null
     private var nowPlayingListener: Player.Listener? = null
     private var episodeImageAttacher: EpisodeImageAttacher? = null
     private var speedJob: Job? = null
@@ -101,13 +113,23 @@ class PlaybackService : MediaLibraryService() {
             .setSeekBackIncrementMs(SKIP_MS)
             .setSeekForwardIncrementMs(SKIP_MS)
             .build()
+            .also { exoPlayer = it }
         val sessionActivity = PendingIntent.getActivity(
             this,
             0,
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        session = MediaLibrarySession.Builder(this, player, LibrarySessionCallback())
+        // 再生の共有（ADR 0013、#355）: セッションには ▶ の直前に取得元の値を読むプレイヤーを渡す。ほかの部品は ExoPlayer を直接見る
+        val sessionPlayer = ReadBeforePlayPlayer(player, scope, playbackSharing::refreshBeforePlay)
+        // ▶ の直前の読み込みを待っている間に出力先が外れたら、待っていた ▶ を取り消す（#358）。鳴っている最中は ExoPlayer の
+        // setHandleAudioBecomingNoisy(true) に任せる（sessionPlayer は待っていなければ何もしない）
+        noisyReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) sessionPlayer.cancelPendingPlay()
+            }
+        }.also { registerReceiver(it, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY)) }
+        session = MediaLibrarySession.Builder(this, sessionPlayer, LibrarySessionCallback())
             .setSessionActivity(sessionActivity)
             .setMediaButtonPreferences(
                 listOf(
@@ -126,7 +148,17 @@ class PlaybackService : MediaLibraryService() {
             .build()
         positionPersister = PositionPersister(player, playbackStateRepository, clock, scope, applicationScope)
             .also { it.attach() }
-        resumeOnTransition = ResumeOnTransition(player, playbackStateRepository, scope).also { it.attach() }
+        resumeOnTransition = ResumeOnTransition(player, playbackStateRepository, scope, playbackSharing::refreshBeforePlay).also { it.attach() }
+        // 再生の共有: 一時停止・停止・回の終わり・再生済みの手動切替の後に、未送信の回を送る（鳴っている回は除く）
+        sharePusher = PlaybackSharePusher(
+            player = player,
+            scope = scope,
+            sendScope = applicationScope,
+            pending = playbackSharing.observePending(),
+            key = { it.episodeId to it.state?.updatedAt },
+            episodeOf = { EpisodeId(it.episodeId) },
+            send = { rows, except -> playbackSharing.sendPending(rows, except) },
+        ).also { it.attach() }
         nowPlayingListener = nowPlaying.listener(player, scope).also(player::addListener)
         // 回の画像（#283）: 聴く回に替わるたび、埋め込み画像（無ければ番組の画像）を現在の項目に載せる
         episodeImageAttacher = EpisodeImageAttacher(player, scope, episodeImage::load).also { it.attach() }
@@ -151,13 +183,21 @@ class PlaybackService : MediaLibraryService() {
         episodeImageAttacher?.detach()
         positionPersister?.detach()
         resumeOnTransition?.detach()
+        sharePusher?.detach()
+        noisyReceiver?.let(::unregisterReceiver)
+        noisyReceiver = null
         scope.cancel()
+        exoPlayer?.run {
+            nowPlayingListener?.let(::removeListener)
+            removeListener(errorListener)
+        }
         session?.run {
-            nowPlayingListener?.let(player::removeListener)
-            player.removeListener(errorListener)
+            // player はセッションに渡した包み（ReadBeforePlayPlayer）。包みを放してから、中の ExoPlayer も放す（放し済みなら何もしない）
             player.release()
             release()
         }
+        exoPlayer?.release()
+        exoPlayer = null
         nowPlaying.set(null)
         session = null
         super.onDestroy()

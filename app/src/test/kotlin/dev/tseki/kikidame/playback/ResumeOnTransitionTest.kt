@@ -53,6 +53,32 @@ class ResumeOnTransitionTest {
         player.update { }
         assertEquals(0L, player.currentPosition)
     }
+    /** 再生の共有（#355）: 手元の位置へ移った後に取得元の値を読み、採ると決まればその位置へ移り直す。 */
+    @Test
+    fun movesAgainToANewerServerPosition() = runTest(StandardTestDispatcher()) {
+        repo.states.value = mapOf(EpisodeId(2) to PlaybackState(EpisodeId(2), 7.minutes, played = false, updatedAt = now))
+        player.setPlaylist(listOf(item(1), item(2)), listOf(runtime.inWholeMilliseconds, runtime.inWholeMilliseconds))
+        val reads = ArrayList<EpisodeId>()
+        ResumeOnTransition(player, repo, this) { id -> reads += id; PlaybackState(id, 12.minutes, played = false, updatedAt = now) }.attach()
+        player.seekToNextMediaItem()
+        player.update { }
+        runCurrent()
+        player.update { }
+        assertEquals(listOf(EpisodeId(2)), reads)
+        assertEquals(12.minutes.inWholeMilliseconds, player.currentPosition)
+    }
+    /** 取得元の値を採ったら、先頭（ほかで聴き終えた）でも移る（#357 の 1 周目 4）。 */
+    @Test
+    fun movesToTheStartWhenTheServerValueIsTaken() = runTest(StandardTestDispatcher()) {
+        repo.states.value = mapOf(EpisodeId(2) to PlaybackState(EpisodeId(2), 7.minutes, played = false, updatedAt = now))
+        player.setPlaylist(listOf(item(1), item(2)), listOf(runtime.inWholeMilliseconds, runtime.inWholeMilliseconds))
+        ResumeOnTransition(player, repo, this) { id -> PlaybackState(id, 29.minutes, played = true, updatedAt = now) }.attach()
+        player.seekToNextMediaItem()
+        player.update { }
+        runCurrent()
+        player.update { }
+        assertEquals(0L, player.currentPosition)
+    }
     @Test
     fun ignoresPlaylistChange() = runTest(StandardTestDispatcher()) {
         repo.states.value = mapOf(EpisodeId(1) to PlaybackState(EpisodeId(1), 7.minutes, played = false, updatedAt = now))
