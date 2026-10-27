@@ -1,0 +1,4 @@
+- Jellyfin: pick a book library as the source, as well as a music library. Switching libraries keeps your files and re-links them on the next sync
+- Playback position and played state are shared via the book library's user data
+- Background sync runs every 3 hours; the launch sync needs 15+ minutes since the last. New Settings row for battery optimization
+- Sync failures show in Settings' "Last sync" row; a notification comes after 24+ hours of failing
