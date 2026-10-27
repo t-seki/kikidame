@@ -29,6 +29,7 @@ import dev.tseki.kikidame.ui.toClockText
 import dev.tseki.kikidame.ui.toPerformersText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -44,6 +45,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -166,8 +168,13 @@ class PlayerViewModel @Inject constructor(
     fun setSleepTimerToEndOfEpisode() = sleepTimer.set(SleepTimerSetting.EndOfEpisode)
 
     private var controller: MediaController? = null
+    /** onEvents が位置の読みのループの待ちを打ち切って、その位置から待ち直させる（#367）。溜めるのは 1 つだけ。 */
+    private val wakeUps = Channel<Unit>(Channel.CONFLATED)
     private val listener = object : Player.Listener {
-        override fun onEvents(player: Player, events: Player.Events) = refresh(player)
+        override fun onEvents(player: Player, events: Player.Events) {
+            refresh(player)
+            wakeUps.trySend(Unit)
+        }
     }
     init {
         // 再生の失敗でキューが空になった理由。この画面が開いている間はここが受け取り、閉じていれば一覧のスナックバーが受け取る
@@ -179,9 +186,13 @@ class PlayerViewModel @Inject constructor(
             controller = c
             c.addListener(listener)
             open(c, requestedEpisodeId, route.play)
+            // 再生中は秒の境目（とチャプターの開始）の直後に読む（#367）。onEvents が来たらその位置から待ち直す
             while (isActive) {
                 refresh(c)
-                delay(POSITION_REFRESH_MS)
+                // refresh が読んだ位置を使い回す（読み直すと秒の境目をまたいで待ちが約 1 秒になり、秒を飛ばす）
+                val read = _uiState.value
+                val wait = nextPositionRefreshDelayMs(read.isPlaying, read.positionMs, c.playbackParameters.speed, read.chapters)
+                withTimeoutOrNull(wait) { wakeUps.receive() }
             }
         }
     }
@@ -278,9 +289,6 @@ class PlayerViewModel @Inject constructor(
             it.removeListener(listener)
             connection.release(it)
         }
-    }
-    companion object {
-        const val POSITION_REFRESH_MS = 500L
     }
 }
 /** `配信元 · 出演者`。無い方は省き、両方無ければ null。出演者の区切りは言語で変わるので、解決は Composable に任せる。 */
