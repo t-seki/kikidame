@@ -1,4 +1,5 @@
 package dev.tseki.kikidame.ui.player
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
@@ -58,7 +59,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -188,7 +188,7 @@ internal fun PlayerContent(
                 Text(it.resolve(), color = MaterialTheme.colorScheme.error)
             }
             Spacer(Modifier.height(8.dp))
-            // スワイプ中は差分と目標位置（primary）、普段は今のチャプターの題（#348。控えめな色で 1 行、あふれたら「…」）。
+            // スワイプ中は差分と目標位置（primary）、普段は今のチャプターの題（#348。控えめな色で 1 行。1 行に収まらないときだけ `basicMarquee` で横に流す。スワイプ中は流さない）。
             // チャプターの無い回・最初のチャプターの前は空白。場所は常に確保してレイアウトが跳ねないようにする
             val chapterTitle = currentChapter(state.chapters, state.positionMs)?.title
             Text(
@@ -198,9 +198,10 @@ internal fun PlayerContent(
                 style = MaterialTheme.typography.titleMedium,
                 color = if (swipeTargetMs != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.alpha(if (swipeTargetMs != null || !chapterTitle.isNullOrEmpty()) 1f else 0f),
+                modifier = Modifier
+                    .alpha(if (swipeTargetMs != null || !chapterTitle.isNullOrEmpty()) 1f else 0f)
+                    .then(if (swipeTargetMs == null) Modifier.basicMarquee() else Modifier),
             )
             Spacer(Modifier.height(24.dp))
             SeekBar(
