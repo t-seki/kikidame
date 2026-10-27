@@ -92,6 +92,7 @@ class PlaybackSharing @Inject constructor(
         if (shared.isEmpty()) return
         val target = target() ?: return
         val toSend = ArrayList<Pair<SharedPlaybackRow, SharedPlayState>>()
+        val serverOf = HashMap<Long, SharedPlayState>()
         db.withTransaction {
             for (row in dao.listShared()) {
                 val server = shared[row.sourceItemId] ?: continue
@@ -99,11 +100,25 @@ class PlaybackSharing @Inject constructor(
                 when (val decision = PlaybackSharingRules.decide(row.toRecord(), server)) {
                     PlaybackSharingRules.Decision.Keep -> Unit
                     is PlaybackSharingRules.Decision.TakeShared -> take(row, decision.shared)
-                    is PlaybackSharingRules.Decision.SendLocal -> toSend += row to decision.state
+                    is PlaybackSharingRules.Decision.SendLocal -> {
+                        toSend += row to decision.state
+                        serverOf[row.episodeId] = server
+                    }
                 }
             }
         }
-        val failure = sendLock.withLock { send(target, toSend) }
+        val failure = sendLock.withLock {
+            var failure: SyncOutcome.Failure? = null
+            for ((row, _) in toSend) {
+                val item = redecide(row, serverOf.getValue(row.episodeId)) ?: continue
+                val sendFailure = send(target, listOf(item))
+                if (sendFailure != null) {
+                    failure = failure ?: sendFailure
+                    if (sendFailure == SyncOutcome.Unreachable) break
+                }
+            }
+            failure
+        }
         statusStore.record(target.libraryId, clock.now(), failure)
     }
 
@@ -186,6 +201,26 @@ class PlaybackSharing @Inject constructor(
             }
         }
     }
+
+    /**
+     * [sendLock] の中で呼ぶ。同期のトランザクションで「手元を送る」と決めた [decided] の行を読み直し、送る直前に決め直す
+     * （決めてからロックを取るまでに、一時停止などで手元が変わった・ほかの送信が送った場合に、古い値を送らない）。
+     * 最後に見た値が決めたときと違えば（その間にほかの送信が取得元とやり取りした）、一覧で読んだ [server] はもう古いので何もしない。
+     * 送るなら、読み直した行と送る値を返す。取得元の値を採ると決め直したら手元に入れて null。
+     */
+    private suspend fun redecide(decided: SharedPlaybackRow, server: SharedPlayState): Pair<SharedPlaybackRow, SharedPlayState>? =
+        db.withTransaction {
+            val current = dao.findShared(decided.episodeId) ?: return@withTransaction null
+            if (current.toRecord().lastSeen != decided.toRecord().lastSeen) return@withTransaction null
+            when (val decision = PlaybackSharingRules.decide(current.toRecord(), server)) {
+                is PlaybackSharingRules.Decision.SendLocal -> current to decision.state
+                is PlaybackSharingRules.Decision.TakeShared -> {
+                    take(current, decision.shared)
+                    null
+                }
+                PlaybackSharingRules.Decision.Keep -> null
+            }
+        }
 
     /** トランザクションの中で呼ぶ。取得元の値を手元に入れ、最後に見た値にする。入れた状態を返す（行を作らなかったら null）。 */
     private suspend fun take(row: SharedPlaybackRow, shared: SharedPlayState): PlaybackState? {

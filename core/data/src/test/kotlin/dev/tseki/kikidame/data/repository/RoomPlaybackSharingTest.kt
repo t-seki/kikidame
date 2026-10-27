@@ -386,6 +386,72 @@ class RoomPlaybackSharingTest : JellyfinRefreshTestBase() {
         assertEquals(t1 to SyncOutcome.Unreachable, shareStatus.status.first()?.currentFailure)
     }
 
+    /**
+     * 同期で「手元を送る」と決めてから送るまでに手元が変わったら、変わった後の値を送る（#357 の 2 周目 1）。
+     * 2 回を送る同期で、1 回目を送っている間にもう 1 回の手元を変える。
+     */
+    @Test
+    fun syncSendsTheLatestLocalValueWhenItChangesBeforeSending() = runTest {
+        selectBooks()
+        gateway.snapshot = snapshot()
+        repo.refresh()
+        now = t1
+        val e1 = id("e1")
+        val e2 = id("e2")
+        playback.update(e1) { PlaybackRules.advance(it, 3.minutes, runtime, now) }
+        playback.update(e2) { PlaybackRules.advance(it, 3.minutes, runtime, now) }
+        var changed: SourceItemId? = null
+        gateway.duringWrite = {
+            if (changed == null) {
+                val first = gateway.writtenPlayStates.single().first
+                val other = if (first == SourceItemId("e1")) e2 else e1
+                changed = if (other == e1) SourceItemId("e1") else SourceItemId("e2")
+                now = t2
+                playback.update(other) { PlaybackRules.advance(it, 4.minutes, runtime, now) }
+            }
+        }
+
+        repo.refresh()
+
+        assertEquals(2, gateway.writtenPlayStates.size)
+        assertEquals(changed!! to SharedPlayState(4.minutes, false, t2), gateway.writtenPlayStates.last())
+        assertFalse(row(changed!!.value)!!.sharePending)
+    }
+
+    /** 決めてから送るまでに、ほかの送信（一時停止の後など）がその回を送り終えていたら、同期は古い一覧の値で送り直さない。 */
+    @Test
+    fun syncDoesNotResendWhatAnotherSendAlreadySent() = runTest {
+        selectBooks()
+        gateway.snapshot = snapshot()
+        repo.refresh()
+        now = t1
+        val e1 = id("e1")
+        val e2 = id("e2")
+        playback.update(e1) { PlaybackRules.advance(it, 3.minutes, runtime, now) }
+        playback.update(e2) { PlaybackRules.advance(it, 3.minutes, runtime, now) }
+        var other: EpisodeId? = null
+        gateway.duringWrite = {
+            if (other == null) {
+                val first = gateway.writtenPlayStates.single().first
+                val o = if (first == SourceItemId("e1")) e2 else e1
+                other = o
+                // ほかの送信が 5 分を送り、最後に見た値が変わった
+                now = t2
+                playback.update(o) { PlaybackRules.advance(it, 5.minutes, runtime, now) }
+                db.playbackStateDao().markSent(
+                    o.value, dev.tseki.kikidame.domain.Ticks.fromDuration(5.minutes), false, t2,
+                    dev.tseki.kikidame.domain.Ticks.fromDuration(5.minutes), false, t2,
+                )
+            }
+        }
+
+        repo.refresh()
+
+        assertEquals(1, gateway.writtenPlayStates.size, "only the first one is written by the sync")
+        assertEquals(5.minutes, db.playbackStateDao().findByEpisode(other!!.value)!!.let { dev.tseki.kikidame.domain.Ticks.toDuration(it.positionTicks) })
+        assertFalse(db.playbackStateDao().findByEpisode(other!!.value)!!.sharePending)
+    }
+
     @Test
     fun sendPendingSkipsTheEpisodeBeingPlayed() = runTest {
         selectBooks()
