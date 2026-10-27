@@ -189,7 +189,9 @@ class PlayerViewModel @Inject constructor(
             // 再生中は秒の境目（とチャプターの開始）の直後に読む（#367）。onEvents が来たらその位置から待ち直す
             while (isActive) {
                 refresh(c)
-                val wait = nextPositionRefreshDelayMs(c.isPlaying, c.currentPosition.coerceAtLeast(0), c.playbackParameters.speed, chapters)
+                // refresh が読んだ位置を使い回す（読み直すと秒の境目をまたいで待ちが約 1 秒になり、秒を飛ばす）
+                val read = _uiState.value
+                val wait = nextPositionRefreshDelayMs(read.isPlaying, read.positionMs, c.playbackParameters.speed, read.chapters)
                 withTimeoutOrNull(wait) { wakeUps.receive() }
             }
         }
