@@ -286,6 +286,8 @@
     <string name="player_sleep_timer">Sleep timer</string>
     <!-- Short label of the sleep timer button when no timer is set -->
     <string name="player_sleep">Sleep</string>
+    <!-- Button under the seek bar and title of the chapter list sheet (#348) -->
+    <string name="player_chapters">Chapters</string>
     <!-- Sleep timer label when set to stop at the end of the episode -->
     <string name="player_end_of_episode">End of episode</string>
     <string name="player_previous">Previous episode</string>

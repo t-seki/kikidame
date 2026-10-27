@@ -14,8 +14,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Forward10
@@ -38,6 +42,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -48,10 +53,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -134,6 +141,7 @@ internal fun PlayerContent(
 ) {
     var showSpeedSheet by remember { mutableStateOf(false) }
     var showSleepSheet by remember { mutableStateOf(false) }
+    var showChapterSheet by remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -180,12 +188,19 @@ internal fun PlayerContent(
                 Text(it.resolve(), color = MaterialTheme.colorScheme.error)
             }
             Spacer(Modifier.height(8.dp))
-            // スワイプ中だけ見せる。場所は常に確保してレイアウトが跳ねないようにする
+            // スワイプ中は差分と目標位置（primary）、普段は今のチャプターの題（#348。控えめな色で 1 行、あふれたら「…」）。
+            // チャプターの無い回・最初のチャプターの前は空白。場所は常に確保してレイアウトが跳ねないようにする
+            val chapterTitle = currentChapter(state.chapters, state.positionMs)?.title
             Text(
-                text = swipeTargetMs?.let { "${SwipeSeek.deltaText(it - swipeSeek.startMs).resolve()} → ${it.milliseconds.toClockText()}" } ?: " ",
+                text = swipeTargetMs?.let { "${SwipeSeek.deltaText(it - swipeSeek.startMs).resolve()} → ${it.milliseconds.toClockText()}" }
+                    ?: chapterTitle?.takeIf { it.isNotEmpty() }
+                    ?: " ",
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.alpha(if (swipeTargetMs != null) 1f else 0f),
+                color = if (swipeTargetMs != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.alpha(if (swipeTargetMs != null || !chapterTitle.isNullOrEmpty()) 1f else 0f),
             )
             Spacer(Modifier.height(24.dp))
             SeekBar(
@@ -193,7 +208,7 @@ internal fun PlayerContent(
                 durationMs = state.durationMs,
                 onSeek = onSeek,
             )
-            // シークバーの下: 倍速（#35）・再生済み・スリープタイマー（#36）を中央 3 列に（#57）。
+            // シークバーの下: 倍速（#35）・再生済み・スリープタイマー（#36）を中央 3 列に（#57）。チャプターのある回だけ 4 列目にチャプター（#348）。
             // 片手で使うので、親指が届かない TopAppBar ではなく主操作のすぐ上にまとめる。
             // アイコンの contentDescription はラベルが名前にならないもの（倍速の「1×」、スリープの残り時間）にだけ文脈を足す
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
@@ -208,6 +223,9 @@ internal fun PlayerContent(
                     SubAction(Icons.Filled.Bedtime, contentDescription = stringResource(R.string.player_sleep_timer), label = sleepLabel.resolve()) { showSleepSheet = true }
                 } else {
                     SubAction(Icons.Outlined.Bedtime, contentDescription = null, label = stringResource(R.string.player_sleep)) { showSleepSheet = true }
+                }
+                if (state.chapters.isNotEmpty()) {
+                    SubAction(Icons.AutoMirrored.Filled.List, contentDescription = null, label = stringResource(R.string.player_chapters)) { showChapterSheet = true }
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -237,6 +255,14 @@ internal fun PlayerContent(
     if (showSpeedSheet) {
         SpeedSheet(current = speed, onSelect = onSetSpeed, onDismiss = { showSpeedSheet = false })
     }
+    if (showChapterSheet) {
+        ChapterSheet(
+            chapters = state.chapters,
+            positionMs = state.positionMs,
+            onSelect = onSeek,
+            onDismiss = { showChapterSheet = false },
+        )
+    }
     if (showSleepSheet) {
         SleepTimerSheet(
             isSet = sleepTimerLabel != null,
@@ -246,7 +272,7 @@ internal fun PlayerContent(
         )
     }
 }
-/** シークバー下の 3 列の 1 つ。アイコン＋短いラベル。左右のパディングを詰めて、狭い画面（360dp）でも `1.75×` `再生済み` `1:00:00` が並ぶ。 */
+/** シークバー下の 3〜4 列の 1 つ。アイコン＋短いラベル。左右のパディングを詰めて、狭い画面（360dp）でも `1.75×` `再生済み` `1:00:00` が並ぶ。 */
 @Composable
 private fun SubAction(icon: ImageVector, contentDescription: String?, label: String, enabled: Boolean = true, onClick: () -> Unit) {
     TextButton(onClick = onClick, enabled = enabled, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)) {
@@ -255,6 +281,39 @@ private fun SubAction(icon: ImageVector, contentDescription: String?, label: Str
         Text(label, style = MaterialTheme.typography.labelLarge)
     }
 }
+/**
+ * チャプターの一覧のシート（#348）。各行は開始の時刻と題。今のチャプターは面の色を変えて再生中の印を付け、開いたときにその行までスクロールする。
+ * 行を選ぶとその開始へシークして閉じる（再生中か一時停止中かは変えない）。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ChapterSheet(chapters: List<EpisodeChapter>, positionMs: Long, onSelect: (Long) -> Unit, onDismiss: () -> Unit) {
+    val current = currentChapter(chapters, positionMs)
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = chapters.indexOf(current).coerceAtLeast(0))
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Text(stringResource(R.string.player_chapters), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+        LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 32.dp)) {
+            items(chapters) { chapter ->
+                val isCurrent = chapter == current
+                Surface(
+                    onClick = { onSelect(chapter.startMs); onDismiss() },
+                    color = if (isCurrent) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        Text(chapter.startMs.milliseconds.toClockText(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(chapter.title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        if (isCurrent) Icon(Icons.Filled.PlayArrow, contentDescription = null, Modifier.size(20.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
 /** 倍速を選ぶシート。保存と反映は ViewModel → 設定 → サービスの経路で、ここは選択肢を見せるだけ。狭い画面では折り返す。 */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -419,6 +478,15 @@ private fun PlayerContentUnknownDurationPreview() {
     PlayerContentPreviewHost(
         previewState.copy(isPlaying = false, positionMs = 0L, durationMs = 0L, hasPrevious = false),
         subtitle = null,
+    )
+}
+
+/** チャプターのある回（#348）。題の行に今のチャプターの題、4 列目に「チャプター」。 */
+@Preview(showBackground = true)
+@Composable
+private fun PlayerContentWithChaptersPreview() {
+    PlayerContentPreviewHost(
+        previewState.copy(chapters = listOf(EpisodeChapter(0, "オープニング"), EpisodeChapter(600_000, "ふつおたのコーナー"), EpisodeChapter(2_400_000, "エンディング"))),
     )
 }
 

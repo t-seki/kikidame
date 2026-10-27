@@ -210,6 +210,7 @@
     <string name="player_speed">倍速</string>
     <string name="player_sleep_timer">スリープタイマー</string>
     <string name="player_sleep">スリープ</string>
+    <string name="player_chapters">チャプター</string>
     <string name="player_end_of_episode">回の終わり</string>
     <string name="player_previous">前の回</string>
     <string name="player_next">次の回</string>
