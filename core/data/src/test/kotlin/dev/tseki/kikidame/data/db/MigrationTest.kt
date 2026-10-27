@@ -12,6 +12,7 @@ import org.junit.runner.RunWith
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 /**
@@ -193,7 +194,7 @@ class MigrationTest {
 
     /**
      * v9→v10: playback_states.sharePending / sharedPositionTicks / sharedPlayed / sharedLastPlayedAt（再生の共有、ADR 0013、#355）。
-     * 既存の行は未送信でなく、最後に見た取得元の値なし（null）で読め、位置・再生済み・更新時刻は残る。
+     * 既存の行は未送信（まだ一度も送っていない）で、最後に見た取得元の値なし（null）で読め、位置・再生済み・更新時刻は残る。
      */
     @Test
     fun v9ToV10AddsShareColumns() {
@@ -217,7 +218,7 @@ class MigrationTest {
         ).allowMainThreadQueries().build()
         try {
             val state = runBlocking { migrated.playbackStateDao().findByEpisode(10) }!!
-            assertFalse(state.sharePending)
+            assertTrue(state.sharePending, "rows from before v10 have never been sent")
             assertNull(state.sharedPositionTicks)
             assertNull(state.sharedPlayed)
             assertNull(state.sharedLastPlayedAt)

@@ -192,7 +192,7 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 版 7（#196、ADR 0010）で、列 `serverItemId` を `sourceItemId` に、`stationName` / `airedAt` を `publisherName` / `publishedAt` に改め、`playback_states.syncedAt` を削除した。
 版 8（#197）で、`episodes` に共有フォルダのファイルのサイズと更新日時（`sourceFileSize` / `sourceModifiedAt`、nullable）を足した（「共有フォルダの走査」節）。
 版 9（#264、ADR 0012）で、`programs` に番組の画像の版とファイルのパス（`imageVersion` / `imagePath`、nullable）を足した（「番組の画像」節）。
-版 10（#355、ADR 0013）で、`playback_states` に未送信の印（`sharePending`、既定 0）と最後に見たサーバの値（`sharedPositionTicks` / `sharedPlayed` / `sharedLastPlayedAt`、nullable）を足した（「再生位置と再生済み」節）。
+版 10（#355、ADR 0013）で、`playback_states` に未送信の印（`sharePending`。列の既定は 1 で、上げた時点の行は未送信として最初の同期で送る）と最後に見たサーバの値（`sharedPositionTicks` / `sharedPlayed` / `sharedLastPlayedAt`、nullable）を足した（「再生位置と再生済み」節）。
 
 ```kotlin
 @Entity(indices = [Index("sourceItemId", unique = true), Index("publisherName", "name")])
@@ -261,7 +261,7 @@ data class PlaybackStateEntity(    // ブックのライブラリでは再生の
   - 衝突の規則（`:core:domain` の `PlaybackSharingRules`）: 各回ごとに「最後に見たサーバの値」（位置・再生済み・`LastPlayedDate`）を手元に持つ。
     サーバが変わっていればサーバの値、サーバが変わらず手元が変わって（未送信の印が立って）いれば手元を送る。両方なら手元の更新時刻とサーバの `LastPlayedDate` の新しい方
     （サーバの時刻が無い・同じ時刻なら手元）。最後に見た値が無い回は、誰も再生していない値（位置 0・未再生・時刻なし）を見たとみなす
-  - 未送信の印は、手元で位置か再生済みが変わると立つ（`RoomPlaybackStateRepository.update`）。突合で取得元 ID が変わった回も立て、前の ID で見た値は忘れる
+  - 未送信の印は、手元で位置か再生済みが変わると立つ（`RoomPlaybackStateRepository.update`）。突合で取得元 ID が変わった回も立て、前の ID で見た値は忘れる。v10 に上げた時点で手元にある行も立つ（列の既定が 1）
   - 送る: 一時停止・停止・回の終わり・再生済みの手動切替の後（`PlaybackSharePusher`。未送信の回のうち鳴っている回を除いたもの。再生サービスが動いている間だけ）。
     送れなかった分は次の同期で送る
   - 読む: 同期のたび（取り込みの後、`SyncPlanner` の前。ほかで再生済みになった回も保持ルールの対象）。聴いている回（`NowPlaying.excludedFromSync`）は手元のまま。

@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 10,
-    "identityHash": "aa1be23c2cd63cd1fddf835ba46096de",
+    "identityHash": "b344070c6ca829bf184cd451c41e5fa5",
     "entities": [
       {
         "tableName": "programs",
@@ -294,7 +294,7 @@
       },
       {
         "tableName": "playback_states",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`episodeId` INTEGER NOT NULL, `positionTicks` INTEGER NOT NULL, `played` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `sharePending` INTEGER NOT NULL DEFAULT 0, `sharedPositionTicks` INTEGER, `sharedPlayed` INTEGER, `sharedLastPlayedAt` INTEGER, PRIMARY KEY(`episodeId`), FOREIGN KEY(`episodeId`) REFERENCES `episodes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`episodeId` INTEGER NOT NULL, `positionTicks` INTEGER NOT NULL, `played` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `sharePending` INTEGER NOT NULL DEFAULT 1, `sharedPositionTicks` INTEGER, `sharedPlayed` INTEGER, `sharedLastPlayedAt` INTEGER, PRIMARY KEY(`episodeId`), FOREIGN KEY(`episodeId`) REFERENCES `episodes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "episodeId",
@@ -325,7 +325,7 @@
             "columnName": "sharePending",
             "affinity": "INTEGER",
             "notNull": true,
-            "defaultValue": "0"
+            "defaultValue": "1"
           },
           {
             "fieldPath": "sharedPositionTicks",
@@ -366,7 +366,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'aa1be23c2cd63cd1fddf835ba46096de')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'b344070c6ca829bf184cd451c41e5fa5')"
     ]
   }
 }

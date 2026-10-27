@@ -1,6 +1,7 @@
 package dev.tseki.kikidame.data.repository
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.tseki.kikidame.data.db.PlaybackStateEntity
 import dev.tseki.kikidame.data.source.DownloadStream
 import dev.tseki.kikidame.data.source.ScanListener
 import dev.tseki.kikidame.data.source.SourceGateway
@@ -288,6 +289,22 @@ class RoomPlaybackSharingTest : JellyfinRefreshTestBase() {
             gateway.writtenPlayStates.toSet(),
         )
         assertFalse(row("book-1")!!.sharePending)
+    }
+
+    /** v10 に上げる前からある行（未送信で、最後に見た値なし）は、ブックのライブラリの最初の同期で送られる。 */
+    @Test
+    fun rowsFromBeforeTheUpgradeAreSentOnTheFirstSync() = runTest {
+        selectBooks()
+        gateway.snapshot = snapshot()
+        repo.refresh()
+        db.playbackStateDao().upsert(
+            PlaybackStateEntity(id("e1").value, dev.tseki.kikidame.domain.Ticks.fromDuration(8.minutes), played = false, updatedAt = t1, sharePending = true),
+        )
+
+        repo.refresh()
+
+        assertEquals(listOf(SourceItemId("e1") to SharedPlayState(8.minutes, false, t1)), gateway.writtenPlayStates)
+        assertFalse(row("e1")!!.sharePending)
     }
 
     @Test
