@@ -22,6 +22,9 @@ import kotlin.time.Duration.Companion.seconds
  *
  * 待つのは [refresh] の打ち切り（[PlaybackSharingRules.READ_BEFORE_PLAY_TIMEOUT]）まで。失敗・打ち切りは手元の値で鳴らす。共有しない取得元では
  * [refresh] がすぐ null を返す。待っている間に一時停止が来たら、読み込みを捨てて鳴らさない。
+ * 待っている間に出力先が外れた（ヘッドセットや Bluetooth が切れた。ACTION_AUDIO_BECOMING_NOISY）ときも、受ける側（PlaybackService）が
+ * [cancelPendingPlay] を呼んで待っていた ▶ を取り消す。待っている間は中の ExoPlayer の「出力先が外れたら止める」（setHandleAudioBecomingNoisy）が
+ * まだ効かず、そのままだと読み込みの後にスピーカーで鳴り始めるため（#358）。
  *
  * [scope] は [player] のアプリケーションスレッドで動くこと（Player はスレッド拘束）。
  */
@@ -34,6 +37,16 @@ class ReadBeforePlayPlayer(
 ) : ForwardingSimpleBasePlayer(player) {
     /** 読んでいる途中の鳴らし始め。一時停止などの次の指示で捨てる。 */
     private var reading: ListenableFuture<*>? = null
+
+    /**
+     * 待っている ▶ があれば取り消して鳴らさない（画面・通知・セッションの状態は一時停止に戻る）。待っていなければ何もしない
+     * （鳴っている最中の出力先の変化は、中の ExoPlayer に任せる）。[player] のアプリケーションスレッドで呼ぶこと。
+     */
+    fun cancelPendingPlay() {
+        val pending = reading ?: return
+        reading = null
+        pending.cancel(true)
+    }
 
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
         reading?.cancel(true)
