@@ -192,11 +192,11 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 
 ```kotlin
 @Entity(indices = [Index("sourceItemId", unique = true), Index("publisherName", "name")])
-data class ProgramEntity(          // 番組（Jellyfin では MusicAlbum）。(配信元, 番組名) は突合のキーだが一意ではない（v2）
+data class ProgramEntity(          // 番組（Jellyfin では MusicAlbum、ブックでは各回の `Album` のタグ）。(配信元, 番組名) は突合のキーだが一意ではない（v2）
   @PrimaryKey(autoGenerate = true) val id: Long = 0,
   val sourceItemId: String?,       // 取得元 ID（ADR 0001・0010）
   val name: String,
-  val publisherName: String?,      // 配信元（Jellyfin では MusicAlbum.AlbumArtist）
+  val publisherName: String?,      // 配信元（Jellyfin では MusicAlbum.AlbumArtist、ブックでは各回の `AlbumArtist` のタグ）
   val syncEnabled: Boolean,        // 同期対象か（既定 false）
   val keepLatest: Int?,            // 最新 N 回まで保持（null = 上限なし）
   val deleteAfterPlayed: Boolean,
@@ -207,7 +207,7 @@ data class ProgramEntity(          // 番組（Jellyfin では MusicAlbum）。(
 )
 
 @Entity(indices = [Index("sourceItemId", unique = true), Index("programId")])
-data class EpisodeEntity(          // 各回（Jellyfin では Audio）
+data class EpisodeEntity(          // 各回（Jellyfin では Audio、ブックでは AudioBook）
   @PrimaryKey(autoGenerate = true) val id: Long = 0,
   val sourceItemId: String?,       // 取得元 ID
   val programId: Long,
