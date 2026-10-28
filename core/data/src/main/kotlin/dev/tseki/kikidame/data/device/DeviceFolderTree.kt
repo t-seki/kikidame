@@ -34,7 +34,8 @@ import kotlin.time.Instant
  * - [list]・[read]・[open] の呼び出しの中で出た [SecurityException] は [SourceException.Unauthorized] に変える。そのほかの失敗はそのまま投げる。
  *   [open] が返したストリーム（ダウンロードの本体）を読む途中の [SecurityException] は、[IOException] に変える（ストリームの読み出しは
  *   [IOException] を前提にしている）。そのダウンロードは失敗として扱われて後でやり直され、次の同期で根の確認がログアウトに導く
- * - 更新日時を provider が返さなければ 1970-01-01（エポック）で補う（毎回同じ値になるので、タグを読み直さない）
+ * - 更新日時を provider が返さなければ 1970-01-01（エポック）で補う（毎回同じ値になるので、タグを読み直さない）。
+ *   そのときファイルの版（大きさと更新日時の組、ADR 0014）は大きさだけで決まるので、大きさの変わらない書き換えには気づけない（差し替えない）
  * - 接続を持たないので [reset] は何もしない。[read] は同じファイルを続けて読むことが多いので、最後に開いたファイルを持ち回し（[LastOpened]）、[close] で閉じる
  */
 class DeviceFolderTree(

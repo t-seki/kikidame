@@ -16,6 +16,8 @@ import dev.tseki.kikidame.domain.LibraryMatching
 import dev.tseki.kikidame.domain.LibraryRefreshRepository
 import dev.tseki.kikidame.domain.ProgramId
 import dev.tseki.kikidame.domain.RefreshResult
+import dev.tseki.kikidame.domain.Replacement
+import dev.tseki.kikidame.domain.ReplacementCheck
 import dev.tseki.kikidame.domain.ScanProgress
 import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceEpisodes
@@ -36,6 +38,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -45,12 +48,14 @@ import kotlin.time.Instant
 /**
  * 取得元の一覧を [SourceGateway] から取得し、突合（[LibraryMatching]）して Room に 1 トランザクションで適用する。
  * 取得元由来の各回は取得元の値で上書きし（取得元が返さないサイズだけ手元の値を残す。出演者は空でも上書き。
- * 共有フォルダのファイルのサイズ・更新日時（`sourceFileSize` / `sourceModifiedAt`、#197）も取得元の値で書く）、`LocalFile` は触らない。`PlaybackState` は再生の共有（下）のときだけ書く。
+ * 共有フォルダのファイルのサイズ・更新日時（`sourceFileSize` / `sourceModifiedAt`、#197）とファイルの版（`sourceVersion`、ADR 0014）も取得元の値で書く）、`LocalFile` は触らない。`PlaybackState` は再生の共有（下）のときだけ書く。
  *
  * 全走査（[refresh]）は同期そのもの: 取り込んだ後に [SyncPlanner] を回し、保持ルールによる削除・取得元から消えた各回の除去・
  * ダウンロードの予約まで行う（ADR 0004）。1 番組の同期（[syncProgram]）は、その番組だけを取り込んで同期する。
  * 共有フォルダの全走査では、取得元がタグを読み終えた番組から先に 1 番組ずつ取り込んで同期し（[syncProgram] と同じ範囲）、
  * 全部を読み終えたら全体を取り込み直して消失を判断する（#209 の決定 1）。どの取り込みも、それぞれ 1 トランザクション。
+ *
+ * 差し替え（ADR 0014、#371）: 同期（[synchronize]）の中で、手元にある回のファイルが取得元で書き換わったかを見分け、差し替えを予約する。
  *
  * 再生の共有（ADR 0013、#355）: 全走査と 1 番組の同期では、取り込みの後・同期（削除・予約）の前に、一覧と一緒に読んだ UserData を
  * 手元と突き合わせる（[PlaybackSharing.reconcile]。共有する取得元（Jellyfin のブックのライブラリ）だけ）。[excluded]（聴いている回）は手元のまま。
@@ -313,8 +318,9 @@ class RoomLibraryRefreshRepository @Inject constructor(
 
     /**
      * 取り込み後の Room の状態と全走査の結果から [SyncPlanner] を回し、結論を実行する。
-     * 実行順は 除去 → 削除 → 予約（容量を先に空ける）。[excluded]（再生中の回）は今回は消さない。
+     * 実行順は 除去 → 削除 → 差し替えの予約 → 予約（容量を先に空ける）。[excluded]（再生中の回）は今回は消さず、差し替えも予約しない。
      * 対象の番組は [SourceSnapshot.scope] で決まる（[SnapshotScope.Program] ならその番組だけ。[SyncInputs]）。
+     * 差し替えの予約（[reserveReplacements]）は、予約した数（[SyncOutcome.enqueued]）に含める（#371 で人が決めた）。
      */
     internal suspend fun synchronize(snapshot: SourceSnapshot, excluded: Set<EpisodeId>): SyncOutcome {
         val inputs = inputs(snapshot)
@@ -332,8 +338,63 @@ class RoomLibraryRefreshRepository @Inject constructor(
             downloads.deleteLocal(id)
             deleted++
         }
-        val enqueued = downloads.enqueueForSync(plan.download)
+        val replaced = reserveReplacements(snapshot, excluded)
+        val enqueued = downloads.enqueueForSync(plan.download) + replaced
         return SyncOutcome(enqueued = enqueued, deleted = deleted, removed = removed, onHold = plan.onHoldCount)
+    }
+
+    /**
+     * **差し替え**（ADR 0014、#371）を見分けて予約する。手元にある回（DONE、まだ差し替えを予約していない）のうち [snapshot] に載っている回について、
+     * 落としたときの版と一覧の版・大きさを [Replacement] で比べる。[excluded]（聴いている回）は外す（聴いている回でなくなった後の同期で見る）。
+     *
+     * - 手元の大きさは、ディスク上のファイルの長さ（共有フォルダでは `episodes.sizeBytes` が走査のたびに一覧の値で上書きされるため）。ファイルが無い回は見ない
+     * - 取得元への大きさの問い合わせ（[SourceGateway.fetchFileSize]）は、要る回にだけ 1 回ずつ行う。失敗した回は今回は何もしない。
+     *   届かない・認証が通らないときは、残りの回も問い合わせない（同期は止めない。画像の取得（[updateImages]）と同じ）
+     * - 中身が同じと分かった回は、差し替えずに一覧の版を落としたときの版として書く
+     *
+     * 予約した数を返す。
+     */
+    private suspend fun reserveReplacements(snapshot: SourceSnapshot, excluded: Set<EpisodeId>): Int {
+        val listed = snapshot.episodes.associateBy { it.sourceId.value }
+        val toReplace = ArrayList<EpisodeId>()
+        var canAsk = true
+        for (row in db.localFileDao().listReplaceCandidates()) {
+            currentCoroutineContext().ensureActive()
+            val id = EpisodeId(row.episodeId)
+            if (id in excluded) continue
+            val se = listed[row.sourceItemId] ?: continue
+            val localSize = withContext(Dispatchers.IO) { File(row.path).takeIf { it.isFile }?.length() } ?: continue
+            var check = Replacement.check(row.sourceVersion, se.version, se.sourceFileSize, localSize)
+            if (check == ReplacementCheck.AskSourceSize) {
+                val size = if (canAsk) {
+                    try {
+                        source.fetchFileSize(se.sourceId)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: SourceException.Unreachable) {
+                        Log.w(TAG, "file size fetch failed; skipping the remaining checks: ${se.sourceId.value}", e)
+                        canAsk = false
+                        null
+                    } catch (e: SourceException.Unauthorized) {
+                        Log.w(TAG, "file size fetch failed; skipping the remaining checks: ${se.sourceId.value}", e)
+                        canAsk = false
+                        null
+                    } catch (e: Exception) {
+                        Log.w(TAG, "file size fetch failed: ${se.sourceId.value}", e)
+                        null
+                    }
+                } else {
+                    null
+                }
+                check = Replacement.afterSourceSize(size, localSize)
+            }
+            when (check) {
+                ReplacementCheck.Replace -> toReplace += id
+                ReplacementCheck.RecordVersion -> se.version?.let { db.localFileDao().setSourceVersion(row.episodeId, it) }
+                ReplacementCheck.Keep, ReplacementCheck.AskSourceSize -> Unit
+            }
+        }
+        return if (toReplace.isEmpty()) 0 else downloads.enqueueReplacements(toReplace)
     }
 
     /**
@@ -376,5 +437,6 @@ class RoomLibraryRefreshRepository @Inject constructor(
         performers = performers,
         sourceFileSize = sourceFileSize,
         sourceModifiedAt = sourceModifiedAt,
+        sourceVersion = version,
     )
 }

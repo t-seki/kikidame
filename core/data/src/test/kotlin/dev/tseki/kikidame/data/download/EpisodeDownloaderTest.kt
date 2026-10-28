@@ -24,6 +24,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
@@ -46,6 +47,16 @@ class EpisodeDownloaderTest {
         override suspend fun markDone(episodeId: EpisodeId, path: String, sizeBytes: Long) { state = DownloadState.DONE; done = path to sizeBytes }
         override suspend fun markFailed(episodeId: EpisodeId) { state = DownloadState.FAILED; failures++ }
         override suspend fun isStillWanted(episodeId: EpisodeId): Boolean = wanted
+
+        /** 差し替え（ADR 0014）。予約中・落としている最中は [replaceState]、確定・断念で null。 */
+        var replaceState: DownloadState? = null
+        var replacedSize: Long? = null
+        var abandoned = 0
+        override suspend fun markReplaceRunning(episodeId: EpisodeId) { replaceState = DownloadState.RUNNING }
+        override suspend fun markReplaced(episodeId: EpisodeId, sizeBytes: Long) { replaceState = null; replacedSize = sizeBytes }
+        override suspend fun abandonReplace(episodeId: EpisodeId) { replaceState = null; abandoned++ }
+        override suspend fun isReplaceStillWanted(episodeId: EpisodeId): Boolean = wanted && replaceState != null
+        override suspend fun resetRunningReplacements() = Unit
     }
 
     private val gateway = FakeJellyfinGateway()
@@ -59,6 +70,7 @@ class EpisodeDownloaderTest {
         override suspend fun fetchProgram(programId: SourceItemId) = error("unused")
         override suspend fun openDownload(episodeId: SourceItemId, rangeStart: Long): DownloadStream =
             gateway.openDownload(credentials, episodeId, rangeStart)
+        override suspend fun fetchFileSize(episodeId: SourceItemId): Long? = error("unused")
     }
     private val downloader = EpisodeDownloader(source, queue)
     private val sourceId = SourceItemId("a1")
@@ -71,6 +83,76 @@ class EpisodeDownloaderTest {
             localFile = LocalFile(EpisodeId(1), DownloadState.PENDING, target.absolutePath, pinned = true),
             playback = null,
         )
+    }
+
+    /** 差し替え（ADR 0014）の行: DONE で今のファイル（[current]）があり、差し替えを予約してある。 */
+    private fun replacing(current: ByteArray): EpisodeWithState {
+        val it = item()
+        File(it.localFile!!.path!!).apply { parentFile!!.mkdirs(); writeBytes(current) }
+        queue.state = DownloadState.DONE
+        queue.replaceState = DownloadState.PENDING
+        return it.copy(localFile = it.localFile!!.copy(state = DownloadState.DONE, replacing = true))
+    }
+
+    private val oldBytes = ByteArray(5000) { 7 }
+
+    @Test
+    fun replacementDownloadsFromScratchAndMovesOverTheCurrentFile() = runTest {
+        gateway.files[sourceId] = payload
+        val it = replacing(oldBytes)
+        val part = File(it.localFile!!.path!! + ".part").apply { writeBytes(ByteArray(1000) { 9 }) }
+
+        val outcome = downloader.download(it)
+
+        assertIs<DownloadOutcome.Done>(outcome)
+        assertEquals(listOf(0L), gateway.openedRanges, "a replacement never resumes an old part")
+        assertContentEquals(payload, File(it.localFile!!.path!!).readBytes())
+        assertFalse(part.exists())
+        assertEquals(payload.size.toLong(), queue.replacedSize)
+        assertEquals(DownloadState.DONE, queue.state, "the row stays DONE throughout")
+        assertNull(queue.done, "markDone is not used for a replacement")
+    }
+
+    @Test
+    fun replacementFinishedWhileNowPlayingIsPostponedAndKeepsTheCurrentFile() = runTest {
+        gateway.files[sourceId] = payload
+        val it = replacing(oldBytes)
+
+        val outcome = downloader.download(it, isNowPlaying = { id -> id == EpisodeId(1) })
+
+        assertIs<DownloadOutcome.Postponed>(outcome)
+        assertContentEquals(oldBytes, File(it.localFile!!.path!!).readBytes())
+        assertFalse(File(it.localFile!!.path!! + ".part").exists())
+        assertEquals(1, queue.abandoned)
+        assertNull(queue.replacedSize)
+        assertNull(queue.replaceState)
+    }
+
+    @Test
+    fun failedReplacementKeepsTheCurrentFileAndDoesNotCountAnAttempt() = runTest {
+        val it = replacing(oldBytes)
+
+        val outcome = downloader.download(it)
+
+        assertIs<DownloadOutcome.Failed>(outcome)
+        assertContentEquals(oldBytes, File(it.localFile!!.path!!).readBytes())
+        assertFalse(File(it.localFile!!.path!! + ".part").exists())
+        assertEquals(1, queue.abandoned)
+        assertEquals(0, queue.failures)
+        assertEquals(DownloadState.DONE, queue.state)
+    }
+
+    @Test
+    fun cancelledReplacementDeletesThePartOnly() = runTest {
+        gateway.files[sourceId] = payload
+        val it = replacing(oldBytes)
+        var calls = 0
+
+        val outcome = downloader.download(it) { _, _ -> if (++calls == 1) queue.wanted = false }
+
+        assertIs<DownloadOutcome.Cancelled>(outcome)
+        assertFalse(File(it.localFile!!.path!! + ".part").exists())
+        assertContentEquals(oldBytes, File(it.localFile!!.path!!).readBytes())
     }
 
     @Test

@@ -25,6 +25,7 @@ import dev.tseki.kikidame.domain.SourceProgram
 import dev.tseki.kikidame.domain.SourceSnapshot
 import dev.tseki.kikidame.domain.SessionRepository
 import dev.tseki.kikidame.domain.SessionState
+import dev.tseki.kikidame.playback.NowPlaying
 import dev.tseki.kikidame.testing.FakeSessionRepository
 import dev.tseki.kikidame.testing.RecordingSyncFailureNotifier
 import dev.tseki.kikidame.R
@@ -62,6 +63,11 @@ class DownloadWorkerTest {
         override suspend fun markDone(episodeId: EpisodeId, path: String, sizeBytes: Long) { state[episodeId] = DownloadState.DONE; done += episodeId }
         override suspend fun markFailed(episodeId: EpisodeId) { state[episodeId] = DownloadState.FAILED }
         override suspend fun isStillWanted(episodeId: EpisodeId): Boolean = state[episodeId] != DownloadState.DONE
+        override suspend fun markReplaceRunning(episodeId: EpisodeId) = Unit
+        override suspend fun markReplaced(episodeId: EpisodeId, sizeBytes: Long) = Unit
+        override suspend fun abandonReplace(episodeId: EpisodeId) = Unit
+        override suspend fun isReplaceStillWanted(episodeId: EpisodeId): Boolean = false
+        override suspend fun resetRunningReplacements() = Unit
     }
 
     private class Source(val files: Map<SourceItemId, ByteArray>, val unauthorized: Boolean = false) : SourceGateway {
@@ -73,6 +79,7 @@ class DownloadWorkerTest {
             val bytes = files[episodeId] ?: throw SourceException.Failed("HTTP 404")
             return DownloadStream(null, bytes.size.toLong(), bytes.inputStream())
         }
+        override suspend fun fetchFileSize(episodeId: SourceItemId): Long? = error("unused")
     }
 
     private fun item(id: Long, server: String?) = EpisodeWithState(
@@ -90,7 +97,7 @@ class DownloadWorkerTest {
         TestListenableWorkerBuilder<DownloadWorker>(ApplicationProvider.getApplicationContext())
             .setWorkerFactory(object : WorkerFactory() {
                 override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters): ListenableWorker =
-                    DownloadWorker(appContext, workerParameters, queue, EpisodeDownloader(source, queue), sessions, notifier)
+                    DownloadWorker(appContext, workerParameters, queue, EpisodeDownloader(source, queue), sessions, notifier, NowPlaying())
             })
             .build()
 

@@ -85,15 +85,18 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 
 - ライブラリ一覧: `/UserViews`。`CollectionType = music` と `books`（#354）のものだけ選択できる（他は理由付きでグレーアウト）
 - ブックのライブラリ（#354）: `/Items?ParentId={libraryId}&IncludeItemTypes=Folder&Recursive=true&Fields=ParentId` で番組のフォルダを、
-  `/Items?ParentId={libraryId}&IncludeItemTypes=AudioBook&Recursive=true&Fields=DateCreated,ParentId,Path&SortBy=DateCreated&SortOrder=Descending`（500 件ずつ）で各回を取り、タグでまとめる。
+  `/Items?ParentId={libraryId}&IncludeItemTypes=AudioBook&Recursive=true&Fields=DateCreated,ParentId,Path,Etag&SortBy=DateCreated&SortOrder=Descending`（500 件ずつ）で各回を取り、タグでまとめる（`Etag` はファイルの版。#371、ADR 0014）。
   `albums=` の絞り込みは使わない（10.10.7 では効き、12.0 では 0 件、10.11.11 では全件が返った。#352・#354）。1 番組の各回・番組の存在確認もライブラリ全体を取ってまとめた中から選ぶ。
   AudioBook は `Container` を返さない（10.10.7・12.0）ので、保存先の拡張子は `Path` から取る。番組の画像の中身は、番組のフォルダの `/Items/{folderId}/Images/Primary`
 - 番組一覧: `/Items?ParentId={libraryId}&IncludeItemTypes=MusicAlbum&Recursive=true`（1 回。`Fields` は付けない）。
   番組の画像の版は、返る `ImageTags.Primary`（`SourceProgram.image`）。`Fields` を付けなくても返ることを、Jellyfin 10.10.7 の実サーバ（`scripts/jellyfin-testserver.sh up 1010`）で確かめた（`folder.jpg` のあるアルバムだけ `ImageTags` に `Primary` が出た）。Jellyfin 12 では未確認（#282）
-- 各回一覧: `/Items?ParentId={libraryId}&IncludeItemTypes=Audio&Recursive=true&Fields=DateCreated,ParentId&SortBy=DateCreated&SortOrder=Descending&StartIndex=…&Limit=500`
+- 各回一覧: `/Items?ParentId={libraryId}&IncludeItemTypes=Audio&Recursive=true&Fields=DateCreated,ParentId,Etag&SortBy=DateCreated&SortOrder=Descending&StartIndex=…&Limit=500`
   （ライブラリ全体を 500 件ずつ。番組ごとには呼ばない。`AlbumId` で番組に結び付け、どの番組にも属さない Audio は取り込まない。
   **`Fields=MediaSources` は付けない**: SDK 1.9 は `MediaStream.IsOriginal` を必須と見なすが 10.11 は返さず、デコードで落ちる。
-  ファイルサイズは M3 のダウンロード時に確定させる）
+  ファイルサイズはダウンロードの完了時に実際の値で書く。`Etag` は**差し替え**のためのファイルの版（#371、ADR 0014）。`ItemFields.ETAG` を求めたときだけ返る）
+- 各回のファイルの大きさ（差し替え、#371、ADR 0014）: `/Items/{itemId}/Download` に `Range: bytes=0-0` を付け、206 の `Content-Range: bytes 0-0/<全長>` から全長を取る
+  （`SdkJellyfinGateway.fetchFileSize`。本文は 1 バイトだけ）。`HEAD` は 405 で使えない。どちらも 10.10.7 と 12.0 のテストサーバで確かめた。
+  ファイルを書き換えた後、Jellyfin が走査し直す前でも、ディスク上の今の大きさが返った（同じく両方の版で確かめた）。一覧の版（`Etag`）が変わった回と、版を持たない手元の回にだけ問い合わせる
 - 番組の画像の中身（#282）: `/Items/{albumId}/Images/Primary`（SDK の `imageApi.getItemImageUrl` で URL を作り、転送は OkHttp。認証ヘッダは `openDownload` と同じ）。
   404（Primary が無い）と 10 MiB（`SdkJellyfinGateway.MAX_PROGRAM_IMAGE_BYTES`。共有フォルダの上限と同じ値で、根拠は無い）超えは null（画像なし）。サイズ指定・変換は付けず、サーバの原本をそのまま持つ。
   10.10.7 の画像の API は、無効なトークンでも画像を返した（認証を求めない）。ヘッダは付けるが、認証の失敗の経路（401/403 → `Unauthorized`）は実サーバでは確かめていない
@@ -160,6 +163,8 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 走査のときに前の行を取得元 ID（相対パス）で引き、パス・サイズ・更新日時がどれも同じなら、タグを読まずに前の行のタイトル・公開日・尺・出演者を使う。
 どれかが変わったファイルと新しいファイルだけタグを読む。更新日時は ms に揃えて比べる（Room は ms で持つ。ms より細かい値が来ても同じとみなす。SMB の実装から何が来るかは #198 で確かめる。未確認）。
 `sizeBytes` はダウンロードの完了時に実サイズで上書きされるので、この判定には使わない。
+`sourceFileSize` / `sourceModifiedAt` は走査のたびに取得元の値で上書きされるので、「落としたときの値」としては使えない。
+**差し替え**（#371、ADR 0014）は、各回の版（`SourceEpisode.version`。大きさと更新日時（ms）の組 `<大きさ>:<更新日時の ms>`）を落としたときの版（`local_files.sourceVersion`）と比べて決める（「同期エンジンの設計（M3）」節）。
 
 ## 番組の画像（#264）
 
@@ -193,6 +198,7 @@ M1 の時点で `:core:domain` にあるのはほぼ型だけだが、境界を�
 版 7（#196、ADR 0010）で、列 `serverItemId` を `sourceItemId` に、`stationName` / `airedAt` を `publisherName` / `publishedAt` に改め、`playback_states.syncedAt` を削除した。
 版 8（#197）で、`episodes` に共有フォルダのファイルのサイズと更新日時（`sourceFileSize` / `sourceModifiedAt`、nullable）を足した（「共有フォルダの走査」節）。
 版 9（#264、ADR 0012）で、`programs` に番組の画像の版とファイルのパス（`imageVersion` / `imagePath`、nullable）を足した（「番組の画像」節）。
+版 11（#371、ADR 0014）で、`episodes` に一覧で最後に見たファイルの版（`sourceVersion`）を、`local_files` に落としたときの版（`sourceVersion`）と差し替えの状態（`replaceState` / `replaceVersion`）を足した（どれも nullable。「同期エンジンの設計（M3）」節の差し替え）。上げた時点で手元にある回は版を持たず、更新後の最初の同期で大きさだけで比べる。
 版 10（#355、ADR 0013）で、`playback_states` に未送信の印（`sharePending`。列の既定は 1 で、上げた時点の行は未送信として最初の同期で送る）と最後に見たサーバの値（`sharedPositionTicks` / `sharedPlayed` / `sharedLastPlayedAt`、nullable）を足した（「再生位置と再生済み」節）。
 
 ```kotlin
@@ -222,8 +228,9 @@ data class EpisodeEntity(          // 各回（Jellyfin では Audio、ブック
   val runtimeTicks: Long, val sizeBytes: Long,
   val container: String,
   val performers: List<String>,    // 出演者（v6、#70）
-  val sourceFileSize: Long?,       // 共有フォルダのファイルのサイズ（v8、#197）。Jellyfin では null。sizeBytes はダウンロードで上書きされるので別に持つ
-  val sourceModifiedAt: Instant?   // 共有フォルダのファイルの更新日時（v8、#197）。Jellyfin では null
+  val sourceFileSize: Long?,       // 共有フォルダのファイルのサイズ（v8、#197）。Jellyfin では null（一覧が返さない）。sizeBytes はダウンロードで上書きされるので別に持つ。走査のたびに上書きされる
+  val sourceModifiedAt: Instant?,  // 共有フォルダのファイルの更新日時（v8、#197）。Jellyfin では null
+  val sourceVersion: String?       // 一覧で最後に見たファイルの版（v11、#371）。共有フォルダは `<大きさ>:<更新日時の ms>`、Jellyfin は Etag。予約のときに local_files へ写す
 )
 
 @Entity
@@ -235,7 +242,10 @@ data class LocalFileEntity(        // ダウンロード状態の唯一の正（
   val attemptCount: Int,           // FAILED の再試行判断用。WorkManager の backoff は request 単位で各回単位ではない
   val lastAttemptAt: Instant?,
   val downloadedAt: Instant?,
-  val enqueuedAt: Instant?         // キューに入れた時刻（v3）
+  val enqueuedAt: Instant?,        // キューに入れた時刻（v3）。差し替えの予約でも付け直す
+  val sourceVersion: String?,      // 落としたときのファイルの版（v11、#371）。予約したときの一覧の版。v11 より前に落とした回は null
+  val replaceState: DownloadState?,// 差し替えの状態（v11）。null（差し替えていない）/ PENDING / RUNNING。差し替えの間も state は DONE のまま
+  val replaceVersion: String?      // 差し替えを予約したときの一覧の版（v11）。落とし終えたら sourceVersion に移す
 )
 
 @Entity
@@ -319,6 +329,25 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 - アプリ起動時: 前回同期から 15 分以上経っていれば実行（同じ制約で待つ。#135 で「前回同期（`lastFetchedAt`）と前回の試み（`lastAttemptedAt`。失敗した全走査も数える）の新しい方から」に。閾値は #347 で 1 時間から 15 分に縮めた）。番組一覧の手動プルは同期そのもの（M3-b の範囲を参照）
 - ダウンロード: Worker 内で HTTP ストリームを `.part` ファイルへ書き、完了後にリネーム。
   再開は `Range` ヘッダ。進捗は `setProgress` で UI へ
+
+### 差し替え（#371、ADR 0014）
+
+手元にある回（`local_files.state = DONE`）のファイルが取得元で書き換わったら、同期のときに見分けて新しいファイルに替える（`CONTEXT.md` の**差し替え**）。取得元の種類によらず同じ規則。
+
+- **ファイルの版**: 共有フォルダは大きさと更新日時の組、Jellyfin は一覧の `Etag`（`SourceEpisode.version`、`episodes.sourceVersion`）。
+  ダウンロードを予約するとき（同期の予約も手動の予約も）に一覧の版を `local_files.sourceVersion` に写し、落とし終えてもそのまま持つ（落とし始めた後に取得元が変わっても、次の同期で差し替えに回る）
+- **見分け方**（`:core:domain` の `Replacement`。`RoomLibraryRefreshRepository` が同期の削除の後・予約の前に回す）: 一覧の版が null の回は比べない。
+  落としたときの版と違えば、一覧が大きさを返す取得元（共有フォルダ）は差し替える。返さない取得元（Jellyfin）は取得元の大きさを問い合わせ（`SourceGateway.fetchFileSize`）、
+  手元の大きさと違えば差し替え、同じなら版だけ書く。版を持たない回（v11 より前に落とした回）は大きさだけで比べ、同じなら今の版を書く。
+  手元の大きさは、ディスク上のファイルの長さ（共有フォルダでは `episodes.sizeBytes` が走査のたびに一覧の値で上書きされるため）
+- **聴いている回**（`NowPlaying.excludedFromSync`）はその同期では予約しない
+- **予約と実行**: `DownloadRepository.enqueueReplacements` が `replaceState = PENDING` にし、残っている `.part` を捨てる。行は DONE のまま（今のファイルで聴け、一覧の表示も変わらない）。
+  予約した数は同期の結果の予約数（`RefreshResult.enqueued`）に含める（同期の文言も「N 回をダウンロード予約」）。
+  普通のダウンロードと同じ待ち行列（`LocalFileDao.nextPending`）と条件（`DownloadWorker`）で落とす。手動の予約が先で、差し替えは同期の予約と同じ並び
+- **落とし方**（`EpisodeDownloader`）: いつも頭から `.part` に書き、落とし終えたら今のファイルの場所へ `Files.move`（置き換え）。版と `episodes.sizeBytes` と `downloadedAt` を新しくする。
+  落とし終えた時点でその回が聴いている回なら差し替えずに `.part` を捨てる。失敗したら `.part` を捨て、今のファイルと版を残す（試行回数は数えない）。どちらも次の同期でまた予約される。
+  差し替えの間に手元の回を消す（保持ルール・手の削除）と、行と `.part` が消え、Worker は取り消しとして止まる
+- `playback_states` には触らない（再生位置と再生済みは変わらない）
 - 置き場所: `getExternalFilesDir("episodes")/<配信元>/<番組>/<ファイル>`（rajikura の Jellyfin プリセットの出力と同じ階層）
 
 ## 実装順序
@@ -396,7 +425,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
   - 401 はログアウトと同じ処理をして接続画面へ（URL とユーザー名は入力済み）
   - **取得元の選択と SMB（#198、ADR 0010）**: 取得元は同時に 1 つ。一度も接続していなければ取得元の選択（「Jellyfin に接続」「NAS の共有フォルダ（SMB）」、#199 から「端末のフォルダ」も）から始まり、ログアウトした後は直前の取得元の接続画面へ戻る。設定の「別のサーバに接続」は「取得元を変える」（中身は同じ）。ログアウトした後の接続画面（Jellyfin・SMB とも）と端末のフォルダの選択画面（#199）にも同じ入口と確認がある（処理は `SourceChanger`、確認のダイアログは `ChangeSourceConfirmDialog` で共有。3 つの画面の枠（戻るボタン・スクロール・末尾の「取得元を変える」）は `SourceConnectScaffold`、#237）。文言は `source_pick_*`・`smb_connect_*`・`smb_error_*`・`settings_source*`・`settings_smb_*`、各回の詳細の「サーバ ID」は「取得元 ID」（`episode_details_source_id`）
   - 取得元の選択画面の SMB は、#198 の追加の決定で debug 版（`BuildConfig.DEBUG`）だけに出していた。#209 で走査を作り直し、出し分けを外した（release 版でも出す）
-  - **共有フォルダの全走査（#209、ADR 0010 の末尾の注記）**: `SharedFolderSource.fetchAll(listener)` は、一覧を先に全部取ってから番組ごとにタグを読み、タグを読んだ番組をその番組を読み終えるたびに `ScanListener.onProgramScanned` に流す。`RoomLibraryRefreshRepository.refresh` はそれを受けて 1 番組ずつ取り込み（`SnapshotScope.Program`）、その番組の中で削除・予約する（`syncProgram` と同じ範囲）。全部を読み終えたら、全体を取り込み直して消失を判断し、最終同期の時刻を記録する。途中で止まっても取り込み済みの番組は残り、次の同期ではそのタグを読まない（DB の大きさ・更新日時で判定）。木の操作が失敗したら `FolderTree.reset`（SMB は接続を閉じる）してやり直し、続けて 3 回（`SharedFolderSource.MAX_CONSECUTIVE_FAILURES`）失敗したら到達不能（画面が消えて裏に回ると、しばらくして Android が TCP の接続を壊し、張り直しも効かずに到達不能で終わる。壊されるまでの時間は、観測した 2 回で約 6 秒（01:14:48 → 01:14:53.938）と 2 分以上（01:34:13 → 01:36:15）で、一定ではない（何で決まるかは未確認）。張り直しで続けられた場面は実機でまだ見ていない。2026-10-11 の PR #210 の検証）。タグの読み取りは `BlockReader` が 256 KB ずつまとめて読み（位置ごとの塊を 4 つまで持つ）、往復を減らす。進み具合は `ScanListener.onTagProgress` → `LibraryRefreshRepository.refresh(onProgress)` → `LibraryRefresher.tagProgress` で番組一覧の `BackgroundSyncBar` に出す（文言 `sync_reading_tags`）。再生中の回（削除から外す回）は `refresh(excluded = { … })` で番組ごとに読み直す。番組ごとに予約した数は `onEnqueued` で流れ、`LibraryRefresher` は全走査が途中で失敗してもそれが 1 以上なら Worker を起こす（取り消し・認証の失敗では起こさない。取得元を変えるときは `SourceChanger` が Worker を止めてから走査を取り消し、手元を消すため）
+  - **共有フォルダの全走査（#209、ADR 0010 の末尾の注記）**: `SharedFolderSource.fetchAll(listener)` は、一覧を先に全部取ってから番組ごとにタグを読み、タグを読んだ番組をその番組を読み終えるたびに `ScanListener.onProgramScanned` に流す。`RoomLibraryRefreshRepository.refresh` はそれを受けて 1 番組ずつ取り込み（`SnapshotScope.Program`）、その番組の中で削除・予約する（`syncProgram` と同じ範囲）。全部を読み終えたら、全体を取り込み直して消失を判断し、最終同期の時刻を記録する。途中で止まっても取り込み済みの番組は残り、次の同期ではそのタグを読まない（DB の大きさ・更新日時で判定）。木の操作が失敗したら `FolderTree.reset`（SMB は接続を閉じる）してやり直し、続けて 3 回（`SharedFolderSource.MAX_CONSECUTIVE_FAILURES`）失敗したら到達不能（画面が消えて裏に回ると、しばらくして Android が TCP の接続を壊し、張り直しも効かずに到達不能で終わる。壊されるまでの時間は、観測した 2 回で約 6 秒（01:14:48 → 01:14:53.938）と 2 分以上（01:34:13 → 01:36:15）で、一定ではない（何で決まるかは未確認）。張り直しで続けられた場面は実機でまだ見ていない。2026-10-11 の PR #210 の検証）。タグの読み取りは `BlockReader` が 256 KB ずつまとめて読み（位置ごとの塊を 4 つまで持つ）、往復を減らす。進み具合は `ScanListener.onTagProgress` → `LibraryRefreshRepository.refresh(onProgress)` → `LibraryRefresher.tagProgress` で番組一覧の `BackgroundSyncBar` に出す（文言 `sync_reading_tags`）。再生中の回（削除と差し替えの予約から外す回。ADR 0014）は `refresh(excluded = { … })` で番組ごとに読み直す。番組ごとに予約した数は `onEnqueued` で流れ、`LibraryRefresher` は全走査が途中で失敗してもそれが 1 以上なら Worker を起こす（取り消し・認証の失敗では起こさない。取得元を変えるときは `SourceChanger` が Worker を止めてから走査を取り消し、手元を消すため）
   - **セッションの型（#198）**: `SessionState` は `SignedOut`（`lastServerUrl`・`lastUserName`・`lastSmb`・`lastDeviceFolder`（#199）。直前の取得元の入力補助）／`NeedsLibrary`（Jellyfin だけ）／`Ready`。`Ready` は `source: ConnectedSource`（`Jellyfin(session, library)`・`Smb(connection)`・`Device(folder)`（#199））と `lastFetchedAt`・`lastAttemptedAt` を持つ。SMB の設定は `SmbConnection`（ホスト・共有名・共有の中のパス・ユーザー名・パスワード・ゲスト）。`SessionRepository.connectSharedFolder` は共有の直下が読めたら保存する（失敗は `SourceException`: 認証の失敗は `Unauthorized`、届かないは `Unreachable`、読めないは `Failed`）。DataStore（`SessionStore`）の Jellyfin のキーは変えていない。SMB は `smb_host`・`smb_share`・`smb_path`・`smb_user`・`smb_password`（暗号化）・`smb_guest` を足し、`smb_host` があれば SMB、`device_tree_uri` があれば端末のフォルダ（#199）、どちらも無ければ Jellyfin とみなす。取得元に触る入口は `SessionSourceGateway`（`SourceGateway` の bind）で、今の接続の種類で `JellyfinSource` か `SharedFolderSource`（`SmbFolderTree`、端末のフォルダは `DeviceFolderTree`（#199））に振り分ける
   - SMB の認証の失敗は 401 と同じく接続をやり直させる（ログアウトして SMB の接続画面へ）。名前が引けない・タイムアウトは到達不能（判断保留）
   - **端末のフォルダ（#199、ADR 0010 の末尾の注記）**: `ConnectedSource.Device(DeviceFolder(treeUri, name))`、ログアウト中は `SignedOut.lastDeviceFolder`。DataStore のキーは `device_tree_uri`・`device_name`・`device_signed_out`（`device_tree_uri` があれば端末のフォルダ）。`SessionRepository.connectDeviceFolder(treeUri)` は authority が `com.android.externalstorage.documents` でなければ `UnsupportedFolderException`、そうなら永続権限（読み取り）を取り、直下が読めたら保存し、ほかに持っている永続権限を手放す（失敗したら取った権限を手放す）。木は `DeviceFolderTree`（`FolderTree` の SAF 版。`DocumentsContract` の窓口 `DeviceDocuments` を `ContentResolverDeviceDocuments` が実装し、テストは `MemoryDeviceDocuments`）で、相対パスから文書 ID への対応は親を一覧して名前で引く。最初の操作で永続権限と根があることを確かめ、無いと分かったら（永続権限の一覧に無い、`SecurityException`、根の問い合わせが行の無い結果）`SourceException.Unauthorized`。それ以外の失敗は通常の失敗（到達不能）（`LibraryRefresher`・`DownloadWorker` がログアウトし、`DeviceFolderRoute` へ。文言 `sync_error_device_folder_lost`）。根が無いのを null で返さない（全番組が消失扱いになるため）。`FolderTreeFactory` は SMB と端末のフォルダの 2 つの `open` を持つ。「取得元を変える」（`SourceChanger`）は持っている永続権限を全部手放す。画面に出す場所（設定のフォルダの行と、選び直しの案内）は `DeviceFolder.displayPath`（app）が、ツリーの文書 ID（`DeviceFolder.location`。`primary:KikidameTest/Radio` の形は `ExternalStorageProvider` の実装の決まりで、公開の契約ではない）から「内部ストレージ / KikidameTest / Radio」の形に作る。形が崩れていれば保存済みの `name`（選んだフォルダ自身の名前）に戻す。保存（`device_*`）は変えていない（PR #214 のマージ前の検証で、人の判断で足した）。文言は `source_pick_device*`・`device_folder_*`・`settings_source_device`・`settings_device_folder`
@@ -596,6 +625,7 @@ M3 は epic（#13）の下で 3 本の PR に分け、それぞれ実機確認�
 - `docs/adr/0011-no-autoplay-on-bluetooth-connect.md` — Bluetooth の接続では自動で再生しない（ロック画面の再開のカードの ▶ で足りる）
 - `docs/adr/0012-show-images-only-from-source-data.md` — 画像はデータにあるときだけ出す。番組の画像は同期で取って手元に持ち、回の画像は再生のときに手元のファイルから読む
 - `docs/adr/0013-share-playback-state-via-jellyfin-book-library.md` — ブックのライブラリでは、再生位置と再生済みを UserData を通してほかの端末や Jellyfin Web と分け合う（再生の共有）。ADR 0002・0007 を置き換える
+- `docs/adr/0014-replace-local-files-when-the-source-version-changes.md` — 手元のファイルは、取得元のファイルの版が変わったら差し替える。Jellyfin では Etag を合図にして大きさで確かめる
 - Jellyfin 12 認証仕様: https://gist.github.com/nielsvanvelzen/ea047d9028f676185832e51ffaf12a6f
 - jellyfin-sdk-kotlin Releases: https://github.com/jellyfin/jellyfin-sdk-kotlin/releases
 - Jellyfin OpenAPI (stable): https://api.jellyfin.org/openapi/jellyfin-openapi-stable.json

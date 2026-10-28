@@ -241,6 +241,7 @@ class RoomPlaybackSharingTest : JellyfinRefreshTestBase() {
             override suspend fun fetchProgramEpisodes(programId: SourceItemId) = listing.episodes.filter { it.programSourceId == programId }
             override suspend fun fetchProgram(programId: SourceItemId) = listing.programs.firstOrNull { it.sourceId == programId }
             override suspend fun openDownload(episodeId: SourceItemId, rangeStart: Long): DownloadStream = throw UnsupportedOperationException()
+            override suspend fun fetchFileSize(episodeId: SourceItemId): Long? = null
         }
         val folderRepo = refreshRepository(folder)
         folderRepo.refresh()

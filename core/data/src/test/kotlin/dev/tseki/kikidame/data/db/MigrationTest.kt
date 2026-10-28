@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 /**
- * 過去のスキーマ（`schemas/` の JSON）から最新まで AutoMigration で上がること。v4→v5・v5→v6・v7→v8・v8→v9・v9→v10 は既存の行の既定値まで、
+ * 過去のスキーマ（`schemas/` の JSON）から最新まで AutoMigration で上がること。v4→v5・v5→v6・v7→v8・v8→v9・v9→v10・v10→v11 は既存の行の既定値まで、
  * v6→v7 は改名した列の値まで見る。
  * 古い版への INSERT は、その版の列名（`serverItemId`・`stationName`・`airedAt` など）で書く。
  */
@@ -230,11 +230,53 @@ class MigrationTest {
         }
     }
 
+    /**
+     * v10→v11: episodes.sourceVersion、local_files.sourceVersion / replaceState / replaceVersion（差し替え、ADR 0014、#371）。
+     * 既存の手元の回は版を持たず（null。更新後の最初の同期で大きさだけで比べる）、差し替えていない（null）状態で読め、ほかの列は残る。
+     */
+    @Test
+    fun v10ToV11AddsReplaceColumnsAsNull() {
+        helper.createDatabase(DB_NAME, 10).use { db ->
+            db.execSQL(
+                "INSERT INTO programs (id, sourceItemId, name, publisherName, syncEnabled, keepLatest, deleteAfterPlayed, goneSince, starred) " +
+                    "VALUES (1, 'srv-1', 'ハライチのターン！', 'TBSラジオ', 1, 3, 0, NULL, 1)",
+            )
+            db.execSQL(
+                "INSERT INTO episodes (id, sourceItemId, programId, title, publishedAt, addedAt, runtimeTicks, sizeBytes, container, performers) " +
+                    "VALUES (10, 'ep-1', 1, '2026-09-18', 1789300800000, NULL, 36000000000, 1234, 'm4a', '')",
+            )
+            db.execSQL(
+                "INSERT INTO local_files (episodeId, state, path, pinned, attemptCount, lastAttemptAt, downloadedAt, enqueuedAt) " +
+                    "VALUES (10, 'DONE', '/files/TBSラジオ/ハライチのターン！/2026-09-18.m4a', 0, 0, NULL, 1789300900000, NULL)",
+            )
+        }
+        helper.runMigrationsAndValidate(DB_NAME, 11, true).close()
+
+        val migrated = Room.databaseBuilder(
+            ApplicationProvider.getApplicationContext(),
+            KikidameDatabase::class.java,
+            DB_NAME,
+        ).allowMainThreadQueries().build()
+        try {
+            val row = runBlocking { migrated.episodeDao().findById(10) }!!
+            assertNull(row.episode.sourceVersion)
+            assertEquals(1234L, row.episode.sizeBytes)
+            val local = row.localFile!!
+            assertNull(local.sourceVersion)
+            assertNull(local.replaceState)
+            assertNull(local.replaceVersion)
+            assertEquals("/files/TBSラジオ/ハライチのターン！/2026-09-18.m4a", local.path)
+            assertEquals(Instant.fromEpochMilliseconds(1789300900000), local.downloadedAt)
+        } finally {
+            migrated.close()
+        }
+    }
+
     /** 最初のスキーマからの通し。列追加が nullable か既定値付きで、途中のどこも手書きマイグレーションを要さないこと。 */
     @Test
     fun v1MigratesAllTheWayToLatest() {
         helper.createDatabase(DB_NAME, 1).close()
-        helper.runMigrationsAndValidate(DB_NAME, 10, true).close()
+        helper.runMigrationsAndValidate(DB_NAME, 11, true).close()
     }
 
     companion object {

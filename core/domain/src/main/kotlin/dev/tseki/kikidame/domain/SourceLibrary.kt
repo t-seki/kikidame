@@ -33,13 +33,19 @@ data class SourceEpisode(
     /** 出演者（Jellyfin では `Artists`）。取得元が返さなければ空（空で上書きする。サイズと違い「返さない」と「無い」を区別しない）。 */
     val performers: List<String> = emptyList(),
     /**
-     * 共有フォルダでの、取得元のファイルのサイズ（バイト）。Jellyfin では null。
+     * 一覧が返す、取得元のファイルのサイズ（バイト）。共有フォルダでだけ値があり、Jellyfin では null（一覧が返さない）。
      * 更新日時（[sourceModifiedAt]）・取得元 ID（パス）と合わせて、タグを読み直すかの判定に使う（#197）。
+     * **差し替え**（ADR 0014）でも、これが null でない取得元は [version] をそのまま信じ、版を持たない手元の回はこれと手元の大きさで比べる。
      * [sizeBytes] はダウンロードの完了時に実サイズで上書きされるので、判定には使わない。
      */
     val sourceFileSize: Long? = null,
-    /** 共有フォルダでの、取得元のファイルの更新日時。Jellyfin では null。 */
+    /** 共有フォルダでの、取得元のファイルの更新日時。Jellyfin では null（一覧が返さない）。 */
     val sourceModifiedAt: Instant? = null,
+    /**
+     * ファイルの版（ADR 0014、#371）。取得元のファイルが書き換わったかを見分ける値で、**差し替え**の判断に使う。
+     * 共有フォルダでは大きさと更新日時の組、Jellyfin では `Etag`。取得元が返さなければ null（差し替えの判断をしない）。
+     */
+    val version: String? = null,
     /**
      * 取得元に置かれた再生位置と再生済み（**再生の共有**、ADR 0013）。共有する取得元（Jellyfin のブックのライブラリ）でだけ値があり、
      * 音楽のライブラリと共有フォルダでは null（読まない）。

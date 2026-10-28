@@ -56,6 +56,14 @@ data class ScannedFileRow(
     val sourceFileSize: Long,
     val sourceModifiedAt: Instant,
 )
+/** 差し替え（ADR 0014、#371）を考える手元の回: 手元にあり（DONE でパスがある）、取得元 ID を持ち、まだ差し替えを予約していない回。 */
+data class ReplaceCandidateRow(
+    val episodeId: Long,
+    val sourceItemId: String,
+    val path: String,
+    /** 落としたときの版（`local_files.sourceVersion`）。 */
+    val sourceVersion: String?,
+)
 /** 同期の判断に必要な列だけ（`SyncPlanner` の入力）。`local_files` / `playback_states` が無ければ null。 */
 data class EpisodeSyncRow(
     val id: Long,
@@ -227,6 +235,9 @@ interface EpisodeDao {
     suspend fun update(episode: EpisodeEntity)
     @Query("UPDATE episodes SET sizeBytes = :sizeBytes WHERE id = :id")
     suspend fun updateSize(id: Long, sizeBytes: Long)
+    /** 一覧で最後に見たファイルの版（ADR 0014）。 */
+    @Query("SELECT sourceVersion FROM episodes WHERE id = :id")
+    suspend fun findSourceVersion(id: Long): String?
     @Query("DELETE FROM episodes WHERE id = :id")
     suspend fun deleteById(id: Long)
     @Query("SELECT COUNT(*) FROM episodes WHERE programId = :programId")
@@ -236,7 +247,8 @@ interface EpisodeDao {
 interface LocalFileDao {
     /**
      * 手元のファイルの合計（#42）。sizeBytes はダウンロード完了時に実サイズで上書きされている
-     * （`SdkJellyfinGateway` はサイズを返さないので、同期の取り込みで上書きされることはない。返すようにするなら DONE の行は守ること）。
+     * （`SdkJellyfinGateway` はサイズを返さないので、同期の取り込みで上書きされることはない。返すようにするなら DONE の行は守ること。
+     * 差し替えのために問い合わせた大きさ（ADR 0014）は `SourceEpisode.sizeBytes` に載せない）。
      */
     @Query(
         """
@@ -280,17 +292,28 @@ interface LocalFileDao {
     @Query("SELECT * FROM local_files WHERE state = :state")
     suspend fun listByState(state: DownloadState): List<LocalFileEntity>
     /**
-     * キューの先頭: 手動（固定）が常に先、その中はキューに入れた順（FIFO）。
+     * キューの先頭: 手動（固定）の予約が常に先、その中はキューに入れた順（FIFO）。
+     * 差し替えの予約（`replaceState = 'PENDING'`、ADR 0014）も同じ待ち行列に入る。差し替えは同期の予約なので、固定した回の差し替えでも手動の予約の後に並ぶ。
      * `enqueuedAt` は v3 で足した nullable なので NULL を先頭に来させない。同時刻は公開日の新しい順で安定させる。
      */
     @Query(
         """
         SELECT lf.* FROM local_files lf JOIN episodes e ON e.id = lf.episodeId
-        WHERE lf.state = 'PENDING'
-        ORDER BY lf.pinned DESC, lf.enqueuedAt IS NULL, lf.enqueuedAt ASC, e.publishedAt DESC, e.title ASC, e.id ASC LIMIT 1
+        WHERE lf.state = 'PENDING' OR lf.replaceState = 'PENDING'
+        ORDER BY (lf.state = 'PENDING' AND lf.pinned = 1) DESC, lf.enqueuedAt IS NULL, lf.enqueuedAt ASC,
+                 e.publishedAt DESC, e.title ASC, e.id ASC LIMIT 1
         """,
     )
     suspend fun nextPending(): LocalFileEntity?
+    /** 差し替えを考える手元の回（[ReplaceCandidateRow]）。 */
+    @Query(
+        """
+        SELECT lf.episodeId AS episodeId, e.sourceItemId AS sourceItemId, lf.path AS path, lf.sourceVersion AS sourceVersion
+        FROM local_files lf JOIN episodes e ON e.id = lf.episodeId
+        WHERE $LOCAL_FILE_PRESENT AND e.sourceItemId IS NOT NULL AND lf.replaceState IS NULL
+        """,
+    )
+    suspend fun listReplaceCandidates(): List<ReplaceCandidateRow>
     /** 番組の手元のファイルのパス（番組ごとの削除用）。 */
     @Query("SELECT lf.path FROM local_files lf JOIN episodes e ON e.id = lf.episodeId WHERE e.programId = :programId AND lf.path IS NOT NULL")
     suspend fun listPathsByProgram(programId: Long): List<String>
@@ -326,6 +349,29 @@ interface LocalFileDao {
     suspend fun markRunning(episodeId: Long, at: Instant)
     @Query("UPDATE local_files SET state = 'FAILED', attemptCount = attemptCount + 1, lastAttemptAt = :at WHERE episodeId = :episodeId")
     suspend fun markFailed(episodeId: Long, at: Instant)
+
+    // 差し替え（ADR 0014、#371）。どれも state（DONE）には触らない。上と同じく 1 回の更新を 1 つの文で行う
+    /** 落としたときの版を書く（差し替えずに、中身が同じと分かったとき）。手元にある行だけ。 */
+    @Query("UPDATE local_files SET sourceVersion = :version WHERE episodeId = :episodeId AND state = 'DONE'")
+    suspend fun setSourceVersion(episodeId: Long, version: String)
+    /** 差し替えを予約する。手元にあって、まだ予約していない行だけ。予約したら 1。 */
+    @Query(
+        """UPDATE local_files SET replaceState = 'PENDING', replaceVersion = :version, enqueuedAt = :enqueuedAt
+        WHERE episodeId = :episodeId AND state = 'DONE' AND path IS NOT NULL AND replaceState IS NULL""",
+    )
+    suspend fun reserveReplace(episodeId: Long, version: String?, enqueuedAt: Instant): Int
+    @Query("UPDATE local_files SET replaceState = 'RUNNING', lastAttemptAt = :at WHERE episodeId = :episodeId AND replaceState IS NOT NULL")
+    suspend fun markReplaceRunning(episodeId: Long, at: Instant)
+    /** 落とし終えた差し替えを確定する。落としている最中の行だけ。確定したら 1。 */
+    @Query(
+        """UPDATE local_files SET sourceVersion = replaceVersion, replaceState = NULL, replaceVersion = NULL, downloadedAt = :at
+        WHERE episodeId = :episodeId AND state = 'DONE' AND replaceState = 'RUNNING'""",
+    )
+    suspend fun markReplaced(episodeId: Long, at: Instant): Int
+    @Query("UPDATE local_files SET replaceState = NULL, replaceVersion = NULL WHERE episodeId = :episodeId")
+    suspend fun abandonReplace(episodeId: Long)
+    @Query("UPDATE local_files SET replaceState = 'PENDING' WHERE replaceState = 'RUNNING'")
+    suspend fun resetRunningReplacements()
 }
 /** 再生の共有（ADR 0013）の突き合わせに使う、各回の取得元 ID とその再生の状態の行（無ければ null）。 */
 data class SharedPlaybackRow(

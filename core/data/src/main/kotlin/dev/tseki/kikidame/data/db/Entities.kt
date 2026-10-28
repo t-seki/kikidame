@@ -67,10 +67,16 @@ data class EpisodeEntity(
     /**
      * 共有フォルダでの、取得元のファイルのサイズと更新日時（#197）。Jellyfin の行と、v8 より前に取り込んだ行は null。
      * 取得元 ID（相対パス）とこの 2 つがどれも前と同じ回は、タグを読み直さずにこの行の値を使う。
+     * 走査のたびに取得元の値で上書きされるので、「落としたときの値」としては使えない（差し替えの判断は [LocalFileEntity.sourceVersion] と比べる。ADR 0014）。
      * [sizeBytes] はダウンロードの完了時に実サイズで上書きされるので、この判定には使わない。v8 で追加
      */
     val sourceFileSize: Long? = null,
     val sourceModifiedAt: Instant? = null,
+    /**
+     * 一覧で最後に見たファイルの版（`SourceEpisode.version`、ADR 0014、#371）。取得元が返さなければ null。取り込みのたびに一覧の値で書く。
+     * ダウンロードを予約するとき（手動の予約を含む）に [LocalFileEntity.sourceVersion] へ写す。v11 で追加
+     */
+    val sourceVersion: String? = null,
 )
 /** ダウンロード状態の唯一の正（ADR 0003）。 */
 @Entity(
@@ -95,8 +101,20 @@ data class LocalFileEntity(
     val attemptCount: Int = 0,
     val lastAttemptAt: Instant? = null,
     val downloadedAt: Instant? = null,
-    /** キューに入れた時刻。手動（固定）を先に、その中はこの古い順（FIFO）に落とす。同期の予約にも付く。v3 で追加 */
+    /** キューに入れた時刻。手動（固定）を先に、その中はこの古い順（FIFO）に落とす。同期の予約にも付く。差し替えの予約でも付け直す。v3 で追加 */
     val enqueuedAt: Instant? = null,
+    /**
+     * 落としたときのファイルの版（ADR 0014、#371）。予約したときの一覧の版（[EpisodeEntity.sourceVersion]）を写し、落とし終えてもそのまま持つ。
+     * 一覧の版と違えば**差し替え**を考える。v11 に上げる前に落とした行と、取得元が版を返さなかった行は null（大きさだけで比べる）。v11 で追加
+     */
+    val sourceVersion: String? = null,
+    /**
+     * **差し替え**のダウンロードの状態。null なら差し替えていない。PENDING（予約した）か RUNNING（落としている）だけを使い、失敗したら null に戻す。
+     * 差し替えの間も [state] は DONE のまま（今のファイルで聴ける）。v11 で追加
+     */
+    val replaceState: DownloadState? = null,
+    /** 差し替えを予約したときの一覧の版。落とし終えたら [sourceVersion] に移す。差し替えていなければ null。v11 で追加 */
+    val replaceVersion: String? = null,
 )
 /**
  * 再生位置・再生済み。取得元が Jellyfin のブックのライブラリのときは、取得元の UserData と分け合う（**再生の共有**、ADR 0013。

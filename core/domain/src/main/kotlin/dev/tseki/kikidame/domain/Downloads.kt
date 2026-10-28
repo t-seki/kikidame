@@ -68,8 +68,18 @@ interface DownloadRepository {
     /** 手動ダウンロード = 固定。既に行がある回は固定にするだけ（同期分の予約を手動に格上げする）。失敗は [retry]。 */
     suspend fun enqueue(episodeId: EpisodeId)
 
-    /** 同期による予約（`pinned = false`）。渡した順にキューへ入れる。既に行がある回は飛ばし、実際に予約した数を返す。 */
+    /**
+     * 同期による予約（`pinned = false`）。渡した順にキューへ入れる。既に行がある回は飛ばし、実際に予約した数を返す。
+     * 予約した回には、その時点の一覧の版（ADR 0014）を記録する（[enqueue] も同じ）。
+     */
     suspend fun enqueueForSync(episodeIds: List<EpisodeId>): Int
+
+    /**
+     * **差し替え**（ADR 0014、#371）の予約。手元にある（`DONE`）回だけを、同じ待ち行列に入れる。行は `DONE` のまま（今のファイルで聴ける）。
+     * 新しいファイルの版として、その時点の一覧の版を覚える。残っている書きかけのファイル（`.part`）は捨てる。
+     * 手元に無い・もう差し替えを予約している回は飛ばし、実際に予約した数を返す。
+     */
+    suspend fun enqueueReplacements(episodeIds: List<EpisodeId>): Int
 
     /**
      * 取得元の一覧から消えた各回を `Episode` 行ごと消す（`LocalFile` / `PlaybackState` は cascade、ファイルも消す）。
@@ -120,7 +130,10 @@ interface DownloadRepository {
 
 /** ダウンロードの実行側（Worker）が使う。 */
 interface DownloadQueue {
-    /** 次に落とす行（キューに入れた順 = FIFO）。無ければ null。 */
+    /**
+     * 次に落とす行（キューに入れた順 = FIFO）。無ければ null。差し替えの予約（ADR 0014）も同じ待ち行列から返る
+     * （[LocalFile.replacing] が true。行は DONE のまま）。
+     */
     suspend fun nextPending(): EpisodeWithState?
 
     /** 次の実行に備えて、試行回数が上限未満の FAILED を PENDING に戻す。 */
@@ -140,4 +153,27 @@ interface DownloadQueue {
 
     /** キャンセル済みなら false（Worker は約 1 MB ごとに見る）。 */
     suspend fun isStillWanted(episodeId: EpisodeId): Boolean
+
+    // --- 差し替え（ADR 0014、#371）。行は DONE のままなので、上の口（状態を RUNNING / DONE / FAILED にする）は使わない ---
+
+    /** 差し替えを落とし始める。行の状態（DONE）は変えない。 */
+    suspend fun markReplaceRunning(episodeId: EpisodeId)
+
+    /**
+     * 差し替えを落とし終え、新しいファイルを今のファイルの場所に移した。落としたときの版を予約のときに覚えた版に、
+     * 大きさを [sizeBytes] に、落とした日時を今にし、差し替えの印を下ろす。
+     */
+    suspend fun markReplaced(episodeId: EpisodeId, sizeBytes: Long)
+
+    /**
+     * 差し替えをやめる（失敗した・落とし終えたときに聴いている回だった・認証切れ）。差し替えの印を下ろすだけで、今のファイルと
+     * 落としたときの版はそのまま残る。試行回数は増やさない。次の同期でまた見分けて予約する。
+     */
+    suspend fun abandonReplace(episodeId: EpisodeId)
+
+    /** 差し替えがまだ要るか。手元の回ごと消された・差し替えが取り消されたなら false（Worker は約 1 MB ごとに見る）。 */
+    suspend fun isReplaceStillWanted(episodeId: EpisodeId): Boolean
+
+    /** Worker が途中で殺されて落としている最中のまま残った差し替えを、予約に戻す（実行開始時に呼ぶ）。 */
+    suspend fun resetRunningReplacements()
 }

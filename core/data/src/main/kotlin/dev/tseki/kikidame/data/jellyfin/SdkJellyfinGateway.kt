@@ -202,8 +202,9 @@ class SdkJellyfinGateway @Inject constructor(
                 recursive = true,
                 includeItemTypes = listOf(BaseItemKind.AUDIO),
                 // MediaSources は要求しない: SDK 1.9（Jellyfin 12 向け）は MediaStream.IsOriginal を必須と
-                // 見なすが、10.11 はそれを返さずデコードに失敗する。サイズは M3 のダウンロード時に取る
-                fields = listOf(ItemFields.DATE_CREATED, ItemFields.PARENT_ID),
+                // 見なすが、10.11 はそれを返さずデコードに失敗する。サイズはダウンロードの完了時に実際の値で書き、
+                // 差し替えの判断（ADR 0014）で要るときだけ [fetchFileSize] で問い合わせる。Etag はファイルの版（ADR 0014）
+                fields = listOf(ItemFields.DATE_CREATED, ItemFields.PARENT_ID, ItemFields.ETAG),
                 sortBy = listOf(ItemSortBy.DATE_CREATED),
                 sortOrder = listOf(SortOrder.DESCENDING),
             ),
@@ -247,7 +248,8 @@ class SdkJellyfinGateway @Inject constructor(
                 recursive = true,
                 includeItemTypes = listOf(BaseItemKind.AUDIO_BOOK),
                 // AudioBook は Container を返さない（10.10.7・12.0 で確かめた）ので、拡張子を Path から取る
-                fields = listOf(ItemFields.DATE_CREATED, ItemFields.PARENT_ID, ItemFields.PATH),
+                // Etag はファイルの版（ADR 0014）
+                fields = listOf(ItemFields.DATE_CREATED, ItemFields.PARENT_ID, ItemFields.PATH, ItemFields.ETAG),
                 // 再生の共有（ADR 0013）: 各回の UserData を一覧と一緒に読む（回ごとに問い合わせない。#355）
                 userId = UUID.fromString(credentials.userId),
                 enableUserData = true,
@@ -332,6 +334,31 @@ class SdkJellyfinGateway @Inject constructor(
             else -> null
         }
         DownloadStream(resumedFrom = resumedFrom, totalBytes = totalBytes, body = body.byteStream()) { response.close() }
+    }
+
+    /**
+     * 原本の全長を `Range: bytes=0-0` で取る（ADR 0014、#371）。HEAD は 10.10.7・12.0 とも 405 を返すので使わない。
+     * 206 なら `Content-Range` の全長、Range を無視して 200 で全体が返ったら `Content-Length`（本文は読まずに閉じる）。
+     * 書き換えた直後、Jellyfin が走査し直す前でも、ディスク上の今の大きさが返った（10.10.7・12.0 で確かめた）。
+     */
+    override suspend fun fetchFileSize(credentials: ServerCredentials, episodeSourceId: SourceItemId): Long? = call {
+        val api = api(credentials.serverUrl, credentials.accessToken)
+        val url = api.libraryApi.getDownloadUrl(UUID.fromString(episodeSourceId.value))
+        val request = Request.Builder()
+            .url(url)
+            .header("Authorization", authorizationHeader(api, credentials))
+            .header("Range", "bytes=0-0")
+            .build()
+        withContext(Dispatchers.IO) {
+            downloadClient.newCall(request).execute().use { response ->
+                when (response.code) {
+                    206 -> parseContentRangeTotal(response.header("Content-Range"))
+                    200 -> response.body?.contentLength()?.takeIf { it >= 0 }
+                    401, 403 -> throw SourceException.Unauthorized()
+                    else -> throw SourceException.Failed("HTTP ${response.code}")
+                }
+            }
+        }
     }
 
     /**
@@ -423,12 +450,15 @@ class SdkJellyfinGateway @Inject constructor(
             publishedAt = PublishedAt.of(premiereDate?.toKotlinLocalDate(), created.toKotlinLocalDate()),
             addedAt = created.toInstantUtc(),
             runtime = runTimeTicks?.let(Ticks::toDuration) ?: Duration.ZERO,
-            // ファイルサイズは基本フィールドに無い（MediaSources を避けるため）。M3 のダウンロードで確定する
+            // ファイルサイズは基本フィールドに無い（MediaSources を避けるため）。ダウンロードの完了時に確定する。
+            // 差し替えのために問い合わせた大きさ（[fetchFileSize]）もここには載せない（手元の回の大きさを上書きしないため）
             sizeBytes = null,
             // AudioBook は Container を返さないので、Path（ブックのライブラリでだけ要求する）の拡張子で代える
             container = container ?: path?.substringAfterLast('/')?.substringAfterLast('.', missingDelimiterValue = "")?.lowercase() ?: "",
             // 出演者（#70）。`Artists` は基本フィールドで返る（`ItemFields` に無く、要求の有無に依らない）。名前だけの一覧が無い・空なら `ArtistItems` から拾う
             performers = (artists?.takeIf { it.isNotEmpty() } ?: artistItems?.mapNotNull { it.name }).orEmpty().filter { it.isNotBlank() },
+            // ファイルの版（ADR 0014）。`ItemFields.ETAG` を求めたときだけ返る。中身は DateLastSaved の MD5 で、メタデータの保存だけでも変わる
+            version = etag?.takeIf { it.isNotBlank() },
         )
     }
 

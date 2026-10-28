@@ -11,4 +11,9 @@ data class LocalFile(
     val attemptCount: Int = 0,
     val lastAttemptAt: Instant? = null,
     val downloadedAt: Instant? = null,
+    /**
+     * **差し替え**（ADR 0014）のダウンロードが予約されているか、落としている最中か。[state] は DONE のまま（今のファイルで聴ける）。
+     * ダウンロードの実行側は、これが true の行を差し替えとして落とす。
+     */
+    val replacing: Boolean = false,
 )
