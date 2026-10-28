@@ -28,7 +28,7 @@ data class NowPlayingState(
     val isPlaying: Boolean,
     /**
      * 最後まで聴き終えて止まっている。キューの最後なら `STATE_ENDED`、途中の回でもスリープタイマーの
-     * 「この回の終わりまで」で回の終わりで止めたとき（#36）。載ったままだが、同期はもう削除から外さない（#27）。
+     * 「この回の終わりまで」で回の終わりで止めたとき（#36）。載ったままだが、同期はもう削除と差し替え（ADR 0014）から外さない（#27）。
      */
     val isEnded: Boolean = false,
     /** ミニプレイヤーの再生位置の線（#59）。再生中は 1 秒ごとに更新する。尺が分からなければ [durationMs] は 0。 */
@@ -38,7 +38,8 @@ data class NowPlayingState(
 
 /**
  * 聴いている回 = 今プレイヤーに載っている各回（止まっていても）。[PlaybackService] が書き、
- * 同期がこの回（聴き終えていなければ）を今回の削除から外し、一覧のマークとミニプレイヤーがこの回を指す（ADR 0006）。
+ * 同期がこの回（聴き終えていなければ）を今回の削除と差し替えの予約から外し（ダウンロードの Worker も、差し替えを落とし終えた時点で
+ * この回なら差し替えない。ADR 0014）、一覧のマークとミニプレイヤーがこの回を指す（ADR 0006）。
  * 聴いている回が利用者の操作なしに消えたとき（再生の失敗）は、その理由も [messages] でここから UI へ渡す。
  * Worker・Service・UI は同一プロセスなので、MediaController を結ばずにここで受け渡す。
  */
@@ -47,7 +48,10 @@ class NowPlaying @Inject constructor() {
     private val _state = MutableStateFlow<NowPlayingState?>(null)
     val state: StateFlow<NowPlayingState?> = _state
 
-    /** 同期が今回の削除から外す各回。載っていて、まだ聴き終えていない回。 */
+    /**
+     * 同期が今回の削除と差し替えの予約から外す各回。載っていて、まだ聴き終えていない回。
+     * ダウンロードの Worker も、差し替えを落とし終えた時点でこの回なら差し替えない（ADR 0014）。
+     */
     val excludedFromSync: EpisodeId?
         get() = _state.value?.takeIf { !it.isEnded }?.episodeId
 
