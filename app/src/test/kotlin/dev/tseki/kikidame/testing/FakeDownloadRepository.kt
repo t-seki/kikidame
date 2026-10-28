@@ -24,6 +24,7 @@ class FakeDownloadRepository(
     val removedPrograms = mutableListOf<ProgramId>()
     override suspend fun enqueue(episodeId: EpisodeId) = Unit
     override suspend fun enqueueForSync(episodeIds: List<EpisodeId>) = episodeIds.size
+    override suspend fun enqueueReplacements(episodeIds: List<EpisodeId>) = episodeIds.size
     override suspend fun removeEpisode(episodeId: EpisodeId) = Unit
     override suspend fun removeProgram(programId: ProgramId) {
         removedPrograms += programId

@@ -146,3 +146,47 @@ object SyncInputs {
         }
     }
 }
+
+/**
+ * **差し替え**（CONTEXT.md、ADR 0014、#371）の判断。手元にある回（`DONE`）1 本ごとに、落としたときの版と、今の一覧の版・大きさから決める。I/O はしない。
+ * 聴いている回を外すのと、取得元への大きさの問い合わせは呼び出し側が行う。
+ *
+ * - 一覧の版が null なら、比べず、版も書き換えない（[ReplacementCheck.Keep]）
+ * - 落としたときの版が一覧の版と同じなら [ReplacementCheck.Keep]
+ * - 落としたときの版があって違うとき: 一覧がファイルの大きさを返す取得元（共有フォルダ。版は大きさと更新日時の組）は、
+ *   版をそのまま信じて [ReplacementCheck.Replace]。返さない取得元（Jellyfin。版は Etag で、メタデータの保存だけでも変わる）は
+ *   [ReplacementCheck.AskSourceSize]（取得元の大きさを問い合わせて [afterSourceSize] で決める）
+ * - 落としたときの版が無い（この仕組みより前に落とした回）とき: 大きさだけで比べる。一覧が大きさを返せばそれと、
+ *   返さなければ [ReplacementCheck.AskSourceSize]
+ */
+object Replacement {
+    fun check(heldVersion: String?, listedVersion: String?, listedFileSize: Long?, localSize: Long): ReplacementCheck = when {
+        listedVersion == null -> ReplacementCheck.Keep
+        heldVersion == listedVersion -> ReplacementCheck.Keep
+        heldVersion != null -> if (listedFileSize != null) ReplacementCheck.Replace else ReplacementCheck.AskSourceSize
+        listedFileSize != null -> bySize(listedFileSize, localSize)
+        else -> ReplacementCheck.AskSourceSize
+    }
+
+    /** [ReplacementCheck.AskSourceSize] の続き。取得元の大きさ [sourceSize] が分からなければ（null）何もしない（次の同期でまた見る）。 */
+    fun afterSourceSize(sourceSize: Long?, localSize: Long): ReplacementCheck =
+        if (sourceSize == null) ReplacementCheck.Keep else bySize(sourceSize, localSize)
+
+    private fun bySize(sourceSize: Long, localSize: Long): ReplacementCheck =
+        if (sourceSize != localSize) ReplacementCheck.Replace else ReplacementCheck.RecordVersion
+}
+
+/** [Replacement] の結論。 */
+enum class ReplacementCheck {
+    /** 何もしない。 */
+    Keep,
+
+    /** 差し替えを予約する。 */
+    Replace,
+
+    /** 差し替えず、一覧の版を落としたときの版として書く（中身は同じと分かった）。 */
+    RecordVersion,
+
+    /** 取得元にファイルの大きさを問い合わせてから、[Replacement.afterSourceSize] で決める。 */
+    AskSourceSize,
+}

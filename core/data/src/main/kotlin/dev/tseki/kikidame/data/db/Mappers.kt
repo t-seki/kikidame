@@ -67,6 +67,7 @@ fun LocalFileEntity.toDomain(): LocalFile = LocalFile(
     attemptCount = attemptCount,
     lastAttemptAt = lastAttemptAt,
     downloadedAt = downloadedAt,
+    replacing = replaceState != null,
 )
 fun PlaybackStateEntity.toDomain(): PlaybackState = PlaybackState(
     episodeId = EpisodeId(episodeId),

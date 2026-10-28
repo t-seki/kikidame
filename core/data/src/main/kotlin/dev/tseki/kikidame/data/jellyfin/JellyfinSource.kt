@@ -50,6 +50,9 @@ class JellyfinSource @Inject constructor(
     override suspend fun openDownload(episodeId: SourceItemId, rangeStart: Long): DownloadStream =
         gateway.openDownload(credentials(), episodeId, rangeStart)
 
+    override suspend fun fetchFileSize(episodeId: SourceItemId): Long? =
+        gateway.fetchFileSize(credentials(), episodeId)
+
     /** ダウンロードはライブラリを選ぶ前（[SessionState.NeedsLibrary]）でも行う（`DownloadWorker` の挙動）。 */
     private suspend fun credentials(): ServerCredentials = when (val s = store.current()) {
         is SessionState.Ready -> (s.source as? ConnectedSource.Jellyfin)?.session?.credentials() ?: throw SourceException.Unauthorized()

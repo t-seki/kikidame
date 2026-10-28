@@ -74,6 +74,10 @@ class SessionSourceGateway internal constructor(
         }
     }
 
+    /** 各回のファイルの大きさ（ADR 0014）。共有フォルダは呼び出しごとに木を開く。 */
+    override suspend fun fetchFileSize(episodeId: SourceItemId): Long? =
+        withSource { it.fetchFileSize(episodeId) }
+
     private suspend fun <T> withSource(block: suspend (SourceGateway) -> T): T {
         val tree = openTreeOrNull() ?: return block(jellyfin)
         try {

@@ -60,6 +60,12 @@ interface JellyfinGateway {
     suspend fun openDownload(credentials: ServerCredentials, episodeSourceId: SourceItemId, rangeStart: Long): DownloadStream
 
     /**
+     * 原本のファイルの大きさ（ADR 0014、#371）。`/Items/{id}/Download` に `Range: bytes=0-0` を付けて、`Content-Range` の全長から取る
+     * （HEAD は 405 で使えない。10.10.7 と 12.0 で確かめた）。全長が分からなければ null。
+     */
+    suspend fun fetchFileSize(credentials: ServerCredentials, episodeSourceId: SourceItemId): Long?
+
+    /**
      * 各回の UserData（再生位置・再生済み・`LastPlayedDate`）を読む（**再生の共有**、ADR 0013 の決定 5）。ブックのライブラリの各回にだけ使う。
      * [timeout] があれば、それまでに返らなければ [SourceException.Unreachable]（▶ の直前の読み込み。失敗したら手元の値で鳴らす）。
      */

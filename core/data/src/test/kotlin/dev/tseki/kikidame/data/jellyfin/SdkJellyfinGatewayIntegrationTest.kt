@@ -186,6 +186,10 @@ class SdkJellyfinGatewayIntegrationTest {
             bytes.size.toLong()
         }
 
+        // 差し替え（ADR 0014、#371）: 一覧は Etag をファイルの版として返し、大きさは中身を落とさずに取れる
+        assertTrue(!episode.version.isNullOrBlank(), "一覧に Etag が無い")
+        assertEquals(total, gateway.fetchFileSize(credentials, episode.sourceId), "Range: bytes=0-0 の全長と本文の長さ")
+
         gateway.openDownload(credentials, episode.sourceId, rangeStart = 100).use { stream ->
             val rest = stream.body.readBytes()
             if (stream.resumedFrom != null) {

@@ -96,6 +96,18 @@ class FakeJellyfinGateway : JellyfinGateway {
         }
     }
 
+    /** 大きさを問い合わせた各回（呼ばれた順、ADR 0014）。大きさは [fileSizes] にあればその値、無ければ [files] の長さ、どちらも無ければ null。 */
+    val fetchedFileSizes = ArrayList<SourceItemId>()
+    val fileSizes = HashMap<SourceItemId, Long>()
+    /** 大きさの問い合わせだけが投げる。 */
+    var fileSizeFailure: SourceException? = null
+    override suspend fun fetchFileSize(credentials: ServerCredentials, episodeSourceId: SourceItemId): Long? {
+        failWith?.let { throw it }
+        fetchedFileSizes += episodeSourceId
+        fileSizeFailure?.let { throw it }
+        return fileSizes[episodeSourceId] ?: files[episodeSourceId]?.size?.toLong()
+    }
+
     /** 各回 ID → サーバの UserData（再生の共有）。無ければ [SharedPlayState.EMPTY]。 */
     val playStates = HashMap<SourceItemId, SharedPlayState>()
     /** UserData を読んだ各回（呼ばれた順）。 */

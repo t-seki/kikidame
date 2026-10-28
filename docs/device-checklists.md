@@ -271,3 +271,30 @@ Jellyfin のブックのライブラリを取得元に選べるようにした�
 - [ ] チャプター入りの回で、題の行と一覧の強調が、チャプターの開始の時刻に遅れずに替わる
 - [ ] 一時停止から再生へ戻った直後の最初の秒から、秒が均等に進む
 - [ ] 1 秒を超えて待つ遅い倍速（例: 0.5×）でも、秒が均等に進む
+
+### 実機チェックリスト（#371: 差し替え）
+
+取得元で書き換わった手元の回を、同期のときに新しいファイルに替える（`CONTEXT.md` の**差し替え**、ADR 0014）。人が実機で確かめ、確かめた項目に人か Supervisor がチェックを入れる。
+
+1 つ目の項目は、debug 版がもう新しいファイルを持っていて、Supervisor は release 版に触らない（[device-testing.md](device-testing.md)）ので、リリースの後に人が release 版で確かめる。マージの前には、debug 版で似た状態を作って確かめる。作り方は次のとおり（[device-testing.md](device-testing.md) の「再開（`.part` + `Range`）の確認」と同じ、DB を引き出して書き換えて戻す形。書き換えて戻すのは取り消せない操作なので、Supervisor は打たずに人に頼む）。
+
+- チャプター入りの回を 1 つ選び、その回の `local_files.sourceVersion` を NULL にして（版を持たない回、つまり更新前に落とした回にする）、手元のファイルの末尾に 1 バイト足す（取得元と大きさを変える）
+- その後に番組一覧を引っ張って同期すると、取得元に大きさを問い合わせ、違うので差し替える。差し替えの後は、足した 1 バイトの無い取得元のファイルになる
+
+```bash
+$ADB shell am force-stop $PKG
+W=$(mktemp -d)   # repo の外に置く
+for f in kikidame.db kikidame.db-wal; do $ADB exec-out run-as $PKG cat databases/$f > $W/$f; done
+python3 -c "import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); print(c.execute(\"UPDATE local_files SET sourceVersion=NULL WHERE episodeId=? AND state='DONE'\", (sys.argv[2],)).rowcount); c.commit(); c.execute('PRAGMA wal_checkpoint(TRUNCATE)'); c.close()" $W/kikidame.db '<episodeId>'   # 1 なら書き換わった
+$ADB shell run-as $PKG rm -f databases/kikidame.db-wal databases/kikidame.db-shm
+$ADB exec-in run-as $PKG sh -c 'cat > databases/kikidame.db' < $W/kikidame.db
+rm -r $W
+$ADB shell "printf x >> '<path>'"   # <path> は local_files.path
+```
+
+この手順のうち、手元で流して確かめたのは `python3 -c` の UPDATE の文だけ（v11 のスキーマの `local_files` を作った sqlite で、1 を出して `sourceVersion` が NULL になった）。端末への `adb` の操作は流していない（未確認）。
+
+- [ ] release 版で、更新後の同期の後、「VIVANT 悪役会議室」2026-10-25 がチャプター 6 個で再生される（リリースの後に人が確かめる。マージの前は、上の手順で作った debug 版の回で、同期の後にファイルの大きさが取得元と同じに戻り、チャプターが出ることを確かめる）
+- [ ] 書き換わっていない回は差し替えられない（落とした日時 `downloadedAt` が変わらない）
+- [ ] 聴いている回（プレイヤーに載せたまま）は、その同期では差し替えられず、別の回に替えた後の同期で差し替えられる
+- [ ] 差し替えの途中に聴き始めた回は差し替えられず、聴いている回でなくなった後の同期で新しいファイルになる

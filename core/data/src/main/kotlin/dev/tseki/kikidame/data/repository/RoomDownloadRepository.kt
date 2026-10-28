@@ -31,6 +31,7 @@ import kotlin.time.Clock
 /**
  * ダウンロードの状態（`local_files`）と手元のファイルをまとめて扱う。
  * 削除の規則は [deletionScopeFor]: 取得元 ID がある回はファイルと行だけ、無い回は各回ごと。
+ * 差し替え（ADR 0014、#371）は、DONE の行に `replaceState` を立てて同じ待ち行列に入れる。手元の回を消すと、差し替えも一緒に消える（行と `.part` が消える）。
  */
 @Singleton
 class RoomDownloadRepository @Inject constructor(
@@ -60,7 +61,22 @@ class RoomDownloadRepository @Inject constructor(
         inserted
     }
 
-    /** トランザクション内で呼ぶ。取得元 ID の無い回は落とせないので何もしない（false）。 */
+    override suspend fun enqueueReplacements(episodeIds: List<EpisodeId>): Int {
+        val reserved = ArrayList<String>()
+        db.withTransaction {
+            val now = clock.now()
+            for (id in episodeIds) {
+                val version = db.episodeDao().findSourceVersion(id.value)
+                if (db.localFileDao().reserveReplace(id.value, version, now) == 0) continue
+                db.localFileDao().findByEpisode(id.value)?.path?.let { reserved += it }
+            }
+        }
+        // 古い版の書きかけの続きを要求しないよう、残っている .part を捨てる（ADR 0014）。ファイル I/O はトランザクションの外で
+        withContext(Dispatchers.IO) { for (path in reserved) File(path + PART_SUFFIX).delete() }
+        return reserved.size
+    }
+
+    /** トランザクション内で呼ぶ。取得元 ID の無い回は落とせないので何もしない（false）。予約したときの一覧の版を記録する（ADR 0014）。 */
     private suspend fun insertPending(episodeId: EpisodeId, pinned: Boolean): Boolean {
         val row = db.episodeDao().findById(episodeId.value) ?: return false
         val episode = row.episode
@@ -74,6 +90,7 @@ class RoomDownloadRepository @Inject constructor(
                 path = path.absolutePath,
                 pinned = pinned,
                 enqueuedAt = clock.now(),
+                sourceVersion = episode.sourceVersion,
             ),
         )
         return true
@@ -246,6 +263,29 @@ class RoomDownloadRepository @Inject constructor(
         val row = db.localFileDao().findByEpisode(episodeId.value) ?: return false
         return row.state == DownloadState.RUNNING || row.state == DownloadState.PENDING
     }
+
+    // --- 差し替え（ADR 0014、#371）。行は DONE のまま ---
+
+    override suspend fun markReplaceRunning(episodeId: EpisodeId) {
+        db.localFileDao().markReplaceRunning(episodeId.value, clock.now())
+    }
+
+    override suspend fun markReplaced(episodeId: EpisodeId, sizeBytes: Long) {
+        db.withTransaction {
+            if (db.localFileDao().markReplaced(episodeId.value, clock.now()) > 0) db.episodeDao().updateSize(episodeId.value, sizeBytes)
+        }
+    }
+
+    override suspend fun abandonReplace(episodeId: EpisodeId) {
+        db.localFileDao().abandonReplace(episodeId.value)
+    }
+
+    override suspend fun isReplaceStillWanted(episodeId: EpisodeId): Boolean {
+        val row = db.localFileDao().findByEpisode(episodeId.value) ?: return false
+        return row.state == DownloadState.DONE && row.replaceState != null
+    }
+
+    override suspend fun resetRunningReplacements() = db.localFileDao().resetRunningReplacements()
 
     companion object {
         const val PART_SUFFIX = ".part"

@@ -37,6 +37,7 @@ import kotlin.time.Instant
  * - 名前が `.`・`@`・`#` で始まるフォルダとファイル（NAS や OS が作るもの）は、どの段でも無視する（[isIgnoredName]、#197 の追加の決定）。
  *   [fetchProgram]・[fetchProgramEpisodes] も同じ規則で、そういう名前の番組は無いものとして扱う
  * - 取得元 ID は相対パス（決定 7）。番組は `<配信元>/<番組>`、各回は `<配信元>/<番組>/<ファイル名>`
+ * - 各回のファイルの版（[SourceEpisode.version]、ADR 0014）は大きさと更新日時（ms）の組（[fileVersion]）。どちらかが変われば**差し替え**る
  * - 回の情報はタグから読む（決定 8・9）。取得元 ID・サイズ・更新日時がどれも前の走査（[ScannedFiles]）と同じ回は、
  *   タグを読み直さずに前の値を使う
  * - 全走査は一覧を先に全部取ってから番組ごとにタグを読み、読み終えた番組を [ScanListener] に流す（#209 の決定 1。epic #195 の決定 8 の
@@ -207,6 +208,17 @@ class SharedFolderSource(
         )
     }
 
+    /**
+     * 各回のファイルの大きさ（ADR 0014）。番組のフォルダの一覧から読む。ファイルが無い・取得元 ID が各回の形でなければ null。
+     * 一覧が大きさを返すので、同期の差し替えの判断では呼ばない（口をそろえるために持つ）。
+     */
+    override suspend fun fetchFileSize(episodeId: SourceItemId): Long? {
+        val programPath = episodeId.value.substringBeforeLast('/', missingDelimiterValue = "")
+        val name = episodeId.value.substringAfterLast('/')
+        if (programSegments(SourceItemId(programPath)) == null || isIgnoredName(name)) return null
+        return onTree { tree.list(programPath)?.firstOrNull { !it.isDirectory && it.name == name }?.sizeBytes }
+    }
+
     private fun episodesIn(
         programId: SourceItemId,
         entries: List<FolderEntry>,
@@ -264,6 +276,7 @@ class SharedFolderSource(
             performers = values.performers,
             sourceFileSize = file.sizeBytes,
             sourceModifiedAt = modifiedAt,
+            version = fileVersion(file.sizeBytes, modifiedAt),
         )
     }
 
@@ -344,6 +357,9 @@ class SharedFolderSource(
             val parts = id.value.split('/')
             return if (parts.size == 2 && parts.none(::isIgnoredName)) parts[0] to parts[1] else null
         }
+
+        /** 各回のファイルの版（ADR 0014）。大きさと更新日時（ms）の組。 */
+        fun fileVersion(sizeBytes: Long, modifiedAt: Instant): String = "$sizeBytes:${modifiedAt.toEpochMilliseconds()}"
 
         private fun Instant.truncatedToMillis(): Instant = Instant.fromEpochMilliseconds(toEpochMilliseconds())
     }

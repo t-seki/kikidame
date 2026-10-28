@@ -193,6 +193,25 @@ class SharedFolderSourceTest : RefreshTestBase() {
         assertEquals(listOf("P/番組/size.m4a", "P/番組/time.m4a"), tags.calls.sorted())
     }
 
+    /** 差し替え（ADR 0014、#371）: 各回の版は大きさと更新日時（ms）の組。大きさは一覧からも 1 本ずつでも取れる。 */
+    @Test
+    fun theFileVersionIsTheSizeAndModifiedTime() = runTest {
+        val modified = Instant.parse("2026-09-17T16:00:00Z") + 1234.nanoseconds
+        folder.put("P/番組/a.m4a", ByteArray(10), modified)
+
+        val e = source.fetchAll().episodes.single()
+
+        assertEquals("10:${Instant.parse("2026-09-17T16:00:00Z").toEpochMilliseconds()}", e.version)
+        assertEquals(10L, source.fetchFileSize(SourceItemId("P/番組/a.m4a")))
+        assertNull(source.fetchFileSize(SourceItemId("P/番組/missing.m4a")))
+        assertNull(source.fetchFileSize(SourceItemId("P/.hidden/a.m4a")))
+
+        folder.put("P/番組/a.m4a", ByteArray(10), modified + 1.minutes)
+        val changed = source.fetchAll().episodes.single()
+        assertEquals(10L, changed.sourceFileSize)
+        assertEquals(false, changed.version == e.version, "a changed modified time changes the version")
+    }
+
     @Test
     fun aRenamedFileIsReadAsANewPath() = runTest {
         folder.put("P/番組/a.m4a")
