@@ -155,7 +155,7 @@ export JAVA_HOME=~/.local/jdk/current   # JDK 25
 
 - 映像・トランスコード・キャスト
 - 複数サーバ・複数ユーザー・複数ライブラリ
-- Jellyfin のブックのライブラリのほか（音楽ライブラリ・共有フォルダ・端末のフォルダ）での、再生位置と再生済みの共有（共有フォルダは [#353](https://github.com/t-seki/kikidame/issues/353) で扱う）
+- Jellyfin のブックのライブラリのほか（音楽ライブラリ・共有フォルダ・端末のフォルダ）での、再生位置と再生済みの共有（共有フォルダは [#353](https://github.com/t-seki/kikidame/issues/353) で検討して見送った）
 - サーバ管理
 - オーディオブック（古い章から順に聴くので「最新 N 回まで保持」が合わない。対応するなら番組に「向き」を足す設計が要る）
 - Google Play での配布と課金（需要が見えたら Releases は無料のまま Play に有料版を併売する選択肢は残している。[ADR 0008](./docs/adr/0008-open-source-distributed-outside-play.md)）
