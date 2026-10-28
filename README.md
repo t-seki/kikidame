@@ -155,7 +155,7 @@ The stack is Kotlin / Jetpack Compose (Material 3) / Media3 / Room / WorkManager
 
 - Video, transcoding, casting
 - Multiple servers, users, or libraries
-- Sharing the playback position and played state with anything other than a Jellyfin books library (a music library, a shared folder, a folder on the device; shared folders are handled in [#353](https://github.com/t-seki/kikidame/issues/353))
+- Sharing the playback position and played state with anything other than a Jellyfin books library (a music library, a shared folder, a folder on the device; shared folders were considered in [#353](https://github.com/t-seki/kikidame/issues/353) and dropped)
 - Server administration
 - Audiobooks (you listen from the oldest chapter, so "Keep latest N" does not fit; supporting them would need a "direction" per program)
 - Distribution and payments on Google Play (if demand appears, the option of selling a paid build on Play while Releases stay free is kept open; [ADR 0008](./docs/adr/0008-open-source-distributed-outside-play.md), Japanese)
