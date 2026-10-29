@@ -24,7 +24,7 @@ https://github.com/user-attachments/assets/32c5be2d-5aee-4df7-baac-68106685913f
 - **オフライン優先** — 聴くのは常に手元のファイル。再生位置・再生済みも手元で持つ。サーバに届かなくても再生は止まらない（Jellyfin のブックのライブラリでは、届くときにサーバと分け合う。下の「再生の共有」）
 - **保持ルール** — 番組ごとに「最新 N 回まで保持」「再生済みなら削除」を決めると、あとは同期が不足分を落とし余剰分を消す
 
-利用形態は、同時に 1 つの取得元（Jellyfin の 1 サーバ・1 ユーザー・1 ライブラリか、NAS の共有フォルダか端末のフォルダの 1 つ）。Jellyfin のブックのライブラリでは、再生位置と再生済みをサーバを通してほかの端末や Jellyfin Web と分け合う（**再生の共有**。下の「Jellyfin」の「再生の共有」）。それ以外の取得元（音楽ライブラリ・共有フォルダ・端末のフォルダ）では、再生位置と再生済みは手元だけで持ち、他端末や Web との併用は想定しない。取得元を変えると、手元の番組・各回・再生位置・ファイルをすべて消してやり直す。同じ Jellyfin のサーバとユーザーのまま、ライブラリだけを選び直すのは取得元を変えることに当たらず、手元は消さずに同期で結び直す（[ADR 0010](./docs/adr/0010-share-playback-state-via-jellyfin-book-library.md) の決定 7）。
+利用形態は、同時に 1 つの取得元（Jellyfin の 1 サーバ・1 ユーザー・1 ライブラリか、NAS の共有フォルダ（SMB）か端末のフォルダの 1 つ）。Jellyfin のブックのライブラリでは、再生位置と再生済みをサーバを通してほかの端末や Jellyfin Web と分け合う（**再生の共有**。下の「Jellyfin」の「再生の共有」）。それ以外の取得元（音楽ライブラリと、NAS・端末の共有フォルダ）では、再生位置と再生済みは手元だけで持ち、他端末や Web との併用は想定しない。取得元を変えると、手元の番組・各回・再生位置・ファイルをすべて消してやり直す。同じ Jellyfin のサーバとユーザーのまま、ライブラリだけを選び直すのは取得元を変えることに当たらず、手元は消さずに同期で結び直す（[ADR 0010](./docs/adr/0010-share-playback-state-via-jellyfin-book-library.md) の決定 7）。
 
 ## できること
 
@@ -42,10 +42,10 @@ https://github.com/user-attachments/assets/32c5be2d-5aee-4df7-baac-68106685913f
 
 Google Play では配布しない（[ADR 0005](./docs/adr/0005-open-source-distributed-outside-play.md)）。配布経路は 2 つ:
 
-1. **GitHub Releases** の APK — [Releases](https://github.com/t-seki/kikidame/releases) から `kikidame-<版>.apk` を入れる
+1. **GitHub Releases** の APK — [Releases](https://github.com/t-seki/kikidame/releases) から `kikidame-<バージョン>.apk` を入れる
 2. **Obtainium** — 自動更新したい人は [Obtainium](https://github.com/ImranR98/Obtainium) に `https://github.com/t-seki/kikidame` を登録する。新しい Release が出ると通知され、同じ署名の APK なので上書きで更新できる（手元の各回と再生位置は残る）
 
-**IzzyOnDroid と F-Droid 本家には申請しない。** 理由は 2 つ。(1) どちらも生成 AI で書かれたコードを含むアプリを受け付けない方針で（[IzzyOnDroid の App Inclusion Policy](https://izzyondroid.org/docs/general/AppInclusionPolicy/): "We are strongly opposed to apps which are fully or in part created by generative AI tools"）、Kikidame のコードは大半を Claude Code で書いている。申請テンプレには AI 使用の申告が必須なので、正直に申告すれば却下対象になる。虚偽の申告はしない。(2) F-Droid 本家はソースからビルドし直して F-Droid の鍵で署名するため、Releases 版とは署名が違い、片方から片方へ更新できない（入れ直すと手元の各回と再生位置が消える）。F-Droid クライアントから入れたい人向けには、審査を通さない自前のリポジトリを検討している。
+**IzzyOnDroid と F-Droid 本家には申請しない。** 理由は 2 つ。(1) どちらも生成 AI で書かれたコードを含むアプリを受け付けない方針で（[IzzyOnDroid の App Inclusion Policy](https://izzyondroid.org/docs/general/AppInclusionPolicy/): "We are strongly opposed to apps which are fully or in part created by generative AI tools"）、Kikidame のコードは大半を Claude Code で書いている。申請テンプレには AI 使用の申告が必須なので、正直に申告すれば却下対象になる。虚偽の申告はしない。(2) F-Droid 本家はソースからビルドし直して F-Droid の鍵で署名するため、Releases の APK とは署名が違い、片方から片方へ更新できない（入れ直すと手元の各回と再生位置が消える）。F-Droid クライアントから入れたい人向けには、審査を通さない自前のリポジトリを検討している。
 
 端末は Android 12（API 31）以上。ストア向けの説明文とスクリーンショットは [fastlane/metadata/android/](./fastlane/metadata/android/) にある（Obtainium は読まないが、自前の F-Droid リポジトリの `fdroidserver` がそのまま読む形式なので残している）。
 
@@ -73,20 +73,14 @@ Google Play では配布しない（[ADR 0005](./docs/adr/0005-open-source-distr
   - ブックのライブラリは、10.10.7・12.0 のコンテナ（統合テスト）と 10.11.11 のコンテナで、各回が AudioBook として一覧に出ることを確かめた。本番のサーバでの移行はまだ確かめていない
 - **再生の共有**（ブックのライブラリだけ。[ADR 0010](./docs/adr/0010-share-playback-state-via-jellyfin-book-library.md)）: 各回の再生位置と再生済みを、Jellyfin の UserData（各回の再生位置・再生済み・最後に再生した日時）に書き、ほかで書かれた値を取り込む
   - **Kikidame と Jellyfin Web などのほかのクライアントで、同じ Jellyfin のユーザーでログインする。** UserData は Jellyfin のユーザーと各回の組ごとにサーバの DB に置かれ（音声ファイルには書かれない）、別のユーザーで聴いた分は分け合えない
-  - 送るのは、一時停止・停止・回の終わり・再生済みの手動切替のとき（再生していない間に切り替えた分は、再生を始めたときか次の同期で送る）。読むのは、同期のたびと、回を鳴らし始める直前（一時停止からの再開を含む。2 秒まで待ち、読めなければ手元の位置で鳴らす）。同期のとき、聴いている回は手元のまま
+  - 送るのは、一時停止・停止・回の終わり・再生済みの手動切替のとき。読むのは、同期のたびと、回を鳴らし始める直前。同期のとき、聴いている回は手元のまま。送る・読む正確なタイミングと待つ長さは、[docs/architecture.md](./docs/architecture.md) の「再生位置と再生済み」
   - 両方で変わっていたら、新しい方を採る（手元で変えた時刻と、サーバの最後に再生した日時を比べる）
   - サーバに届かないときも手元の再生は止まらない。送れなかった分は次の同期で送る。設定の「最終同期」の下の「再生の共有」に、最後に共有できた時刻と、送れなかったことが出る（通知は出さない）
   - ほかで再生済みになった回も、同期で取り込んだ後は「再生済みなら削除」の対象になる
-  - Jellyfin Web などは、サーバの規則で位置と再生済みを決める。10.11.11 のコンテナで再生の報告を送って確かめた範囲では、5 分未満で止めた位置は残らず、残り 5 分を切ると再生済みになる（サーバの設定 `MinAudiobookResume`・`MaxAudiobookResume`、既定 5 分）。Kikidame の再生済み（末尾から 2 分）とは閾値が違う。10.10・12 での Web の規則は未確認
+  - Jellyfin Web などは、サーバの規則で位置と再生済みを決めるので、閾値が Kikidame の再生済み（末尾から 2 分）と違う。これまでに確かめたサーバの規則は、[ADR 0010](./docs/adr/0010-share-playback-state-via-jellyfin-book-library.md) と [docs/architecture.md](./docs/architecture.md) の「再生位置と再生済み」
   - Kikidame の再生は、Jellyfin のダッシュボードの「再生中」や再生回数には出ない（再生の報告は送らず、UserData に直接書くため）
   - 書き込みと読み戻しは 10.10.7・12.0.0 のコンテナで確かめた（統合テスト）。10.11 の本番での確かめと、Jellyfin Web の画面での見え方は未確認
   - サーバ側で各回のアイテムが作り直されたとき（ファイル名を変えたときなど）に、サーバの UserData が新しいアイテムに引き継がれるかは未確認。Kikidame の手元にある分は、同期で結び直した後に新しいアイテムへ書き直す
-- 音楽ライブラリからブックのライブラリへ移る手順（手元の番組・各回・再生位置・再生済み・落としたファイルは、ライブラリを選び直した後の同期で、配信元・番組名・タイトルで突合して結び直す。[ADR 0001](./docs/adr/0001-local-surrogate-key.md)）:
-  1. Kikidame を、ブックのライブラリを選べる版に上げる
-  2. Jellyfin のダッシュボードで、音楽ライブラリを消す。同じフォルダを音楽とブックの 2 つのライブラリに入れると、アイテムが使い回され、ブックのライブラリでも Audio と MusicAlbum のまま見えるため（[ADR 0010](./docs/adr/0010-share-playback-state-via-jellyfin-book-library.md) の「確かめた事実」）
-  3. 同じフォルダで、コンテンツの種類が「ブック」のライブラリを作り、スキャンが終わるのを待つ
-  4. Kikidame の「設定」の「ライブラリ」をタップし、ブックのライブラリを選んで「決定」をタップする。同期が始まる
-  5. 番組と各回がそのまま残っていること、聴きかけの回の位置と再生済みの印が残っていることを確かめる。結び直した各回の位置と再生済みは、同じ同期でサーバへ書く（サーバに別の値があれば、新しい方を採る）。結び直せなかった番組（配信元・番組名が変わったときなど）は手元に残り、設定の「取得元に見つからない番組を手元から消す」の数に入る
 
 ### NAS の共有フォルダ（SMB）
 
@@ -105,17 +99,27 @@ Google Play では配布しない（[ADR 0005](./docs/adr/0005-open-source-distr
 - **最初の取り込みの間は、アプリを開いて画面をつけておく。** 画面が消えてアプリが裏に回ると、しばらくして（数秒〜数分。端末や状況で変わる）Android がアプリの通信を切り、取り込みは止まる。取り込み済みの番組は残り、次にアプリを開いたとき、読み終えていない番組から続きを読む（取り込み済みの番組のタグは読み直さない）。番組が共有から消えたかどうかは、最後まで読み終えた走査でだけ判断する
 - 読み取りが失敗したら、接続を張り直して同じファイルから読み直し、続けて 3 回失敗したら、その同期は到達不能で終わる。張り直しで実際に続けられるか（短い通信の途切れの後など）は、実機ではまだ確かめていない
 - 各回のファイル名を変えると未結合になり、同じ番組の中でタイトル（次に公開日と尺）で結び直す。番組のフォルダ名を変えると、配信元と番組名で結べないので、その番組は消失（判断保留）になる
-- お使いの NAS とネットワークで動くか（名前の解決、ゲストの接続、最初の取り込みにかかる時間）は、1 台の NAS と 1 台の端末でしか確かめていない。試す準備は [docs/device-testing.md](./docs/device-testing.md) の「共有フォルダ（SMB）」を参照
+- お使いの NAS とネットワークで動くか（名前の解決、ゲストの接続、最初の取り込みにかかる時間）は、1 台の NAS と 1 台の端末でしか確かめていない。試す準備は [docs/device-testing.md](./docs/device-testing.md) の「NAS の共有フォルダ（SMB）」を参照
 
 ### 端末のフォルダ
 
 - 内部ストレージか SD カードのフォルダを、Android のフォルダ選択（Storage Access Framework）で選ぶ。ほかの provider（Google ドライブ、SAF 経由の SMB など）のフォルダは受け付けず、端末のフォルダを選び直してもらう。アプリはフォルダを読むだけで、書き込みも削除もしない。「ローカルネットワーク」の権限は要らない
-- フォルダの中の構成は、上の SMB の共有フォルダと同じく、ちょうど **`<配信元>/<番組>/<各回のファイル>`** の 3 段。例えば `Radio/<配信元>/<番組>/<回>.m4a` なら `Radio` を選ぶ。内部ストレージの直下や `Download` そのものは Android の決まりで選べないので、その下にフォルダを作って選ぶ。`Download` の下のフォルダを選べるかは未確認
+- フォルダの中の構成は、上の NAS の共有フォルダ（SMB）と同じく、ちょうど **`<配信元>/<番組>/<各回のファイル>`** の 3 段。例えば `Radio/<配信元>/<番組>/<回>.m4a` なら `Radio` を選ぶ。内部ストレージの直下や `Download` そのものは Android の決まりで選べないので、その下にフォルダを作って選ぶ。`Download` の下のフォルダを選べるかは未確認
 - ほかの取得元と同じく、各回はアプリの中にコピーしてから聴く。**コピーした回は、端末の容量を二重に使う**（フォルダのファイルと、アプリの中のコピー）。番組ごとの同期対象と保持ルールで、コピーする数を絞れる
 - **フォルダのファイルは消さずに置いておく。** フォルダからファイルを消すと、次の同期でその回は取得元から消えたものとして扱われ、アプリの中のコピーも消える（固定していても消える）。PC で録ったファイルを Syncthing や FolderSync などでフォルダに同期して溜める使い方を想定しているので、ファイルはそのまま置いておく
 - 端末のフォルダからのダウンロードと同期にはネットワークが要らないので、「Wi-Fi のみ」もかけない（端末の中から端末の中へのコピーなので）
 - フォルダを読めなくなったら（権限が取り消された、フォルダを移した・消した）、ログアウトしてフォルダを選び直してもらう。手元の番組・各回・ファイルは残り、選び直したフォルダの中の構成が同じなら結び直る
 - 内部ストレージのフォルダは実機（Android 17）で、取り込み・コピー・再生・フォルダを動かした後の選び直しまで確かめた。SD カードとファイルの多いフォルダで動くかは未確認。試す準備は [docs/device-testing.md](./docs/device-testing.md) の「端末のフォルダ」を参照
+
+## 音楽ライブラリからブックのライブラリへ移る
+
+手元の番組・各回・再生位置・再生済み・落としたファイルは、ライブラリを選び直した後の同期で、配信元・番組名・タイトルで突合して結び直す（[ADR 0001](./docs/adr/0001-local-surrogate-key.md)）。次の順に進める。
+
+1. Kikidame を、ブックのライブラリを選べるバージョンに上げる
+2. Jellyfin のダッシュボードで、音楽ライブラリを消す。同じフォルダを音楽とブックの 2 つのライブラリに入れると、アイテムが使い回され、ブックのライブラリでも Audio と MusicAlbum のまま見えるため（[ADR 0010](./docs/adr/0010-share-playback-state-via-jellyfin-book-library.md) の「確かめた事実」）
+3. 同じフォルダで、コンテンツの種類が「ブック」のライブラリを作り、スキャンが終わるのを待つ
+4. Kikidame の「設定」の「ライブラリ」をタップし、ブックのライブラリを選んで「決定」をタップする。同期が始まる
+5. 番組と各回がそのまま残っていること、聴きかけの回の位置と再生済みの印が残っていることを確かめる。結び直した各回の位置と再生済みは、同じ同期でサーバへ書く（サーバに別の値があれば、新しい方を採る）。結び直せなかった番組（配信元・番組名が変わったときなど）は手元に残り、設定の「取得元に見つからない番組を手元から消す」の数に入る
 
 ## 仕組みの要点
 
@@ -124,38 +128,19 @@ Google Play では配布しない（[ADR 0005](./docs/adr/0005-open-source-distr
 - **アプリ内の同一性は取得元 ID（Jellyfin の id、共有フォルダでは中の相対パス）に依存しない。** サーバでライブラリを作り直して ID が変わっても、共有フォルダでファイル名を変えても、配信元・番組名・タイトルで突合して結び直し、ファイルも再生位置も残す（[ADR 0001](./docs/adr/0001-local-surrogate-key.md)）
 - **保持ルールが効くのは同期のときだけ。** 再生済みにした瞬間には何も消えない。番組の同期の設定を変えている間も何も消えず、設定を閉じたときにその番組の同期が走って適用される
 
-## ビルドと実行
+## 開発
 
-JDK 25 と Android SDK（platform 37）が要る。リポジトリ直下に `local.properties`（git 管理外）を置く:
+Kotlin / Jetpack Compose / Media3 / Room / WorkManager / Hilt で書いていて、JDK 25 と Android SDK でビルドする。
 
-```
-sdk.dir=/home/<you>/Android/Sdk
-```
-
-```bash
-export JAVA_HOME=~/.local/jdk/current   # JDK 25
-./gradlew test                          # ユニットテスト（エミュレータ不要、CI と同じ）
-./gradlew :app:assembleDebug            # APK
-./gradlew :app:installDebug             # 接続中の端末へ
-```
-
-ツールチェインの揃え方は [docs/development.md](./docs/development.md)、Linux や WSL2 から adb でつなぐワイヤレスデバッグと DB とファイルの突き合わせは [docs/device-testing.md](./docs/device-testing.md)。
-
-## モジュール構成
-
-```
-:core:domain   純粋 Kotlin。番組／各回／保持ルール／再生済みの型と、同期・再生済み判定の純粋関数
-:core:data     Room の Entity / DAO / Repository。Entity ↔ ドメイン型の変換はここに閉じる
-:app           Compose UI、Media3 の MediaLibraryService（再生と Android Auto のブラウズツリー）、WorkManager の Worker、Hilt
-```
-
-スタックは Kotlin / Jetpack Compose (Material 3) / Media3 / Room / WorkManager / Hilt / jellyfin-sdk-kotlin。ダウンロードは Media3 の DownloadManager を使わず、SDK が作った URL とヘッダで OkHttp から直接ファイルへ書く（[ADR 0002](./docs/adr/0002-download-without-media3-downloadmanager.md)）。
+- ツールチェイン・ビルド・テスト・リリース: [docs/development.md](./docs/development.md)
+- 設計（全体像・モジュール・スキーマ・同期）: [docs/architecture.md](./docs/architecture.md)
+- 実機で試す手順（ワイヤレスデバッグ・Android Auto・DB とファイルの突き合わせ）: [docs/device-testing.md](./docs/device-testing.md)
 
 ## やらないこと
 
 - 映像・トランスコード・キャスト
 - 複数サーバ・複数ユーザー・複数ライブラリ
-- Jellyfin のブックのライブラリのほか（音楽ライブラリ・共有フォルダ・端末のフォルダ）での、再生位置と再生済みの共有。取得元には書き込まないため（例外はブックのライブラリの UserData だけ。[ADR 0007](./docs/adr/0007-add-file-shares-as-sources.md) の決定 6）
+- Jellyfin のブックのライブラリのほか（音楽ライブラリと、NAS・端末の共有フォルダ）での、再生位置と再生済みの共有。取得元には書き込まないため（例外はブックのライブラリの UserData だけ。[ADR 0007](./docs/adr/0007-add-file-shares-as-sources.md) の決定 6）
 - サーバ管理
 - オーディオブック（古い章から順に聴くので「最新 N 回まで保持」が合わない。対応するなら番組に「向き」を足す設計が要る）
 - Google Play での配布と課金（需要が見えたら Releases は無料のまま Play に有料版を併売する選択肢は残している。[ADR 0005](./docs/adr/0005-open-source-distributed-outside-play.md)）
@@ -173,6 +158,6 @@ export JAVA_HOME=~/.local/jdk/current   # JDK 25
 
 ## ライセンス
 
-[MPL-2.0](./LICENSE)（[ADR 0005](./docs/adr/0005-open-source-distributed-outside-play.md)）。Kikidame は Jellyfin プロジェクトとは無関係の非公式クライアントで、Jellyfin の名前とロゴは Jellyfin プロジェクトのものです。
+[MPL-2.0](./LICENSE)（[ADR 0012](./docs/adr/0012-license-mpl-2.0.md)）。Kikidame は Jellyfin プロジェクトとは無関係の非公式クライアントで、Jellyfin の名前とロゴは Jellyfin プロジェクトのものです。
 
 サーバとの通信には [jellyfin-sdk-kotlin](https://github.com/jellyfin/jellyfin-sdk-kotlin)（LGPL-3.0）を使っています。同梱している依存ライブラリとそのライセンスの一覧はアプリ内の「設定 > オープンソースライセンス」に出ます。一覧の元データは `app/src/main/res/raw/aboutlibraries.json` で、依存を変えたら `./gradlew :app:exportLibraryDefinitions` で再生成してコミットします（ビルド時には生成しないので、オフラインのビルドでも同じ一覧になります）。
