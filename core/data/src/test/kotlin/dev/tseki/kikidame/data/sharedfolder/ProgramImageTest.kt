@@ -103,7 +103,7 @@ class ProgramImageTest : RefreshTestBase() {
         assertEquals(first, program("A").image)
         assertEquals(1, source.imageFetches.size)
 
-        // 変わったら（rajikura は保存のたびに上書きする）別の名前のファイルに取り直し、前のファイルを消す
+        // 変わったら（ラジオ録音ツールが保存のたびに画像を上書きする場合を想定する）別の名前のファイルに取り直し、前のファイルを消す
         folder.put("TBSラジオ/A/folder.jpg", newer, MemoryFolderTree.EPOCH + 1.hours)
         repo.refresh()
         val second = assertNotNull(program("A").image)

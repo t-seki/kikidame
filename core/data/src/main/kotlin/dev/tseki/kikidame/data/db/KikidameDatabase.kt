@@ -21,7 +21,7 @@ import androidx.room.migration.AutoMigrationSpec
         AutoMigration(from = 4, to = 5),
         // v6: episodes.performers（出演者）
         AutoMigration(from = 5, to = 6),
-        // v7: 列名をコードの名前に揃え、使わない playback_states.syncedAt を消す（ADR 0007）
+        // v7: 列名をコードの名前に揃え、使わない playback_states.syncedAt を消す
         AutoMigration(from = 6, to = 7, spec = KikidameDatabase.V6ToV7::class),
         // v8: episodes.sourceFileSize / sourceModifiedAt（共有フォルダのタグを読み直すかの判定）
         AutoMigration(from = 7, to = 8),
@@ -41,7 +41,7 @@ abstract class KikidameDatabase : RoomDatabase() {
     abstract fun playbackStateDao(): PlaybackStateDao
 
     /**
-     * v6 → v7（ADR 0007）。サーバ ID を取得元 ID に改め、`@ColumnInfo` で残していた旧い列名をコードの名前に揃える。
+     * v6 → v7。サーバ ID を取得元 ID に改め、`@ColumnInfo` で残していた旧い列名をコードの名前に揃える。
      * `syncedAt` は使っていなかった列（再生位置をサーバへ送らない形。ADR 0010）で、ここで消す。値は列の改名で残る。
      */
     @RenameColumn(tableName = "programs", fromColumnName = "serverItemId", toColumnName = "sourceItemId")

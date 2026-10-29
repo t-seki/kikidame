@@ -1,14 +1,14 @@
 # 実機で試す手順
 
-実機（debug 版）で確かめるときに使う手順。ビルド・テスト・リリースの手順は [development.md](development.md)。
+実機（debug ビルド）で確かめるときに使う手順。ビルド・テスト・リリースの手順は [development.md](development.md)。
 
-debug 版は applicationId が `dev.tseki.kikidame.debug`、アプリ名が「Kikidame (debug)」で、release 版（`dev.tseki.kikidame`、Releases の APK）とは別のアプリとして並ぶ。以下の `$ADB` は adb のパス、`$PKG` は debug 版の applicationId を指す。
+debug ビルドは applicationId が `dev.tseki.kikidame.debug`、アプリ名が「Kikidame (debug)」で、release ビルド（`dev.tseki.kikidame`、Releases の APK）とは別のアプリとして並ぶ。以下の `$ADB` は adb のパス、`$PKG` は debug ビルドの applicationId を指す。
 
 ## 接続
 
 ### ワイヤレスデバッグでつなぐ（推奨）
 
-LAN 上の端末には TCP で届くので、USB が見えない環境（WSL2 など）でもつなげる。WSL2 から直接つなげば、Windows の adb を経由しないのでファイアウォールの設定は要らない。PC が有線でも、端末と同じルータの下にいればよい。
+LAN 上の端末には TCP で届くので、USB が見えない環境でもつなげる。PC が有線でも、端末と同じルータの下にいればよい。
 
 1. 端末: 開発者向けオプション → ワイヤレスデバッグ ON → 「ペア設定コードによるデバイスのペア設定」
 2. PC（初回と、鍵が合わなくなったとき。ダイアログを開いたまま）:
@@ -18,7 +18,7 @@ LAN 上の端末には TCP で届くので、USB が見えない環境（WSL2 �
    $ADB mdns services                   # _adb-tls-pairing._tcp の行がペア設定の IP:ポート（ダイアログを開いている間だけ出る）
    $ADB pair <ペア設定の IP:ポート> <6 桁コード>
    ```
-   release 版は debuggable でないので `run-as` が効かない。開発中の確認は debug 版で行う
+   release ビルドは debuggable でないので `run-as` が効かない。開発中の確認は debug ビルドで行う
 3. 接続（端末の再起動後はポートが変わるので都度）:
    ```bash
    $ADB mdns services                   # _adb-tls-connect._tcp の行が接続用の IP:ポート
@@ -51,7 +51,7 @@ $ADB shell getprop ro.product.model
 ### つながらないときの切り分け
 
 - **Android 17 / targetSdk 37 は `ACCESS_LOCAL_NETWORK` が要る**。無いと LAN 内のサーバ宛の TCP が黙って落ち、
-  DNS だけ通る（名前解決は成功し、接続が 6 秒でタイムアウトする）。初回起動の権限ダイアログで許可する。
+  DNS だけ通る（名前解決は成功し、接続がタイムアウトする）。初回起動の権限ダイアログで許可する。
   `adb shell` の `nc` は対象外なので疎通確認に使えない。アプリの UID で試す:
   ```bash
   $ADB shell "run-as $PKG sh -c 'timeout 6 nc -z <host> 443; echo rc=\$?'"   # rc=124 なら落ちている
@@ -63,47 +63,19 @@ $ADB shell getprop ro.product.model
 - 機内モードのテストで TCP のワイヤレス接続が切れることがある。`$ADB devices` の mDNS 側の名前
   （`adb-…_adb-tls-connect._tcp`）を `ANDROID_SERIAL` に使えばそのまま届く
 
-### debug の署名鍵をマシン間で共有する
+### 別の PC でビルドした debug ビルドが入っているとき
 
-debug の APK はマシンごとの `~/.android/debug.keystore` で署名される。別のマシンでビルドした debug 版が端末に入っていると、このマシンのビルドの上書きインストールが `INSTALL_FAILED_UPDATE_INCOMPATIBLE` で失敗する（`uninstall` すればデータが消える）。消さずに続けるには、端末に入っている方のマシンの鍵をコピーする。
-
-鍵をコピーすると `INSTALL_FAILED_UPDATE_INCOMPATIBLE` は解消する。解消したかは、ビルドした APK の `apksigner verify --print-certs` の SHA-256 が端末の debug 版の署名と一致するかで見る。
-
-次は流していない手順の案（**未確認**）。コピーの方法は `scp` 以外でもよい。
-
-```bash
-# 元のマシンで（コピー先の ~/.android は無ければ作っておく）
-scp ~/.android/debug.keystore <host>:~/.android/debug.keystore
-# コピー先で
-chmod 600 ~/.android/debug.keystore
-```
-
-指紋は、コピー後の鍵でビルドした APK の証明書の SHA-256 を、端末に入っている debug 版の署名と比べる。端末の署名の取り方は**未確認**（案: `$ADB shell pm path dev.tseki.kikidame.debug` で APK のパスを見て `$ADB pull` し、同じ `apksigner` にかける）。`apksigner` は build-tools の中にあり、版は `ls ~/Android/Sdk/build-tools/` で確かめる。
-
-```bash
-APKSIGNER=~/Android/Sdk/build-tools/36.0.0/apksigner   # 版は ls ~/Android/Sdk/build-tools/ で確かめる
-$APKSIGNER verify --print-certs app/build/outputs/apk/debug/app-debug.apk | grep SHA-256
-```
-
-鍵のファイルをチャットや issue に貼らない。
-
-### 代替: Windows 側の adb に USB 接続
-
-WSL2 から USB の端末は見えない。Windows 側の adb でインストールする:
-
-```powershell
-adb install -r \\wsl.localhost\Ubuntu\home\<you>\dev\<repo>\app\build\outputs\apk\debug\app-debug.apk
-```
+debug の APK は PC ごとの `~/.android/debug.keystore` で署名される。別の PC でビルドした debug ビルドが端末に入っていると、この PC のビルドの上書きインストールが `INSTALL_FAILED_UPDATE_INCOMPATIBLE` で失敗する。`uninstall` すれば入れ直せるが、debug ビルドのデータは消える。
 
 ## ダウンロード
 
 ### 再開（`.part` + `Range`）の確認
 
-LAN では 10 MB が 0.5 秒で落ちるので、ダウンロード中に kill しても再開の経路を踏めない。代わりに「途中まで落ちた状態」を作る:
+LAN では短時間で落ち切るので、ダウンロード中に kill しても再開の経路を踏めない。代わりに「途中まで落ちた状態」を作る:
 
 ```bash
 $ADB shell am force-stop $PKG
-# DB を引き出し、対象の local_files.state を 'DONE' → 'PENDING' に書き換えて戻す（debug 版の run-as。「裏の同期をすぐ起こす」と同じ形）
+# DB を引き出し、対象の local_files.state を 'DONE' → 'PENDING' に書き換えて戻す（debug ビルドの run-as。「裏の同期をすぐ起こす」と同じ形）
 W=$(mktemp -d)   # repo の外に置く
 for f in kikidame.db kikidame.db-wal; do $ADB exec-out run-as $PKG cat databases/$f > $W/$f; done
 python3 -c "import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); print(c.execute(\"UPDATE local_files SET state='PENDING' WHERE episodeId=? AND state='DONE'\", (sys.argv[2],)).rowcount); c.commit(); c.execute('PRAGMA wal_checkpoint(TRUNCATE)'); c.close()" $W/kikidame.db '<episodeId>'   # 1 なら書き換わった。checkpoint で WAL を本体に書き込む
@@ -120,8 +92,8 @@ $ADB logcat -d | grep JellyfinGateway   # download <id> from 5000000 -> HTTP 206
 
 ## 同期
 
-同期の入口は 1 つ（`LibraryRefresher`）。番組一覧を引っ張る＝ライブラリ全体の同期（大きなライブラリでは数十秒かかる）、
-各回一覧を引っ張る＝その番組だけの同期（取り込み → この番組だけの `planSync`。1〜2 秒）。
+同期の入口は 1 つ（`LibraryRefresher`）。番組一覧を引っ張る＝ライブラリ全体の同期（全走査を伴うので、1 番組の同期より重い）、
+各回一覧を引っ張る＝その番組だけの同期（取り込み → この番組だけの `planSync`。全走査を待たずに終わる）。
 定期同期は WorkManager の `sync-periodic`（3 時間）、起動時同期は `sync-once`。状態は次で見える:
 
 ```bash
@@ -137,7 +109,7 @@ $ADB logcat -d | grep -E "SyncWorker|LibraryRefresher"   # "sync: programs=N epi
 ### 裏の同期をすぐ起こす
 
 確実なのは、セッションの Preferences DataStore から前回の全走査の時刻（`last_fetched_at` / `last_attempted_at`）を消してから開く方法。
-次に開いたとき起動時同期が必ず積まれ、何度でも繰り返せる。`run-as` を使うので debug 版だけ。
+次に開いたとき起動時同期が必ず積まれ、何度でも繰り返せる。`run-as` を使うので debug ビルドだけ。
 ファイルにはトークンの暗号文が入るので、中身を表示しない・コミットしない。キーを消すのは `scripts/datastore-drop-keys.py`（キー名だけ出す）:
 
 ```bash
@@ -179,8 +151,8 @@ $ADB logcat -d | grep -E "SyncWorker|LibraryRefresher"
    ```bash
    sdkmanager --install "extras;google;auto"
    ```
-   `~/Android/Sdk/extras/google/auto/desktop-head-unit` に置かれる。WSL2 では WSLg があれば GUI がそのまま出る（Linux 版のバイナリなので `chmod +x` が要ることがある）
-2. スマホに Play から Android Auto アプリを入れ、開発者モードにする: Android Auto の設定 → 「バージョン」を 10 回タップ → 右上メニュー「開発者向け設定」→ **「提供元不明のアプリ」を ON**（debug 版の「Kikidame (debug)」も release 版も Play を通っていないので、これが無いと一覧に出ない）→ 同じメニューの「ヘッドユニット サーバーを起動」
+   `~/Android/Sdk/extras/google/auto/desktop-head-unit` に置かれる。Linux 用のバイナリなので `chmod +x` が要ることがある
+2. スマホに Play から Android Auto アプリを入れ、開発者モードにする: Android Auto の設定 → 「バージョン」を 10 回タップ → 右上メニュー「開発者向け設定」→ **「提供元不明のアプリ」を ON**（debug ビルドの「Kikidame (debug)」も release ビルドも Play を通っていないので、これが無いと一覧に出ない）→ 同じメニューの「ヘッドユニット サーバーを起動」
 3. アプリを実機に入れる:
    ```bash
    ./gradlew :app:installDebug
@@ -193,14 +165,14 @@ $ADB forward tcp:5277 tcp:5277
 ~/Android/Sdk/extras/google/auto/desktop-head-unit
 ```
 
-DHU の窓が開き、スマホ側で Android Auto が始まる。DHU のメディアタブ（音符のアイコン）に Kikidame が出る（debug 版と release 版の両方が入っていれば 2 つ並ぶ。確認するのは「Kikidame (debug)」）。出ないときは「提供元不明のアプリ」と、`AndroidManifest.xml` の `<meta-data android:name="com.google.android.gms.car.application">` と `android.media.browse.MediaBrowserService` の action を疑う。DHU 側で `Ctrl+M` の後に `d` でデイ／ナイトが切り替わり、コンソールには `help` でコマンド一覧が出る（`mic play <file>` は使わない: 音声アシスタントは非目標）。
+DHU の窓が開き、スマホ側で Android Auto が始まる。DHU のメディアタブ（音符のアイコン）に Kikidame が出る（debug ビルドと release ビルドの両方が入っていれば 2 つ並ぶ。確認するのは「Kikidame (debug)」）。出ないときは「提供元不明のアプリ」と、`AndroidManifest.xml` の `<meta-data android:name="com.google.android.gms.car.application">` と `android.media.browse.MediaBrowserService` の action を疑う。DHU 側で `Ctrl+M` の後に `d` でデイ／ナイトが切り替わり、コンソールには `help` でコマンド一覧が出る（`mic play <file>` は使わない: 音声アシスタントは非目標）。
 
 Auto はブラウズツリーを開き直すたびに `onGetChildren` を呼ぶので、ダウンロードや同期で手元の回が増減したら、タブを行き来すれば最新になる（変化の押し通知は今はしない）。
 
 ### 落とし穴
 
 - DHU は `libc++1` `libc++abi1` が要る（Ubuntu: `sudo apt install -y libc++1 libc++abi1`）。`ldd ~/Android/Sdk/extras/google/auto/desktop-head-unit | grep 'not found'` が空になれば足りている
-- バックグラウンド（Claude Code 等）から起動すると stdin が EOF になって即終了する（`Version: 2.0-linux` を出して exit 0）。`sleep 1d | ~/Android/Sdk/extras/google/auto/desktop-head-unit` か、FIFO を stdin にする（作業ディレクトリはどこでもよい）:
+- バックグラウンド（端末に繋がっていない実行）から起動すると stdin が EOF になって即終了する（`Version: 2.0-linux` を出して exit 0）。`sleep 1d | ~/Android/Sdk/extras/google/auto/desktop-head-unit` か、FIFO を stdin にする（作業ディレクトリはどこでもよい）:
 
   ```bash
   mkfifo dhu.in; exec 3<>dhu.in
@@ -211,28 +183,27 @@ Auto はブラウズツリーを開き直すたびに `onGetChildren` を呼ぶ�
   コンソールの出力（`help` の一覧など）は tty でないと見えない
 - 初回はスマホに「この車で使う」許可画面（FRX）が出る。5 秒以内に進めないと `PROJECTION_NOT_STARTED` で切れる（logcat に `CarInfo authorization: UNKNOWN` → `Triggering FRX`）ので、スマホの画面を見ながら繋ぐ
 - DHU を途中で落とすとスマホのヘッドユニットサーバーが「Already connected」で固まる（`DeveloperHeadUnitNetworkService` の FATAL）。DHU 側は「Waiting for phone」のまま。Android Auto の ⋮ から「ヘッドユニット サーバーを停止」→「起動」で直る
-- WSLg では `DISPLAY=:0 xwininfo -root -tree` で "Android Auto - Desktop Head Unit" の窓 ID を取り、`DISPLAY=:0 import -window <id> shot.png`（ImageMagick）で DHU の画面が撮れる。右半分に Google マップの現在地が映るので、共有するときは注意
 - portaudio の `Device unavailable` は無視してよい（DHU 側で音は出ないが再生は進む）
-- `installDebug` は applicationId が別なので release 版に触らない。release 版そのものをデータを残したまま手元のビルドで更新するなら、release 署名で上書きする:
+- `installDebug` は applicationId が別なので release ビルドに触らない。release ビルドそのものをデータを残したまま手元のビルドで更新するなら、release 署名で上書きする:
 
   ```bash
   source ~/.android-keys/kikidame.env          # export KIKIDAME_KEYSTORE=… 等を書いた chmod 600 のファイル（git 管理外）
   ./gradlew :app:assembleRelease
   $ADB pull "$($ADB shell pm path dev.tseki.kikidame | cut -d: -f2)" installed.apk
-  APKSIGNER=~/Android/Sdk/build-tools/36.0.0/apksigner   # 版は ls ~/Android/Sdk/build-tools/ で確かめる
+  APKSIGNER=~/Android/Sdk/build-tools/36.0.0/apksigner   # バージョンは ls ~/Android/Sdk/build-tools/ で確かめる
   $APKSIGNER verify --print-certs installed.apk | grep SHA-256                        # 実機の証明書
   $APKSIGNER verify --print-certs app/build/outputs/apk/release/app-release.apk | grep SHA-256   # 一致すること
   $ADB install -r app/build/outputs/apk/release/app-release.apk
   ```
 
-  **`.env` を `grep` や `cat` で表示しない**（rtk は `grep -c` でも一致行を出す）。存在確認は `test -r` で
+  **`.env` を `grep` や `cat` で表示しない**（`grep -c` でも一致行を出す環境がある）。存在確認は `test -r` で
 
 ## 共有フォルダ（SMB）
 
 ### 準備
 
 - 共有に `<配信元>/<番組>/<各回のファイル>` の 3 段で、m4a と mp3 を置く（タグの付いたものと、タグの無いものの両方）。`@eaDir` や `#recycle` のような名前が `.`・`@`・`#` で始まるフォルダも混ぜておく
-- debug 版を実機に入れておく（[接続](#接続)）
+- debug ビルドを実機に入れておく（[接続](#接続)）
 - 失敗の原因は logcat に出る。接続画面で失敗したときは `SmbConnect` タグ、同期・ダウンロードで共有フォルダに触って失敗したときは `SessionSourceGateway` タグに、原因の連鎖付きで出る（認証の失敗は `SourceException.Unauthorized`、届かないは `Unreachable`）。クラッシュは `AndroidRuntime`:
   ```bash
   $ADB logcat -d | grep -E "SmbConnect|SessionSourceGateway|AndroidRuntime" | tail -50
@@ -242,7 +213,7 @@ Auto はブラウズツリーを開き直すたびに `onGetChildren` を呼ぶ�
 
 ### 準備
 
-- debug 版を実機に入れておく（[接続](#接続)）
+- debug ビルドを実機に入れておく（[接続](#接続)）
 - 端末の内部ストレージに、試験用の 3 段のフォルダを `adb push` で置く。`SRC` は手元の m4a と mp3（タグの付いたものと無いもの）を置いたフォルダに読み替える。`@eaDir` のような無視する名前のフォルダと、音声でないファイルも混ぜる:
   ```bash
   SRC=~/kikidame-test-audio

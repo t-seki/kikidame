@@ -80,7 +80,7 @@ class MigrationTest {
     }
 
     /**
-     * v6→v7（ADR 0007）: 列の改名（`serverItemId` → `sourceItemId`、`stationName` → `publisherName`、
+     * v6→v7: 列の改名（`serverItemId` → `sourceItemId`、`stationName` → `publisherName`、
      * `airedAt` → `publishedAt`）と `playback_states.syncedAt` の削除。値と再生位置が残る。
      */
     @Test
