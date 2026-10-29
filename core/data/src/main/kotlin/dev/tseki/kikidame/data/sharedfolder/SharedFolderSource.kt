@@ -319,7 +319,7 @@ class SharedFolderSource(
         /** やり直す前に待つ時間。切れた直後にすぐ張り直して同じ失敗を重ねないため。長さに根拠は無い（測っていない）。 */
         val RETRY_DELAY: Duration = 2.seconds
 
-        /** 番組の画像として読む、番組のフォルダの中のファイルの名前（ADR 0009。rajikura の付け方に合わせる）。 */
+        /** 番組の画像として読む、番組のフォルダの中のファイルの名前（ADR 0009。ラジオ録音ツールが番組のフォルダに画像を置く付け方に合わせる）。 */
         const val PROGRAM_IMAGE_NAME: String = "folder.jpg"
 
         /**

@@ -138,7 +138,7 @@ class SdkJellyfinGateway @Inject constructor(
     }
 
     /**
-     * ブックのライブラリでは、`albums=` の絞り込みが AudioBook に効かない版がある（10.11 では全件が返った）ので、
+     * ブックのライブラリでは、`albums=` の絞り込みが AudioBook に効かない Jellyfin がある（Jellyfin 10.11.11 では全件が返った）ので、
      * ライブラリ全体を取ってタグでまとめた中から選ぶ（ADR 0010 の決定 2）。
      */
     override suspend fun fetchProgramEpisodes(
@@ -159,7 +159,7 @@ class SdkJellyfinGateway @Inject constructor(
 
     /**
      * 音楽のライブラリでは `getItem` ではなく `getItems(ids=…)` で引く。`getItem` は項目の全フィールド（`MediaSources` 含む）を返すので、
-     * 番組 ID が各回（Audio）を指していたとき 10.10 では `MediaStream.IsOriginal` 欠落でデコードに失敗する。
+     * 番組 ID が各回（Audio）を指していたとき、`MediaStream.IsOriginal` を返さない Jellyfin ではその欠落でデコードに失敗する。
      * `getItems` は [fetchAudio] と同じ基本フィールドだけを返し、無い ID・番組でない ID は空の一覧になる。
      * ブックのライブラリでは番組のアイテムが無いので、ライブラリ全体を取ってタグでまとめた中から選ぶ。
      */
@@ -202,7 +202,7 @@ class SdkJellyfinGateway @Inject constructor(
                 recursive = true,
                 includeItemTypes = listOf(BaseItemKind.AUDIO),
                 // MediaSources は要求しない: SDK 1.9（Jellyfin 12 向け）は MediaStream.IsOriginal を必須と
-                // 見なすが、10.11 はそれを返さずデコードに失敗する。サイズはダウンロードの完了時に実際の値で書き、
+                // 見なすが、それを返さない Jellyfin ではデコードに失敗する。サイズはダウンロードの完了時に実際の値で書き、
                 // 差し替えの判断（ADR 0011）で要るときだけ [fetchFileSize] で問い合わせる。Etag はファイルの版（ADR 0011）
                 fields = listOf(ItemFields.DATE_CREATED, ItemFields.PARENT_ID, ItemFields.ETAG),
                 sortBy = listOf(ItemSortBy.DATE_CREATED),
@@ -247,7 +247,7 @@ class SdkJellyfinGateway @Inject constructor(
                 parentId = parent,
                 recursive = true,
                 includeItemTypes = listOf(BaseItemKind.AUDIO_BOOK),
-                // AudioBook は Container を返さない（10.10.7・12.0 で確かめた）ので、拡張子を Path から取る
+                // AudioBook は Container を返さない（Jellyfin 10.10.7 と 12.0 で確かめた）ので、拡張子を Path から取る
                 // Etag はファイルの版（ADR 0011）
                 fields = listOf(ItemFields.DATE_CREATED, ItemFields.PARENT_ID, ItemFields.PATH, ItemFields.ETAG),
                 // 再生の共有（ADR 0010）: 各回の UserData を一覧と一緒に読む（回ごとに問い合わせない）
@@ -337,9 +337,9 @@ class SdkJellyfinGateway @Inject constructor(
     }
 
     /**
-     * 原本の全長を `Range: bytes=0-0` で取る（ADR 0011）。HEAD は 10.10.7・12.0 とも 405 を返すので使わない。
+     * 原本の全長を `Range: bytes=0-0` で取る（ADR 0011）。HEAD は Jellyfin 10.10.7・12.0 とも 405 を返すので使わない。
      * 206 なら `Content-Range` の全長、Range を無視して 200 で全体が返ったら `Content-Length`（本文は読まずに閉じる）。
-     * 書き換えた直後、Jellyfin が走査し直す前でも、ディスク上の今の大きさが返った（10.10.7・12.0 で確かめた）。
+     * 書き換えた直後、Jellyfin が走査し直す前でも、ディスク上の今の大きさが返った（Jellyfin 10.10.7・12.0 で確かめた）。
      */
     override suspend fun fetchFileSize(credentials: ServerCredentials, episodeSourceId: SourceItemId): Long? = call {
         val api = api(credentials.serverUrl, credentials.accessToken)
