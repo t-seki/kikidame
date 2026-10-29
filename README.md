@@ -45,7 +45,7 @@ Not distributed on Google Play ([ADR 0005](./docs/adr/0005-open-source-distribut
 1. **GitHub Releases** — download `kikidame-<version>.apk` from [Releases](https://github.com/t-seki/kikidame/releases)
 2. **Obtainium** — for automatic updates, add `https://github.com/t-seki/kikidame` to [Obtainium](https://github.com/ImranR98/Obtainium). It notifies you of new releases; the APK carries the same signature, so it installs over the existing app and keeps your episodes and playback positions
 
-**Not submitted to IzzyOnDroid or the main F-Droid repository.** Two reasons. (1) Both reject apps whose code was written with generative AI ([IzzyOnDroid App Inclusion Policy](https://izzyondroid.org/docs/general/AppInclusionPolicy/): "We are strongly opposed to apps which are fully or in part created by generative AI tools"), and most of Kikidame's code is written with Claude Code. The submission form requires a declaration of AI use; an honest answer would be rejected, and we will not make a false declaration. (2) The main F-Droid repository rebuilds from source and signs with its own key, so its APK cannot update to or from the Releases build (reinstalling would lose your episodes and playback positions). A self-hosted F-Droid repository, which needs no third-party review, is being considered for people who prefer the F-Droid client ([#123](https://github.com/t-seki/kikidame/issues/123)).
+**Not submitted to IzzyOnDroid or the main F-Droid repository.** Two reasons. (1) Both reject apps whose code was written with generative AI ([IzzyOnDroid App Inclusion Policy](https://izzyondroid.org/docs/general/AppInclusionPolicy/): "We are strongly opposed to apps which are fully or in part created by generative AI tools"), and most of Kikidame's code is written with Claude Code. The submission form requires a declaration of AI use; an honest answer would be rejected, and we will not make a false declaration. (2) The main F-Droid repository rebuilds from source and signs with its own key, so its APK cannot update to or from the Releases build (reinstalling would lose your episodes and playback positions). A self-hosted F-Droid repository, which needs no third-party review, is being considered for people who prefer the F-Droid client.
 
 Requires Android 12 (API 31) or later. Store descriptions and screenshots live in [fastlane/metadata/android/](./fastlane/metadata/android/) (Obtainium does not read them, but `fdroidserver` for the self-hosted repository mentioned above reads exactly this layout, so they are kept).
 
@@ -70,19 +70,19 @@ The app connects to **Jellyfin**, a **shared folder on a NAS (SMB)** or a **fold
 - In other words, the file tags need `album` = program, `albumartist` = publisher, the date (`©day` in M4A) = published at, and `artist` = performers. In a books library the app groups the episodes into programs by the `album` and `albumartist` tags; in a music library Jellyfin builds the structure above. Whether MP3 date tags yield a published date is unverified
   - For radio recordings, set the tags `album` = program, `albumartist` = station, and the date (`©day` in M4A) = broadcast date, using a general-purpose tag editor such as Mp3tag
   - For podcasts, tag the files you fetched from the feed with `album` = program name, `albumartist` = the publisher or network, and the date = release date, then put them in the library. In a music library, one folder per program helps Jellyfin group them into a MusicAlbum
-  - Books libraries were checked with the 10.10.7 and 12.0 containers (the integration test) and a 10.11.11 container ([#352](https://github.com/t-seki/kikidame/issues/352)): every episode is listed as an AudioBook. Moving a real server over has not been checked yet
+  - Books libraries were checked with the 10.10.7 and 12.0 containers (the integration test) and a 10.11.11 container: every episode is listed as an AudioBook. Moving a real server over has not been checked yet
 - **Playback sharing** (books libraries only. [ADR 0010](./docs/adr/0010-share-playback-state-via-jellyfin-book-library.md), Japanese): the playback position and played state of each episode are written to Jellyfin's UserData (each item's playback position, played state and last played date), and values written elsewhere are taken in
   - **Sign in with the same Jellyfin user in Kikidame and in Jellyfin Web or any other client.** UserData is stored in the server's database per Jellyfin user and item (it is not written to the audio files), so listening as another user is not shared
   - Kikidame sends on pause, stop, the end of an episode, and when you mark an episode played or unplayed (marks changed while nothing is playing are sent when playback starts or on the next sync). It reads at every sync and just before an episode starts playing (including resuming from pause; it waits up to 2 seconds and plays from the position on the device if the read fails). During a sync, the episode you are listening to keeps the position on the device
   - If both sides changed, the newer one wins (the time of the change on the device against the server's last played date)
   - When the server cannot be reached, playback on the device does not stop. What could not be sent is sent on the next sync. "Playback sharing" under "Last sync" in Settings shows the last time sharing worked and whether sending failed (no notification is shown)
   - Episodes that became played elsewhere are also removed by "Delete after played" once a sync has taken them in
-  - Jellyfin Web and other clients decide the position and played state by the server's rules. As far as checked by sending playback reports to a 10.11.11 container, a position stopped before 5 minutes is not kept, and an episode becomes played with less than 5 minutes left (the server settings `MinAudiobookResume` and `MaxAudiobookResume`, 5 minutes by default; [#352](https://github.com/t-seki/kikidame/issues/352)). This differs from Kikidame's own played rule (the last 2 minutes). The web rules on 10.10 and 12 are not verified
+  - Jellyfin Web and other clients decide the position and played state by the server's rules. As far as checked by sending playback reports to a 10.11.11 container, a position stopped before 5 minutes is not kept, and an episode becomes played with less than 5 minutes left (the server settings `MinAudiobookResume` and `MaxAudiobookResume`, 5 minutes by default). This differs from Kikidame's own played rule (the last 2 minutes). The web rules on 10.10 and 12 are not verified
   - Kikidame's playback does not appear in "Now playing" or the play counts on the Jellyfin dashboard (it writes UserData directly and sends no playback reports)
   - Writing and reading back were verified with 10.10.7 and 12.0.0 containers (the integration test). Verification on a real 10.11 server and how it looks in Jellyfin Web are not done yet
   - Whether the server carries the UserData over when it recreates an episode's item (for example after a file rename) is not verified. What Kikidame has on the device is written again to the new item after the sync links it again
 - To move from a music library to a books library (the programs, episodes, playback positions, played state and downloaded files on the device are linked again by the sync after you choose the new library, matching on publisher, program name and title. [ADR 0001](./docs/adr/0001-local-surrogate-key.md)):
-  1. Update Kikidame to a version that can use books libraries (one that includes [#354](https://github.com/t-seki/kikidame/issues/354))
+  1. Update Kikidame to a version that can use books libraries
   2. In the Jellyfin dashboard, remove the music library. If the same folder is in both a music and a books library, Jellyfin reuses the items and the books library still shows them as Audio and MusicAlbum ("確かめた事実" in [ADR 0010](./docs/adr/0010-share-playback-state-via-jellyfin-book-library.md), Japanese)
   3. Add a library with the content type "Books" for the same folder and wait for the scan to finish
   4. In Kikidame, tap "Library" in Settings and choose the books library, then tap "Done". The sync starts
@@ -101,11 +101,11 @@ The app connects to **Jellyfin**, a **shared folder on a NAS (SMB)** or a **fold
 
   Other files (non-audio files, files at other levels) are silently ignored. Folders and files whose names start with `.`, `@` or `#` (`@eaDir`, `#recycle`, `._foo.m4a` and the like, made by NAS units and operating systems) are ignored at every level. The one exception is `folder.jpg` in a program folder (2nd level folder; only that exact name), which is read as the program image
 - Publisher and program come from the folder names; the tags are not used for them. For each episode the app reads the tags: title (the file name without the extension if missing), date (the file's modified time if there is no full date), duration, and artist (performers). The tags are read again only when a file's path, size or modified time changes
-- The first full scan lists every folder first, then reads the tags program by program. Each program shows up in the program list as soon as its tags are read, and while tags are being read the program list shows a count such as "Reading tags 1,234 / 6,090". The first import of a share with thousands of episode files takes on the order of ten minutes or more (about 12 minutes for about 6,000 files on the developer's NAS; it depends on your NAS, network and files)
+- The first full scan lists every folder first, then reads the tags program by program. Each program shows up in the program list as soon as its tags are read, and while tags are being read the program list shows a count such as "Reading tags 1,234 / 6,090". The first import of a share with thousands of episode files takes on the order of ten minutes or more (about 12 minutes for about 6,000 files in one test; it depends on your NAS, network and files)
 - **Keep the app open with the screen on during the first import.** When the screen turns off and the app goes to the background, Android cuts the app's network connection after a while (from a few seconds to a few minutes; it varies with the device and the situation), and the import stops. Programs already imported stay, and the next time you open the app the import continues with the programs not read yet (their tags are not read again). Whether a program has disappeared from the share is decided only by a scan that reaches the end
 - If a read fails, the app reconnects and tries the same file again, and ends the sync as unreachable after three failures in a row. Whether reconnecting actually lets a scan continue (for example after a short network glitch) has not been seen on a real device yet
 - Renaming an episode file makes it unlinked and it is matched again by title (then by published day and duration) within the same program. Renaming a program folder makes the program Gone (On Hold), because the publisher and program name no longer match
-- Whether this works on your NAS and network (name resolution, guest access, how long the first import takes) is verified only on the developer's NAS and device; see "実機で試す（#198: SMB の共有フォルダ）" for the setup in [docs/device-testing.md](./docs/device-testing.md) and its checklists in [docs/device-checklists.md](./docs/device-checklists.md) (Japanese)
+- Whether this works on your NAS and network (name resolution, guest access, how long the first import takes) has been verified on only one NAS and one device; see "共有フォルダ（SMB）" in [docs/device-testing.md](./docs/device-testing.md) for the test setup (Japanese)
 
 ### Folder on this device
 
@@ -115,7 +115,7 @@ The app connects to **Jellyfin**, a **shared folder on a NAS (SMB)** or a **fold
 - **Keep the files in the folder.** If you delete a file from the folder, the next sync treats that episode as gone from the source and deletes the app's copy too, even if it is Pinned. This is meant for recordings you sync into the folder from a PC (Syncthing, FolderSync and the like): keep them there
 - Downloads and syncs from a folder on this device need no network at all, so "Wi-Fi only" does not apply to it (the copy stays inside the device)
 - If the app loses access to the folder (the permission was revoked, or the folder was moved or deleted), it signs out and asks you to pick the folder again. Programs, episodes and files on the device are kept, and they link up again if the folder you pick has the same layout
-- Folders in internal storage have been verified on a real device (Android 17): import, copying, playback, and re-selecting the folder after it was moved. Whether it works on SD cards and large folders is unverified. See "実機で試す（#199: 端末のフォルダ）" in [docs/device-checklists.md](./docs/device-checklists.md) (Japanese)
+- Folders in internal storage have been verified on a real device (Android 17): import, copying, playback, and re-selecting the folder after it was moved. Whether it works on SD cards and large folders is unverified. See "端末のフォルダ" in [docs/device-testing.md](./docs/device-testing.md) for the test setup (Japanese)
 
 ## How it works
 
@@ -139,7 +139,7 @@ export JAVA_HOME=~/.local/jdk/current   # JDK 25
 ./gradlew :app:installDebug             # install on the connected device
 ```
 
-Setting up the toolchain is covered in [docs/development.md](./docs/development.md), wireless debugging from WSL2 and reconciling the DB with the files on disk in [docs/device-testing.md](./docs/device-testing.md), and the device checklists in [docs/device-checklists.md](./docs/device-checklists.md) (completed ones in [docs/device-checklists-archive.md](./docs/device-checklists-archive.md)) (Japanese).
+Setting up the toolchain is covered in [docs/development.md](./docs/development.md), wireless debugging with adb from Linux or WSL2 and reconciling the DB with the files on disk in [docs/device-testing.md](./docs/device-testing.md) (Japanese).
 
 ## Modules
 
@@ -155,12 +155,12 @@ The stack is Kotlin / Jetpack Compose (Material 3) / Media3 / Room / WorkManager
 
 - Video, transcoding, casting
 - Multiple servers, users, or libraries
-- Sharing the playback position and played state with anything other than a Jellyfin books library (a music library, a shared folder, a folder on the device; shared folders were considered in [#353](https://github.com/t-seki/kikidame/issues/353) and dropped)
+- Sharing the playback position and played state with anything other than a Jellyfin books library (a music library, a shared folder, a folder on the device)
 - Server administration
 - Audiobooks (you listen from the oldest chapter, so "Keep latest N" does not fit; supporting them would need a "direction" per program)
 - Distribution and payments on Google Play (if demand appears, the option of selling a paid build on Play while Releases stay free is kept open; [ADR 0005](./docs/adr/0005-open-source-distributed-outside-play.md), Japanese)
 
-The full list is under "やらないこと" in [docs/claude-code-handoff.md](./docs/claude-code-handoff.md) (Japanese).
+The full list is under "やらないこと" in [docs/architecture.md](./docs/architecture.md) (Japanese).
 
 ## Documentation
 
@@ -168,11 +168,9 @@ The documentation below is in Japanese.
 
 - Glossary: [CONTEXT.md](./CONTEXT.md) (each term carries its English name)
 - Architecture decision records: [docs/adr/](./docs/adr/)
-- Implementation handoff (overall design, milestones): [docs/claude-code-handoff.md](./docs/claude-code-handoff.md)
-- Development guide (toolchain, tests, release, parallel work): [docs/development.md](./docs/development.md)
+- Architecture (overall design, modules, schema, sync): [docs/architecture.md](./docs/architecture.md)
+- Development guide (toolchain, tests, release): [docs/development.md](./docs/development.md)
 - Testing on a device (wireless debugging, Android Auto, preparing test data, reconciling the DB with the files): [docs/device-testing.md](./docs/device-testing.md)
-- Device checklists with unchecked items: [docs/device-checklists.md](./docs/device-checklists.md)
-- Completed device checklists: [docs/device-checklists-archive.md](./docs/device-checklists-archive.md)
 - UI guidelines (what matters, colors, the role of each screen): [docs/ui.md](./docs/ui.md)
 
 ## License
