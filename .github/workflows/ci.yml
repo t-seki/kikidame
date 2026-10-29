@@ -8,15 +8,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      # ADR を足したら docs/claude-code-handoff.md の「参照」の一覧にも足す（#211）
-      - name: ADR index in handoff is complete
+      # ADR を足したら docs/architecture.md の「参照」の一覧にも足す
+      - name: ADR index in architecture is complete
         run: scripts/check-adr-index.sh
-      # ADR の末尾の注記の形（段落は改名・移動の注記だけ、箇条書きの項目は句点で終わらない）を確かめる。検査自体の落ちる例・通る例も流す（#324）
+      # ADR の末尾の注記の形（段落は改名・移動の注記だけ、箇条書きの項目は句点で終わらない）を確かめる。検査自体の落ちる例・通る例も流す
       - name: ADR notes follow the format
         run: |
           scripts/test-check-adr-notes.sh
           scripts/check-adr-notes.sh
-      # docs と README のインラインコードの .sh が repo にもリンクにも無いと落とす。検査自体の落ちる例・通る例も流す（#328）
+      # docs と README のインラインコードの .sh が repo にもリンクにも無いと落とす。検査自体の落ちる例・通る例も流す
       - name: Doc script references resolve
         run: |
           scripts/test-check-doc-script-refs.sh
@@ -29,15 +29,15 @@ jobs:
         with:
           packages: platforms;android-37.0 build-tools;36.0.0 platform-tools
       - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
-      # 未使用 import と連続した空行だけを見る ktlint（#254）。規則は .editorconfig。自動ではコミットしない
+      # 未使用 import と連続した空行だけを見る ktlint。規則は .editorconfig。自動ではコミットしない
       - name: Kotlin style (ktlint)
         run: ./gradlew lintKotlin --no-daemon
       - name: Unit tests (JVM + Robolectric, no emulator)
         run: ./gradlew test --no-daemon
-      # lint（#111）: MissingTranslation（values/ と values-ja/ の片方だけの追加）と UnsafeOptInUsageError を落とす
+      # lint: MissingTranslation（values/ と values-ja/ の片方だけの追加）と UnsafeOptInUsageError を落とす
       - name: Lint
         run: ./gradlew :app:lintDebug --no-daemon
-      # core/domain は純 JVM で Android Lint の NewApi が効かないので、animal-sniffer で minSdk 31 の API シグネチャと照合する（#215）
+      # core/domain は純 JVM で Android Lint の NewApi が効かないので、animal-sniffer で minSdk 31 の API シグネチャと照合する
       - name: API level check (core/domain)
         run: ./gradlew :core:domain:animalsnifferMain --no-daemon
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -47,7 +47,7 @@ jobs:
           path: |
             **/build/reports/tests/
             app/build/reports/lint-results-debug.*
-  # release ビルド（#186）と aboutlibraries.json の鮮度（#187）。署名なし（KIKIDAME_KEYSTORE を渡さない）で回し、Secrets は使わない
+  # release ビルドと aboutlibraries.json の鮮度。署名なし（KIKIDAME_KEYSTORE を渡さない）で回し、Secrets は使わない
   release-build:
     runs-on: ubuntu-latest
     steps:
