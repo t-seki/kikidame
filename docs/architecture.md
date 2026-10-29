@@ -19,6 +19,8 @@ Kikidame の今の設計を述べる文書。用語は `CONTEXT.md` の定義に
    - [番組の画像](#番組の画像)
 6. [突合と取り込み](#突合と取り込み)
 7. [同期](#同期)
+   - [同期エンジンの設計](#同期エンジンの設計)
+     - [実行側の規則](#実行側の規則)
 8. [ダウンロードと差し替え](#ダウンロードと差し替え)
    - [ダウンロード](#ダウンロード)
    - [差し替え](#差し替え)
@@ -272,7 +274,7 @@ data class PlaybackStateEntity(    // ブックのライブラリでは再生の
 途中で止まっても取り込み済みの番組は残り、次の同期ではそのタグを読まない（DB の大きさ・更新日時で判定）。
 全走査は、前面サービスも通知も作らず、アプリのスコープと WorkManager の上で走る（ADR 0003）。
 木の操作が失敗したら `FolderTree.reset`（SMB は接続を閉じる）してやり直し、続けて 3 回（`SharedFolderSource.MAX_CONSECUTIVE_FAILURES`）失敗したら到達不能にする。画面が消えて裏に回ると、しばらくして Android が TCP の接続を壊し、張り直しも効かずに到達不能で終わることがある（壊されるまでの時間は一定ではなく、何で決まるかは未確認。張り直しで続けられた場面は実機でまだ見ていない）。
-タグの読み取りは、遅いのは転送量ではなく往復の回数と見て（m4a のタグの読み取りは、測った例で 1 本あたり 2,048 バイトずつ 150〜191 回の読み出しになった）、`BlockReader` が 256 KB ずつまとめて読み（位置ごとの塊を 4 つまで持つ）、往復を減らす。並列では読まない。進み具合は `ScanListener.onTagProgress` → `LibraryRefreshRepository.refresh(onProgress)` → `LibraryRefresher.tagProgress` で番組一覧の `BackgroundSyncBar` に出す。
+タグの読み取りは、遅いのは転送量ではなく往復の回数と見て、`BlockReader` が 256 KB ずつまとめて読み（位置ごとの塊を 4 つまで持つ）、往復を減らす。並列では読まない。進み具合は `ScanListener.onTagProgress` → `LibraryRefreshRepository.refresh(onProgress)` → `LibraryRefresher.tagProgress` で番組一覧の `BackgroundSyncBar` に出す。
 聴いている回（削除と差し替えの予約から外す回。ADR 0011）は `refresh(excluded = { … })` で番組ごとに読み直す。番組ごとに予約した数は `onEnqueued` で流れ、`LibraryRefresher` は全走査が途中で失敗してもそれが 1 以上なら Worker を起こす（取り消し・認証の失敗では起こさない。取得元を変えるときは `SourceChanger` が Worker を止めてから走査を取り消し、手元を消すため）。
 
 ### 番組の画像
@@ -349,7 +351,7 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 - **「Wi-Fi のみ」は同期にも効く**（手動を含む。取得元が端末のフォルダなら効かせない。domain の `wifiOnlyApplies`）。`SyncWorker` の制約は `DownloadWorker` と同じ（UNMETERED / CONNECTED、充電中は課さない。同期自体の通信は一覧の JSON だけで軽く、転送は `DownloadWorker` の制約で守られる）。手動は `LibraryRefresher` で `ConnectivityManager.isActiveNetworkMetered` を見て、従量制なら「Wi-Fi に接続していないため更新しません」で終える（裏で待たせない）。判定は全走査・番組単位・起動時・定期のすべてが通るが、**ゲートは取得元への取得だけを包む**: 先頭の `reconcileMissingFiles()`（ローカル I/O のみ）は従量制でも走らせる
 - **起点**: 定期は `PeriodicWorkRequest` 3 時間ごと（`UPDATE` で起動時に登録し直す）。起動時は `ProcessLifecycleOwner` の `ON_START` で、前回同期から 15 分以上（`lastFetchedAt` と `lastAttemptedAt`（失敗した全走査も数える。全走査が取得元に問い合わせる直前に成功・失敗を問わず記録）の新しい方から数える）なら `OneTimeWorkRequest`（ユニーク `sync-once`、`KEEP`）を出す。同じ制約で待つ。定期・起動時の失敗は `Result.success()` で終え次回を待つ（スナックバー無し、Log のみ）
 - **周期と閾値の根拠と電池の最適化**: 必須の要求は「アプリを開いたら、新しい回が手元に来ている（来はじめる）」で、開かずに手元に来るまでの遅れも縮めたいため、周期を 3 時間、起動時の閾値を 15 分にした。App Standby のバケットが RARE になりうるので、定期の同期は遅れうる（どれだけ遅れるかは未確認）。そのため設定の「ダウンロード」の節に、電池の最適化の対象のときだけ「電池の最適化を外す」の行を出す（`PowerManager.isIgnoringBatteryOptimizations`。`ON_RESUME` のたびに判定し直す。押すと `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` で OS の確認を出す。`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` を Manifest に足した。Play を通さずに配るので方針の縛りは受けない。ADR 0005）。やらないこと: 録音時刻に合わせて起こす・取得元からの知らせ（webhook）を受ける（端末に外から届く経路が要り、FCM は非目標）、「次の予定」の時刻の表示（RARE では予定どおりに走らないことがあり誤解を招く）、同期の試みを数日分残す記録（「最終同期」の行に任せる）
-- **同期の表示と結果**: 走っている間は裏の同期か操作による同期かを `LibraryRefresher.isSyncingBackground` などで区別し、手動の操作が合流したら裏の表示から操作の表示に切り替える。共有フォルダの全走査のタグの読み込みの進み具合は `LibraryRefresher.tagProgress`。結果は変化だけを出す: 新しい回（取り込みで手元に新しく増えた各回。突合で結び直した回は数えない。`RefreshResult.newEpisodes`）・ダウンロード予約・削除の数、判断保留の番組があればその数。0 は省く。手動は変化が無ければ「最新の状態です」、裏の同期（定期・起動時）は変化があったときだけ出す（`messages` を collect している番組一覧・各回一覧を開いているときだけ。それ以外の画面にいる間や、閉じている間の成功した裏の同期の結果は後から出さない）。`RefreshResult` に `enqueued` / `deleted` / `onHold` を持つ。文言と見せ方は [ui.md](ui.md)
+- **同期の表示と結果**: 走っている間は裏の同期か操作による同期かを `LibraryRefresher.isSyncingInBackground` などで区別し、手動の操作が合流したら裏の表示から操作の表示に切り替える。共有フォルダの全走査のタグの読み込みの進み具合は `LibraryRefresher.tagProgress`。結果は変化だけを出す: 新しい回（取り込みで手元に新しく増えた各回。突合で結び直した回は数えない。`RefreshResult.newEpisodes`）・ダウンロード予約・削除の数、判断保留の番組があればその数。0 は省く。手動は変化が無ければ「最新の状態です」、裏の同期（定期・起動時）は変化があったときだけ出す（`messages` を collect している番組一覧・各回一覧を開いているときだけ。それ以外の画面にいる間や、閉じている間の成功した裏の同期の結果は後から出さない）。`RefreshResult` に `enqueued` / `deleted` / `onHold` を持つ。文言と見せ方は [ui.md](ui.md)
 - **失敗の記録と通知**: 全走査の最後の試み（成功・失敗とその理由・「Wi-Fi ではない」の見送り）と時刻を、手動でも裏でも `LibraryRefresher` が `SessionRepository.recordSyncAttempt` で DataStore に記録する
   （`SessionState.Ready.lastSyncAttempt`。`lastAttemptedAt` とは別の値で、`SyncScheduler.isStale` は変えない。1 番組の同期・401・取り消しは記録しない）。設定の「最終同期」の行は、
   それが `lastFetchedAt` より新しく成功でないときに補足の行を出す。裏の同期（`SyncWorker` → `LibraryRefresher.refreshInBackground`。手動が合流したら手動として扱う）が失敗で終わり、

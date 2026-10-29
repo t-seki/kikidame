@@ -172,7 +172,7 @@ Auto はブラウズツリーを開き直すたびに `onGetChildren` を呼ぶ�
 ### 落とし穴
 
 - DHU は `libc++1` `libc++abi1` が要る（Ubuntu: `sudo apt install -y libc++1 libc++abi1`）。`ldd ~/Android/Sdk/extras/google/auto/desktop-head-unit | grep 'not found'` が空になれば足りている
-- バックグラウンド（端末に繋がっていない実行）から起動すると stdin が EOF になって即終了する（`Version: 2.0-linux` を出して exit 0）。`sleep 1d | ~/Android/Sdk/extras/google/auto/desktop-head-unit` か、FIFO を stdin にする（作業ディレクトリはどこでもよい）:
+- バックグラウンド（標準入力が無い実行）から起動すると stdin が EOF になって即終了する（`Version: 2.0-linux` を出して exit 0）。`sleep 1d | ~/Android/Sdk/extras/google/auto/desktop-head-unit` か、FIFO を stdin にする（作業ディレクトリはどこでもよい）:
 
   ```bash
   mkfifo dhu.in; exec 3<>dhu.in
@@ -198,7 +198,7 @@ Auto はブラウズツリーを開き直すたびに `onGetChildren` を呼ぶ�
 
   **`.env` を `grep` や `cat` で表示しない**（`grep -c` でも一致行を出す環境がある）。存在確認は `test -r` で
 
-## 共有フォルダ（SMB）
+## NAS の共有フォルダ（SMB）
 
 ### 準備
 
