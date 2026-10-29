@@ -1,17 +1,15 @@
 # 開発ガイド
 
-このファイルの全体で、経緯と実例（「PR #… で起きた」の列挙、決まりの根拠にした実測の値など）は issue に置き、本文には決まりの 1 文と `（#N）` だけを書く（#334）。
-
 ## 前提
 
 | 項目 | 版 | 備考 |
 | --- | --- | --- |
-| JDK | **25** | AGP 9.4 の要件は 17+ だが、Robolectric 4.17 が SDK 37 のサンドボックスに Java 21 以上を要求する。そのうえで CI・release と揃えて 25 を使う（#179） |
+| JDK | **25** | AGP 9.4 の要件は 17+ だが、Robolectric 4.17 が SDK 37 のサンドボックスに Java 21 以上を要求する。そのうえで CI・release と揃えて 25 を使う |
 | Android SDK | platform `android-37.0`、build-tools `36.0.0`、platform-tools | `sdkmanager "platforms;android-37.0" "build-tools;36.0.0" "platform-tools"` |
 | Gradle | wrapper（版は `gradle/wrapper/gradle-wrapper.properties`） | `./gradlew` が取得する |
 | AGP | 9.4 | built-in Kotlin。`org.jetbrains.kotlin.android` は適用しない |
 
-WSL2 で sudo を使わずに揃える例:
+Linux（WSL2 を含む）で sudo を使わずに揃える例:
 
 ```bash
 # JDK（Temurin）
@@ -28,9 +26,7 @@ yes | latest/bin/sdkmanager --licenses
 latest/bin/sdkmanager "platforms;android-37.0" "build-tools;36.0.0" "platform-tools"
 ```
 
-素の Linux（devbox）でも同じ手順で入れられる（#156）。
-
-origin の URL は SSH（`git@github.com:...`）にしておく。HTTPS のままで credential helper が無いと、worker の素の `git push` が `could not read Username` で失敗する。HTTPS で使うなら `gh auth setup-git` で credential helper を入れる。
+origin の URL は SSH（`git@github.com:...`）にしておく。HTTPS のままで credential helper が無いと、`git push` が `could not read Username` で失敗する。HTTPS で使うなら `gh auth setup-git` で credential helper を入れる。
 
 リポジトリ直下に `local.properties`（git 管理外）を置く:
 
@@ -71,18 +67,18 @@ Robolectric と JUnit 5 は統一しない（Robolectric の公式ランナー�
 Robolectric が SDK 37 で JDK 内部 API へアクセスするための `--add-opens` はルートの
 `build.gradle.kts` で Android モジュールのテストタスクに付けている。
 
-ADR（`docs/adr/`）を足したら、`docs/claude-code-handoff.md` の「参照」の ADR の一覧にも足す。CI の `test` job の先頭で `scripts/check-adr-index.sh`（#211）が、`docs/adr/*.md` のファイル名が handoff に出ているかを確かめ、欠けていれば名前を出して落とす（手元でも repo 直下で流せる）。一覧の文面が正しいかは確かめない。
+ADR（`docs/adr/`）を足したら、`docs/architecture.md` の「参照」の ADR の一覧にも足す。CI の `test` job の先頭で `scripts/check-adr-index.sh` が、`docs/adr/*.md` のファイル名が `docs/architecture.md` に出ているかを確かめ、欠けていれば名前を出して落とす（手元でも repo 直下で流せる）。一覧の文面が正しいかは確かめない。
 
-同じく `test` job の先頭で `scripts/check-adr-notes.sh`（#324）が、`docs/adr/*.md` の末尾の注記の形を確かめる。落とすのは、行頭が `- ` や空白でなく、行頭から「…注記（#N…）:」（コロンは半角・全角）と続く段落のうち改名の注記・移動の注記以外のもの（行の途中に現れる本文の行には当てない）（決定や事実の注記を段落で書いたもの）と、`- <日付> ` で始まる箇条書きの項目（入れ子の子項目の行を含む。項目の最後の行を見る）の末尾が句点で終わるもの。落ちる例と通る例は `scripts/test-check-adr-notes.sh` が流す（これも CI で流す）。注記の中身は確かめない。
+同じく `test` job の先頭で `scripts/check-adr-notes.sh` が、`docs/adr/*.md` の末尾の注記の形を確かめる。落とすのは、行頭が `- ` や空白でなく、行頭から「…注記（#N…）:」（コロンは半角・全角）と続く段落のうち改名の注記・移動の注記以外のもの（行の途中に現れる本文の行には当てない）（決定や事実の注記を段落で書いたもの）と、`- <日付> ` で始まる箇条書きの項目（入れ子の子項目の行を含む。項目の最後の行を見る）の末尾が句点で終わるもの。落ちる例と通る例は `scripts/test-check-adr-notes.sh` が流す（これも CI で流す）。注記の中身は確かめない。
 
-同じく `test` job で `scripts/check-doc-script-refs.sh`（#328）が、`docs/**/*.md` と `README*.md` のインラインコード（バッククォートに挟まれた範囲を前から順に拾う。span の中にバッククォートがあるとずれることがある）に書かれたシェルスクリプトのファイル名が、repo の中にもリンクの中にも無いと落とす。見るのは空白で区切った語のうち末尾が拡張子 sh のもので、repo 直下、またはその Markdown のあるフォルダからの相対パスにファイルが無く、`[…](…)` の形のリンクの中にも無いものを落とす（`~/…`・`$HOME/…`・glob のようなパスの形でない語も、ファイルが無いとして落とす。コードブロックの中は見ない）。直し方は、repo の中のスクリプトは `scripts/check-adr-index.sh` のようにパス付きで書き、ほかの repo のものは `https://…` のリンクにする。手元でも repo 直下で流せる。落ちる例と通る例は `scripts/test-check-doc-script-refs.sh` が流す（これも CI で流す）。リンク先の URL が実在するかは確かめない。
+同じく `test` job で `scripts/check-doc-script-refs.sh` が、`docs/**/*.md` と `README*.md` のインラインコード（バッククォートに挟まれた範囲を前から順に拾う。span の中にバッククォートがあるとずれることがある）に書かれたシェルスクリプトのファイル名が、repo の中にもリンクの中にも無いと落とす。見るのは空白で区切った語のうち末尾が拡張子 sh のもので、repo 直下、またはその Markdown のあるフォルダからの相対パスにファイルが無く、`[…](…)` の形のリンクの中にも無いものを落とす（`~/…`・`$HOME/…`・glob のようなパスの形でない語も、ファイルが無いとして落とす。コードブロックの中は見ない）。直し方は、repo の中のスクリプトは `scripts/check-adr-index.sh` のようにパス付きで書き、ほかの repo のものは `https://…` のリンクにする。手元でも repo 直下で流せる。落ちる例と通る例は `scripts/test-check-doc-script-refs.sh` が流す（これも CI で流す）。リンク先の URL が実在するかは確かめない。
 
-既存の ADR を改めるときは、本文を書き換えず、末尾に注記を足す。改名で本文の名前が古くなるときも同じで、本文は当時の記述のまま残す（#196・#268）。
-- 注記の形は CI の `scripts/check-adr-notes.sh` が確かめる（#324）。段落で書くのは改名の注記と移動の注記だけで、決定や事実の注記は下の箇条書きにする
-- 改名の注記の形: 「改名の注記（#239）: 上の本文の `X` は、その後 `Y` に改めた。本文は当時の記述のまま残している。」の段落で書き、末尾に句点を付ける
-- 末尾の注記の形: `- <日付> <出どころ>: …` の箇条書きの 1 項目にし、項目の末尾に句点（。）を付けない。項目の途中の文の区切りには句点を使ってよい（#294）
+既存の ADR を改めるときは、本文を書き換えず、末尾に注記を足す。改名で本文の名前が古くなるときも同じで、本文は当時の記述のまま残す。
+- 注記の形は CI の `scripts/check-adr-notes.sh` が確かめる。段落で書くのは改名の注記と移動の注記だけで、決定や事実の注記は下の箇条書きにする
+- 改名の注記の形: 「改名の注記（<出どころの番号>）: 上の本文の `X` は、その後 `Y` に改めた。本文は当時の記述のまま残している。」の段落で書き、末尾に句点を付ける
+- 末尾の注記の形: `- <日付> <出どころ>: …` の箇条書きの 1 項目にし、項目の末尾に句点（。）を付けない。項目の途中の文の区切りには句点を使ってよい
 - 決定そのものや事実が変わるときも、同じ ADR の末尾に日付と出どころ（issue か ADR の番号）を添えた 1 行を足す
-- 新しい ADR を足すか、元の ADR の末尾に注記を足すかの境目（#274）: 決定の核（ADR の題が言っていること）が取り消される・別のものに置き換わるときは、新しい ADR を足す。核は残り、細部・前提の事実・名前・結果だけが変わるときは、元の ADR の末尾に注記を足す
+- 新しい ADR を足すか、元の ADR の末尾に注記を足すかの境目: 決定の核（ADR の題が言っていること）が取り消される・別のものに置き換わるときは、新しい ADR を足す。核は残り、細部・前提の事実・名前・結果だけが変わるときは、元の ADR の末尾に注記を足す
 - 新しい ADR で改めたとき:
   - 新しい ADR の本文に、どの ADR の何を改めるかを書く
   - 元の ADR の本文は書き換えず、末尾に「日付 ADR NNNN: …」の注記を足す
@@ -91,7 +87,7 @@ ADR（`docs/adr/`）を足したら、`docs/claude-code-handoff.md` の「参照
 Room のスキーマは `core/data/schemas/` に書き出す（`room { schemaDirectory(...) }`）。
 Entity を変えたら version を上げ、書き出された JSON もコミットする。
 
-### テスト用 Jellyfin サーバ（#97）
+### テスト用 Jellyfin サーバ
 
 対応範囲は Jellyfin **10.10 以上**。版ごとの差（10.10 は `MediaStream.IsOriginal` を返さず、SDK 1.9 は必須と見なす、等）は
 本物のサーバに当てないと分からないので、コンテナで立てて `SdkJellyfinGateway` の統合テストを回す。docker と ffmpeg と curl と python3 が要る。
@@ -105,65 +101,39 @@ KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTe
   --tests dev.tseki.kikidame.data.jellyfin.SdkJellyfinGatewayIntegrationTest
 ```
 
-- `up` は ffmpeg で無音の m4a を作った合成ライブラリ（番組 2 × 各回 3。同じ公開日の 2 本、タイトルが日付でない回、出演者の無い回を含む。番組 A のフォルダにだけ `folder.jpg` を置く（#282））を
+- `up` は ffmpeg で無音の m4a を作った合成ライブラリ（番組 2 × 各回 3。同じ公開日の 2 本、タイトルが日付でない回、出演者の無い回を含む。番組 A のフォルダにだけ `folder.jpg` を置く）を
   `/media` にマウントし、初期セットアップと音楽ライブラリ `radio` の作成を REST で済ませ、スキャンが終わるまで待つ。
   置き場は `$KIKIDAME_JF_DIR`（既定 `/tmp/kikidame-jf`）。ユーザーは `kikidame` / `kikidame-test`
-- ブックのライブラリ `radio-book`（#354）も作る。中身は音楽と同じ 6 本と `folder.jpg` に、各回が 1 本だけの番組 C を足したもので、
+- ブックのライブラリ `radio-book` も作る。中身は音楽と同じ 6 本と `folder.jpg` に、各回が 1 本だけの番組 C を足したもので、
   別のディレクトリ（`$KIKIDAME_JF_DIR/media-book` を `/media-book` にマウント）に置く。同じパスを 2 つのライブラリに入れると、
-  アイテムが使い回されてブックのライブラリでも Audio のまま見える（#352）ため。配信元のフォルダ（ニッポン放送）にも `folder.jpg` を置き、
+  アイテムが使い回されてブックのライブラリでも Audio のまま見えるため。配信元のフォルダ（ニッポン放送）にも `folder.jpg` を置き、
   各回が 1 本だけの番組（各回の親が配信元のフォルダになる）の画像にならないことを見る
 - `KIKIDAME_JF_LIBRARY=showcase` を付けて `media` / `up` すると、ストア向けスクリーンショット用の英語の架空ライブラリ
-  （Example FM / Example Public Radio の 5 番組、45 回。#95）になる。統合テストの期待値は日本語ライブラリ前提なので、
+  （Example FM / Example Public Radio の 5 番組、45 回）になる。統合テストの期待値は日本語ライブラリ前提なので、
   そのときは統合テストを回さない
 - 統合テストは `KIKIDAME_JELLYFIN_URL` が無ければ `Assume` でスキップするので、CI と普段の `./gradlew test` には出てこない。
   付いているときはキャッシュを使わず毎回走る（`core/data/build.gradle.kts`）
 - `JellyfinGateway` の全メソッド（ログイン・ライブラリ一覧・番組と各回の取得・1 番組の各回・番組の存在確認・ダウンロードと `Range`・
   認証切れ・到達不能）を 1 回ずつ呼ぶ。`fetchProgramImage` も呼び、番組 A は `ImageTags.Primary` と JPEG の中身、番組 B は画像なし（null）を見る。新しい版が出たら `resolve()` にタグを足して同じテストを当てる
 - ブックのライブラリ（`radio-book`）でも、一覧（AudioBook が `Album`・`AlbumArtist` のタグで 3 番組・7 本にまとまること）・1 番組の各回・番組の存在確認・
-  番組の画像（番組 A は番組のフォルダの画像、番組 B と番組 C は画像なし）・ダウンロードと `Range` を呼ぶ（#354）
-- ブックの各回の UserData（再生の共有、#355）: `writePlayState` で位置（尺の中の 7 秒）・再生済み・`LastPlayedDate` を書き、書き込みの応答・`fetchPlayState`（時間の上限なしと上限つき）・
+  番組の画像（番組 A は番組のフォルダの画像、番組 B と番組 C は画像なし）・ダウンロードと `Range` を呼ぶ
+- ブックの各回の UserData（再生の共有）: `writePlayState` で位置（尺の中の 7 秒）・再生済み・`LastPlayedDate` を書き、書き込みの応答・`fetchPlayState`（時間の上限なしと上限つき）・
   一覧（`fetchLibrary` の各回の `shared`）のどれでも同じ値で読み戻せること、再生済みにする・未再生に戻すのも同じことを見る。音楽のライブラリの一覧は UserData を載せない（`shared` が null）ことも見る。
   書いた回は最後に位置 0・未再生に書き戻す
-- 差し替え（#371、ADR 0011）: 音楽とブックのどちらのライブラリでも、ダウンロードの確かめ（`assertDownloads`）の中で、一覧の各回の版（`Etag`）が空でないことと、
+- 差し替え（ADR 0011）: 音楽とブックのどちらのライブラリでも、ダウンロードの確かめ（`assertDownloads`）の中で、一覧の各回の版（`Etag`）が空でないことと、
   `fetchFileSize`（`Range: bytes=0-0` の 206 の `Content-Range` の全長）が落とした本文の長さと同じことを見る。10.10.7 と 12.0 で通した
 - 認証は SDK が付ける `Authorization: MediaBrowser Client="Kikidame", Version="…", DeviceId="…", Device="…"` の 1 形式だけ
-  （レガシーの `X-Emby-Authorization` は送らない。2026-09-21 に記録用サーバで確認）
-- 実機（Android）からコンテナに繋ぐには、Tailscale の HTTPS（`tailscale serve`）で出す。アプリは `http://` の URL を受け付けない（`normalizeServerUrl` が `plain http is not supported` で弾く）ので、`adb reverse` で `http://localhost` につなぐ形は使えない。実機は tailnet 経由でつなぐ。
-  下の例は Jellyfin 12（`up 12`、`http://localhost:8098`）に向けたもの（#168）。`<host>.<tailnet>.ts.net` は自分のマシンと tailnet の名前に読み替える
-  1. tailnet で HTTPS 証明書を有効にする（1 回だけ）。管理画面の [DNS ページ](https://login.tailscale.com/admin/dns)で MagicDNS を有効にし、
-     HTTPS Certificates の Enable HTTPS を押す（[Tailscale の docs「Enabling HTTPS」](https://tailscale.com/docs/how-to/set-up-https-certificates)）。
-     有効にする前に `tailscale serve` を打つと「Serve is not enabled on your tailnet」と出て止まり、有効にするための URL が出る
-  2. 実機の Tailscale アプリをオンにして、tailnet に入れる
-  3. 開発機で、コンテナのポートを HTTPS で出す。sudo なしだと「Access denied: serve config denied」で止まる
-
-     ```bash
-     sudo tailscale serve --bg --https=443 http://localhost:8098
-     ```
-
-  4. `tailscale serve status` が `https://<host>.<tailnet>.ts.net (tailnet only)` / `|-- / proxy http://localhost:8098` を出し、
-     `curl` が 200 を返すことを確かめる
-
-     ```bash
-     tailscale serve status
-     curl https://<host>.<tailnet>.ts.net/System/Info/Public
-     ```
-
-  5. アプリの接続画面で URL `https://<host>.<tailnet>.ts.net`、ユーザー `kikidame` / パスワード `kikidame-test` で入る。
-     ただし「取得元を変える」は手元のデータを消すので、本番サーバに繋いだ実機では試さない
-  6. 済んだら止める（止めるのにも sudo が要る）
-
-     ```bash
-     sudo tailscale serve reset
-     ```
+  （レガシーの `X-Emby-Authorization` は送らない）
+- 実機（Android）からコンテナに繋ぐには、実機から届く HTTPS の URL が要る。アプリは `http://` の URL を受け付けない（`normalizeServerUrl` が `plain http is not supported` で弾く）ので、`adb reverse` で `http://localhost` につなぐ形は使えない。開発機のコンテナのポート（Jellyfin 12 なら `http://localhost:8098`）を、実機から届く HTTPS で公開する（リバースプロキシや、VPN の HTTPS 公開機能など。手順は使う道具による）。アプリの接続画面では、その URL とユーザー `kikidame` / パスワード `kikidame-test` で入る。ただし「取得元を変える」は手元のデータを消すので、本番のサーバに繋いだ実機では試さない
 
 確認した版（統合テスト 5 件、番組 2 / 各回 6）:
 
-| 版 | 日付 | 結果 |
-| --- | --- | --- |
-| 10.10.7 | 2026-09-21 | 通る（#97） |
-| 12.0.0 | 2026-09-21 | 通る |
+| 版 | 結果 |
+| --- | --- |
+| 10.10.7 | 通る |
+| 12.0.0 | 通る |
 
-## リリース（#94）
+## リリース
 
 配布は GitHub Releases の署名済み APK（ADR 0005）。`v*` のタグを push すると `.github/workflows/release.yml` が
 release APK をビルドし、`kikidame-<version>.apk` と R8 の `mapping-<version>.txt` を Release に添付する。
@@ -188,9 +158,9 @@ release APK をビルドし、`kikidame-<version>.apk` と R8 の `mapping-<vers
 ### 版を上げて出す
 
 1. `app/build.gradle.kts` の `versionCode`（単調増加の整数。F-Droid はこれを見る）と `versionName`（`X.Y.Z`）を上げる PR をマージする
-   - 版を上げる PR では、`fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` と `ja-JP` の同名のファイルを足す。書き方は既存のファイルに合わせ、前の版からマージされた利用者から見える変更を箇条書きにする（#339）
-   - changelog は 1 ファイル 500 文字までにし、`wc -m` で数える（#363）
-   - 版を上げる PR では、リリースした版に何が入っているかを述べた記述（例:「まだリリースした版には入っていない」「debug 版だけ」「not in the released builds」「debug build only」）を README（英日）と `docs/` で探し、出す版に合わせて直す。当たった行は人が読み、出す版と食い違う記述だけを直す（この項自身、経緯の記録、直った後の文にも当たる）（#223）
+   - 版を上げる PR では、`fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` と `ja-JP` の同名のファイルを足す。書き方は既存のファイルに合わせ、前の版からマージされた利用者から見える変更を箇条書きにする
+   - changelog は 1 ファイル 500 文字までにし、`wc -m` で数える
+   - 版を上げる PR では、リリースした版に何が入っているかを述べた記述（例:「まだリリースした版には入っていない」「debug 版だけ」「not in the released builds」「debug build only」）を README（英日）と `docs/` で探し、出す版に合わせて直す。当たった行は人が読み、出す版と食い違う記述だけを直す（この項自身、直った後の文にも当たる）
      ```bash
      grep -rnE "リリースした版|リリース版|released build|release build|debug 版だけ|debug 版のみ|debug build only|debug builds? only" README*.md docs
      ```
@@ -201,81 +171,6 @@ release ビルドは R8 と resource shrinking を有効にしている（APK �
 ライブラリの consumer rules で足りていて `app/proguard-rules.pro` は最小限。縮小で壊れたら、`mapping-<version>.txt` でスタックトレースを戻せる。
 `res/raw/aboutlibraries.json` はコードから参照しているので shrinker に消されない（消えたら設定のライセンス一覧が空になる）。
 
-## 並行作業（複数の Claude Code セッション）
-
-方針は `~/.claude/CLAUDE.md` の「Parallel Work」（作業セッションは全部 worktree、main のチェックアウトは統合専用、作業セッションの閉じ方もそこ）。
-main のチェックアウトから fork subagent に並列で実装させて回す手順は、共通 skill `/supervise`（dotfiles）にある。skill はこの repo 固有の手順として下の「Supervisor」節を読む。人が立ち上げる別セッションで作業するときも、worktree の準備は同じ節に従う。
-
-実機は 1 台。触るのは Supervisor（main のチェックアウトにいるセッション）だけで、作業セッションは実機を触らない（触るならひと言告げる）。
-
-## Supervisor
-
-`/supervise`（dotfiles の共通 skill）が読む repo 固有の手順（どの repo でも同じ部分は #128 で skill に移した）。
-
-### worktree の準備
-
-- fork の worktree は repo 直下の `.claude/worktrees/`（`.gitignore` 済み）に切られる
-- worktree には `local.properties`（git 管理外）を置かない。コピーしない（`cp` が auto mode の分類器に止められたことがある。#163）。`local.properties` の中身は `sdk.dir` の 1 行だけなので、代わりに環境変数 `ANDROID_HOME` で SDK を渡す
-- Gradle は `ANDROID_HOME=~/Android/Sdk JAVA_HOME=~/.local/jdk/current ./gradlew <タスク>` の形で回す（例: `./gradlew :app:assembleDebug`。#163）。`build/` は worktree ごとに別なので初回ビルドが重い。`~/.gradle` のキャッシュは共有されるので依存の再ダウンロードは無い
-- Gradle のデーモンも `~/.gradle` 単位で、main と全 worktree が共有している。ほかの worktree でビルドが走っている間は `./gradlew --stop` を打たない（走っているビルドが `Gradle build daemon has been stopped: stop command received` で落ちる。#188）。検証用の worktree は `--stop` なしで `git worktree remove` してよい
-- issue の「触るファイル」と完了条件に、次を入れる（入れ忘れると PR のレビューで指摘されて直すことになる）
-  - 画面（UI）を変える issue: `docs/ui.md` と `docs/claude-code-handoff.md` の該当箇所（#156）
-  - CI（`.github/workflows/ci.yml` の job・ステップ）を変える issue: 「マージ前の検証」の 1 の CI の列挙（#219）。検査を足す issue は、完了条件に「違反を入れた一時コミットで足したステップが落ちる run と、revert 後に全チェックが通る run の URL を PR の本文に書く」も入れる（#326）。また、このファイルの「ビルド・テスト」節の検査の説明の段落（`scripts/check-doc-script-refs.sh` の段落と同じ形。何を落とすか、手元でも repo 直下で流せること、テストも CI で流すこと）も「触るファイル」と完了条件に入れる（#330）
-  - 挙動を変える issue: `docs/device-checklists.md` の実機チェックリストの項目（未確認の `- [ ]`）（#294）
-  - 用語の意味や利用者向けの説明が変わる issue: `CONTEXT.md` と README（`README.md` と `README.ja.md` の両方）（#294）と、ストアの説明文 `fastlane/metadata/android/*/full_description.txt`（`en-US` と `ja-JP` の両方）（#359）
-- 挙動を変える issue で、既存のチェック済みの項目（`[x]`）が今の挙動と合わなくなるときは、記録の文は書き換えず、項目の末尾に当時の確認と分かる印（例: 「（当時の確認。#281 でボタンをなくした）」）を足す。これも「触るファイル」と完了条件に入れる（#297）
-- チェックリストの最後の未確認の項目（`- [ ]`）を `[x]` にした（または見送りの印を足した）PR は、同じ PR でそのチェックリストを `docs/device-checklists.md` から `docs/device-checklists-archive.md` へ、文を変えずに移す（前置きの、確認した日・端末・サーバの版も一緒に移す）。実機では確かめないと決めた項目は、箱は `[ ]` のまま変えず、末尾に「（実機では見送り: <理由・担保しているテスト>）」の印を足す。この印の付いた `[ ]` は済んだと数える（#305）
-- 担当は「同じファイルを触らない」単位で分ける（#81）
-
-### マージ前の検証
-
-docs だけの PR は 1（CI）だけ。2〜6 はアプリに変更がある PR で行う。Renovate の PR をどちらに数えるかは「マージの承認」に従う。Renovate の PR には担当の worker がいないので、2 のビルドは Supervisor が検証用の worktree で行う（`/supervise` の手順 7）。
-
-1. CI（`test` job の ADR の一覧の検査（`scripts/check-adr-index.sh`）と ADR の注記の形の検査（`scripts/check-adr-notes.sh`）と docs のインラインコードの .sh の検査（`scripts/check-doc-script-refs.sh`）と `./gradlew lintKotlin`（ktlint。未使用 import と連続した空行）と `./gradlew test` と `./gradlew :app:lintDebug` と `./gradlew :core:domain:animalsnifferMain`、`release-build` job の署名なしの `./gradlew :app:assembleRelease` と `aboutlibraries.json` の鮮度の検査）が通っている
-   - release ビルド（R8 の minify・resource shrink を含む）は CI の `release-build` が PR ごとに試すので、PR のたびに手元で `assembleRelease` を流して確かめなくてよい。署名と APK の配布はリリース手順（「リリース」節）で行う
-   - `release-build` は `exportLibraryDefinitions` を流し、`app/src/main/res/raw/aboutlibraries.json` に差分が出ると落ちる。ログに差分と直し方（`./gradlew :app:exportLibraryDefinitions` を流して `app/src/main/res/raw/aboutlibraries.json` をコミットする）が出る。自動ではコミットしない
-   - Renovate の PR でこの検査が落ちたら、Supervisor が worker を起動し、Renovate のブランチに再生成のコミットを積ませる。`/supervise` の「bot の版更新 PR のブランチには積まない」の例外（#187・t-seki/dotfiles#349）
-   - CI の job・ステップに検査を足す PR は、「違反があると足したステップが落ちる」ことを CI の run で確かめ、次の 2 つの run の URL を PR の本文に書く（手元の再現では代えない。#326）。URL は [`worker-pr-status.sh`](https://github.com/t-seki/dotfiles/blob/main/claude/.claude/skills/supervise/scripts/worker-pr-status.sh) の `check:` の行の link から取る
-     - 違反を入れた一時コミットで、足したステップが落ちる run
-     - その一時コミットを revert したコミットで、全チェックが通る run
-2. 担当の fork に `./gradlew :app:assembleDebug` を頼み（「worktree の準備」の形で、`ANDROID_HOME` と `JAVA_HOME` を付けて回す）、APK のフルパス（`<worktree>/app/build/outputs/apk/debug/app-debug.apk`）を報告させる
-3. Supervisor が `$ADB install -r <APK>` で実機の **debug 版**に入れる。debug 版は applicationId が `dev.tseki.kikidame.debug`、アプリ名が「Kikidame (debug)」で、普段使いの **release 版**（`dev.tseki.kikidame`、Releases の APK）とは別アプリとして並ぶ。release 版には触らない
-4. Room のスキーマを上げる PR も入れてよい（影響は debug 版に閉じる）。その後にスキーマの古いビルドを入れてダウングレードで落ちたら、`$ADB uninstall dev.tseki.kikidame.debug` してから入れ直す（debug 版のログイン・DB・手元のファイルが消える）
-5. 画面で確かめられる点は、先に Supervisor が debug 版の画面を撮り、UI の文字を読み、タップして確かめる（手順と、`android layout` を使わない理由（Play プロテクトのブロック）は [device-testing.md の「Supervisor が debug 版の画面を確かめる」](device-testing.md#supervisor-が-debug-版の画面を確かめる319)）。消す・書き換えるなど取り消せない操作は分類器に止められる前提で、打たずに人に頼む。再生画面を開く操作は音が出るので避ける
-6. 人に実機で見てほしい点を PR ごとに示す。再生画面を開く確認は音が出るので避ける（出すなら実機の音量をハードキーで 0 にしてから）
-
-debug 版は初回（とアンインストールの後）にサーバへのログインと同期が要る。以後は `install -r` でデータが残る。
-
-### マージの承認
-
-承認制。
-
-- アプリに変更がある PR: ビルドを実機の debug 版に入れ、人が見てからマージする
-- docs だけの PR: これも承認制。実機の確認は無く、人が差分を見て決める
-- Renovate の PR（依存の更新）は、APK に入るかどうかで分ける。どちらも承認制で、自動マージはしない
-  - 承認の仕方: APK に入る Gradle の依存・プラグイン（`gradle/libs.versions.toml`、`build.gradle.kts` 系。AGP、Kotlin、Media3、Room など）の更新は、アプリに変更がある PR と同じく実機の debug 版で見てから承認する。GitHub Actions・Gradle wrapper・統合テスト用のコンテナだけの更新は、docs だけの PR と同じく CI と差分を見て承認する。両方が 1 つの PR に混ざるとき（preset は minor / patch を 1 つの PR にまとめる）は、実機で見る側に倒す
-  - 自動マージを切っている理由: 共通の preset（`local>t-seki/renovate-config`）は minor / patch と pin / pinDigest / digest の更新を自動マージする。この repo の auto-merge は無効（`allow_auto_merge: false`）で、Renovate は「platform の auto-merge が使えないときは Renovate 自身の自動マージに切り替える」（Renovate の docs、configuration-options の `platformAutomerge`）ため、CI が通っただけで実機の確認なしにマージされうる
-  - 切っている場所: `renovate.json` の `packageRules`（`matchPackageNames: ["*"]` で `automerge` / `platformAutomerge` を false にして、preset の設定を上書きしている）
-
-### マージ後の確認（デプロイ）
-
-docs だけの PR は `git pull --ff-only` までで、以下は行わない。以下はアプリに変更がある PR をマージしたとき。
-Renovate の PR をどちらに数えるかは「マージの承認」に従う。
-
-- main で `git pull --ff-only` した後、`./gradlew :app:installDebug` で debug 版を main のビルドに入れ直す（接続は [device-testing.md](device-testing.md) の「実機で試す（M1）」）
-- Room のスキーマを上げた PR をマージした後は、それより古い debug ビルドを入れない（入れるなら先にアンインストールする）
-- release 版は、Supervisor がマージのたびに触るものではない。更新は「リリース」節の手順（タグ → Releases → Obtainium / `adb install -r`）で行う
-
-### 大きさの基準
-
-`259 行・25605 バイト（d8886a9）`
-
-この development.md の大きさの基準（測り方と値の形は [REPO-SECTION.md の「大きさの基準」](https://github.com/t-seki/dotfiles/blob/main/claude/.claude/skills/supervise/REPO-SECTION.md#大きさの基準)）。
-
 ## 実機の確認
 
-実機の手順とチェックリストは、#305 で別のファイルに分けた。
-
-- 手順（WSL2 の adb の接続、裏の同期をすぐ起こす、Android Auto（DHU）、共有フォルダ・端末のフォルダの準備、手元のファイルと DB の突き合わせなど）: [device-testing.md](device-testing.md)
-- 未確認の項目が残るチェックリスト: [device-checklists.md](device-checklists.md)
-- 済んだチェックリスト（M1・M2・M3-a・M3-b・M3-c）: [device-checklists-archive.md](device-checklists-archive.md)
+実機の手順（adb でのワイヤレスデバッグの接続、裏の同期をすぐ起こす、Android Auto（DHU）、共有フォルダ・端末のフォルダの準備、手元のファイルと DB の突き合わせなど）は [device-testing.md](device-testing.md)。
