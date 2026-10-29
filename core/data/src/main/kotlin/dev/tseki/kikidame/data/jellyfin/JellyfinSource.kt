@@ -16,9 +16,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Jellyfin のライブラリ（音楽かブック。#354）を取得元（[SourceGateway]）として見せる（ADR 0010）。
+ * Jellyfin のライブラリ（音楽かブック。#354）を取得元（[SourceGateway]）として見せる（ADR 0007）。
  * 認証の情報（[ServerCredentials]）とライブラリは、呼ばれるたびに [SessionStore] から読む。
- * 番組についての呼び出しは、ライブラリの種類で番組の組み方が変わるので、選んだライブラリも渡す（ADR 0013 の決定 2）。
+ * 番組についての呼び出しは、ライブラリの種類で番組の組み方が変わるので、選んだライブラリも渡す（ADR 0010 の決定 2）。
  */
 @Singleton
 class JellyfinSource @Inject constructor(

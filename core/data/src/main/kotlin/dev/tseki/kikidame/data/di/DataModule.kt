@@ -154,7 +154,7 @@ abstract class RepositoryModule {
     @Binds
     abstract fun bindJellyfinGateway(impl: SdkJellyfinGateway): JellyfinGateway
 
-    /** 取得元は Jellyfin か共有フォルダ（ADR 0010）。今の接続の種類で振り分ける。 */
+    /** 取得元は Jellyfin か共有フォルダ（ADR 0007）。今の接続の種類で振り分ける。 */
     @Binds
     abstract fun bindSourceGateway(impl: SessionSourceGateway): SourceGateway
 

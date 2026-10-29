@@ -23,7 +23,7 @@ import org.junit.runner.RunWith
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-/** Jellyfin の取得元（ADR 0010）。認証の情報とライブラリを [dev.tseki.kikidame.data.session.SessionStore] から読んで渡す。 */
+/** Jellyfin の取得元（ADR 0007）。認証の情報とライブラリを [dev.tseki.kikidame.data.session.SessionStore] から読んで渡す。 */
 @RunWith(AndroidJUnit4::class)
 class JellyfinSourceTest {
     @get:Rule

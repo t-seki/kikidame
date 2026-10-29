@@ -4,7 +4,7 @@ import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.RefreshResult
 import dev.tseki.kikidame.text.UiText
 
-// 更新・同期の結果を [UiText] にする純粋な関数（`LibraryRefresher` が流す文言。文字列への解決は ui/ だけ。ADR 0009）。
+// 更新・同期の結果を [UiText] にする純粋な関数（`LibraryRefresher` が流す文言。文字列への解決は ui/ だけ。ADR 0006）。
 
 /** 「N 回をダウンロード予約、M 回を削除」。0 のものは省く。何も無ければ null。区切りは [R.string.common_list_separator]。 */
 private fun RefreshResult.actionsText(): UiText? {

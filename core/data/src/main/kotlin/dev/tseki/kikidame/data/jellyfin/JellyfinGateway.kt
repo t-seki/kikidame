@@ -20,13 +20,13 @@ fun Session.credentials(): ServerCredentials = ServerCredentials(serverUrl, acce
 /**
  * Jellyfin サーバとの境界。SDK への依存はこの実装にだけ閉じ込め、Repository のテストはフェイクで行う。
  * 失敗はすべて [SourceException] に正規化する。同期とダウンロードはこれを直接使わず、
- * 取得元の境界（[dev.tseki.kikidame.data.source.SourceGateway]）の Jellyfin の実装（[JellyfinSource]）を通す（ADR 0010）。
+ * 取得元の境界（[dev.tseki.kikidame.data.source.SourceGateway]）の Jellyfin の実装（[JellyfinSource]）を通す（ADR 0007）。
  *
- * 番組の組み方はライブラリの種類（[SelectedLibrary.kind]）で変わる（ADR 0013 の決定 2）。
+ * 番組の組み方はライブラリの種類（[SelectedLibrary.kind]）で変わる（ADR 0010 の決定 2）。
  * 音楽のライブラリは番組が MusicAlbum、各回が Audio で、番組の取得元 ID は MusicAlbum の id。
  * ブックのライブラリは各回が AudioBook で、番組は各回の Album と AlbumArtist のタグでまとめ、番組の取得元 ID は `<AlbumArtist>/<Album>`。
  * そのため番組についての呼び出しは、ライブラリ（id と種類）を受け取る。
- * ブックのライブラリの一覧は、各回の UserData を [SourceEpisode.shared] に載せる（再生の共有、ADR 0013）。各回の UserData の 1 件ずつの読み書きは
+ * ブックのライブラリの一覧は、各回の UserData を [SourceEpisode.shared] に載せる（再生の共有、ADR 0010）。各回の UserData の 1 件ずつの読み書きは
  * [fetchPlayState] と [writePlayState]（`PlaybackSharing` が使う。同期とダウンロードの境界 [dev.tseki.kikidame.data.source.SourceGateway] は通らない）。
  */
 interface JellyfinGateway {
@@ -47,7 +47,7 @@ interface JellyfinGateway {
     suspend fun fetchProgram(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId): SourceProgram?
 
     /**
-     * 番組の画像の中身を取る（#282、ADR 0012）。音楽のライブラリは MusicAlbum の Primary、ブックのライブラリは番組のフォルダ（Folder）の
+     * 番組の画像の中身を取る（#282、ADR 0009）。音楽のライブラリは MusicAlbum の Primary、ブックのライブラリは番組のフォルダ（Folder）の
      * Primary（#354）。画像が無い・大きすぎるときは null。版は [SourceProgram.image]（Primary の ImageTag）で、取り直すかは呼び出し側が決める。
      */
     suspend fun fetchProgramImage(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId): ByteArray?
@@ -60,19 +60,19 @@ interface JellyfinGateway {
     suspend fun openDownload(credentials: ServerCredentials, episodeSourceId: SourceItemId, rangeStart: Long): DownloadStream
 
     /**
-     * 原本のファイルの大きさ（ADR 0014、#371）。`/Items/{id}/Download` に `Range: bytes=0-0` を付けて、`Content-Range` の全長から取る
+     * 原本のファイルの大きさ（ADR 0011、#371）。`/Items/{id}/Download` に `Range: bytes=0-0` を付けて、`Content-Range` の全長から取る
      * （HEAD は 405 で使えない。10.10.7 と 12.0 で確かめた）。全長が分からなければ null。
      */
     suspend fun fetchFileSize(credentials: ServerCredentials, episodeSourceId: SourceItemId): Long?
 
     /**
-     * 各回の UserData（再生位置・再生済み・`LastPlayedDate`）を読む（**再生の共有**、ADR 0013 の決定 5）。ブックのライブラリの各回にだけ使う。
+     * 各回の UserData（再生位置・再生済み・`LastPlayedDate`）を読む（**再生の共有**、ADR 0010 の決定 5）。ブックのライブラリの各回にだけ使う。
      * [timeout] があれば、それまでに返らなければ [SourceException.Unreachable]（▶ の直前の読み込み。失敗したら手元の値で鳴らす）。
      */
     suspend fun fetchPlayState(credentials: ServerCredentials, episodeSourceId: SourceItemId, timeout: Duration? = null): SharedPlayState
 
     /**
-     * 各回の UserData に [state] を `POST /UserItems/{itemId}/UserData` で書き（ADR 0013 の決定 3。再生の報告は使わない）、
+     * 各回の UserData に [state] を `POST /UserItems/{itemId}/UserData` で書き（ADR 0010 の決定 3。再生の報告は使わない）、
      * サーバが返した書いた後の値を返す。呼び出し側は、返した値を「最後に見たサーバの値」にする（送った値ではなく）。
      */
     suspend fun writePlayState(credentials: ServerCredentials, episodeSourceId: SourceItemId, state: SharedPlayState): SharedPlayState

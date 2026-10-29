@@ -56,7 +56,7 @@ data class ScannedFileRow(
     val sourceFileSize: Long,
     val sourceModifiedAt: Instant,
 )
-/** 差し替え（ADR 0014、#371）を考える手元の回: 手元にあり（DONE でパスがある）、取得元 ID を持ち、まだ差し替えを予約していない回。 */
+/** 差し替え（ADR 0011、#371）を考える手元の回: 手元にあり（DONE でパスがある）、取得元 ID を持ち、まだ差し替えを予約していない回。 */
 data class ReplaceCandidateRow(
     val episodeId: Long,
     val sourceItemId: String,
@@ -108,7 +108,7 @@ interface ProgramDao {
     suspend fun listAll(): List<ProgramEntity>
     @Query("UPDATE programs SET goneSince = :at WHERE id = :id")
     suspend fun setGoneSince(id: Long, at: Instant?)
-    /** 番組の画像（ADR 0012）の版とファイルを書く。画像を持たなくなったらどちらも null。 */
+    /** 番組の画像（ADR 0009）の版とファイルを書く。画像を持たなくなったらどちらも null。 */
     @Query("UPDATE programs SET imageVersion = :version, imagePath = :path WHERE id = :id")
     suspend fun setImage(id: Long, version: String?, path: String?)
     /** 手元に持っている番組の画像のファイル（どの行からも指されていないファイルを消すのに使う）。 */
@@ -235,7 +235,7 @@ interface EpisodeDao {
     suspend fun update(episode: EpisodeEntity)
     @Query("UPDATE episodes SET sizeBytes = :sizeBytes WHERE id = :id")
     suspend fun updateSize(id: Long, sizeBytes: Long)
-    /** 一覧で最後に見たファイルの版（ADR 0014）。 */
+    /** 一覧で最後に見たファイルの版（ADR 0011）。 */
     @Query("SELECT sourceVersion FROM episodes WHERE id = :id")
     suspend fun findSourceVersion(id: Long): String?
     @Query("DELETE FROM episodes WHERE id = :id")
@@ -248,7 +248,7 @@ interface LocalFileDao {
     /**
      * 手元のファイルの合計（#42）。sizeBytes はダウンロード完了時に実サイズで上書きされている
      * （`SdkJellyfinGateway` はサイズを返さないので、同期の取り込みで上書きされることはない。返すようにするなら DONE の行は守ること。
-     * 差し替えのために問い合わせた大きさ（ADR 0014）は `SourceEpisode.sizeBytes` に載せない）。
+     * 差し替えのために問い合わせた大きさ（ADR 0011）は `SourceEpisode.sizeBytes` に載せない）。
      */
     @Query(
         """
@@ -293,7 +293,7 @@ interface LocalFileDao {
     suspend fun listByState(state: DownloadState): List<LocalFileEntity>
     /**
      * キューの先頭: 手動（固定）の予約が常に先、その中はキューに入れた順（FIFO）。
-     * 差し替えの予約（`replaceState = 'PENDING'`、ADR 0014）も同じ待ち行列に入る。差し替えは同期の予約なので、固定した回の差し替えでも手動の予約の後に並ぶ。
+     * 差し替えの予約（`replaceState = 'PENDING'`、ADR 0011）も同じ待ち行列に入る。差し替えは同期の予約なので、固定した回の差し替えでも手動の予約の後に並ぶ。
      * `enqueuedAt` は v3 で足した nullable なので NULL を先頭に来させない。同時刻は公開日の新しい順で安定させる。
      */
     @Query(
@@ -350,7 +350,7 @@ interface LocalFileDao {
     @Query("UPDATE local_files SET state = 'FAILED', attemptCount = attemptCount + 1, lastAttemptAt = :at WHERE episodeId = :episodeId")
     suspend fun markFailed(episodeId: Long, at: Instant)
 
-    // 差し替え（ADR 0014、#371）。どれも state（DONE）には触らない。上と同じく 1 回の更新を 1 つの文で行う
+    // 差し替え（ADR 0011、#371）。どれも state（DONE）には触らない。上と同じく 1 回の更新を 1 つの文で行う
     /** 落としたときの版を書く（差し替えずに、中身が同じと分かったとき）。手元にある行だけ。 */
     @Query("UPDATE local_files SET sourceVersion = :version WHERE episodeId = :episodeId AND state = 'DONE'")
     suspend fun setSourceVersion(episodeId: Long, version: String)
@@ -373,7 +373,7 @@ interface LocalFileDao {
     @Query("UPDATE local_files SET replaceState = 'PENDING' WHERE replaceState = 'RUNNING'")
     suspend fun resetRunningReplacements()
 }
-/** 再生の共有（ADR 0013）の突き合わせに使う、各回の取得元 ID とその再生の状態の行（無ければ null）。 */
+/** 再生の共有（ADR 0010）の突き合わせに使う、各回の取得元 ID とその再生の状態の行（無ければ null）。 */
 data class SharedPlaybackRow(
     val episodeId: Long,
     val sourceItemId: String,
@@ -442,7 +442,7 @@ interface PlaybackStateDao {
         sentUpdatedAt: Instant,
     )
 
-    /** 突合で取得元 ID が変わった回（ADR 0013 の決定 7、#352 の決定 8）。未送信にし、前の ID で見た値は忘れる。 */
+    /** 突合で取得元 ID が変わった回（ADR 0010 の決定 7、#352 の決定 8）。未送信にし、前の ID で見た値は忘れる。 */
     @Query(
         """UPDATE playback_states SET sharePending = 1, sharedPositionTicks = NULL, sharedPlayed = NULL, sharedLastPlayedAt = NULL
         WHERE episodeId = :episodeId""",

@@ -44,7 +44,7 @@ class SettingsViewModel @Inject constructor(
     library: LibraryRepository,
     playbackSharing: PlaybackSharing,
 ) : ViewModel() {
-    /** 再生の共有の最後の送受信（ADR 0013 の決定 8、#355）。Jellyfin のブックのライブラリでないときは null（行を出さない）。 */
+    /** 再生の共有の最後の送受信（ADR 0010 の決定 8、#355）。Jellyfin のブックのライブラリでないときは null（行を出さない）。 */
     val playbackShare: StateFlow<PlaybackShareStatus?> = playbackSharing.status
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 

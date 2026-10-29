@@ -9,7 +9,7 @@ import kotlin.time.Duration.Companion.microseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
-/** 再生の共有の衝突の規則（ADR 0013 の決定 4、#355）。 */
+/** 再生の共有の衝突の規則（ADR 0010 の決定 4、#355）。 */
 class PlaybackSharingRulesTest {
     private val episode = EpisodeId(1)
     private val t0 = Instant.parse("2026-10-27T00:00:00Z")
@@ -95,7 +95,7 @@ class PlaybackSharingRulesTest {
     /** 初めて見る回: 最後に見た値が無ければ、誰も再生していない値を見たとみなす。 */
     @Test
     fun `first sight of an empty server value sends the local state`() {
-        // 音楽のライブラリからブックのライブラリへ移った直後（サーバは空、手元は聴いた位置）。手元が送られる（ADR 0013 の決定 7）
+        // 音楽のライブラリからブックのライブラリへ移った直後（サーバは空、手元は聴いた位置）。手元が送られる（ADR 0010 の決定 7）
         val record = SharedPlaybackRecord(local(12.minutes, at = t1), pending = true, lastSeen = null)
         assertEquals(Decision.SendLocal(shared(12.minutes, at = t1)), PlaybackSharingRules.decide(record, SharedPlayState.EMPTY))
     }

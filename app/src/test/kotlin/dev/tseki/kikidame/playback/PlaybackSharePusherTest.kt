@@ -16,7 +16,7 @@ import org.junit.runner.RunWith
 import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.minutes
 
-/** 一時停止などの後に未送信の回を送る（再生の共有、ADR 0013 の決定 5、#355）。 */
+/** 一時停止などの後に未送信の回を送る（再生の共有、ADR 0010 の決定 5、#355）。 */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class PlaybackSharePusherTest {

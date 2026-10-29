@@ -139,7 +139,7 @@ private fun LastSyncRow(ready: SessionState.Ready?) {
 }
 
 /**
- * 「再生の共有」の行（ADR 0013 の決定 8、#355）。値は最後に共有できた時刻（無ければ「まだ共有していません」）。
+ * 「再生の共有」の行（ADR 0010 の決定 8、#355）。値は最後に共有できた時刻（無ければ「まだ共有していません」）。
  * 最後に送れなかったのがそれより新しければ、`error` の色で「<時刻> に送れませんでした: <理由>。送れなかった分は次の同期で送ります」を足す。
  * 理由は同期の失敗と同じ文言（[reason]）。通知は出さない。
  */
@@ -299,7 +299,7 @@ internal fun SettingsContent(
                 )
             }
             LastSyncRow(s as? SessionState.Ready)
-            // 再生の共有（ADR 0013 の決定 8、#355）: Jellyfin のブックのライブラリのときだけ（ほかでは null で出さない）
+            // 再生の共有（ADR 0010 の決定 8、#355）: Jellyfin のブックのライブラリのときだけ（ほかでは null で出さない）
             playbackShare?.let { PlaybackSharingRow(it) }
             HorizontalDivider()
             SectionTitle(stringResource(R.string.settings_section_download))
@@ -365,7 +365,7 @@ internal fun SettingsContent(
                     }
                 },
             )
-            // 言語（#104）。切替は OS のアプリ別言語設定（Android 13+）に任せ、ここはそこへのリンクだけ（ADR 0009）
+            // 言語（#104）。切替は OS のアプリ別言語設定（Android 13+）に任せ、ここはそこへのリンクだけ（ADR 0006）
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 ListItem(
                     modifier = Modifier.clickable {

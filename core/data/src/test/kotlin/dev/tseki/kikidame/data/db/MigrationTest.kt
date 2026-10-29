@@ -80,7 +80,7 @@ class MigrationTest {
     }
 
     /**
-     * v6→v7（ADR 0010、#196）: 列の改名（`serverItemId` → `sourceItemId`、`stationName` → `publisherName`、
+     * v6→v7（ADR 0007、#196）: 列の改名（`serverItemId` → `sourceItemId`、`stationName` → `publisherName`、
      * `airedAt` → `publishedAt`）と `playback_states.syncedAt` の削除。値と再生位置が残る。
      */
     @Test
@@ -163,7 +163,7 @@ class MigrationTest {
         }
     }
 
-    /** v8→v9: programs.imageVersion / imagePath（番組の画像、ADR 0012、#264）。既存の行は画像なし（null）で読め、値は残る。 */
+    /** v8→v9: programs.imageVersion / imagePath（番組の画像、ADR 0009、#264）。既存の行は画像なし（null）で読め、値は残る。 */
     @Test
     fun v8ToV9AddsProgramImageColumnsAsNull() {
         helper.createDatabase(DB_NAME, 8).use { db ->
@@ -193,7 +193,7 @@ class MigrationTest {
     }
 
     /**
-     * v9→v10: playback_states.sharePending / sharedPositionTicks / sharedPlayed / sharedLastPlayedAt（再生の共有、ADR 0013、#355）。
+     * v9→v10: playback_states.sharePending / sharedPositionTicks / sharedPlayed / sharedLastPlayedAt（再生の共有、ADR 0010、#355）。
      * 既存の行は未送信（まだ一度も送っていない）で、最後に見た取得元の値なし（null）で読め、位置・再生済み・更新時刻は残る。
      */
     @Test
@@ -231,7 +231,7 @@ class MigrationTest {
     }
 
     /**
-     * v10→v11: episodes.sourceVersion、local_files.sourceVersion / replaceState / replaceVersion（差し替え、ADR 0014、#371）。
+     * v10→v11: episodes.sourceVersion、local_files.sourceVersion / replaceState / replaceVersion（差し替え、ADR 0011、#371）。
      * 既存の手元の回は版を持たず（null。更新後の最初の同期で大きさだけで比べる）、差し替えていない（null）状態で読め、ほかの列は残る。
      */
     @Test

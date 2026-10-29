@@ -53,7 +53,7 @@ interface SyncFailureNotifier {
  * ステータスバーと通知の一覧にだけ出る）。再生の通知（Media3 の `DefaultMediaNotificationProvider` のチャンネル `default_channel_id`、
  * 通知 ID 1001）とはチャンネルも通知 ID も分けている。押すとアプリを開き直して番組一覧を出す。
  *
- * 文言を `String` に解決するのは、通知を組み立てる [show] の 1 か所だけ（システムの UI へは `String` を渡すしかないため。ADR 0009 の末尾の注記）。
+ * 文言を `String` に解決するのは、通知を組み立てる [show] の 1 か所だけ（システムの UI へは `String` を渡すしかないため。ADR 0006）。
  * そこまでは [UiText] で持つ。通知が許可されていない端末では出さない（許可を求め直さない。設定の「最終同期」の行で知らせる）。
  */
 @Singleton

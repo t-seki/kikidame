@@ -330,7 +330,7 @@
     <string name="settings_last_sync_failed">Failed at %1$s: %2$s</string>
     <!-- Line under "Last sync" when the latest full sync was skipped because "Wi-Fi only" is on and the network is metered (#346). %1$s = date and time -->
     <string name="settings_last_sync_skipped">Skipped at %1$s: not on Wi-Fi</string>
-    <!-- Row under "Last sync", shown only for a Jellyfin book library: sharing the playback position and played state with the server (ADR 0013, #355) -->
+    <!-- Row under "Last sync", shown only for a Jellyfin book library: sharing the playback position and played state with the server (ADR 0010, #355) -->
     <string name="settings_playback_sharing">Playback sharing</string>
     <!-- Value of "Playback sharing": the last time positions were exchanged with the server. %1$s = date and time like "2026-10-26 14:00" -->
     <string name="settings_playback_sharing_ok">Shared at %1$s</string>
@@ -499,14 +499,14 @@
     <!-- %1$s = message from the source -->
     <string name="sync_error_server_failed">The source returned an error: %1$s</string>
 
-    <!-- ===== sync_failure: the notification shown when background sync has kept failing (#346). Resolved where the notification is built (ADR 0009 の例外) ===== -->
+    <!-- ===== sync_failure: the notification shown when background sync has kept failing (#346). Resolved where the notification is built (ADR 0006 の例外) ===== -->
     <!-- Name of the notification channel, shown in the system's notification settings for the app -->
     <string name="sync_failure_channel_name">Sync</string>
     <string name="sync_failure_notification_title">Sync is not working</string>
     <!-- %1$d = hours since the last successful sync (24), %2$s = the reason (one of the sync_error_* texts) -->
     <string name="sync_failure_notification_text">No new episodes fetched for over %1$d hours (%2$s)</string>
 
-    <!-- ===== playback: the playback service (notification / lock screen / Android Auto). Resolved by the Service itself (ADR 0009 の例外) ===== -->
+    <!-- ===== playback: the playback service (notification / lock screen / Android Auto). Resolved by the Service itself (ADR 0006 の例外) ===== -->
     <!-- Skip back by 10 seconds (the app skips 10 s, not 15 or 30) -->
     <string name="playback_skip_back">Back 10 s</string>
     <string name="playback_skip_forward">Forward 10 s</string>

@@ -22,7 +22,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
-/** ▶ の直前の読み込み（再生の共有、ADR 0013 の決定 5、#355）。 */
+/** ▶ の直前の読み込み（再生の共有、ADR 0010 の決定 5、#355）。 */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class ReadBeforePlayPlayerTest {

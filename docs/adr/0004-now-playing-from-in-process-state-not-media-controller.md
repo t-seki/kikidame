@@ -1,0 +1,18 @@
+---
+status: accepted
+date: 2026-09-18
+---
+一覧の聴いている回のマークとミニプレイヤーは「聴いている回」を知る必要があるが、これらの画面では Media3 の正規の経路である `MediaController` の購読は採らない。`MediaController` を作ると `PlaybackService` に bind してサービスが起動するため、番組一覧を開くだけで再生サービスが立ち上がり、「何も載っていなければ出さない」判定が起動と競合する。代わりに、`PlaybackService` が `Player.Listener` で書き込むプロセス内のシングルトン `NowPlaying`（同期が削除の対象から外す回を知るのにも使う）を UI が読む。再生／一時停止などの**操作**だけは `PlayerConnection` の `MediaController` を使う（ミニプレイヤーが見えている時点でサービスは生きているので、新たな起動にはならない）。
+
+- `MediaController` はサービスに bind するので、持っている限り `stopSelf()` してもサービスは破棄されない。`PlayerConnection` は利用者を数え、最後の利用者が離れたら controller を解放して bind を外す（再生画面は画面の間だけ、ミニプレイヤーは操作のあいだだけ持つ）。プロセスの寿命で持つと、一時停止してタスクを消しても `onTaskRemoved` → `stopSelf()` が効かず、聴いている回が消えない
+- 同じ経路で、聴いている回が利用者の操作なしに消えた理由（再生の失敗）もサービスから UI へ渡す（`NowPlaying.messages`）。状態ではなく 1 回きりの通知だが、プロセス内で受け渡す点は同じ
+- 範囲: 一覧とミニプレイヤーの**読み**だけ。再生画面（`PlayerViewModel`）は再生を始める画面なのでサービスが生きていて当然で、位置の追従も要るため `MediaController` を購読する
+- 前提: アプリは単一のプロセスで、Service・Worker・UI が同じ `NowPlaying` のインスタンスを見る。マルチプロセスにするときはこの決定を見直す
+- Android Auto は車載機からアプリの外で `MediaLibraryService` に bind するので、UI を開かずにサービスが起動する。プレイヤーが空のあいだ `NowPlaying` は null のままなので、一覧とミニプレイヤーの「何も載っていなければ出さない」判定は変わらない。Auto が bind している間は `onTaskRemoved` → `stopSelf()` が効かないが、これは車が操作権を持っている状態なので意図どおり
+- 再開: プレイヤーが空のとき（プロセスが死んだ後の通知の ▶、Auto の「最近」、端末の再起動の後）だけ Media3 が `onPlaybackResumption` を呼び、`PlaybackService` は Room の続きから聴く回（`LibraryRepository.getContinueListening`）から番組のキューを復元する。「聴いている回」は、復元した回がプレイヤーに載った時点で立つ（Room に「聴いている回」を書くのではなく、再生位置の記録から組み立て直す）
+- Media3 は `MediaButtonReceiver` の Manifest の宣言があるときだけ再開（SystemUI の `isRecent` と `onPlaybackResumption`）を有効にする（`MediaSessionLegacyStub.canResumePlaybackOnStart`）。SystemUI の `isRecent` はアプリの `onGetLibraryRoot` を通らず Media3 が自前のルートを返すので、コールバックの側では制御できない
+
+## 退けた案
+
+- **`MediaController` の購読** — Media3 の想定する形で、別のプロセスやほかのアプリのセッションにも使えるが、上の起動の副作用がある
+- **Room に「聴いている回」を書く** — プロセスが死んだ後も残ってしまい、「サービスが止まれば消える」という意味と合わない

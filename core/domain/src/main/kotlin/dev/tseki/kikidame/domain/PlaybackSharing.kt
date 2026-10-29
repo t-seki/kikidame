@@ -5,7 +5,7 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 /**
- * 取得元に置かれた、1 つの各回の再生位置と再生済み（**再生の共有**、ADR 0013）。Jellyfin のブックのライブラリの UserData の
+ * 取得元に置かれた、1 つの各回の再生位置と再生済み（**再生の共有**、ADR 0010）。Jellyfin のブックのライブラリの UserData の
  * `PlaybackPositionTicks`・`Played`・`LastPlayedDate`。[lastPlayedAt] は、その値を最後に書いた（再生した）時刻で、書かれていなければ null。
  */
 data class SharedPlayState(val position: Duration, val played: Boolean, val lastPlayedAt: Instant?) {
@@ -19,13 +19,13 @@ data class SharedPlayState(val position: Duration, val played: Boolean, val last
         /** 誰も再生していない各回の値（位置 0・未再生・時刻なし）。 */
         val EMPTY = SharedPlayState(Duration.ZERO, played = false, lastPlayedAt = null)
 
-        /** 手元の状態を送るときの値。`LastPlayedDate` には手元の更新時刻を入れる（ADR 0013 の決定 3）。 */
+        /** 手元の状態を送るときの値。`LastPlayedDate` には手元の更新時刻を入れる（ADR 0010 の決定 3）。 */
         fun of(state: PlaybackState): SharedPlayState = SharedPlayState(state.position, state.played, state.updatedAt)
     }
 }
 
 /**
- * 1 つの各回についての、再生の共有の手元の記録（ADR 0013 の決定 4・5）。
+ * 1 つの各回についての、再生の共有の手元の記録（ADR 0010 の決定 4・5）。
  *
  * @property local 手元の再生位置と再生済み。行が無ければ null
  * @property pending 未送信（手元で位置か再生済みが変わってから、まだ取得元に送れていない）
@@ -38,7 +38,7 @@ data class SharedPlaybackRecord(
 )
 
 /**
- * 再生の共有の衝突の規則（ADR 0013 の決定 4）。純粋関数で、I/O はしない。
+ * 再生の共有の衝突の規則（ADR 0010 の決定 4）。純粋関数で、I/O はしない。
  *
  * - 取得元が変わった: 取得元の値（位置・再生済み・`LastPlayedDate`）が、最後に見た値と違う。最後に見た値が無ければ、
  *   誰も再生していない値（[SharedPlayState.EMPTY]）を見たとみなす（初めて見る回は、取得元に値があれば「変わった」）
@@ -83,12 +83,12 @@ object PlaybackSharingRules {
         return next.takeIf { PlaybackRules.isWorthRecording(existing, it) }
     }
 
-    /** ▶ の直前の読み込みの待ち時間の上限（ADR 0013 の決定 5。目安 2 秒。#352 の決定 7）。超えたら手元の値で鳴らす。 */
+    /** ▶ の直前の読み込みの待ち時間の上限（ADR 0010 の決定 5。目安 2 秒。#352 の決定 7）。超えたら手元の値で鳴らす。 */
     val READ_BEFORE_PLAY_TIMEOUT: Duration = 2.seconds
 }
 
 /**
- * 再生の共有の最後の送受信（設定の「最終同期」の近くの 1 行。ADR 0013 の決定 8）。今のライブラリのものだけ。
+ * 再生の共有の最後の送受信（設定の「最終同期」の近くの 1 行。ADR 0010 の決定 8）。今のライブラリのものだけ。
  *
  * @property lastSucceededAt 最後に送受信できた時刻（同期での突き合わせと、一時停止などの後の送信）。無ければ null
  * @property failedAt 最後に送れなかった時刻。[lastSucceededAt] より新しいときだけ失敗を出す
