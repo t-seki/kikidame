@@ -5,7 +5,7 @@
   ],
   "packageRules": [
     {
-      "description": "kikidame では自動マージしない。preset の automerge を上書きする(docs/development.md の「マージの承認」)",
+      "description": "kikidame では自動マージしない。preset の automerge を上書きする(この repo は platform の auto-merge が無効で、そのとき Renovate は自分の自動マージに切り替えるため、実機で確かめる前にマージされないようにする)",
       "matchPackageNames": ["*"],
       "automerge": false,
       "platformAutomerge": false

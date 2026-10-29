@@ -29,16 +29,16 @@ LAN 上の端末には TCP で届くので、USB が見えない環境（WSL2 �
    ```bash
    tail -n 20 /tmp/adb.$(id -u).log
    ```
-   `SSLV3_ALERT_CERTIFICATE_UNKNOWN` なら、端末がこの PC の鍵（`~/.android/adbkey`）を知らない。1 からペアリングし直す（adb デーモンの起動時に鍵が新しく作られていて、こうなったことがある）。端末の開発者向けオプションの「ADB 認証のタイムアウトを無効にする」が OFF だと、7 日使わなかった PC の承認も切れる
+   `SSLV3_ALERT_CERTIFICATE_UNKNOWN` なら、端末がこの PC の鍵（`~/.android/adbkey`）を知らない。1 からペアリングし直す（adb デーモンの起動時に鍵が新しく作られた場合にも起きる）。端末の開発者向けオプションの「ADB 認証のタイムアウトを無効にする」が OFF だと、7 日使わなかった PC の承認も切れる
 4. インストールは Gradle から。複数に見えるときは `ANDROID_SERIAL` で接続用の名前を指定する:
    ```bash
    export JAVA_HOME=~/.local/jdk/current ANDROID_SERIAL=<接続用の IP:ポート>
    ./gradlew :app:installDebug
    ```
 
-`adb mdns services` は、adb サーバを起動した直後には何も出さず、少し待つと出たことがある（素の Linux で。原因は未確認）。空なら少し待って打ち直す。
+`adb mdns services` は、adb サーバを起動した直後には何も出さず、少し待つと出る場合がある。空なら少し待って打ち直す。
 
-マシンごとに初回は `adb pair` が要る（ペア設定は端末とマシンの組ごと）。`adb mdns services` で端末が見つからないことがあった。そのときは、端末のワイヤレスデバッグ画面に出ている IP:ポートを見て、`adb connect` する。
+マシンごとに初回は `adb pair` が要る（ペア設定は端末とマシンの組ごと）。`adb mdns services` で端末が見つからない場合がある。そのときは、端末のワイヤレスデバッグ画面に出ている IP:ポートを見て、`adb connect` する。
 
 つないだ後は、同じ端末が「IP:ポート」と「mDNS の名前（`adb-…._adb-tls-connect._tcp`）」の 2 つで `adb devices` に出ることがある。`-s` も `ANDROID_SERIAL` も無いと `more than one device` で失敗するので、`ANDROID_SERIAL` に IP:ポートを入れて export する（手順 4 と同じ）。
 
@@ -47,8 +47,6 @@ export ANDROID_SERIAL=<IP:ポート>
 $ADB devices
 $ADB shell getprop ro.product.model
 ```
-
-素の Linux でつないだ記録による手順で、この文書を書いたときには流し直していない。
 
 ### つながらないときの切り分け
 
@@ -69,7 +67,7 @@ $ADB shell getprop ro.product.model
 
 debug の APK はマシンごとの `~/.android/debug.keystore` で署名される。別のマシンでビルドした debug 版が端末に入っていると、このマシンのビルドの上書きインストールが `INSTALL_FAILED_UPDATE_INCOMPATIBLE` で失敗する（`uninstall` すればデータが消える）。消さずに続けるには、端末に入っている方のマシンの鍵をコピーする。
 
-確かめたこと: 別のマシンの鍵をコピーして `INSTALL_FAILED_UPDATE_INCOMPATIBLE` を解消した。解消後のビルドの APK で `apksigner verify --print-certs` の SHA-256 が、端末の debug 版の署名と一致した。
+鍵をコピーすると `INSTALL_FAILED_UPDATE_INCOMPATIBLE` は解消する。解消したかは、ビルドした APK の `apksigner verify --print-certs` の SHA-256 が端末の debug 版の署名と一致するかで見る。
 
 次は流していない手順の案（**未確認**）。コピーの方法は `scp` 以外でもよい。
 
@@ -177,9 +175,16 @@ $ADB logcat -d | grep -E "SyncWorker|LibraryRefresher"
 
 ### 準備（1 回だけ）
 
-1. SDK Manager（`sdkmanager --install "extras;google;auto"`、または Android Studio の SDK Tools → "Android Auto Desktop Head Unit Emulator"）で DHU を入れる。`~/Android/Sdk/extras/google/auto/desktop-head-unit` に置かれる。WSL2 では WSLg があれば GUI がそのまま出る（Linux 版のバイナリなので `chmod +x` が要ることがある）
+1. SDK Manager で DHU を入れる（Android Studio の SDK Tools → "Android Auto Desktop Head Unit Emulator" でもよい）:
+   ```bash
+   sdkmanager --install "extras;google;auto"
+   ```
+   `~/Android/Sdk/extras/google/auto/desktop-head-unit` に置かれる。WSL2 では WSLg があれば GUI がそのまま出る（Linux 版のバイナリなので `chmod +x` が要ることがある）
 2. スマホに Play から Android Auto アプリを入れ、開発者モードにする: Android Auto の設定 → 「バージョン」を 10 回タップ → 右上メニュー「開発者向け設定」→ **「提供元不明のアプリ」を ON**（debug 版の「Kikidame (debug)」も release 版も Play を通っていないので、これが無いと一覧に出ない）→ 同じメニューの「ヘッドユニット サーバーを起動」
-3. アプリを実機に入れる（`./gradlew :app:installDebug`）
+3. アプリを実機に入れる:
+   ```bash
+   ./gradlew :app:installDebug
+   ```
 
 ### つなぐ
 
@@ -256,8 +261,6 @@ Auto はブラウズツリーを開き直すたびに `onGetChildren` を呼ぶ�
   ```bash
   $ADB shell rm -r /sdcard/KikidameTest
   ```
-
-この節の手順は、試験用のフォルダをこの形で置いて確かめた。
 
 ## 手元のファイルと DB の突き合わせ
 
