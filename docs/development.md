@@ -58,6 +58,13 @@ Robolectric が SDK 37 で JDK 内部 API へアクセスするための `--add-
 Room のスキーマは `core/data/schemas/` に書き出す（`room { schemaDirectory(...) }`）。
 Entity を変えたらスキーマの版を上げ、書き出された JSON もコミットする。
 
+設定の「オープンソースライセンス」に出す依存の一覧の元データは `app/src/main/res/raw/aboutlibraries.json`。
+ビルド時には生成しない（オフラインのビルドでも同じ一覧になる）ので、依存を変えたら次で再生成してコミットする。
+
+```bash
+./gradlew :app:exportLibraryDefinitions
+```
+
 ## docs と ADR の決まり
 
 ADR（`docs/adr/`）を足したら、`docs/architecture.md` の「参照」の ADR の一覧にも足す。CI の `test` job の先頭で `scripts/check-adr-index.sh` が、`docs/adr/*.md` のファイル名が `docs/architecture.md` に出ているかを確かめ、欠けていれば名前を出して落とす（手元でも repo 直下で流せる）。一覧の文面が正しいかは確かめない。

@@ -160,4 +160,4 @@ Kotlin / Jetpack Compose / Media3 / Room / WorkManager / Hilt で書いていて
 
 [MPL-2.0](./LICENSE)（[ADR 0012](./docs/adr/0012-license-mpl-2.0.md)）。Kikidame は Jellyfin プロジェクトとは無関係の非公式クライアントで、Jellyfin の名前とロゴは Jellyfin プロジェクトのものです。
 
-サーバとの通信には [jellyfin-sdk-kotlin](https://github.com/jellyfin/jellyfin-sdk-kotlin)（LGPL-3.0）を使っています。同梱している依存ライブラリとそのライセンスの一覧はアプリ内の「設定 > オープンソースライセンス」に出ます。一覧の元データは `app/src/main/res/raw/aboutlibraries.json` で、依存を変えたら `./gradlew :app:exportLibraryDefinitions` で再生成してコミットします（ビルド時には生成しないので、オフラインのビルドでも同じ一覧になります）。
+サーバとの通信には [jellyfin-sdk-kotlin](https://github.com/jellyfin/jellyfin-sdk-kotlin)（LGPL-3.0）を使っています。同梱している依存ライブラリとそのライセンスの一覧はアプリ内の「設定 > オープンソースライセンス」に出ます。

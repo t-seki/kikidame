@@ -162,4 +162,4 @@ The documentation below is in Japanese.
 
 [MPL-2.0](./LICENSE) ([ADR 0012](./docs/adr/0012-license-mpl-2.0.md), Japanese). Kikidame is an unofficial client with no affiliation to the Jellyfin project; the Jellyfin name and logo belong to the Jellyfin project.
 
-Communication with the server uses [jellyfin-sdk-kotlin](https://github.com/jellyfin/jellyfin-sdk-kotlin) (LGPL-3.0). The list of bundled dependencies and their licenses is shown in the app under "Settings > Open source licenses". Its source data is `app/src/main/res/raw/aboutlibraries.json`; after changing dependencies, regenerate it with `./gradlew :app:exportLibraryDefinitions` and commit the result (it is not generated at build time, so offline builds produce the same list).
+Communication with the server uses [jellyfin-sdk-kotlin](https://github.com/jellyfin/jellyfin-sdk-kotlin) (LGPL-3.0). The list of bundled dependencies and their licenses is shown in the app under "Settings > Open source licenses".
