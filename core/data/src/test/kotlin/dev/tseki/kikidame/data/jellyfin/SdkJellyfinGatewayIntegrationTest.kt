@@ -186,7 +186,7 @@ class SdkJellyfinGatewayIntegrationTest {
             bytes.size.toLong()
         }
 
-        // 差し替え（ADR 0014、#371）: 一覧は Etag をファイルの版として返し、大きさは中身を落とさずに取れる
+        // 差し替え（ADR 0011、#371）: 一覧は Etag をファイルの版として返し、大きさは中身を落とさずに取れる
         assertTrue(!episode.version.isNullOrBlank(), "一覧に Etag が無い")
         assertEquals(total, gateway.fetchFileSize(credentials, episode.sourceId), "Range: bytes=0-0 の全長と本文の長さ")
 
@@ -205,7 +205,7 @@ class SdkJellyfinGatewayIntegrationTest {
     }
 
     /**
-     * ブックのライブラリ（#354、ADR 0013 の決定 2）: 各回は AudioBook で、番組は Album と AlbumArtist のタグでまとまる。
+     * ブックのライブラリ（#354、ADR 0010 の決定 2）: 各回は AudioBook で、番組は Album と AlbumArtist のタグでまとまる。
      * 番組の取得元 ID は `<AlbumArtist>/<Album>`。各回が 1 本だけの番組 C もまとまる。
      */
     @Test
@@ -305,7 +305,7 @@ class SdkJellyfinGatewayIntegrationTest {
     }
 
     /**
-     * 再生の共有（#355、ADR 0013 の決定 3）: ブックの各回の UserData に `POST /UserItems/{itemId}/UserData` で書いた位置・再生済み・
+     * 再生の共有（#355、ADR 0010 の決定 3）: ブックの各回の UserData に `POST /UserItems/{itemId}/UserData` で書いた位置・再生済み・
      * `LastPlayedDate` が、そのまま読み戻せる。5 分未満の位置（テストのファイルは 12 秒なので尺の中の 7 秒）も 0 に戻されずに残る。
      * 書いた後の値は、書き込みの応答・1 件の読み込み・一覧（同期で読む経路）のどれでも同じ（「最後に見たサーバの値」と比べるため）。
      */
@@ -335,7 +335,7 @@ class SdkJellyfinGatewayIntegrationTest {
         }
     }
 
-    /** 再生の共有は音楽のライブラリではしない（ADR 0013 の決定 1）。一覧は UserData を読まない。 */
+    /** 再生の共有は音楽のライブラリではしない（ADR 0010 の決定 1）。一覧は UserData を読まない。 */
     @Test
     fun musicLibraryDoesNotCarryUserData() = runTest {
         val credentials = signIn()

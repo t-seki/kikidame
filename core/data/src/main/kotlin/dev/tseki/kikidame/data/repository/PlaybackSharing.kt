@@ -45,7 +45,7 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 
 /**
- * **再生の共有**（ADR 0013）。取得元が Jellyfin のブックのライブラリのときだけ、各回の再生位置と再生済みを UserData と分け合う。
+ * **再生の共有**（ADR 0010）。取得元が Jellyfin のブックのライブラリのときだけ、各回の再生位置と再生済みを UserData と分け合う。
  * 音楽のライブラリ・共有フォルダ・未接続では、どの口も取得元に触らない（読みも書きもしない。決定 1）。
  *
  * - 同期（[reconcile]）: 一覧と一緒に読んだ UserData（[SourceEpisode.shared]）を、各回ごとに衝突の規則（[PlaybackSharingRules]）で

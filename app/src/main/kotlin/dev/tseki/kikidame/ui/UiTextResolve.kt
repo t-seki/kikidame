@@ -6,7 +6,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import dev.tseki.kikidame.text.UiText
 
-/** [UiText]（`text/`。型は Compose に依存しない）を文字列に解決する。解決するのは `ui/` だけ（ADR 0009）。 */
+/** [UiText]（`text/`。型は Compose に依存しない）を文字列に解決する。解決するのは `ui/` だけ（ADR 0006）。 */
 @Composable
 fun UiText.resolve(): String = when (this) {
     is UiText.Plain -> text

@@ -26,7 +26,7 @@ import javax.inject.Singleton
 
 /**
  * 今の接続（[SessionStore]）の取得元の種類に応じて、Jellyfin（[JellyfinSource]）か共有フォルダ（[SharedFolderSource]。SMB と端末のフォルダ）に振り分ける
- * [SourceGateway]（ADR 0010、#198・#199）。同期とダウンロードは、取得元の種類を知らずにこれを通る。呼ばれるたびに接続を読み直すので、
+ * [SourceGateway]（ADR 0007、#198・#199）。同期とダウンロードは、取得元の種類を知らずにこれを通る。呼ばれるたびに接続を読み直すので、
  * 取得元を変えた直後も古い取得元には触らない。
  *
  * 共有フォルダ（SMB・端末のフォルダ）は、1 回の呼び出しごとに [FolderTreeFactory] で木を作って閉じる（全走査は 1 本の接続で行い、
@@ -74,7 +74,7 @@ class SessionSourceGateway internal constructor(
         }
     }
 
-    /** 各回のファイルの大きさ（ADR 0014）。共有フォルダは呼び出しごとに木を開く。 */
+    /** 各回のファイルの大きさ（ADR 0011）。共有フォルダは呼び出しごとに木を開く。 */
     override suspend fun fetchFileSize(episodeId: SourceItemId): Long? =
         withSource { it.fetchFileSize(episodeId) }
 

@@ -32,7 +32,7 @@ sealed interface SleepTimerSetting {
 
 /**
  * スリープタイマーの置き場。再生画面が [set] で選び、[PlaybackService] の [SleepTimerRunner] が読んで実行し、
- * 進み具合（数え始め・一時停止・発火・解除）も書き戻す。プロセス内で受け渡す点は [NowPlaying] と同じ（ADR 0006）。
+ * 進み具合（数え始め・一時停止・発火・解除）も書き戻す。プロセス内で受け渡す点は [NowPlaying] と同じ（ADR 0004）。
  */
 @Singleton
 class SleepTimer @Inject constructor() {

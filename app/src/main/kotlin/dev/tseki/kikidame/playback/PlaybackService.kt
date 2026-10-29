@@ -44,9 +44,9 @@ import kotlinx.coroutines.guava.future
 import javax.inject.Inject
 import kotlin.time.Clock
 /**
- * 通知・ロック画面を持つ再生サービス。再生専用（ADR 0003）。
+ * 通知・ロック画面を持つ再生サービス。再生専用（ADR 0002）。
  * Android Auto（#96）には [MediaLibraryService] として [BrowseTree] を出す。Auto は車載機からアプリの外で bind するので、
- * 画面を開かずにこのサービスが起動する経路がある（ADR 0006 の addendum）。
+ * 画面を開かずにこのサービスが起動する経路がある（ADR 0004）。
  */
 // Media3 の MediaLibrarySession / LibraryResult は unstable API。クラス単位で opt-in する（#111）
 @OptIn(UnstableApi::class)
@@ -120,7 +120,7 @@ class PlaybackService : MediaLibraryService() {
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        // 再生の共有（ADR 0013、#355）: セッションには ▶ の直前に取得元の値を読むプレイヤーを渡す。ほかの部品は ExoPlayer を直接見る
+        // 再生の共有（ADR 0010、#355）: セッションには ▶ の直前に取得元の値を読むプレイヤーを渡す。ほかの部品は ExoPlayer を直接見る
         val sessionPlayer = ReadBeforePlayPlayer(player, scope, playbackSharing::refreshBeforePlay)
         // ▶ の直前の読み込みを待っている間に出力先が外れたら、待っていた ▶ を取り消す（#358）。鳴っている最中は ExoPlayer の
         // setHandleAudioBecomingNoisy(true) に任せる（sessionPlayer は待っていなければ何もしない）
@@ -237,7 +237,7 @@ class PlaybackService : MediaLibraryService() {
          * 再開（#108）: プレイヤーが空のとき（プロセス死後の通知の ▶、Auto の「最近」、端末の再起動後）に
          * 最後に聴いていた回を復元する。「続きから」の各回（[dev.tseki.kikidame.domain.LibraryRepository.getContinueListening]）の
          * 先頭から、[onSetMediaItems] と同じ番組のキューを組む。無ければ空のリスト（Media3 の既定と同じ扱い）。
-         * 「聴いている回」（ADR 0006）はこの結果がプレイヤーに載った時点で立つ。
+         * 「聴いている回」（ADR 0004）はこの結果がプレイヤーに載った時点で立つ。
          */
         override fun onPlaybackResumption(
             mediaSession: MediaSession,

@@ -16,7 +16,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * 再生の共有（ADR 0013 の決定 5、#355）の「▶ の直前の読み込み」。セッションに渡すプレイヤーで、鳴らし始める（playWhenReady を立てる）前に
+ * 再生の共有（ADR 0010 の決定 5、#355）の「▶ の直前の読み込み」。セッションに渡すプレイヤーで、鳴らし始める（playWhenReady を立てる）前に
  * [refresh] で取得元の値を 1 回だけ読み、取得元の値を採ると決まったら、その位置（[PlaybackRules.resumePosition]）へ移ってから鳴らす。
  * 一時停止からの再開も同じ。画面・通知・Android Auto・ヘッドセットのボタンのどれから押しても、ここを通る。
  *

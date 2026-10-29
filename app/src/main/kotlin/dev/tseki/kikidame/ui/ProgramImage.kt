@@ -14,7 +14,7 @@ import dev.tseki.kikidame.domain.ProgramImage
 import java.io.File
 
 /**
- * 番組の画像（CONTEXT.md、ADR 0012）。手元のファイル（[ProgramImage.path]）を Coil で非同期に読み、[modifier] の大きさに [contentScale] で出す（既定は切り抜き。再生画面だけ切らずに全体を出す、#301）。
+ * 番組の画像（CONTEXT.md、ADR 0009）。手元のファイル（[ProgramImage.path]）を Coil で非同期に読み、[modifier] の大きさに [contentScale] で出す（既定は切り抜き。再生画面だけ切らずに全体を出す、#301）。
  * 何の画像かは隣の番組名で分かるので、読み上げの説明は付けない。読めなかったときも代わりの絵は置かない（`docs/ui.md` の原則）。
  * 画像が無い番組で呼ばない（場所を空けるか詰めるかは呼び出し側が決める）。
  */

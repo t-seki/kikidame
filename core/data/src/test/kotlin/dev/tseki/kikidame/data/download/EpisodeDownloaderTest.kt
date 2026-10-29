@@ -48,7 +48,7 @@ class EpisodeDownloaderTest {
         override suspend fun markFailed(episodeId: EpisodeId) { state = DownloadState.FAILED; failures++ }
         override suspend fun isStillWanted(episodeId: EpisodeId): Boolean = wanted
 
-        /** 差し替え（ADR 0014）。予約中・落としている最中は [replaceState]、確定・断念で null。 */
+        /** 差し替え（ADR 0011）。予約中・落としている最中は [replaceState]、確定・断念で null。 */
         var replaceState: DownloadState? = null
         var replacedSize: Long? = null
         var abandoned = 0
@@ -85,7 +85,7 @@ class EpisodeDownloaderTest {
         )
     }
 
-    /** 差し替え（ADR 0014）の行: DONE で今のファイル（[current]）があり、差し替えを予約してある。 */
+    /** 差し替え（ADR 0011）の行: DONE で今のファイル（[current]）があり、差し替えを予約してある。 */
     private fun replacing(current: ByteArray): EpisodeWithState {
         val it = item()
         File(it.localFile!!.path!!).apply { parentFile!!.mkdirs(); writeBytes(current) }

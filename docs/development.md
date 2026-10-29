@@ -77,16 +77,16 @@ ADR（`docs/adr/`）を足したら、`docs/claude-code-handoff.md` の「参照
 
 同じく `test` job で `scripts/check-doc-script-refs.sh`（#328）が、`docs/**/*.md` と `README*.md` のインラインコード（バッククォートに挟まれた範囲を前から順に拾う。span の中にバッククォートがあるとずれることがある）に書かれたシェルスクリプトのファイル名が、repo の中にもリンクの中にも無いと落とす。見るのは空白で区切った語のうち末尾が拡張子 sh のもので、repo 直下、またはその Markdown のあるフォルダからの相対パスにファイルが無く、`[…](…)` の形のリンクの中にも無いものを落とす（`~/…`・`$HOME/…`・glob のようなパスの形でない語も、ファイルが無いとして落とす。コードブロックの中は見ない）。直し方は、repo の中のスクリプトは `scripts/check-adr-index.sh` のようにパス付きで書き、ほかの repo のものは `https://…` のリンクにする。手元でも repo 直下で流せる。落ちる例と通る例は `scripts/test-check-doc-script-refs.sh` が流す（これも CI で流す）。リンク先の URL が実在するかは確かめない。
 
-既存の ADR を改めるときは、本文を書き換えず、末尾に注記を足す。改名で本文の名前が古くなるときも同じで、本文は当時の記述のまま残す（#196・#268）。すでに本文を直した ADR（0008・0010）は書き直さない（#268）。
-- 注記の形は CI の `scripts/check-adr-notes.sh` が確かめる（#324）。段落で書くのは改名の注記と移動の注記（ADR 0010 の「移動の注記（#305）:」）だけで、決定や事実の注記は下の箇条書きにする
-- 改名の注記の形: 「改名の注記（#239）: 上の本文の `X` は、その後 `Y` に改めた。本文は当時の記述のまま残している。」の段落で書き、末尾に句点を付ける（例: ADR 0010 の末尾）
-- 末尾の注記の形: `- <日付> <出どころ>: …` の箇条書きの 1 項目にし、項目の末尾に句点（。）を付けない。項目の途中の文の区切りには句点を使ってよい（例: ADR 0004 の末尾）（#294）
+既存の ADR を改めるときは、本文を書き換えず、末尾に注記を足す。改名で本文の名前が古くなるときも同じで、本文は当時の記述のまま残す（#196・#268）。
+- 注記の形は CI の `scripts/check-adr-notes.sh` が確かめる（#324）。段落で書くのは改名の注記と移動の注記だけで、決定や事実の注記は下の箇条書きにする
+- 改名の注記の形: 「改名の注記（#239）: 上の本文の `X` は、その後 `Y` に改めた。本文は当時の記述のまま残している。」の段落で書き、末尾に句点を付ける
+- 末尾の注記の形: `- <日付> <出どころ>: …` の箇条書きの 1 項目にし、項目の末尾に句点（。）を付けない。項目の途中の文の区切りには句点を使ってよい（#294）
 - 決定そのものや事実が変わるときも、同じ ADR の末尾に日付と出どころ（issue か ADR の番号）を添えた 1 行を足す
 - 新しい ADR を足すか、元の ADR の末尾に注記を足すかの境目（#274）: 決定の核（ADR の題が言っていること）が取り消される・別のものに置き換わるときは、新しい ADR を足す。核は残り、細部・前提の事実・名前・結果だけが変わるときは、元の ADR の末尾に注記を足す
-- 新しい ADR で改めたとき（例: ADR 0010 が ADR 0001 を改めた）:
+- 新しい ADR で改めたとき:
   - 新しい ADR の本文に、どの ADR の何を改めるかを書く
   - 元の ADR の本文は書き換えず、末尾に「日付 ADR NNNN: …」の注記を足す
-  - 核をまるごと置き換えたときは、元の ADR の frontmatter の `status` を `superseded by ADR-NNNN` に変える。一部だけ改めたとき（ADR 0010 の型）は `accepted` のまま
+  - 核をまるごと置き換えたときは、元の ADR の frontmatter の `status` を `superseded by ADR-NNNN` に変える。一部だけ改めたときは `accepted` のまま
 
 Room のスキーマは `core/data/schemas/` に書き出す（`room { schemaDirectory(...) }`）。
 Entity を変えたら version を上げ、書き出された JSON もコミットする。
@@ -124,7 +124,7 @@ KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTe
 - ブックの各回の UserData（再生の共有、#355）: `writePlayState` で位置（尺の中の 7 秒）・再生済み・`LastPlayedDate` を書き、書き込みの応答・`fetchPlayState`（時間の上限なしと上限つき）・
   一覧（`fetchLibrary` の各回の `shared`）のどれでも同じ値で読み戻せること、再生済みにする・未再生に戻すのも同じことを見る。音楽のライブラリの一覧は UserData を載せない（`shared` が null）ことも見る。
   書いた回は最後に位置 0・未再生に書き戻す
-- 差し替え（#371、ADR 0014）: 音楽とブックのどちらのライブラリでも、ダウンロードの確かめ（`assertDownloads`）の中で、一覧の各回の版（`Etag`）が空でないことと、
+- 差し替え（#371、ADR 0011）: 音楽とブックのどちらのライブラリでも、ダウンロードの確かめ（`assertDownloads`）の中で、一覧の各回の版（`Etag`）が空でないことと、
   `fetchFileSize`（`Range: bytes=0-0` の 206 の `Content-Range` の全長）が落とした本文の長さと同じことを見る。10.10.7 と 12.0 で通した
 - 認証は SDK が付ける `Authorization: MediaBrowser Client="Kikidame", Version="…", DeviceId="…", Device="…"` の 1 形式だけ
   （レガシーの `X-Emby-Authorization` は送らない。2026-09-21 に記録用サーバで確認）
@@ -165,7 +165,7 @@ KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTe
 
 ## リリース（#94）
 
-配布は GitHub Releases の署名済み APK（ADR 0008）。`v*` のタグを push すると `.github/workflows/release.yml` が
+配布は GitHub Releases の署名済み APK（ADR 0005）。`v*` のタグを push すると `.github/workflows/release.yml` が
 release APK をビルドし、`kikidame-<version>.apk` と R8 の `mapping-<version>.txt` を Release に添付する。
 
 ### 署名鍵

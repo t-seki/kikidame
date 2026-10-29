@@ -24,8 +24,8 @@ import javax.inject.Inject
 
 /**
  * 一覧の下のミニプレイヤー。読みはプロセス内の [NowPlaying]（サービスを起動しない）、
- * 操作だけ [PlayerConnection] を使う（ADR 0006）。
- * 番組の画像は [LibraryRepository] から引く（回の ID は [NowPlaying] から取り、サービスは起動しない。ADR 0006 に反しない）。
+ * 操作だけ [PlayerConnection] を使う（ADR 0004）。
+ * 番組の画像は [LibraryRepository] から引く（回の ID は [NowPlaying] から取り、サービスは起動しない。ADR 0004 に反しない）。
  */
 @HiltViewModel
 class MiniPlayerViewModel @Inject constructor(
@@ -36,7 +36,7 @@ class MiniPlayerViewModel @Inject constructor(
     val state: StateFlow<NowPlayingState?> = nowPlaying.state
 
     /**
-     * 聴いている回の番組の画像（ADR 0012、#289）。無ければ null。[state] は再生位置で毎秒変わるので、回の ID が変わったときだけ引き直す。
+     * 聴いている回の番組の画像（ADR 0009、#289）。無ければ null。[state] は再生位置で毎秒変わるので、回の ID が変わったときだけ引き直す。
      * 番組を購読するので、同期が画像を取り直しても追従する。回の画像（#283）は使わない。
      */
     val programImage: StateFlow<ProgramImage?> = nowPlaying.state

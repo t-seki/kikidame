@@ -7,7 +7,7 @@ import kotlin.time.Instant
  * 「一覧が空」は `Known(emptySet())` で、`Unavailable` とは型で区別する。
  */
 sealed interface SourceEpisodes {
-    /** 完全な一覧が取れた。削除の権限を持つのはこの形だけ（ADR 0004）。 */
+    /** 完全な一覧が取れた。削除の権限を持つのはこの形だけ（ADR 0003）。 */
     data class Known(val sourceIds: Set<SourceItemId>) : SourceEpisodes
 
     /** 一覧を取得できなかった。M3-b では全走査しか無いので番組ごとにこの形になる経路は無いが、型は残す。 */
@@ -116,7 +116,7 @@ object SyncPlanner {
  * 同期の入力（[SyncProgramInput]）を組み立てる純粋関数。I/O はしない。
  *
  * - 対象の番組は [SourceSnapshot.scope] で決まる。[SnapshotScope.Library] なら全番組、
- *   [SnapshotScope.Program] なら取得元 ID がその番組のものだけ（1 番組の同期。他の番組は一覧に無くても消失扱いにしない、ADR 0004）
+ *   [SnapshotScope.Program] なら取得元 ID がその番組のものだけ（1 番組の同期。他の番組は一覧に無くても消失扱いにしない、ADR 0003）
  * - 取得元 ID を持たない番組は `Known` でも `Gone` でもない（取得元に在ると主張していない）ので入力に入れない
  * - 番組の取得元 ID が snapshot の番組一覧にあれば `Known`（その番組の取得元の各回）、無ければ `Gone`
  */
@@ -148,7 +148,7 @@ object SyncInputs {
 }
 
 /**
- * **差し替え**（CONTEXT.md、ADR 0014、#371）の判断。手元にある回（`DONE`）1 本ごとに、落としたときの版と、今の一覧の版・大きさから決める。I/O はしない。
+ * **差し替え**（CONTEXT.md、ADR 0011、#371）の判断。手元にある回（`DONE`）1 本ごとに、落としたときの版と、今の一覧の版・大きさから決める。I/O はしない。
  * 聴いている回を外すのと、取得元への大きさの問い合わせは呼び出し側が行う。
  *
  * - 一覧の版が null なら、比べず、版も書き換えない（[ReplacementCheck.Keep]）

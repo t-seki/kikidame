@@ -20,8 +20,8 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 
 /**
- * 同じサーバ・同じユーザーのまま、音楽のライブラリからブックのライブラリへ選び直す（#354、ADR 0013 の決定 7）。
- * 手元は消さず、次の同期で未結合になった番組・各回を突合で結び直す（ADR 0005）。番組の取得元 ID は MusicAlbum の id から
+ * 同じサーバ・同じユーザーのまま、音楽のライブラリからブックのライブラリへ選び直す（#354、ADR 0010 の決定 7）。
+ * 手元は消さず、次の同期で未結合になった番組・各回を突合で結び直す（ADR 0001）。番組の取得元 ID は MusicAlbum の id から
  * `<AlbumArtist>/<Album>` に、各回の取得元 ID は Audio の id から AudioBook の id に変わる。
  */
 @RunWith(AndroidJUnit4::class)

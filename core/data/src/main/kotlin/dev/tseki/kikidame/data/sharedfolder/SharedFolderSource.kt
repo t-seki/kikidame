@@ -26,18 +26,18 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 /**
- * 共有フォルダ（CONTEXT.md）を取得元（[SourceGateway]）として見せる（ADR 0010、#197）。[FolderTree] の上で走査する。
+ * 共有フォルダ（CONTEXT.md）を取得元（[SourceGateway]）として見せる（ADR 0007、#197）。[FolderTree] の上で走査する。
  *
  * - 構成はちょうど `<配信元>/<番組>/<各回のファイル>` の 3 段（epic #195 の決定 5）。2 段目のフォルダはすべて番組
  *   （音声ファイルが 0 本でも番組）。3 段目の、拡張子が [AUDIO_EXTENSIONS] のファイルだけを各回とし、
  *   それ以外（1・2 段目のファイル、4 段目以下、音声でないファイル）は黙って無視する。配信元と番組はフォルダの名前で決める
  * - 例外は番組のフォルダ（2 段目）の [PROGRAM_IMAGE_NAME]（`folder.jpg`。名前は大文字小文字まで一致するものだけ）で、
- *   番組の画像（CONTEXT.md）として読む（ADR 0012、#264）。一覧の大きさと更新日時を [SourceProgram.image] の版にし、
+ *   番組の画像（CONTEXT.md）として読む（ADR 0009、#264）。一覧の大きさと更新日時を [SourceProgram.image] の版にし、
  *   中身は [fetchProgramImage] で読む。`folder.png` など、ほかの画像は読まない
  * - 名前が `.`・`@`・`#` で始まるフォルダとファイル（NAS や OS が作るもの）は、どの段でも無視する（[isIgnoredName]、#197 の追加の決定）。
  *   [fetchProgram]・[fetchProgramEpisodes] も同じ規則で、そういう名前の番組は無いものとして扱う
  * - 取得元 ID は相対パス（決定 7）。番組は `<配信元>/<番組>`、各回は `<配信元>/<番組>/<ファイル名>`
- * - 各回のファイルの版（[SourceEpisode.version]、ADR 0014）は大きさと更新日時（ms）の組（[fileVersion]）。どちらかが変われば**差し替え**る
+ * - 各回のファイルの版（[SourceEpisode.version]、ADR 0011）は大きさと更新日時（ms）の組（[fileVersion]）。どちらかが変われば**差し替え**る
  * - 回の情報はタグから読む（決定 8・9）。取得元 ID・サイズ・更新日時がどれも前の走査（[ScannedFiles]）と同じ回は、
  *   タグを読み直さずに前の値を使う
  * - 全走査は一覧を先に全部取ってから番組ごとにタグを読み、読み終えた番組を [ScanListener] に流す（#209 の決定 1。epic #195 の決定 8 の
@@ -57,7 +57,7 @@ class SharedFolderSource(
 ) : SourceGateway {
 
     /**
-     * 全走査（#209 の決定 1・4）。返す一覧は完全な一覧（ADR 0004）。共有フォルダの根が無ければ到達不能。
+     * 全走査（#209 の決定 1・4）。返す一覧は完全な一覧（ADR 0003）。共有フォルダの根が無ければ到達不能。
      *
      * 1. 一覧（名前・大きさ・更新日時）を先に全部取り、タグを読む回の数を数える
      * 2. 番組ごとにタグを読む（前の走査と同じ回は読まない）。1 本読むごとに [ScanListener.onTagProgress]、
@@ -172,7 +172,7 @@ class SharedFolderSource(
     }
 
     /**
-     * 番組のフォルダの [PROGRAM_IMAGE_NAME] を全部読む（ADR 0012）。無ければ null。取得元 ID が番組の形でなければ null。
+     * 番組のフォルダの [PROGRAM_IMAGE_NAME] を全部読む（ADR 0009）。無ければ null。取得元 ID が番組の形でなければ null。
      * [MAX_PROGRAM_IMAGE_BYTES] より大きいファイルは読まずに null（画像なしとして扱う。PR #288 1 周目 #5 の決定）。
      */
     override suspend fun fetchProgramImage(programId: SourceItemId): ByteArray? {
@@ -209,7 +209,7 @@ class SharedFolderSource(
     }
 
     /**
-     * 各回のファイルの大きさ（ADR 0014）。番組のフォルダの一覧から読む。ファイルが無い・取得元 ID が各回の形でなければ null。
+     * 各回のファイルの大きさ（ADR 0011）。番組のフォルダの一覧から読む。ファイルが無い・取得元 ID が各回の形でなければ null。
      * 一覧が大きさを返すので、同期の差し替えの判断では呼ばない（口をそろえるために持つ）。
      */
     override suspend fun fetchFileSize(episodeId: SourceItemId): Long? {
@@ -319,7 +319,7 @@ class SharedFolderSource(
         /** やり直す前に待つ時間（#209）。切れた直後にすぐ張り直して同じ失敗を重ねないため。長さに根拠は無い（測っていない）。 */
         val RETRY_DELAY: Duration = 2.seconds
 
-        /** 番組の画像として読む、番組のフォルダの中のファイルの名前（ADR 0012。rajikura の付け方に合わせる）。 */
+        /** 番組の画像として読む、番組のフォルダの中のファイルの名前（ADR 0009。rajikura の付け方に合わせる）。 */
         const val PROGRAM_IMAGE_NAME: String = "folder.jpg"
 
         /**
@@ -358,7 +358,7 @@ class SharedFolderSource(
             return if (parts.size == 2 && parts.none(::isIgnoredName)) parts[0] to parts[1] else null
         }
 
-        /** 各回のファイルの版（ADR 0014）。大きさと更新日時（ms）の組。 */
+        /** 各回のファイルの版（ADR 0011）。大きさと更新日時（ms）の組。 */
         fun fileVersion(sizeBytes: Long, modifiedAt: Instant): String = "$sizeBytes:${modifiedAt.toEpochMilliseconds()}"
 
         private fun Instant.truncatedToMillis(): Instant = Instant.fromEpochMilliseconds(toEpochMilliseconds())

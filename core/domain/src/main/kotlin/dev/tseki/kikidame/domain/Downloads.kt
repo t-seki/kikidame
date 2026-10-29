@@ -70,12 +70,12 @@ interface DownloadRepository {
 
     /**
      * 同期による予約（`pinned = false`）。渡した順にキューへ入れる。既に行がある回は飛ばし、実際に予約した数を返す。
-     * 予約した回には、その時点の一覧の版（ADR 0014）を記録する（[enqueue] も同じ）。
+     * 予約した回には、その時点の一覧の版（ADR 0011）を記録する（[enqueue] も同じ）。
      */
     suspend fun enqueueForSync(episodeIds: List<EpisodeId>): Int
 
     /**
-     * **差し替え**（ADR 0014、#371）の予約。手元にある（`DONE`）回だけを、同じ待ち行列に入れる。行は `DONE` のまま（今のファイルで聴ける）。
+     * **差し替え**（ADR 0011、#371）の予約。手元にある（`DONE`）回だけを、同じ待ち行列に入れる。行は `DONE` のまま（今のファイルで聴ける）。
      * 新しいファイルの版として、その時点の一覧の版を覚える。残っている書きかけのファイル（`.part`）は捨てる。
      * 手元に無い・もう差し替えを予約している回は飛ばし、実際に予約した数を返す。
      */
@@ -131,7 +131,7 @@ interface DownloadRepository {
 /** ダウンロードの実行側（Worker）が使う。 */
 interface DownloadQueue {
     /**
-     * 次に落とす行（キューに入れた順 = FIFO）。無ければ null。差し替えの予約（ADR 0014）も同じ待ち行列から返る
+     * 次に落とす行（キューに入れた順 = FIFO）。無ければ null。差し替えの予約（ADR 0011）も同じ待ち行列から返る
      * （[LocalFile.replacing] が true。行は DONE のまま）。
      */
     suspend fun nextPending(): EpisodeWithState?
@@ -154,7 +154,7 @@ interface DownloadQueue {
     /** キャンセル済みなら false（Worker は約 1 MB ごとに見る）。 */
     suspend fun isStillWanted(episodeId: EpisodeId): Boolean
 
-    // --- 差し替え（ADR 0014、#371）。行は DONE のままなので、上の口（状態を RUNNING / DONE / FAILED にする）は使わない ---
+    // --- 差し替え（ADR 0011、#371）。行は DONE のままなので、上の口（状態を RUNNING / DONE / FAILED にする）は使わない ---
 
     /** 差し替えを落とし始める。行の状態（DONE）は変えない。 */
     suspend fun markReplaceRunning(episodeId: EpisodeId)

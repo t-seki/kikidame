@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.first
 
 /**
  * `local_files` の待ち行列を 1 本ずつ落とす（順序は `LocalFileDao.nextPending`: 手動が先、その中はキューに入れた順）。並列にはしない。
- * 待ち行列に入るのは、`state` が PENDING の行と、差し替え（ADR 0014、#371）を予約した行（`state` は DONE のまま、`replaceState` が PENDING）。
+ * 待ち行列に入るのは、`state` が PENDING の行と、差し替え（ADR 0011、#371）を予約した行（`state` は DONE のまま、`replaceState` が PENDING）。
  * 1 本の失敗は行に記録して（FAILED にし、試行回数を数えて）次へ進む。差し替えの失敗は行に記録せず、差し替えの印（`replaceState`）を
  * 下ろすだけ（試行回数も数えず、今のファイルと版は残る。次の同期でまた予約される）。
  * 401 はログアウトして止まる（同期の失敗の通知も消す。#346）。
@@ -39,7 +39,7 @@ class DownloadWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        // 接続していなければ何もしない。取得元への接続の情報は取得元の実装が持つ（ADR 0010）
+        // 接続していなければ何もしない。取得元への接続の情報は取得元の実装が持つ（ADR 0007）
         if (sessionRepository.state.first() is SessionState.SignedOut) return Result.success()
         queue.resetRunning()
         queue.resetRunningReplacements()

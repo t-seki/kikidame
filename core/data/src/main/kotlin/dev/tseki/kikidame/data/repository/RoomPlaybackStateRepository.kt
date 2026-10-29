@@ -30,7 +30,7 @@ class RoomPlaybackStateRepository @Inject constructor(
         val existing = row?.toDomain()
         val next = transform(existing ?: PlaybackState.initial(episodeId, clock.now()))
         if (PlaybackRules.isWorthRecording(existing, next)) {
-            // 位置か再生済みが変わったら未送信（再生の共有、ADR 0013 の決定 5）。最後に見た取得元の値は運ぶ（ここでは変えない）
+            // 位置か再生済みが変わったら未送信（再生の共有、ADR 0010 の決定 5）。最後に見た取得元の値は運ぶ（ここでは変えない）
             val changed = existing == null || existing.position != next.position || existing.played != next.played
             val entity = next.toEntity()
             dao.upsert(

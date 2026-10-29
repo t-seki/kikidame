@@ -128,7 +128,7 @@ class LibraryMatchingTest {
         assertTrue(match.programLinks.isEmpty())
     }
 
-    // --- 未結合の結び直し（ADR 0005） ---
+    // --- 未結合の結び直し（ADR 0001） ---
     @Test
     fun `a program whose source id vanished is relinked by name and its episodes by title`() {
         val match = LibraryMatching.match(

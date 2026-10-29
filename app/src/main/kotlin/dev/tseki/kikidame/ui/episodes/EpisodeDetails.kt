@@ -14,7 +14,7 @@ import dev.tseki.kikidame.ui.toSizeText
 /**
  * 各回の詳細画面（#43）に並べる値。Room にあるものを整形するだけで、取得元へは問い合わせない。
  * 利用者向けの群と、デバッグ向けの「技術的な詳細」に分ける（後者は折り畳み、長押しでコピー）。
- * ラベルと定型の値は [UiText]（ADR 0009）。取得元から来た値・日付・尺は [UiText.Plain]。
+ * ラベルと定型の値は [UiText]（ADR 0006）。取得元から来た値・日付・尺は [UiText.Plain]。
  */
 object EpisodeDetails {
     data class Row(val label: UiText, val value: UiText) {

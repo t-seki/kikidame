@@ -96,7 +96,7 @@ class FakeJellyfinGateway : JellyfinGateway {
         }
     }
 
-    /** 大きさを問い合わせた各回（呼ばれた順、ADR 0014）。大きさは [fileSizes] にあればその値、無ければ [files] の長さ、どちらも無ければ null。 */
+    /** 大きさを問い合わせた各回（呼ばれた順、ADR 0011）。大きさは [fileSizes] にあればその値、無ければ [files] の長さ、どちらも無ければ null。 */
     val fetchedFileSizes = ArrayList<SourceItemId>()
     val fileSizes = HashMap<SourceItemId, Long>()
     /** 大きさの問い合わせだけが投げる。 */

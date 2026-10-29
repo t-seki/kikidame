@@ -8,7 +8,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 番組の画像（CONTEXT.md、ADR 0012、#264）の置き場 `filesDir/program_images`。同期が取得元から取った画像をここに置き、
+ * 番組の画像（CONTEXT.md、ADR 0009、#264）の置き場 `filesDir/program_images`。同期が取得元から取った画像をここに置き、
  * 表示はここから読む（表示のときに取得元へ行かない）。音声ファイル（[EpisodesDirectory]）と違って `adb push` で入れることは無いので、
  * アプリの内部の領域に置く。
  *
@@ -44,7 +44,7 @@ class ProgramImageFiles(val root: File) {
         root.listFiles()?.forEach { if (it.absolutePath !in keep) it.delete() }
     }
 
-    /** 全部消す（取得元を変えてやり直すとき、ADR 0010 の決定 2）。消せなかったファイルの数を返す。 */
+    /** 全部消す（取得元を変えてやり直すとき、ADR 0007 の決定 2）。消せなかったファイルの数を返す。 */
     fun deleteAll(): Int = root.listFiles()?.count { !it.delete() } ?: 0
 
     private fun digest(version: String): String =

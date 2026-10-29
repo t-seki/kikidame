@@ -20,7 +20,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 /**
- * Jellyfin の番組の画像（#282、ADR 0012）: Primary の ImageTag が版で、同期が手元のファイルにそろえる。
+ * Jellyfin の番組の画像（#282、ADR 0009）: Primary の ImageTag が版で、同期が手元のファイルにそろえる。
  * ImageTag が変わらなければ取り直さない。取得元は [FakeJellyfinGateway]（`JellyfinSource` 越し）。
  */
 @RunWith(AndroidJUnit4::class)

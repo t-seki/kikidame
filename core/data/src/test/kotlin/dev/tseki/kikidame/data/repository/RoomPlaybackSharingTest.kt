@@ -33,7 +33,7 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 /**
- * 再生の共有（#355、ADR 0013）: 同期で、ブックのライブラリの一覧と一緒に読んだ UserData を手元と突き合わせる。
+ * 再生の共有（#355、ADR 0010）: 同期で、ブックのライブラリの一覧と一緒に読んだ UserData を手元と突き合わせる。
  * 一時停止などの後の送信（[PlaybackSharing.sendPending]）と、▶ の直前の読み込み（[PlaybackSharing.refreshBeforePlay]）も見る。
  */
 @RunWith(AndroidJUnit4::class)
@@ -206,7 +206,7 @@ class RoomPlaybackSharingTest : JellyfinRefreshTestBase() {
         assertEquals(20.minutes, episode("e1").playback?.position)
     }
 
-    /** 音楽のライブラリでは、一覧に値があっても読みも書きもしない（ADR 0013 の決定 1）。 */
+    /** 音楽のライブラリでは、一覧に値があっても読みも書きもしない（ADR 0010 の決定 1）。 */
     @Test
     fun theMusicLibraryNeverShares() = runTest {
         signInAndSelect()
@@ -229,7 +229,7 @@ class RoomPlaybackSharingTest : JellyfinRefreshTestBase() {
     }
 
     /**
-     * 共有フォルダでも読みも書きもしない（ADR 0013 の決定 1）。共有フォルダの一覧は UserData を持たないが、ここでは持たせても
+     * 共有フォルダでも読みも書きもしない（ADR 0010 の決定 1）。共有フォルダの一覧は UserData を持たないが、ここでは持たせても
      * 接続の種類で外れることを見る。
      */
     @Test
@@ -259,7 +259,7 @@ class RoomPlaybackSharingTest : JellyfinRefreshTestBase() {
         assertNull(shareStatus.status.first())
     }
 
-    /** 音楽からブックへ移ったとき、結び直した回の手元の状態は未送信になり、新しい ID に書かれる（ADR 0013 の決定 7）。 */
+    /** 音楽からブックへ移ったとき、結び直した回の手元の状態は未送信になり、新しい ID に書かれる（ADR 0010 の決定 7）。 */
     @Test
     fun relinkedEpisodesAreSentToTheirNewIds() = runTest {
         signInAndSelect()
@@ -309,7 +309,7 @@ class RoomPlaybackSharingTest : JellyfinRefreshTestBase() {
     }
 
     /**
-     * 一時停止などの後の送信も、送る前に取得元の値を読んで衝突の規則を通す（ADR 0013 の決定 4、#357 の 1 周目 1）。
+     * 一時停止などの後の送信も、送る前に取得元の値を読んで衝突の規則を通す（ADR 0010 の決定 4、#357 の 1 周目 1）。
      * v10 に上げた直後（未送信・最後に見た値なし）に、ほかで聴き進めた値の方が新しければ、手元の古い値で上書きしない。
      */
     @Test

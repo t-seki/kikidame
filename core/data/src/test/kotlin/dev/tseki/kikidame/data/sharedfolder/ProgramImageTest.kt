@@ -26,7 +26,7 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
 /**
- * 番組の画像（ADR 0012、#264）: 共有フォルダは番組のフォルダの `folder.jpg` だけを読み、同期が手元のファイルにそろえる。
+ * 番組の画像（ADR 0009、#264）: 共有フォルダは番組のフォルダの `folder.jpg` だけを読み、同期が手元のファイルにそろえる。
  * 取得元はメモリ上の木（[MemoryFolderTree]）の [SharedFolderSource] で、画像の中身を取った回数と失敗を [CountingSource] で見る。
  */
 @RunWith(AndroidJUnit4::class)
@@ -232,7 +232,7 @@ class ProgramImageTest : RefreshTestBase() {
         for (p in listOf("A", "B", "C")) assertNotNull(program(p).image)
     }
 
-    /** 「この番組を削除」は、その番組の画像のファイルもすぐ消す（ADR 0012 の決定 2）。 */
+    /** 「この番組を削除」は、その番組の画像のファイルもすぐ消す（ADR 0009 の決定 2）。 */
     @Test
     fun removeProgramDeletesItsImage() = runTest {
         signIn()
@@ -267,7 +267,7 @@ class ProgramImageTest : RefreshTestBase() {
         assertFalse(orphan.exists())
     }
 
-    /** 取得元を変えてやり直す（ADR 0010 の決定 2）と、画像のファイルも消える。 */
+    /** 取得元を変えてやり直す（ADR 0007 の決定 2）と、画像のファイルも消える。 */
     @Test
     fun resetAllDeletesImages() = runTest {
         signIn()

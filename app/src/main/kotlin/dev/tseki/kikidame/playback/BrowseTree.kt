@@ -33,7 +33,7 @@ class BrowseTree(
     private val library: LibraryRepository,
     private val labels: Labels,
 ) {
-    /** タブの表示名。Service が `getString` して渡す（ADR 0009 の例外）。 */
+    /** タブの表示名。Service が `getString` して渡す（ADR 0006 の例外）。 */
     data class Labels(val continueListening: String, val starred: String, val programs: String)
 
     sealed interface Node {

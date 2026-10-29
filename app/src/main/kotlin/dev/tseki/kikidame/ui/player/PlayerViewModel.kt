@@ -105,7 +105,7 @@ class PlayerViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     /**
-     * 再生中の回の番組の画像（ADR 0012、#264）。無ければ null。番組を購読するので、この画面を開いたまま同期が画像を取り直しても追従する。
+     * 再生中の回の番組の画像（ADR 0009、#264）。無ければ null。番組を購読するので、この画面を開いたまま同期が画像を取り直しても追従する。
      * 画面に出すのは [episodeImage] を優先し、これはその回の画像が無いときの番組の画像。
      * 回の画像として番組の画像が載った後は、同期が番組の画像を取り直しても、次に回が替わるまで再生画面・通知の画像は差し替わらない（載せた `artworkData` を読むため）。
      */

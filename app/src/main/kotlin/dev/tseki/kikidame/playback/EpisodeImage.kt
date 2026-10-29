@@ -12,7 +12,7 @@ import java.io.File
 import javax.inject.Inject
 import kotlin.math.max
 /**
- * 再生中の回の画像（ADR 0012、#283）。各回のファイルに埋め込まれた画像を、再生するときに手元のファイルから読む。
+ * 再生中の回の画像（ADR 0009、#283）。各回のファイルに埋め込まれた画像を、再生するときに手元のファイルから読む。
  * 埋め込みが無い（読めない）ときは番組の画像のファイル。どちらも無ければ null。
  * 通知・ロック画面・Auto には `setArtworkData` でバイト列を渡す（外のプロセスに画像を渡す ContentProvider は持たない）ので、
  * 縮めて（長辺 [MAX_SIDE_PX] まで）圧縮し直す。

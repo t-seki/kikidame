@@ -9,12 +9,12 @@ data class SourceProgram(
     val name: String,
     /** 配信元。Jellyfin の音楽のライブラリでは MusicAlbum の AlbumArtist、ブックのライブラリでは各回の AlbumArtist のタグ。無ければ null。 */
     val publisherName: String?,
-    /** 番組の画像（CONTEXT.md）。取得元に無ければ null。中身は `SourceGateway.fetchProgramImage` で別に取る（ADR 0012）。 */
+    /** 番組の画像（CONTEXT.md）。取得元に無ければ null。中身は `SourceGateway.fetchProgramImage` で別に取る（ADR 0009）。 */
     val image: SourceImage? = null,
 )
 
 /**
- * 取得元にある番組の画像の目印（ADR 0012、#264）。[version] が前の同期と同じなら、画像を取り直さない。
+ * 取得元にある番組の画像の目印（ADR 0009、#264）。[version] が前の同期と同じなら、画像を取り直さない。
  * 共有フォルダでは `folder.jpg` の大きさと更新日時から作る。Jellyfin ではアルバム（ブックのライブラリでは番組のフォルダ。#354）の Primary の ImageTag を使う（#282）。
  */
 data class SourceImage(val version: String)
@@ -35,19 +35,19 @@ data class SourceEpisode(
     /**
      * 一覧が返す、取得元のファイルのサイズ（バイト）。共有フォルダでだけ値があり、Jellyfin では null（一覧が返さない）。
      * 更新日時（[sourceModifiedAt]）・取得元 ID（パス）と合わせて、タグを読み直すかの判定に使う（#197）。
-     * **差し替え**（ADR 0014）でも、これが null でない取得元は [version] をそのまま信じ、版を持たない手元の回はこれと手元の大きさで比べる。
+     * **差し替え**（ADR 0011）でも、これが null でない取得元は [version] をそのまま信じ、版を持たない手元の回はこれと手元の大きさで比べる。
      * [sizeBytes] はダウンロードの完了時に実サイズで上書きされるので、判定には使わない。
      */
     val sourceFileSize: Long? = null,
     /** 共有フォルダでの、取得元のファイルの更新日時。Jellyfin では null（一覧が返さない）。 */
     val sourceModifiedAt: Instant? = null,
     /**
-     * ファイルの版（ADR 0014、#371）。取得元のファイルが書き換わったかを見分ける値で、**差し替え**の判断に使う。
+     * ファイルの版（ADR 0011、#371）。取得元のファイルが書き換わったかを見分ける値で、**差し替え**の判断に使う。
      * 共有フォルダでは大きさと更新日時の組、Jellyfin では `Etag`。取得元が返さなければ null（差し替えの判断をしない）。
      */
     val version: String? = null,
     /**
-     * 取得元に置かれた再生位置と再生済み（**再生の共有**、ADR 0013）。共有する取得元（Jellyfin のブックのライブラリ）でだけ値があり、
+     * 取得元に置かれた再生位置と再生済み（**再生の共有**、ADR 0010）。共有する取得元（Jellyfin のブックのライブラリ）でだけ値があり、
      * 音楽のライブラリと共有フォルダでは null（読まない）。
      */
     val shared: SharedPlayState? = null,
@@ -55,7 +55,7 @@ data class SourceEpisode(
 
 /**
  * 1 回の取得で得た取得元の一覧。番組に属さない各回は含めない。
- * [scope] が [SnapshotScope.Library] なら完全な一覧（削除と結び直しの権限を持つ、ADR 0004 / 0005）、
+ * [scope] が [SnapshotScope.Library] なら完全な一覧（削除と結び直しの権限を持つ、ADR 0003 / 0001）、
  * [SnapshotScope.Program] なら 1 番組分（その番組の各回については完全）。
  */
 data class SourceSnapshot(

@@ -21,7 +21,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
-/** 再取り込み（取得元 ID の変更）後の結び直し（ADR 0005）と、タイトルが違う未結合の各回の第二段突合（公開日 + 尺）。 */
+/** 再取り込み（取得元 ID の変更）後の結び直し（ADR 0001）と、タイトルが違う未結合の各回の第二段突合（公開日 + 尺）。 */
 @RunWith(AndroidJUnit4::class)
 class RoomRematchTest : JellyfinRefreshTestBase() {
     private val publisher = "TBSラジオ"

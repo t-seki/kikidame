@@ -33,7 +33,7 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 /**
- * 差し替え（CONTEXT.md、ADR 0014、#371）: 同期が、手元にある回のファイルが取得元で書き換わったかを見分けて予約し、
+ * 差し替え（CONTEXT.md、ADR 0011、#371）: 同期が、手元にある回のファイルが取得元で書き換わったかを見分けて予約し、
  * ダウンロードの Worker と同じ待ち行列から落として今のファイルに替えること。取得元は Jellyfin（[FakeJellyfinGateway]）と、
  * 一覧が大きさを返す共有フォルダの形の取得元（[FolderLike]）。
  */
