@@ -51,12 +51,12 @@ Google Play では配布しない（[ADR 0005](./docs/adr/0005-open-source-distr
 
 ## 取得元の前提
 
-接続できるのは **Jellyfin**・**NAS の共有フォルダ（SMB）**・**端末のフォルダ** のどれか 1 つ。SMB の共有フォルダと端末のフォルダは v0.4.0 から選べる（v0.3.0 までの release 版は Jellyfin だけ）。
+接続できるのは **Jellyfin**・**NAS の共有フォルダ（SMB）**・**端末のフォルダ** のどれか 1 つ。
 
 ### Jellyfin
 
 - Jellyfin **10.10 以上**を対象（10.10.7 / 12.0.0 はコンテナと統合テスト、10.11 は実機で確認。`scripts/jellyfin-testserver.sh` と `docs/development.md` の「テスト用 Jellyfin サーバ」を参照。レガシー認証は使わない）
-- 音声は**ブックのライブラリ**（コンテンツの種類「ブック」）か**音楽ライブラリ**として取り込まれていること。勧めるのはブックのライブラリ。再生位置と再生済みを Jellyfin を通してほかの端末や Jellyfin Web と分け合う機能（再生の共有。下）は、ブックのライブラリでだけ行う（[ADR 0010](./docs/adr/0010-share-playback-state-via-jellyfin-book-library.md)）。音楽ライブラリも今までどおり使えるが、再生位置と再生済みは手元だけで持つ。アプリはこう読み替える:
+- 音声は**ブックのライブラリ**（コンテンツの種類「ブック」）か**音楽ライブラリ**として取り込まれていること。勧めるのはブックのライブラリ。再生位置と再生済みを Jellyfin を通してほかの端末や Jellyfin Web と分け合う機能（再生の共有。下）は、ブックのライブラリでだけ行う（[ADR 0010](./docs/adr/0010-share-playback-state-via-jellyfin-book-library.md)）。音楽ライブラリも使えるが、再生位置と再生済みは手元だけで持つ。アプリはこう読み替える:
 
   | Jellyfin（ブックのライブラリ） | Jellyfin（音楽ライブラリ） | アプリ内 |
   | --- | --- | --- |
@@ -155,7 +155,7 @@ export JAVA_HOME=~/.local/jdk/current   # JDK 25
 
 - 映像・トランスコード・キャスト
 - 複数サーバ・複数ユーザー・複数ライブラリ
-- Jellyfin のブックのライブラリのほか（音楽ライブラリ・共有フォルダ・端末のフォルダ）での、再生位置と再生済みの共有
+- Jellyfin のブックのライブラリのほか（音楽ライブラリ・共有フォルダ・端末のフォルダ）での、再生位置と再生済みの共有。取得元には書き込まないため（例外はブックのライブラリの UserData だけ。[ADR 0007](./docs/adr/0007-add-file-shares-as-sources.md) の決定 6）
 - サーバ管理
 - オーディオブック（古い章から順に聴くので「最新 N 回まで保持」が合わない。対応するなら番組に「向き」を足す設計が要る）
 - Google Play での配布と課金（需要が見えたら Releases は無料のまま Play に有料版を併売する選択肢は残している。[ADR 0005](./docs/adr/0005-open-source-distributed-outside-play.md)）

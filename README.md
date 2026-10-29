@@ -51,12 +51,12 @@ Requires Android 12 (API 31) or later. Store descriptions and screenshots live i
 
 ## Source prerequisites
 
-The app connects to **Jellyfin**, a **shared folder on a NAS (SMB)** or a **folder on this device**, one at a time. The SMB shared folder and the folder on this device are available from v0.4.0 (release builds up to v0.3.0 offer only Jellyfin).
+The app connects to **Jellyfin**, a **shared folder on a NAS (SMB)** or a **folder on this device**, one at a time.
 
 ### Jellyfin
 
 - Jellyfin **10.10 or later** (10.10.7 and 12.0.0 verified with containers and the integration test, 10.11 on a real server; see `scripts/jellyfin-testserver.sh` and "テスト用 Jellyfin サーバ" in `docs/development.md`, Japanese. Legacy authentication is not used)
-- The audio must be in a **books library** (content type "Books") or a **music library**. A books library is recommended: sharing the playback position and played state with other devices and Jellyfin Web through Jellyfin (playback sharing, below) is done for books libraries only ([ADR 0010](./docs/adr/0010-share-playback-state-via-jellyfin-book-library.md), Japanese). Music libraries keep working as before, with the playback position and played state kept on the device only. The app maps them like this:
+- The audio must be in a **books library** (content type "Books") or a **music library**. A books library is recommended: sharing the playback position and played state with other devices and Jellyfin Web through Jellyfin (playback sharing, below) is done for books libraries only ([ADR 0010](./docs/adr/0010-share-playback-state-via-jellyfin-book-library.md), Japanese). Music libraries also work, with the playback position and played state kept on the device only. The app maps them like this:
 
   | Jellyfin (books library) | Jellyfin (music library) | In the app |
   | --- | --- | --- |
@@ -155,7 +155,7 @@ The stack is Kotlin / Jetpack Compose (Material 3) / Media3 / Room / WorkManager
 
 - Video, transcoding, casting
 - Multiple servers, users, or libraries
-- Sharing the playback position and played state with anything other than a Jellyfin books library (a music library, a shared folder, a folder on the device)
+- Sharing the playback position and played state with anything other than a Jellyfin books library (a music library, a shared folder, a folder on the device), because the app does not write to a source (the only exception is the UserData of a Jellyfin books library; [ADR 0007](./docs/adr/0007-add-file-shares-as-sources.md), decision 6, Japanese)
 - Server administration
 - Audiobooks (you listen from the oldest chapter, so "Keep latest N" does not fit; supporting them would need a "direction" per program)
 - Distribution and payments on Google Play (if demand appears, the option of selling a paid build on Play while Releases stay free is kept open; [ADR 0005](./docs/adr/0005-open-source-distributed-outside-play.md), Japanese)
