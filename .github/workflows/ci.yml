@@ -11,11 +11,11 @@ jobs:
       # ADR を足したら docs/architecture.md の「参照」の一覧にも足す
       - name: ADR index in architecture is complete
         run: scripts/check-adr-index.sh
-      # ADR の末尾の注記の形（段落は改名・移動の注記だけ、箇条書きの項目は句点で終わらない）を確かめる。検査自体の落ちる例・通る例も流す
-      - name: ADR notes follow the format
+      # repo が追跡している Markdown に自 repo の issue・PR の番号（#N）があると落とす。検査自体の落ちる例・通る例も流す
+      - name: No issue or PR numbers in Markdown
         run: |
-          scripts/test-check-adr-notes.sh
-          scripts/check-adr-notes.sh
+          scripts/test-check-issue-refs.sh
+          scripts/check-issue-refs.sh
       # docs と README のインラインコードの .sh が repo にもリンクにも無いと落とす。検査自体の落ちる例・通る例も流す
       - name: Doc script references resolve
         run: |
