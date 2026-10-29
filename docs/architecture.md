@@ -434,15 +434,17 @@ I/O（HTTP・ファイル・DB）はこの関数の外側に置く。
 - `CONTEXT.md` — 用語集（番組／各回／公開日／同期対象／保持ルール／固定／判断保留／再生済み）
 - `docs/adr/0001-local-surrogate-key.md` — 主キーは取得元 ID ではなく代理キー。未結合の行は、同期の削除判断の前に突合で結び直す
 - `docs/adr/0002-download-without-media3-downloadmanager.md` — DownloadManager を使わない
-- `docs/adr/0003-sync-deletes-only-from-full-listing.md` — 同期の削除の権限は全走査の一覧だけ
+- `docs/adr/0003-sync-deletes-only-from-full-listing.md` — 同期の削除の権限は完全な一覧（全走査、1 番組の同期ではその番組の一覧）だけ。共有フォルダの全走査は番組ごとに取り込む
 - `docs/adr/0004-now-playing-from-in-process-state-not-media-controller.md` — 聴いている回はプロセス内の状態から取る
-- `docs/adr/0005-open-source-distributed-outside-play.md` — MPL-2.0 の OSS として Play を通さず、GitHub Releases と Obtainium で配布する
+- `docs/adr/0005-open-source-distributed-outside-play.md` — オープンソースとして Play を通さず、GitHub Releases と Obtainium で配布する
 - `docs/adr/0006-ui-text-resolved-only-in-compose.md` — UI の文言は strings.xml、文字列に解決するのは Compose だけ（`UiText`）。既定は英語
-- `docs/adr/0007-add-file-shares-as-sources.md` — ファイル共有（SMB・端末のフォルダ）を取得元に加える。サーバ ID を取得元 ID に改めた
+- `docs/adr/0007-add-file-shares-as-sources.md` — 共有フォルダ（NAS の共有フォルダ（SMB）・端末のフォルダ）を取得元に加える。取得元は同時に 1 つで、取得元には書き込まない（例外はブックのライブラリの再生の共有）
 - `docs/adr/0008-no-autoplay-on-bluetooth-connect.md` — Bluetooth の接続では自動で再生しない（ロック画面の再開のカードの ▶ で足りる）
 - `docs/adr/0009-show-images-only-from-source-data.md` — 画像はデータにあるときだけ出す。番組の画像は同期で取って手元に持ち、回の画像は再生のときに手元のファイルから読む
 - `docs/adr/0010-share-playback-state-via-jellyfin-book-library.md` — ブックのライブラリでは、再生位置と再生済みを UserData を通してほかの端末や Jellyfin Web と分け合う（再生の共有）。ほかの取得元では手元だけで持ち、送らない
 - `docs/adr/0011-replace-local-files-when-the-source-version-changes.md` — 手元のファイルは、取得元のファイルの版が変わったら差し替える。Jellyfin では Etag を合図にして大きさで確かめる
+- `docs/adr/0012-license-mpl-2.0.md` — ライセンスは GPL-3.0 ではなく MPL-2.0
+- `docs/adr/0013-shared-folder-three-level-layout.md` — 共有フォルダの中はちょうど 3 段で、番組と配信元はタグでなくフォルダの名前で決める
 - Jellyfin 12 認証仕様: https://gist.github.com/nielsvanvelzen/ea047d9028f676185832e51ffaf12a6f
 - jellyfin-sdk-kotlin Releases: https://github.com/jellyfin/jellyfin-sdk-kotlin/releases
 - Jellyfin OpenAPI (stable): https://api.jellyfin.org/openapi/jellyfin-openapi-stable.json
