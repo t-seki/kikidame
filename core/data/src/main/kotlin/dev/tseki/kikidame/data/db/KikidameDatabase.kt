@@ -15,21 +15,21 @@ import androidx.room.migration.AutoMigrationSpec
         AutoMigration(from = 1, to = 2),
         // v3: local_files.enqueuedAt（手動ダウンロードの FIFO 順）
         AutoMigration(from = 2, to = 3),
-        // v4: programs.goneSince（消失の記録、#3）
+        // v4: programs.goneSince（消失の記録）
         AutoMigration(from = 3, to = 4),
-        // v5: programs.starred（よく聴く、#16）
+        // v5: programs.starred（よく聴く）
         AutoMigration(from = 4, to = 5),
-        // v6: episodes.performers（出演者、#70）
+        // v6: episodes.performers（出演者）
         AutoMigration(from = 5, to = 6),
-        // v7: 列名をコードの名前に揃え、使わない playback_states.syncedAt を消す（ADR 0007、#196）
+        // v7: 列名をコードの名前に揃え、使わない playback_states.syncedAt を消す（ADR 0007）
         AutoMigration(from = 6, to = 7, spec = KikidameDatabase.V6ToV7::class),
-        // v8: episodes.sourceFileSize / sourceModifiedAt（共有フォルダのタグを読み直すかの判定、#197）
+        // v8: episodes.sourceFileSize / sourceModifiedAt（共有フォルダのタグを読み直すかの判定）
         AutoMigration(from = 7, to = 8),
-        // v9: programs.imageVersion / imagePath（番組の画像、ADR 0009、#264）
+        // v9: programs.imageVersion / imagePath（番組の画像、ADR 0009）
         AutoMigration(from = 8, to = 9),
-        // v10: playback_states.sharePending / sharedPositionTicks / sharedPlayed / sharedLastPlayedAt（再生の共有、ADR 0010、#355）
+        // v10: playback_states.sharePending / sharedPositionTicks / sharedPlayed / sharedLastPlayedAt（再生の共有、ADR 0010）
         AutoMigration(from = 9, to = 10),
-        // v11: episodes.sourceVersion、local_files.sourceVersion / replaceState / replaceVersion（差し替え、ADR 0011、#371）
+        // v11: episodes.sourceVersion、local_files.sourceVersion / replaceState / replaceVersion（差し替え、ADR 0011）
         AutoMigration(from = 10, to = 11),
     ],
 )

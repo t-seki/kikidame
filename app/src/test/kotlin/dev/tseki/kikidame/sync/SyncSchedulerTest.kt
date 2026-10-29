@@ -9,7 +9,7 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
-/** 起動時同期を積むかの判定（#135）。前回同期と前回の試みの新しい方から 15 分（#347 で 1 時間から縮めた）。 */
+/** 起動時同期を積むかの判定。前回同期と前回の試みの新しい方から 15 分。 */
 class SyncSchedulerTest {
     private val now = Instant.parse("2026-09-24T12:00:00Z")
 
@@ -33,7 +33,7 @@ class SyncSchedulerTest {
         assertTrue(SyncScheduler.isStale(jellyfinReady(lastSuccess, now - 15.minutes), now))
     }
 
-    /** 定期は 3 時間、起動時の閾値は 15 分（#347）。 */
+    /** 定期は 3 時間、起動時の閾値は 15 分。 */
     @Test
     fun periodAndThreshold() {
         assertEquals(3.hours, SyncScheduler.PERIOD)

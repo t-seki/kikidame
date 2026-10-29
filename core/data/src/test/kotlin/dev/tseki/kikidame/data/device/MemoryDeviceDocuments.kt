@@ -3,7 +3,7 @@ package dev.tseki.kikidame.data.device
 import java.io.FileNotFoundException
 
 /**
- * メモリ上の端末のフォルダ（SAF、#199）。1 つのツリー [treeUri] だけを持つ。文書 ID は `doc:<根からの相対パス>` の形にして、
+ * メモリ上の端末のフォルダ（SAF）。1 つのツリー [treeUri] だけを持つ。文書 ID は `doc:<根からの相対パス>` の形にして、
  * 木（[DeviceFolderTree]）が ID の形に頼らないことを見えるようにする。
  *
  * [folder] / [file] で中身を作る。[rootGone] で根を消し（provider が「無い」と答える）、[queryFailure] で問い合わせを例外で失敗させ

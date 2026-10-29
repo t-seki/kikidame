@@ -44,14 +44,14 @@ class SettingsViewModel @Inject constructor(
     library: LibraryRepository,
     playbackSharing: PlaybackSharing,
 ) : ViewModel() {
-    /** 再生の共有の最後の送受信（ADR 0010 の決定 8、#355）。Jellyfin のブックのライブラリでないときは null（行を出さない）。 */
+    /** 再生の共有の最後の送受信（ADR 0010 の決定 8）。Jellyfin のブックのライブラリでないときは null（行を出さない）。 */
     val playbackShare: StateFlow<PlaybackShareStatus?> = playbackSharing.status
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    /** 手元のファイルの合計（#42）。null は読み込み前。 */
+    /** 手元のファイルの合計。null は読み込み前。 */
     val localStorage: StateFlow<LocalStorageUsage?> = library.observeLocalStorage()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-    /** 取得元に見つからない番組の件数（#317）。0 番組なら設定の行を出さない。 */
+    /** 取得元に見つからない番組の件数。0 番組なら設定の行を出さない。 */
     val unmatched: StateFlow<UnmatchedPrograms> = downloads.observeUnmatchedPrograms()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UnmatchedPrograms(0, 0, 0))
 
@@ -135,7 +135,7 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** テーマ（#62）。null は読み込み前（チップは出すが無効にする）。 */
+    /** テーマ。null は読み込み前（チップは出すが無効にする）。 */
     val themeMode: StateFlow<ThemeMode?> = settings.themeMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     fun setThemeMode(value: ThemeMode) {
@@ -166,7 +166,7 @@ class SettingsViewModel @Inject constructor(
 
     /**
      * 「取得元を変える」。再生とダウンロード・同期の Worker を止めてから、手元のデータと音声ファイルを全部消して取得元の選択画面へ
-     * （セッション状態の変化で遷移する）。止めずに消すと、開いているファイルを消したり、Worker が行を作り直したりする（#50）。
+     * （セッション状態の変化で遷移する）。止めずに消すと、開いているファイルを消したり、Worker が行を作り直したりする。
      */
     fun resetAndConnectElsewhere() {
         viewModelScope.launch { sourceChanger.changeSource() }

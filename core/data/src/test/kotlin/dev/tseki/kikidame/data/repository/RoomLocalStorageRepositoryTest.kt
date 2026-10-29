@@ -23,7 +23,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
-/** 手元のファイルの内訳（番組ごと・回ごとの容量と、固定・再生済み・未再生の内訳）と、選んだ回の削除（#335）。 */
+/** 手元のファイルの内訳（番組ごと・回ごとの容量と、固定・再生済み・未再生の内訳）と、選んだ回の削除。 */
 @RunWith(AndroidJUnit4::class)
 class RoomLocalStorageRepositoryTest : RefreshTestBase() {
     private val storage by lazy { RoomLocalStorageRepository(db.localFileDao(), downloads) }
@@ -85,7 +85,7 @@ class RoomLocalStorageRepositoryTest : RefreshTestBase() {
 
         assertEquals(listOf(100L to 1), storage.observePrograms().first().map { it.totalBytes to it.episodeCount })
         assertEquals(listOf("done"), storage.observeEpisodes().first().map { it.title })
-        // 設定の行の合計（#42）と同じ定義
+        // 設定の行の合計と同じ定義
         val usage = library.observeLocalStorage().first()
         assertEquals(usage.totalBytes to usage.episodeCount, 100L to 1)
     }

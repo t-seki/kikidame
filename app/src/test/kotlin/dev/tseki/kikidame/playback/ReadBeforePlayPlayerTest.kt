@@ -22,7 +22,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
-/** ▶ の直前の読み込み（再生の共有、ADR 0010 の決定 5、#355）。 */
+/** ▶ の直前の読み込み（再生の共有、ADR 0010 の決定 5）。 */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class ReadBeforePlayPlayerTest {
@@ -126,7 +126,7 @@ class ReadBeforePlayPlayerTest {
         assertEquals(emptyList(), reads)
     }
 
-    /** 待っている間に出力先が外れたら、待っていた ▶ を取り消す（#358）。 */
+    /** 待っている間に出力先が外れたら、待っていた ▶ を取り消す。 */
     @Test
     fun cancelWhileReadingDoesNotPlayAndReturnsToPaused() = runTest(StandardTestDispatcher()) {
         val answer = CompletableDeferred<PlaybackState?>()

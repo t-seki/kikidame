@@ -30,7 +30,7 @@ import dev.tseki.kikidame.ui.source.ChangeSourceButton
 import dev.tseki.kikidame.ui.source.ChangeSourceViewModel
 
 /**
- * 取得元の接続画面（Jellyfin・SMB・端末のフォルダ）の枠（#237）。トップバー（[onBack] があるときだけ ←）、スクロールする縦の並び、
+ * 取得元の接続画面（Jellyfin・SMB・端末のフォルダ）の枠。トップバー（[onBack] があるときだけ ←）、スクロールする縦の並び、
  * 末尾の「取得元を変える」。[onBack] は取得元の選択から来たときだけ渡す。
  * ログアウトした後（[onBack] が無い）は取得元を選び直す入口が他に無いので「取得元を変える」を置き、手元を全部消した後に
  * [onSourceChanged]（初回の取得元の選択画面へ戻る）を呼ぶ。取得元の選択から来たときは戻るで選び直せるので置かない。

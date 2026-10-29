@@ -51,7 +51,7 @@ class FakeSessionRepository(initial: SessionState = jellyfinReady()) : SessionRe
         state.value = SessionState.SignedOut(null, null)
     }
 
-    /** 記録した全走査の最後の試み（記録した順。#346）。 */
+    /** 記録した全走査の最後の試み（記録した順）。 */
     val syncAttempts = mutableListOf<SyncAttempt>()
 
     /** 接続済みなら状態にも反映する（成功なら通知を出した記録も消す。`SessionStore` と同じ）。 */

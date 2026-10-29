@@ -3,7 +3,7 @@ package dev.tseki.kikidame.domain
 import kotlin.time.Duration
 import kotlin.time.Instant
 
-/** 取得元（CONTEXT.md）上の番組の、取り込みに必要な部分だけのスナップショット。Jellyfin の音楽のライブラリでは MusicAlbum、ブックのライブラリでは各回の Album のタグ（#354）。 */
+/** 取得元（CONTEXT.md）上の番組の、取り込みに必要な部分だけのスナップショット。Jellyfin の音楽のライブラリでは MusicAlbum、ブックのライブラリでは各回の Album のタグ。 */
 data class SourceProgram(
     val sourceId: SourceItemId,
     val name: String,
@@ -14,12 +14,12 @@ data class SourceProgram(
 )
 
 /**
- * 取得元にある番組の画像の目印（ADR 0009、#264）。[version] が前の同期と同じなら、画像を取り直さない。
- * 共有フォルダでは `folder.jpg` の大きさと更新日時から作る。Jellyfin ではアルバム（ブックのライブラリでは番組のフォルダ。#354）の Primary の ImageTag を使う（#282）。
+ * 取得元にある番組の画像の目印（ADR 0009）。[version] が前の同期と同じなら、画像を取り直さない。
+ * 共有フォルダでは `folder.jpg` の大きさと更新日時から作る。Jellyfin ではアルバム（ブックのライブラリでは番組のフォルダ）の Primary の ImageTag を使う。
  */
 data class SourceImage(val version: String)
 
-/** 取得元上の各回。Jellyfin の音楽のライブラリでは Audio、ブックのライブラリでは AudioBook（#354）。 */
+/** 取得元上の各回。Jellyfin の音楽のライブラリでは Audio、ブックのライブラリでは AudioBook。 */
 data class SourceEpisode(
     val sourceId: SourceItemId,
     val programSourceId: SourceItemId,
@@ -34,7 +34,7 @@ data class SourceEpisode(
     val performers: List<String> = emptyList(),
     /**
      * 一覧が返す、取得元のファイルのサイズ（バイト）。共有フォルダでだけ値があり、Jellyfin では null（一覧が返さない）。
-     * 更新日時（[sourceModifiedAt]）・取得元 ID（パス）と合わせて、タグを読み直すかの判定に使う（#197）。
+     * 更新日時（[sourceModifiedAt]）・取得元 ID（パス）と合わせて、タグを読み直すかの判定に使う。
      * **差し替え**（ADR 0011）でも、これが null でない取得元は [version] をそのまま信じ、版を持たない手元の回はこれと手元の大きさで比べる。
      * [sizeBytes] はダウンロードの完了時に実サイズで上書きされるので、判定には使わない。
      */
@@ -42,7 +42,7 @@ data class SourceEpisode(
     /** 共有フォルダでの、取得元のファイルの更新日時。Jellyfin では null（一覧が返さない）。 */
     val sourceModifiedAt: Instant? = null,
     /**
-     * ファイルの版（ADR 0011、#371）。取得元のファイルが書き換わったかを見分ける値で、**差し替え**の判断に使う。
+     * ファイルの版（ADR 0011）。取得元のファイルが書き換わったかを見分ける値で、**差し替え**の判断に使う。
      * 共有フォルダでは大きさと更新日時の組、Jellyfin では `Etag`。取得元が返さなければ null（差し替えの判断をしない）。
      */
     val version: String? = null,

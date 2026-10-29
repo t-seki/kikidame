@@ -1,5 +1,5 @@
 name: Release
-# v1.2.3 のタグを push すると release APK をビルドして GitHub Release に添付する（#94）。
+# v1.2.3 のタグを push すると release APK をビルドして GitHub Release に添付する。
 # 署名鍵は Secrets: KEYSTORE_BASE64（.jks を base64 にしたもの）、KEYSTORE_PASSWORD、KEY_ALIAS、KEY_PASSWORD。
 # APK の名前は kikidame-<version>.apk に固定する（Obtainium が追いやすい）。
 on:

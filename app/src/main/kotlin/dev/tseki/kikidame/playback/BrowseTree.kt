@@ -17,9 +17,9 @@ import dev.tseki.kikidame.text.toPublishedDateText
 import kotlinx.coroutines.flow.first
 import kotlin.time.Duration
 /**
- * Android Auto のブラウズツリー（#96）。ルートの下は「続きから」「よく聴く」「番組」のタブ → 番組 → 手元にある各回の
+ * Android Auto のブラウズツリー。ルートの下は「続きから」「よく聴く」「番組」のタブ → 番組 → 手元にある各回の
  * 3 階層（Auto が推奨する上限内）。手元に無い回は出さない（運転中に落とさせない）。
- * 「続きから」（#108）は途中まで聴いた各回（[LibraryRepository.getContinueListening]）を直接並べ、1 つも無ければタブごと出さない。
+ * 「続きから」は途中まで聴いた各回（[LibraryRepository.getContinueListening]）を直接並べ、1 つも無ければタブごと出さない。
  * 「よく聴く」は、印が付いていて手元に回がある番組が 1 つも無ければタブごと出さない。
  * 「最近」（`LibraryParams.isRecent`。端末の再起動直後などにシステムが出す再開の候補）は [Node.Recent] で、
  * 「続きから」の各回の先頭 1 件だけを返す。
@@ -27,7 +27,7 @@ import kotlin.time.Duration
  * ID の形は [Node]。各回の ID は [EpisodeMediaItems.mediaId] と同じなので、ツリーから選ばれた回は
  * 既存の `onAddMediaItems` / `onSetMediaItems` がそのまま解決できる。
  */
-// Media3 の MediaConstants（完了状態の extras）は unstable API。クラス単位で opt-in する（#111）
+// Media3 の MediaConstants（完了状態の extras）は unstable API。クラス単位で opt-in する
 @OptIn(UnstableApi::class)
 class BrowseTree(
     private val library: LibraryRepository,
@@ -120,7 +120,7 @@ class BrowseTree(
      *
      * Auto の一覧は legacy の `MediaDescriptionCompat.subtitle` を 2 行目に出す。Media3 の `LegacyConversions
      * .convertToMediaDescriptionCompat` は `displayTitle` が無いと title → artist → album の順で title / subtitle /
-     * description を埋め、`subtitle` は無視する（#113 で番組名だけが出た理由）。`displayTitle` を置くと `subtitle` /
+     * description を埋め、`subtitle` は無視する（置かないと Auto の 2 行目に番組名だけが出る）。`displayTitle` を置くと `subtitle` /
      * `description` がそのまま使われるので、ここでだけ置く。再生に載る方は `onSetMediaItems` が
      * [EpisodeMediaItems.toMediaItem] から作り直すので、通知・ロック画面の artist / album は変わらない。
      */
@@ -167,7 +167,7 @@ class BrowseTree(
 
         /**
          * 各回の 2 行目「公開日 · 番組名」。タイトルが公開日と同じ文字列の回では公開日を省いて番組名だけ
-         * （アプリの各回一覧と同じ規則。#66）。
+         * （アプリの各回一覧と同じ規則）。
          */
         fun episodeSubtitle(title: String, publishedText: String, programName: String): String =
             listOfNotNull(publishedText.takeIf { it != title }, programName).joinToString(" · ")

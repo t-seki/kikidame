@@ -3,7 +3,7 @@ package dev.tseki.kikidame.data.sharedfolder
 import java.io.InputStream
 
 /**
- * 位置を指定して読む関数（[readAt]）を、[offset] から読み進める [InputStream] にする（#233）。
+ * 位置を指定して読む関数（[readAt]）を、[offset] から読み進める [InputStream] にする。
  * [FolderTree.open] が返すストリーム（ダウンロードの本体）に、SMB と端末のフォルダの木が使う。
  *
  * - [readAt] は `(position, buffer, offset, size)` を受け、読んだバイト数を返す（末尾以降なら 0 以下）。

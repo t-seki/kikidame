@@ -188,7 +188,7 @@ class RoomDownloadRepositoryTest : JellyfinRefreshTestBase() {
         assertNull(library.getEpisode(present)!!.localFile)
     }
 
-    // --- 別の経路と重なったとき（#261）。行を書く文の直前に、別の経路の書き込みを差し込む ---
+    // --- 別の経路と重なったとき。行を書く文の直前に、別の経路の書き込みを差し込む ---
 
     @Test
     fun markRunningDoesNotBringBackACancelledRow() = runTest {

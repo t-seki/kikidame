@@ -6,7 +6,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import kotlin.test.assertEquals
 
-/** 電池の最適化を外す OS の確認の Intent（#347）。action と `package:` の URI を見る（Robolectric）。 */
+/** 電池の最適化を外す OS の確認の Intent。action と `package:` の URI を見る（Robolectric）。 */
 @RunWith(AndroidJUnit4::class)
 class BatteryOptimizationTest {
     @Test

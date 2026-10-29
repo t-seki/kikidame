@@ -37,7 +37,7 @@ internal enum class SyncSheetState { Hidden, Open, ConfirmRemove }
 /**
  * 番組の同期のシート（[ProgramSyncSheet]）と、番組を消す確認・同期をやめる確認の 2 つのダイアログ。
  * 状態は呼び出し側が持ち（トップバーのボタンで開くため）、番組が読めるまでは何も出さない。ViewModel は呼ばない
- * （シートを開いた・閉じたを伝えるのは呼び出し側。#311）。
+ * （シートを開いた・閉じたを伝えるのは呼び出し側）。
  * 同期をやめる確認は、呼び出し側から引数で渡される [pendingDisable]（null なら出さない）で開き、[SyncSheetState] とは関係ない。
  */
 @Composable
@@ -88,7 +88,7 @@ internal fun ProgramSyncDialogs(
 
 /**
  * 同期対象と保持ルールの編集。変えている間は保存するだけで、何も消えない。シートを閉じたとき、開いたときから設定が変わっていれば
- * その番組の同期が走って適用される（ダウンロードも削除も。#311）。開いた・閉じたを ViewModel に伝えるのはこのシートでも [ProgramSyncDialogs] でもなく、
+ * その番組の同期が走って適用される（ダウンロードも削除も）。開いた・閉じたを ViewModel に伝えるのはこのシートでも [ProgramSyncDialogs] でもなく、
  * 呼び出し側の `EpisodeListContent` が状態が [SyncSheetState.Open] の間だけ置く `DisposableEffect`。
  * 取得元 ID の無い番組は同期できないのでスイッチを無効にする。
  */
@@ -108,7 +108,7 @@ private fun ProgramSyncSheet(
     val enabled = program.syncEnabled
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Text(program.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
-        // この番組の手元のファイル（#42）。保持ルールを触る前に目に入る位置に
+        // この番組の手元のファイル。保持ルールを触る前に目に入る位置に
         localStorage?.let {
             Text(
                 if (it.episodeCount > 0) stringResource(R.string.episode_list_storage, it.toText().resolve()) else stringResource(R.string.episode_list_storage_empty),

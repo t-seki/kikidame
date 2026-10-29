@@ -39,7 +39,7 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
-/** 「続きから」タブ（#151）の ViewModel と行の補足。補足は並び・省略を見るので日本語で解決して比べる。 */
+/** 「続きから」タブの ViewModel と行の補足。補足は並び・省略を見るので日本語で解決して比べる。 */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 @Config(qualifiers = "ja")

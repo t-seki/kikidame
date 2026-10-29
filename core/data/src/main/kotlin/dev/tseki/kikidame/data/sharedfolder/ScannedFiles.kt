@@ -6,7 +6,7 @@ import dev.tseki.kikidame.domain.Ticks
 import kotlin.time.Duration
 import kotlin.time.Instant
 
-/** 前の走査で取り込んだ回の、タグ由来の値とファイルのサイズ・更新日時（#197）。 */
+/** 前の走査で取り込んだ回の、タグ由来の値とファイルのサイズ・更新日時。 */
 data class ScannedFile(
     val sizeBytes: Long,
     val modifiedAt: Instant,
@@ -16,7 +16,7 @@ data class ScannedFile(
     val performers: List<String>,
 )
 
-/** 前の走査の結果を、取得元 ID（相対パス）で引けるように読む。タグを読み直すかの判定に使う（epic #195 の決定 8）。 */
+/** 前の走査の結果を、取得元 ID（相対パス）で引けるように読む。タグを読み直すかの判定に使う。 */
 fun interface ScannedFiles {
     suspend fun load(): Map<SourceItemId, ScannedFile>
 }

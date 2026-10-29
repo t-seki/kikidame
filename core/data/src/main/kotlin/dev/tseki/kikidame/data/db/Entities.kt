@@ -7,7 +7,7 @@ import androidx.room.PrimaryKey
 import dev.tseki.kikidame.domain.DownloadState
 import kotlin.time.Instant
 /**
- * 番組 = MusicAlbum（Jellyfin のブックのライブラリでは各回の Album のタグ。#354）。主キーはローカル代理キー、取得元 ID は nullable unique（ADR 0001）。
+ * 番組 = MusicAlbum（Jellyfin のブックのライブラリでは各回の Album のタグ）。主キーはローカル代理キー、取得元 ID は nullable unique（ADR 0001）。
  * (配信元, 番組名) は突合のキーだが一意ではない（取得元に同名の番組が複数あり得る）。
  */
 @Entity(
@@ -29,14 +29,14 @@ data class ProgramEntity(
     /** よく聴く（表示用の印。CONTEXT.md）。v5 で追加 */
     @ColumnInfo(defaultValue = "0") val starred: Boolean = false,
     /**
-     * 手元に持っている番組の画像（ADR 0009、#264）の版（`SourceImage.version`）と、そのファイルの絶対パス。
+     * 手元に持っている番組の画像（ADR 0009）の版（`SourceImage.version`）と、そのファイルの絶対パス。
      * 版が取得元と同じなら画像を取り直さない。画像を持たなければどちらも null。2 つは同時に書く。
      * 取りに行って画像なしだった版（大きすぎるなど）は、版だけを持ちパスは null（同じ版の間は取り直さない）。v9 で追加
      */
     val imageVersion: String? = null,
     val imagePath: String? = null,
 )
-/** 各回 = Audio（Jellyfin のブックのライブラリでは AudioBook。#354）。 */
+/** 各回 = Audio（Jellyfin のブックのライブラリでは AudioBook）。 */
 @Entity(
     tableName = "episodes",
     indices = [Index("sourceItemId", unique = true), Index("programId")],
@@ -62,10 +62,10 @@ data class EpisodeEntity(
     val runtimeTicks: Long,
     val sizeBytes: Long,
     val container: String,
-    /** 出演者（Audio・AudioBook の Artists、#70）。[Converters] で 1 列に畳む。v6 で追加 */
+    /** 出演者（Audio・AudioBook の Artists）。[Converters] で 1 列に畳む。v6 で追加 */
     @ColumnInfo(defaultValue = "") val performers: List<String> = emptyList(),
     /**
-     * 共有フォルダでの、取得元のファイルのサイズと更新日時（#197）。Jellyfin の行と、v8 より前に取り込んだ行は null。
+     * 共有フォルダでの、取得元のファイルのサイズと更新日時。Jellyfin の行と、v8 より前に取り込んだ行は null。
      * 取得元 ID（相対パス）とこの 2 つがどれも前と同じ回は、タグを読み直さずにこの行の値を使う。
      * 走査のたびに取得元の値で上書きされるので、「落としたときの値」としては使えない（差し替えの判断は [LocalFileEntity.sourceVersion] と比べる。ADR 0011）。
      * [sizeBytes] はダウンロードの完了時に実サイズで上書きされるので、この判定には使わない。v8 で追加
@@ -73,7 +73,7 @@ data class EpisodeEntity(
     val sourceFileSize: Long? = null,
     val sourceModifiedAt: Instant? = null,
     /**
-     * 一覧で最後に見たファイルの版（`SourceEpisode.version`、ADR 0011、#371）。取得元が返さなければ null。取り込みのたびに一覧の値で書く。
+     * 一覧で最後に見たファイルの版（`SourceEpisode.version`、ADR 0011）。取得元が返さなければ null。取り込みのたびに一覧の値で書く。
      * ダウンロードを予約するとき（手動の予約を含む）に [LocalFileEntity.sourceVersion] へ写す。v11 で追加
      */
     val sourceVersion: String? = null,
@@ -104,7 +104,7 @@ data class LocalFileEntity(
     /** キューに入れた時刻。手動（固定）を先に、その中はこの古い順（FIFO）に落とす。同期の予約にも付く。差し替えの予約でも付け直す。v3 で追加 */
     val enqueuedAt: Instant? = null,
     /**
-     * 落としたときのファイルの版（ADR 0011、#371）。予約したときの一覧の版（[EpisodeEntity.sourceVersion]）を写し、落とし終えてもそのまま持つ。
+     * 落としたときのファイルの版（ADR 0011）。予約したときの一覧の版（[EpisodeEntity.sourceVersion]）を写し、落とし終えてもそのまま持つ。
      * 一覧の版と違えば**差し替え**を考える。v11 に上げる前に落とした行と、取得元が版を返さなかった行は null（大きさだけで比べる）。v11 で追加
      */
     val sourceVersion: String? = null,
@@ -138,7 +138,7 @@ data class PlaybackStateEntity(
     val played: Boolean,
     val updatedAt: Instant,
     /**
-     * 未送信（ADR 0010 の決定 5、#355）。手元で位置か再生済みが変わると立ち、取得元に送れたら下りる。取得元が共有しないとき
+     * 未送信（ADR 0010 の決定 5）。手元で位置か再生済みが変わると立ち、取得元に送れたら下りる。取得元が共有しないとき
      * （音楽のライブラリ・共有フォルダ）も立つが送らない。突合で取得元 ID が変わった回も立つ。v10 で追加。
      * 列の既定は 1: v10 に上げた時点で手元にある行は、まだ一度も送っていないので未送信として扱う（ブックのライブラリを選んだまま上げた端末や、
      * この版より前に音楽からブックへ移って結び直し済みの端末でも、最初の同期で送る。サーバに別の値があれば新しい方。ADR 0010 の決定 7）。

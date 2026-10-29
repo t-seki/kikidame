@@ -2,7 +2,7 @@ package dev.tseki.kikidame.playback
 import androidx.media3.common.MediaItem
 import org.junit.Test
 import kotlin.test.assertEquals
-/** `onGetChildren` のページ分割（#96）。Auto は普通ページを指定しないので、指定が無ければ全部。 */
+/** `onGetChildren` のページ分割。Auto は普通ページを指定しないので、指定が無ければ全部。 */
 class PaginateTest {
     private val items = (1..5).map { MediaItem.Builder().setMediaId(it.toString()).build() }
     private fun ids(list: List<MediaItem>) = list.map { it.mediaId }

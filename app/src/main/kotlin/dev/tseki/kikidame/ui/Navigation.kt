@@ -40,10 +40,10 @@ import kotlinx.serialization.Serializable
 import javax.inject.Inject
 import kotlin.reflect.KClass
 
-/** 番組ごとの手元の回の一覧（#335）で最後の回を消して戻るとき、消した後の文言を内訳の画面へ渡すキー。 */
+/** 番組ごとの手元の回の一覧で最後の回を消して戻るとき、消した後の文言を内訳の画面へ渡すキー。 */
 private const val STORAGE_RETURNED_MESSAGE = "storage_returned_message"
 
-/** 初回の取得元の選択（#198）。 */
+/** 初回の取得元の選択。 */
 @Serializable
 object SourcePickRoute
 
@@ -51,11 +51,11 @@ object SourcePickRoute
 @Serializable
 object ConnectRoute
 
-/** NAS の共有フォルダ（SMB）への接続（#198）。 */
+/** NAS の共有フォルダ（SMB）への接続。 */
 @Serializable
 object SmbConnectRoute
 
-/** 端末のフォルダ（SAF）の説明と選択（#199）。 */
+/** 端末のフォルダ（SAF）の説明と選択。 */
 @Serializable
 object DeviceFolderRoute
 
@@ -67,11 +67,11 @@ object SettingsRoute
 @Serializable
 object LicensesRoute
 
-/** 手元のファイルの内訳（#335）。設定の「手元のファイル」の行から開く。 */
+/** 手元のファイルの内訳。設定の「手元のファイル」の行から開く。 */
 @Serializable
 object StorageRoute
 
-/** 番組ごとの手元の回の一覧（#335）。内訳の画面の番組の行から開く。番組名は、最後の回を消して番組ごと消えてもトップバーに出せるように持つ。 */
+/** 番組ごとの手元の回の一覧。内訳の画面の番組の行から開く。番組名は、最後の回を消して番組ごと消えてもトップバーに出せるように持つ。 */
 @Serializable
 data class StorageProgramRoute(val programId: Long, val programName: String)
 
@@ -80,7 +80,7 @@ object ProgramListRoute
 
 @Serializable
 data class EpisodeListRoute(val programId: Long)
-/** 各回の詳細（#43）。番組の各回一覧と「続きから」タブ（#151）の長押しから開く。番組から引くので programId も持つ。 */
+/** 各回の詳細。番組の各回一覧と「続きから」タブの長押しから開く。番組から引くので programId も持つ。 */
 @Serializable
 data class EpisodeDetailsRoute(val programId: Long, val episodeId: Long)
 
@@ -102,8 +102,8 @@ class SessionViewModel @Inject constructor(
 }
 
 /**
- * 番組の画面（根。「続きから・よく聴く・番組一覧」のタブ、#151）→ 各回一覧 → 再生画面 の 3 階層に、取得元の選択（#198）・Jellyfin の接続画面・SMB の接続画面（#198）・
- * 端末のフォルダの説明と選択（#199）・ライブラリ選択・設定・各回の詳細と、設定から開く手元のファイルの内訳・番組ごとの手元の回の一覧（#335）を足したもの。
+ * 番組の画面（根。「続きから・よく聴く・番組一覧」のタブ）→ 各回一覧 → 再生画面 の 3 階層に、取得元の選択・Jellyfin の接続画面・SMB の接続画面・
+ * 端末のフォルダの説明と選択・ライブラリ選択・設定・各回の詳細と、設定から開く手元のファイルの内訳・番組ごとの手元の回の一覧を足したもの。
  * 「続きから」タブの行からは、各回一覧を経ずに再生画面と各回の詳細へ直接行く。
  * 起動時はセッション状態で開始画面を決め、その後は状態の**変化**（ログアウト・401・ライブラリ選択）で遷移する。
  * デバッグ用に接続画面から番組一覧へ抜けても、状態が変わらない限り戻されない。
@@ -192,7 +192,7 @@ fun KikidameNavHost(sessionViewModel: SessionViewModel = hiltViewModel()) {
                 onProgramClick = { navController.navigate(EpisodeListRoute(it.value)) },
                 onSettingsClick = { navController.navigate(SettingsRoute) },
                 onNowPlayingClick = { navController.navigate(PlayerRoute(it.value, play = false)) },
-                // 「続きから」タブ（#151）の行は各回一覧の行と同じ行き先
+                // 「続きから」タブの行は各回一覧の行と同じ行き先
                 onEpisodeClick = { navController.navigate(PlayerRoute(it.value)) },
                 onEpisodeDetails = { programId, episodeId -> navController.navigate(EpisodeDetailsRoute(programId.value, episodeId.value)) },
             )
@@ -223,7 +223,7 @@ private fun NavHostController.popIfNotRoot() {
 }
 
 /**
- * [entry] の画面を 1 回だけ閉じる。画面が自分から戻るとき（番組ごとの手元の回が 0 になった、#335）に、
+ * [entry] の画面を 1 回だけ閉じる。画面が自分から戻るとき（番組ごとの手元の回が 0 になった）に、
  * 戻る操作と重なっても 2 画面戻らないように、[entry] が最上位のときだけポップする。
  */
 @Composable
@@ -247,7 +247,7 @@ private fun SessionState.SignedOut.signedOutDestination(): Any = when {
 /**
  * [backOrNull] を、その画面の back stack entry ごとに入った時点で 1 回だけ決める。
  * 事実: composition のたびに [backOrNull] を読むと、← で戻るとき、消えていく接続画面に
- * 「取得元を変える」が一瞬出た（#260、実機の debug 版）。
+ * 「取得元を変える」が一瞬出る（端末で確かめた）。
  * 推測（未確認）: 退場のアニメーションの間に描き直され、そのとき `previousBackStackEntry` が
  * 新しい最上位から見たものに変わって null になるためと見ている。
  */

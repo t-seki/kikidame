@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# テスト用の Jellyfin をコンテナで立てる（#97）。
+# テスト用の Jellyfin をコンテナで立てる。
 #
 #   scripts/jellyfin-testserver.sh up 1010     # Jellyfin 10.10.x を http://localhost:8097 に
 #   scripts/jellyfin-testserver.sh up 12       # Jellyfin 12.x    を http://localhost:8098 に
@@ -7,12 +7,12 @@
 #   scripts/jellyfin-testserver.sh media       # 合成ライブラリだけ作り直す
 #
 # KIKIDAME_JF_LIBRARY=showcase を付けると、統合テスト用の日本語ライブラリ（番組 2 × 各回 3）の代わりに、
-# スクリーンショット用の英語の架空ライブラリ（Example FM / Example Public Radio の 5 番組、45 回）を作る（#95）。
+# スクリーンショット用の英語の架空ライブラリ（Example FM / Example Public Radio の 5 番組、45 回）を作る。
 #
-# up は、ffmpeg で無音の m4a を作った合成ライブラリ（番組 2 × 各回 3。番組 A のフォルダにだけ folder.jpg を置く（番組の画像、#282））をマウントし、
+# up は、ffmpeg で無音の m4a を作った合成ライブラリ（番組 2 × 各回 3。番組 A のフォルダにだけ folder.jpg を置く（番組の画像））をマウントし、
 # 初期セットアップ（言語・ユーザー・リモートアクセス・完了）と音楽ライブラリ「radio」の作成を REST で済ませ、
-# スキャンが終わるまで待つ。ブックのライブラリ「radio-book」（#354）も作る。中身は音楽と同じ 6 本と folder.jpg に、各回が 1 本だけの番組 C を足したもので、
-# 音楽とは別のディレクトリ（/media-book）に置く（同じパスを 2 つのライブラリに入れると、アイテムが使い回されて Audio のまま見えるため。#352）。
+# スキャンが終わるまで待つ。ブックのライブラリ「radio-book」も作る。中身は音楽と同じ 6 本と folder.jpg に、各回が 1 本だけの番組 C を足したもので、
+# 音楽とは別のディレクトリ（/media-book）に置く（同じパスを 2 つのライブラリに入れると、アイテムが使い回されて Audio のまま見えるため）。
 # 終わると統合テスト用の環境変数を表示する:
 #
 #   KIKIDAME_JELLYFIN_URL=http://localhost:8097 KIKIDAME_JELLYFIN_USER=kikidame KIKIDAME_JELLYFIN_PASSWORD=kikidame-test \
@@ -46,8 +46,8 @@ make_track() {
   fi
 }
 
-# スクリーンショット用（#95）: 英語の架空の配信元・番組。実在の局名・番組名は誤解を招くので使わない。
-# 尺は 25〜60 分の無音（12 秒だと一覧の尺が「0:12」になって不自然）。#95 の PR のスクリーンショットはこのライブラリで撮った。
+# スクリーンショット用: 英語の架空の配信元・番組。実在の局名・番組名は誤解を招くので使わない。
+# 尺は 25〜60 分の無音（12 秒だと一覧の尺が「0:12」になって不自然）。
 make_showcase_track() {
   local out="$1" title="$2" album="$3" publisher="$4" date="$5" artist="$6"
   local dur=$(( 1500 + (RANDOM % 8) * 300 ))
@@ -96,14 +96,14 @@ make_media() {
   make_track "$MEDIA/ニッポン放送/テスト番組A/2026-09-14.m4a"     "2026-09-14"     "テスト番組A" "ニッポン放送" "2026-09-14" "出演者甲;出演者乙"
   make_track "$MEDIA/ニッポン放送/テスト番組A/2026-09-14 (1).m4a" "2026-09-14 (1)" "テスト番組A" "ニッポン放送" "2026-09-14" "出演者甲"
   make_track "$MEDIA/ニッポン放送/テスト番組A/夏休みスペシャル.m4a" "夏休みスペシャル" "テスト番組A" "ニッポン放送" "2026-08-01" "出演者甲"
-  # 番組 A だけ folder.jpg を置く（番組の画像。#282。Jellyfin はアルバムの Primary にフォルダの folder.jpg を使う）。番組 B は画像なし
+  # 番組 A だけ folder.jpg を置く（番組の画像。Jellyfin はアルバムの Primary にフォルダの folder.jpg を使う）。番組 B は画像なし
   ffmpeg -loglevel error -y -f lavfi -i color=c=red:s=64x64 -frames:v 1 "$MEDIA/ニッポン放送/テスト番組A/folder.jpg"
   # 番組 B: 出演者が無い回を含む
   make_track "$MEDIA/TBSラジオ/テスト番組B/2026-09-07.m4a" "2026-09-07" "テスト番組B" "TBSラジオ" "2026-09-07" "出演者丙"
   make_track "$MEDIA/TBSラジオ/テスト番組B/2026-08-31.m4a" "2026-08-31" "テスト番組B" "TBSラジオ" "2026-08-31" ""
   make_track "$MEDIA/TBSラジオ/テスト番組B/2026-08-24.m4a" "2026-08-24" "テスト番組B" "TBSラジオ" "2026-08-24" "出演者丙"
   echo "media: $MEDIA ($(find "$MEDIA" -name '*.m4a' | wc -l) tracks)"
-  # ブックのライブラリ（#354）: 音楽と同じ 6 本と folder.jpg に、各回が 1 本だけの番組 C（ニッポン放送）を足す。
+  # ブックのライブラリ: 音楽と同じ 6 本と folder.jpg に、各回が 1 本だけの番組 C（ニッポン放送）を足す。
   # 各回が 1 本だけの番組は、各回の親が配信元のフォルダになる。配信元のフォルダにも folder.jpg を置き、それが番組 C の画像にならないことを見る
   cp -R "$MEDIA/." "$BOOK_MEDIA/"
   make_track "$BOOK_MEDIA/ニッポン放送/テスト番組C/2026-09-01.m4a" "2026-09-01" "テスト番組C" "ニッポン放送" "2026-09-01" "出演者丁"
@@ -179,7 +179,7 @@ up() {
       -d '{"LibraryOptions":{"PathInfos":[{"Path":"/media"}],"EnableEmbeddedTitles":true,"SaveLocalMetadata":false,"MetadataSavers":[],"TypeOptions":[{"Type":"MusicAlbum","MetadataFetchers":[],"ImageFetchers":[]},{"Type":"MusicArtist","MetadataFetchers":[],"ImageFetchers":[]},{"Type":"Audio","MetadataFetchers":[],"ImageFetchers":[]}]}}'
     echo "library: radio created, scanning"
   fi
-  # ブックのライブラリ radio-book（#354）。メタデータ取得は同じく全部切る
+  # ブックのライブラリ radio-book。メタデータ取得は同じく全部切る
   if ! curl -sf -H "$token_header" "$URL/Library/VirtualFolders" | grep -q '"Name":"radio-book"'; then
     curl -sf -X POST -H 'Content-Type: application/json' -H "$token_header" \
       "$URL/Library/VirtualFolders?name=radio-book&collectionType=books&refreshLibrary=true" \

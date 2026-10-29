@@ -59,7 +59,7 @@ data class PlayerUiState(
     val durationMs: Long = 0,
     val hasPrevious: Boolean = false,
     val hasNext: Boolean = false,
-    /** 再生中の回に埋め込まれたチャプター（#348。hidden を除き開始の順）。無ければ空。 */
+    /** 再生中の回に埋め込まれたチャプター（hidden を除き開始の順）。無ければ空。 */
     val chapters: List<EpisodeChapter> = emptyList(),
     val error: UiText? = null,
 )
@@ -89,7 +89,7 @@ class PlayerViewModel @Inject constructor(
         .flatMapLatest { id -> if (id == null) flowOf(false) else playbackStates.observe(id).map { it?.played == true } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
     /**
-     * タイトルの下の `配信元 · 出演者`（#70）。配信元は番組から、出演者は各回から取り、どちらも Room を購読する
+     * タイトルの下の `配信元 · 出演者`。配信元は番組から、出演者は各回から取り、どちらも Room を購読する
      * （この画面を開いたまま同期が出演者を書き換えても追従する）。どちらも無ければ null。番組 ID を知るために最初に 1 回だけ各回を引く。
      */
     val subtitle: StateFlow<UiText?> = _uiState
@@ -105,7 +105,7 @@ class PlayerViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     /**
-     * 再生中の回の番組の画像（ADR 0009、#264）。無ければ null。番組を購読するので、この画面を開いたまま同期が画像を取り直しても追従する。
+     * 再生中の回の番組の画像（ADR 0009）。無ければ null。番組を購読するので、この画面を開いたまま同期が画像を取り直しても追従する。
      * 画面に出すのは [episodeImage] を優先し、これはその回の画像が無いときの番組の画像。
      * 回の画像として番組の画像が載った後は、同期が番組の画像を取り直しても、次に回が替わるまで再生画面・通知の画像は差し替わらない（載せた `artworkData` を読むため）。
      */
@@ -122,12 +122,12 @@ class PlayerViewModel @Inject constructor(
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     /**
-     * 再生中の回の画像（#283）。サービスが現在の項目の `artworkData` に載せたもの（回の埋め込み画像、無ければ番組の画像。通知・ロック画面・Auto と同じ）。
+     * 再生中の回の画像。サービスが現在の項目の `artworkData` に載せたもの（回の埋め込み画像、無ければ番組の画像。通知・ロック画面・Auto と同じ）。
      * 載るまで・どちらも無いときは null。
      */
     val episodeImage: StateFlow<ByteArray?> = _episodeImage
 
-    /** 倍速（#35）。アプリ全体の設定で、サービス側が同じ Flow を購読してプレイヤーに反映する。 */
+    /** 倍速。アプリ全体の設定で、サービス側が同じ Flow を購読してプレイヤーに反映する。 */
     val speed: StateFlow<Float> = settings.playbackSpeed
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlaybackSpeed.DEFAULT)
 
@@ -144,7 +144,7 @@ class PlayerViewModel @Inject constructor(
     }
 
     /**
-     * スリープタイマーの表示（#36）: 残り時間「24:59」（60 分直後は「1:00:00」。一時停止中は止まったまま）、「回の終わり」、未設定なら null。
+     * スリープタイマーの表示: 残り時間「24:59」（60 分直後は「1:00:00」。一時停止中は止まったまま）、「回の終わり」、未設定なら null。
      * 設定済みかどうかは、画面がこれの null かどうかで見る（どの設定も最初の値をすぐ出すので、設定済みで null のまま残らない）。
      */
     val sleepTimerLabel: StateFlow<UiText?> = sleepTimer.setting
@@ -168,7 +168,7 @@ class PlayerViewModel @Inject constructor(
     fun setSleepTimerToEndOfEpisode() = sleepTimer.set(SleepTimerSetting.EndOfEpisode)
 
     private var controller: MediaController? = null
-    /** onEvents が位置の読みのループの待ちを打ち切って、その位置から待ち直させる（#367）。溜めるのは 1 つだけ。 */
+    /** onEvents が位置の読みのループの待ちを打ち切って、その位置から待ち直させる。溜めるのは 1 つだけ。 */
     private val wakeUps = Channel<Unit>(Channel.CONFLATED)
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
@@ -186,7 +186,7 @@ class PlayerViewModel @Inject constructor(
             controller = c
             c.addListener(listener)
             open(c, requestedEpisodeId, route.play)
-            // 再生中は秒の境目（とチャプターの開始）の直後に読む（#367）。onEvents が来たらその位置から待ち直す
+            // 再生中は秒の境目（とチャプターの開始）の直後に読む。onEvents が来たらその位置から待ち直す
             while (isActive) {
                 refresh(c)
                 // refresh が読んだ位置を使い回す（読み直すと秒の境目をまたいで待ちが約 1 秒になり、秒を飛ばす）
@@ -220,7 +220,7 @@ class PlayerViewModel @Inject constructor(
             _uiState.update { it.copy(error = UiText.Res(R.string.player_error_not_on_device)) }
             return
         }
-        // ファイルマネージャ等で消されていたら、ここで整合して再生しない（#5）
+        // ファイルマネージャ等で消されていたら、ここで整合して再生しない
         val present = runCatching { downloads.ensureFilePresent(episodeId) }.getOrDefault(true)
         if (!present) {
             _uiState.update { it.copy(error = UiText.Res(R.string.player_error_file_missing)) }

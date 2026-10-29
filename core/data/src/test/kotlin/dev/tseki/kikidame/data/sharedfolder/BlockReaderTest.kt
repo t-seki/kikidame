@@ -6,7 +6,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** タグの読み取り用のまとめ読み（#209 の決定 5）。木への往復（[MemoryFolderTree.reads]）を数える。 */
+/** タグの読み取り用のまとめ読み。木への往復（[MemoryFolderTree.reads]）を数える。 */
 class BlockReaderTest {
     private val folder = MemoryFolderTree()
     private val path = "P/番組/a.m4a"
@@ -25,7 +25,7 @@ class BlockReaderTest {
         assertEquals(4, BlockReader.MAX_BLOCKS)
     }
 
-    /** 小さな読み出しを先頭から続けても、塊 1 つにつき 1 往復（m4a の 2,048 バイト × 150 回。#209 の計測）。 */
+    /** 小さな読み出しを先頭から続けても、塊 1 つにつき 1 往復（計測した m4a の 2,048 バイト × 150 回）。 */
     @Test
     fun smallSequentialReadsShareOneRoundTripPerBlock() {
         val bytes = file(11 * 1024 * 1024)
@@ -41,8 +41,7 @@ class BlockReaderTest {
     }
 
     /**
-     * 先頭と末尾の近くを交互に読んでも、塊を捨て合わずに往復が減る（m4a には末尾の近く（約 10.67 MB の位置）まで読むファイルがあった。
-     * #209 の計測）。
+     * 先頭と末尾の近くを交互に読んでも、塊を捨て合わずに往復が減る（計測では、m4a には末尾の近く（約 10.67 MB の位置）まで読むファイルがあった）。
      */
     @Test
     fun alternatingReadsAtTheHeadAndNearTheEndStayCached() {

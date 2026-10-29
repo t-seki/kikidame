@@ -67,7 +67,7 @@ import dev.tseki.kikidame.ui.toText
 import kotlinx.coroutines.launch
 
 /*
- * 手元のファイルの内訳（#335）。設定の「手元のファイル」の行から開く。
+ * 手元のファイルの内訳。設定の「手元のファイル」の行から開く。
  * - 内訳の画面（[StorageScreen]）: 上に合計、「番組ごと」と「すべての回」のタブ。番組の行を押すと番組ごとの一覧へ
  * - 番組ごとの一覧（[StorageProgramScreen]）: その番組の手元の回だけ（公開日の新しい順）
  * 回の行は押すとチェックが付く・外れる（詳細・再生には移らない）。1 回以上選ぶと下に「N 回を消す（XX MB）」が出る。
@@ -379,7 +379,7 @@ private fun DeleteBar(state: SelectionUiState) {
 
 /**
  * 消す前の確認。件数と容量、取得元 ID の無い回の件数（0 回なら書かない）、同期対象の番組の回を含むときだけ一般の文を足す。
- * どの回が落とし直されるかの予測はしない。ボタンは赤の「消す」と「キャンセル」（#317 の確認と同じ形）。
+ * どの回が落とし直されるかの予測はしない。ボタンは赤の「消す」と「キャンセル」（取得元に見つからない番組をまとめて消すときの確認と同じ形）。
  */
 @Composable
 private fun DeleteConfirmDialog(state: SelectionUiState) {

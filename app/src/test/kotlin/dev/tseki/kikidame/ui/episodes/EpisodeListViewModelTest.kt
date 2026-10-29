@@ -40,7 +40,7 @@ import kotlin.time.Clock
 
 /**
  * 各回一覧の ViewModel の同期対象の切り替え（[EpisodeListViewModel.setSyncEnabled] と OFF の確認 [EpisodeListViewModel.pendingDisable]）と、
- * 同期のシートを閉じたときの 1 番組の同期（[EpisodeListViewModel.onSyncSheetClosed]。#311）。
+ * 同期のシートを閉じたときの 1 番組の同期（[EpisodeListViewModel.onSyncSheetClosed]）。
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -154,7 +154,7 @@ class EpisodeListViewModelTest {
         vm.onSyncSheetOpened()
     }
 
-    /** 設定を変えている間は同期せず、閉じたときに開いたときから変わっていれば、その番組だけを同期する（#311 の決定 1）。 */
+    /** 設定を変えている間は同期せず、閉じたときに開いたときから変わっていれば、その番組だけを同期する。 */
     @Test
     fun closingTheSheetSyncsTheProgramWhenTheSettingsChanged() = runTest(dispatcher) {
         library.programs.value = listOf(program(1), program(2))
@@ -169,7 +169,7 @@ class EpisodeListViewModelTest {
         assertEquals(listOf(ProgramId(1)), refreshRepository.syncedPrograms)
     }
 
-    /** 保持ルールだけを変えて閉じても同期する（件数を減らして閉じれば、その場で消える。#311 の決定 2）。 */
+    /** 保持ルールだけを変えて閉じても同期する（件数を減らして閉じれば、その場で消える）。 */
     @Test
     fun closingTheSheetSyncsWhenOnlyTheRuleChanged() = runTest(dispatcher) {
         library.programs.value = listOf(program(1, syncEnabled = true, rule = RetentionRule(keepLatest = 5)))
@@ -194,7 +194,7 @@ class EpisodeListViewModelTest {
 
     /**
      * ON にして OFF に戻して閉じたら同期しない。ON にしたときに上限の既定の 3 が入って保持ルールは変わるが、
-     * OFF の番組の同期は保持ルールを見ないので、変わったとはしない（#311 の決定 1）。
+     * OFF の番組の同期は保持ルールを見ないので、変わったとはしない。
      */
     @Test
     fun closingTheSheetAfterTurningSyncOnAndOffAgainDoesNotSync() = runTest(dispatcher) {

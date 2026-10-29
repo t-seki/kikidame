@@ -10,7 +10,7 @@ android {
     compileSdk = 37
     defaultConfig {
         minSdk = 31
-        // smbj が参照する Android に無いクラスの R8 の警告を抑える（#198）
+        // smbj が参照する Android に無いクラスの R8 の警告を抑える
         consumerProguardFiles("consumer-rules.pro")
     }
     compileOptions {
@@ -54,13 +54,13 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)
     testImplementation(libs.room.testing)
-    // 統合テスト（#97）が SDK を本物のまま動かすので、app と同じ slf4j バインディングをテストにも
+    // 統合テストが SDK を本物のまま動かすので、app と同じ slf4j バインディングをテストにも
     testRuntimeOnly(libs.slf4j.android)
 }
 
-// 統合テスト（#97）: 環境変数はテストタスクの入力に数えられないので、KIKIDAME_JELLYFIN_URL が付いているときは
+// 統合テスト: 環境変数はテストタスクの入力に数えられないので、KIKIDAME_JELLYFIN_URL が付いているときは
 // up-to-date と build cache（gradle.properties の org.gradle.caching=true）の両方を無効にして毎回走らせる
-// （サーバの中身が変わっても飛ばされないように）。付いていなければ今までどおりキャッシュが効く
+// （サーバの中身が変わっても飛ばされないように）。付いていなければキャッシュが効く
 tasks.withType<Test>().configureEach {
     val jellyfinUrl = System.getenv("KIKIDAME_JELLYFIN_URL") ?: ""
     inputs.property("kikidameJellyfinUrl", jellyfinUrl)

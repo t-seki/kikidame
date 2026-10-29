@@ -40,14 +40,14 @@ import kotlinx.datetime.todayIn
 
 /**
  * 左端の ★ でよく聴くを切り替える。右端は同期対象／消失の状態表示。
- * ★ の右、番組名の左に 48dp の正方形で番組の画像（ADR 0009、#264）を置く。[reserveImage] が true なら、画像の無い番組でも
+ * ★ の右、番組名の左に 48dp の正方形で番組の画像（ADR 0009）を置く。[reserveImage] が true なら、画像の無い番組でも
  * 48dp を空けて（何も描かない）文字の位置を全行でそろえる。一覧の中に画像を持つ番組が 1 つも無いときは、呼び出し側が false にして詰める。
  *
- * M3 の `ListItem` は補足が 2 行に折り返して 3 行になると左右の要素を上に寄せる（`ListItem.kt` の `place()`、#157）。
+ * M3 の `ListItem` は補足が 2 行に折り返して 3 行になると左右の要素を上に寄せる（`ListItem.kt` の `place()`）。
  * 番組の行は行の高さに関わらず左右を真ん中に置く方針なので、`ListItem` は使わず [Row] で組む。
  * 左右は本文の高さが決まる前に測られるので、中身を `fillMaxHeight` で中央寄せにしても `ListItem` では真ん中に置けない。
  * 余白・最小の高さ・文字のスタイルと色は、`ListItem`（material3 1.4.0）の 1〜2 行のときの値に合わせてある。
- * 3 行になっても上下 8dp・最小 72dp のままにする（`ListItem` の 3 行の既定は上下 12dp・最小 88dp。#157 で決めた）。
+ * 3 行になっても上下 8dp・最小 72dp のままにする（`ListItem` の 3 行の既定は上下 12dp・最小 88dp）。
  */
 @Composable
 internal fun ProgramRow(summary: ProgramSummary, reserveImage: Boolean, onClick: () -> Unit, onToggleStarred: () -> Unit) {
@@ -96,7 +96,7 @@ internal fun ProgramRow(summary: ProgramSummary, reserveImage: Boolean, onClick:
 }
 
 /**
- * 行の補足（#41）: `配信元 · 未再生 N / 手元 L · 全 E 回 · 最新 MM-DD`。
+ * 行の補足: `配信元 · 未再生 N / 手元 L · 全 E 回 · 最新 MM-DD`。
  * 未再生 0 なら「未再生 N /」を省き、手元 = 全なら「全 E 回」を「回」に畳む（「/」が 2 つ並ばないよう「全」の前は「·」）。
  * 配信元が無い・各回が無い（最新なし）ならその部分を省き、消失なら末尾に「取得元に見つかりません」を足す。
  */

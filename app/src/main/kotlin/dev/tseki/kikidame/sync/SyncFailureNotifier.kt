@@ -24,7 +24,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 全走査の失敗の理由の文言（#346 の決定 3）。同期の結果のスナックバー、設定の「最終同期」の補足の行、同期の失敗の通知が同じ文言を使う。
+ * 全走査の失敗の理由の文言。同期の結果のスナックバー、設定の「最終同期」の補足の行、同期の失敗の通知が同じ文言を使う。
  */
 fun SyncOutcome.Failure.reason(): UiText = when (this) {
     SyncOutcome.Unreachable -> UiText.Res(R.string.sync_error_unreachable)
@@ -33,7 +33,7 @@ fun SyncOutcome.Failure.reason(): UiText = when (this) {
 }
 
 /**
- * 同期の失敗の通知（#346 の決定 5）を出す・消す口。出すかどうかの判断は [SyncWorker.shouldNotifyFailure]、消すのは全走査が成功したとき・
+ * 同期の失敗の通知を出す・消す口。出すかどうかの判断は [SyncWorker.shouldNotifyFailure]、消すのは全走査が成功したとき・
  * ログアウトと取得元を変える前・401 でログアウトするとき
  * （[LibraryRefresher]・`DownloadWorker`・`LibraryPickViewModel`）。テストでは偽物に差し替える。
  */

@@ -9,7 +9,7 @@ import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-/** 各回一覧と「続きから」が共通で使う部品（#230）のうち純粋な関数。どの文言が選ばれたかを [UiText] で比べる（ADR 0006）。 */
+/** 各回一覧と「続きから」が共通で使う部品のうち純粋な関数。どの文言が選ばれたかを [UiText] で比べる（ADR 0006）。 */
 class EpisodeActionsTest {
     @Test
     fun fileOnlyOfSyncedProgramSaysItComesBackOnNextSync() {

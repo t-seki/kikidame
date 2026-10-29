@@ -48,20 +48,20 @@ import kotlin.time.Instant
 /**
  * 取得元の一覧を [SourceGateway] から取得し、突合（[LibraryMatching]）して Room に 1 トランザクションで適用する。
  * 取得元由来の各回は取得元の値で上書きし（取得元が返さないサイズだけ手元の値を残す。出演者は空でも上書き。
- * 共有フォルダのファイルのサイズ・更新日時（`sourceFileSize` / `sourceModifiedAt`、#197）とファイルの版（`sourceVersion`、ADR 0011）も取得元の値で書く）、`LocalFile` は触らない。`PlaybackState` は再生の共有（下）のときだけ書く。
+ * 共有フォルダのファイルのサイズ・更新日時（`sourceFileSize` / `sourceModifiedAt`）とファイルの版（`sourceVersion`、ADR 0011）も取得元の値で書く）、`LocalFile` は触らない。`PlaybackState` は再生の共有（下）のときだけ書く。
  *
  * 全走査（[refresh]）は同期そのもの: 取り込んだ後に [SyncPlanner] を回し、保持ルールによる削除・取得元から消えた各回の除去・
  * ダウンロードの予約まで行う（ADR 0003）。1 番組の同期（[syncProgram]）は、その番組だけを取り込んで同期する。
  * 共有フォルダの全走査では、取得元がタグを読み終えた番組から先に 1 番組ずつ取り込んで同期し（[syncProgram] と同じ範囲）、
- * 全部を読み終えたら全体を取り込み直して消失を判断する（#209 の決定 1）。どの取り込みも、それぞれ 1 トランザクション。
+ * 全部を読み終えたら全体を取り込み直して消失を判断する。どの取り込みも、それぞれ 1 トランザクション。
  *
- * 差し替え（ADR 0011、#371）: 同期（[synchronize]）の中で、手元にある回のファイルが取得元で書き換わったかを見分け、差し替えを予約する。
+ * 差し替え（ADR 0011）: 同期（[synchronize]）の中で、手元にある回のファイルが取得元で書き換わったかを見分け、差し替えを予約する。
  *
- * 再生の共有（ADR 0010、#355）: 全走査と 1 番組の同期では、取り込みの後・同期（削除・予約）の前に、一覧と一緒に読んだ UserData を
+ * 再生の共有（ADR 0010）: 全走査と 1 番組の同期では、取り込みの後・同期（削除・予約）の前に、一覧と一緒に読んだ UserData を
  * 手元と突き合わせる（[PlaybackSharing.reconcile]。共有する取得元（Jellyfin のブックのライブラリ）だけ）。[excluded]（聴いている回）は手元のまま。
  * 結び直した各回の再生の状態は未送信にする。
  *
- * 番組の画像（ADR 0009、#264）も、取り込みのたびに取得元にそろえる（[updateImages]）。番組ごとの取り込み・全走査の最後の取り込み・
+ * 番組の画像（ADR 0009）も、取り込みのたびに取得元にそろえる（[updateImages]）。番組ごとの取り込み・全走査の最後の取り込み・
  * 1 番組の同期のどれでも、同期（削除・予約）の後に行う。取り直すのは版（[dev.tseki.kikidame.domain.SourceImage.version]）が
  * 変わったときだけ。全走査の最後に、どの番組の行からも指されていない画像のファイルを消す（[pruneImages]）。
  */
@@ -84,7 +84,7 @@ class RoomLibraryRefreshRepository @Inject constructor(
         onEnqueued: (Int) -> Unit,
     ): RefreshResult {
         requireReady()
-        // 失敗しても記録する。到達できない間、起動時同期が前面に出るたびに積まれないように（#135）
+        // 失敗しても記録する。到達できない間、起動時同期が前面に出るたびに積まれないように
         store.saveLastAttemptedAt(clock.now())
         val scanned = ProgramByProgram(excluded, onProgress, onEnqueued)
         val snapshot = source.fetchAll(scanned)
@@ -107,7 +107,7 @@ class RoomLibraryRefreshRepository @Inject constructor(
     }
 
     /**
-     * 全走査の途中で、読み終えた番組を 1 つずつ取り込む（#209 の決定 1）。取り込みの範囲と、その番組の中での削除・予約は
+     * 全走査の途中で、読み終えた番組を 1 つずつ取り込む。取り込みの範囲と、その番組の中での削除・予約は
      * [syncProgram] と同じ（[SnapshotScope.Program] で取り込み、その番組だけを [synchronize]）。消失の判断はしない。
      * 数えた変化は、全走査の結果に足す。[excluded]（再生中の回）は番組ごとに読み直す（長い走査の途中で再生を始めた回を消さない）。
      * 予約した数は、その場で [onEnqueued] にも流す。
@@ -185,7 +185,7 @@ class RoomLibraryRefreshRepository @Inject constructor(
      * - 取得元に画像が無ければ、手元のファイルを消して行の版・パスを null にする
      * - 版が行と同じでファイルもあれば、何もしない。版が行と同じでパスが null（その版は画像なしと分かっている）でも何もしない
      * - それ以外は [SourceGateway.fetchProgramImage] で取り、新しい名前のファイルに書いてから行を書き換え、前のファイルを消す
-     * - 取りに行って null（一覧の後に消えた・大きすぎる（PR #288 1 周目 #5 の決定））なら画像なしとして扱い、手元のファイルを消して、
+     * - 取りに行って null（一覧の後に消えた・大きすぎる）なら画像なしとして扱い、手元のファイルを消して、
      *   行には版だけを書く（パスは null）。同じ版の間は同期のたびに取り直さない。版が変われば取り直す
      * - 取得・書き込みに失敗したら、その番組は前の画像（ファイルと行）のまま残して先へ進む。同期は止めない
      * - ただし取得元に届かない（[SourceException.Unreachable]）・認証が通らない（[SourceException.Unauthorized]）ときは、
@@ -290,7 +290,7 @@ class RoomLibraryRefreshRepository @Inject constructor(
             // 取得元 ID が変わった回の再生の状態は未送信にし、次の突き合わせで新しい ID に書く（ADR 0010 の決定 7）
             db.playbackStateDao().markRelinked(episodeId.value)
         }
-        // 結び直した回は上で取得元 ID を得ているので、ここで挿入されるのは手元に無かった回だけ（#142 の「新しい回」）
+        // 結び直した回は上で取得元 ID を得ているので、ここで挿入されるのは手元に無かった回だけ（これを同期の結果の「新しい回」に数える）
         var newEpisodes = 0
         for (se in snapshot.episodes) {
             val programId = programIdBySourceId[se.programSourceId] ?: continue
@@ -320,7 +320,7 @@ class RoomLibraryRefreshRepository @Inject constructor(
      * 取り込み後の Room の状態と全走査の結果から [SyncPlanner] を回し、結論を実行する。
      * 実行順は 除去 → 削除 → 差し替えの予約 → 予約（容量を先に空ける）。[excluded]（再生中の回）は今回は消さず、差し替えも予約しない。
      * 対象の番組は [SourceSnapshot.scope] で決まる（[SnapshotScope.Program] ならその番組だけ。[SyncInputs]）。
-     * 差し替えの予約（[reserveReplacements]）は、予約した数（[SyncOutcome.enqueued]）に含める（#371 で人が決めた）。
+     * 差し替えの予約（[reserveReplacements]）は、予約した数（[SyncOutcome.enqueued]）に含める。
      */
     internal suspend fun synchronize(snapshot: SourceSnapshot, excluded: Set<EpisodeId>): SyncOutcome {
         val inputs = inputs(snapshot)
@@ -344,7 +344,7 @@ class RoomLibraryRefreshRepository @Inject constructor(
     }
 
     /**
-     * **差し替え**（ADR 0011、#371）を見分けて予約する。手元にある回（DONE、まだ差し替えを予約していない）のうち [snapshot] に載っている回について、
+     * **差し替え**（ADR 0011）を見分けて予約する。手元にある回（DONE、まだ差し替えを予約していない）のうち [snapshot] に載っている回について、
      * 落としたときの版と一覧の版・大きさを [Replacement] で比べる。[excluded]（聴いている回）は外す（聴いている回でなくなった後の同期で見る）。
      *
      * - 手元の大きさは、ディスク上のファイルの長さ（共有フォルダでは `episodes.sizeBytes` が走査のたびに一覧の値で上書きされるため）。ファイルが無い回は見ない

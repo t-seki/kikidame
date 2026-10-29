@@ -28,10 +28,10 @@ data class NowPlayingState(
     val isPlaying: Boolean,
     /**
      * 最後まで聴き終えて止まっている。キューの最後なら `STATE_ENDED`、途中の回でもスリープタイマーの
-     * 「この回の終わりまで」で回の終わりで止めたとき（#36）。載ったままだが、同期はもう削除と差し替え（ADR 0011）から外さない（#27）。
+     * 「この回の終わりまで」で回の終わりで止めたとき。載ったままだが、同期はもう削除と差し替え（ADR 0011）から外さない。
      */
     val isEnded: Boolean = false,
-    /** ミニプレイヤーの再生位置の線（#59）。再生中は 1 秒ごとに更新する。尺が分からなければ [durationMs] は 0。 */
+    /** ミニプレイヤーの再生位置の線。再生中は 1 秒ごとに更新する。尺が分からなければ [durationMs] は 0。 */
     val positionMs: Long = 0,
     val durationMs: Long = 0,
 )

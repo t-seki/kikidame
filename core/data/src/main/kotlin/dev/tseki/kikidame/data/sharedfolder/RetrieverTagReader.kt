@@ -5,15 +5,15 @@ import android.media.MediaMetadataRetriever
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * [MediaMetadataRetriever] でタグを読む [TagReader]（#197）。ファイル全体を転送しないように、
+ * [MediaMetadataRetriever] でタグを読む [TagReader]。ファイル全体を転送しないように、
  * [FolderTree.read]（部分読み）を使う [MediaDataSource] を渡す。小さな読み出しは [BlockReader] がまとめた塊から返し、
- * 木への往復を減らす（#209 の決定 5）。
+ * 木への往復を減らす。
  *
  * - 木の読み取りが失敗したら、その例外を retriever の後で投げ直す（[TagReader] の約束。タグ無しとして保存しないため）
  * - retriever がファイルを解釈できないとき（[RuntimeException]）は空の [AudioTags]
  * - 日付は `METADATA_KEY_YEAR` → `METADATA_KEY_DATE` の順に、年月日まで読めるほうを使う（どちらに何が入るかは形式による。実機で未確認）
  *
- * JVM のテストで動くかは確かめていない（未確認）。テストはフェイクの [TagReader] で行い、このクラス自体はテストしていない。実機で確かめる（#198）。
+ * JVM のテストで動くかは確かめていない（未確認）。テストはフェイクの [TagReader] で行い、このクラス自体はテストしていない。実機で確かめる。
  * まとめ読み（[BlockReader]）は JVM のテストで確かめている。
  */
 class RetrieverTagReader : TagReader {

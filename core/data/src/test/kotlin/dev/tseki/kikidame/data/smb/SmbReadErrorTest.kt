@@ -12,7 +12,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertSame
 
 /**
- * SMB のファイルを読むストリームの、読み取り中の例外の変え方（#233 で `SmbFileInputStream` の catch の並びから [smbReadError] に移した）。
+ * SMB のファイルを読むストリームの、読み取り中の例外の変え方（[smbReadError]）。
  * [CancellationException] は [RuntimeException] の一種なので、[IOException] に変えずにそのまま投げることを押さえる。
  */
 class SmbReadErrorTest {

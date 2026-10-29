@@ -49,7 +49,7 @@ class DownloadScheduler @Inject constructor(
 
     /**
      * PENDING が残っていれば Worker を起動する（アプリ起動時・設定変更時・同期の後にも呼ぶ）。
-     * 取得元が端末のフォルダならネットワークの条件をかけない（#199 の決定 4 と「決定の追記」。[dev.tseki.kikidame.work.requiredNetworkType]）。
+     * 取得元が端末のフォルダならネットワークの条件をかけない（[dev.tseki.kikidame.work.requiredNetworkType]）。
      */
     override suspend fun kick() {
         val constraints = networkConstraints(settings.wifiOnly.first(), sessionRepository.state.first())
@@ -70,7 +70,7 @@ class DownloadScheduler @Inject constructor(
     }
 
     /**
-     * 「取得元を変える」（#50）の前に、キューの Worker を止めて完了を待つ。実行中の転送も切る
+     * 「取得元を変える」の前に、キューの Worker を止めて完了を待つ。実行中の転送も切る
      * （行とファイルをこれから消すので、続けても `.part` が残るか、古い取得元へ無駄に取りに行くだけ）。
      */
     suspend fun cancelAll() {

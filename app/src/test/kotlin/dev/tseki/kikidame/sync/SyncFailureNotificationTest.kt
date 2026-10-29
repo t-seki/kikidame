@@ -16,7 +16,7 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
-/** 裏の同期が失敗で終わったときに、同期の失敗の通知を出すかの判断（#346 の決定 5・7）。 */
+/** 裏の同期が失敗で終わったときに、同期の失敗の通知を出すかの判断。 */
 class SyncFailureNotificationTest {
     private val now = Instant.parse("2026-10-26T05:00:00Z")
 
@@ -62,7 +62,7 @@ class SyncFailureNotificationTest {
         assertEquals(1, notifier.shown.size)
     }
 
-    /** 通知の許可が無くて出せなかったときは「出した」と記録しない。後で許可されたら次の失敗で出る（PR #349 の 1 周目 #1）。 */
+    /** 通知の許可が無くて出せなかったときは「出した」と記録しない。後で許可されたら次の失敗で出る。 */
     @Test
     fun aNotificationThatCouldNotBeShownIsNotRecorded() = runTest {
         val session = FakeSessionRepository(jellyfinReady(lastFetchedAt = now - 25.hours))

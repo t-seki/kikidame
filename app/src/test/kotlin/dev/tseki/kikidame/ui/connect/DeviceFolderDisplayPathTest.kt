@@ -6,7 +6,7 @@ import dev.tseki.kikidame.text.UiText
 import org.junit.Test
 import kotlin.test.assertEquals
 
-/** 端末のフォルダの、画面に出す場所（PR #214 のマージ前の検証で足した）。 */
+/** 端末のフォルダの、画面に出す場所。 */
 class DeviceFolderDisplayPathTest {
     private val separator = UiText.Plain(" / ")
 
@@ -28,7 +28,7 @@ class DeviceFolderDisplayPathTest {
         assertEquals(UiText.Joined(listOf(UiText.Plain("1234-5678"), UiText.Plain("Radio")), separator), folder.displayPath())
     }
 
-    /** 文書 ID が想定の形でなければ、保存済みの表示名に戻す（保存済みの `name` は今までどおり使える）。 */
+    /** 文書 ID が想定の形でなければ、保存済みの表示名に戻す（保存済みの `name` も使える）。 */
     @Test
     fun malformedIdFallsBackToTheSavedName() {
         val folder = DeviceFolder("content://com.android.externalstorage.documents/tree/Radio", "Radio")

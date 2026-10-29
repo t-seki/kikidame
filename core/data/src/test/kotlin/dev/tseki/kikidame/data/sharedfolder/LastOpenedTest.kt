@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
 
-/** 最後に開いたファイルを持ち回す部品（#233）。 */
+/** 最後に開いたファイルを持ち回す部品。 */
 class LastOpenedTest {
     private val events = mutableListOf<String>()
 

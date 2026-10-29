@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/check-doc-script-refs.sh の落ちる例と通る例（#328）。使い方: scripts/test-check-doc-script-refs.sh（repo 直下で）
+# scripts/check-doc-script-refs.sh の落ちる例と通る例。使い方: scripts/test-check-doc-script-refs.sh（repo 直下で）
 set -euo pipefail
 root=$PWD
 tmp=$(mktemp -d)

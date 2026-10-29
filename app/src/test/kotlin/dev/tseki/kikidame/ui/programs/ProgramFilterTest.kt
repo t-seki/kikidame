@@ -63,7 +63,7 @@ class ProgramFilterTest {
         assertEquals(listOf(haraichi, ann), ProgramFilter.apply(all, "ー"))
     }
 
-    // ---- 配信元の絞り込み（#45） ----
+    // ---- 配信元の絞り込み ----
     private val tbs = PublisherKey("TBS")
     private val lfr = PublisherKey("LFR")
     private val none = PublisherKey(null)

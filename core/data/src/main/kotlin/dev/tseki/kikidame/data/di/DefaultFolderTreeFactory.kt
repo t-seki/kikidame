@@ -9,7 +9,7 @@ import dev.tseki.kikidame.domain.DeviceFolder
 import dev.tseki.kikidame.domain.SmbConnection
 
 /**
- * 本番の [FolderTreeFactory]。SMB（#198）は [SmbFolderTree]、端末のフォルダ（SAF、#199）は [DeviceFolderTree] を開く。
+ * 本番の [FolderTreeFactory]。SMB は [SmbFolderTree]、端末のフォルダ（SAF）は [DeviceFolderTree] を開く。
  * `sharedfolder` は SMB と端末のフォルダの実装を知らない抽象なので、両方をつなぐこの実装は DI の側に置く。
  */
 class DefaultFolderTreeFactory(private val documents: DeviceDocuments) : FolderTreeFactory {

@@ -11,7 +11,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** 番組の画像の応答の扱い（#282）: 上限の判定と、応答コードの対応。テスト用サーバは依存に無いので、読む部分を関数に括り出して見る。 */
+/** 番組の画像の応答の扱い: 上限の判定と、応答コードの対応。テスト用サーバは依存に無いので、読む部分を関数に括り出して見る。 */
 class ProgramImageResponseTest {
     private val max = 8L
 

@@ -66,10 +66,10 @@ import dev.tseki.kikidame.ui.theme.KikidameTheme
 import kotlin.time.Instant
 
 /**
- * 番組の画面（根）。「続きから・よく聴く・番組一覧」の 3 つのタブ（#151）を、トップバーのすぐ下のタブとスワイプで切り替える。
+ * 番組の画面（根）。「続きから・よく聴く・番組一覧」の 3 つのタブを、トップバーのすぐ下のタブとスワイプで切り替える。
  * 起動時は前回最後に開いていたタブを開く（端末に保存。初回は「続きから」）。読めるまでは何も出さない（一瞬）。
  *
- * ここは 2 つの ViewModel から値を集め、メッセージをスナックバーに出し、[ProgramListContent] に値とラムダを渡す（#269）。
+ * ここは 2 つの ViewModel から値を集め、メッセージをスナックバーに出し、[ProgramListContent] に値とラムダを渡す。
  */
 @Composable
 fun ProgramListScreen(
@@ -172,7 +172,7 @@ internal class ProgramListActions(
 )
 
 /**
- * 番組の画面の中身。値とラムダだけを取り、ViewModel を受け取らない（#269）。
+ * 番組の画面の中身。値とラムダだけを取り、ViewModel を受け取らない。
  * [bottomBar] はミニプレイヤー（中で hiltViewModel() を呼ぶ）を外側から渡すスロット。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -225,7 +225,7 @@ internal fun ProgramListContent(
         }
     }
 
-    // 絞り込みの入口（#55）は番組が 1 つでもあれば出す。配信元の段は 2 種類以上のときだけ（1 種類なら絞る意味が無い）
+    // 絞り込みの入口は番組が 1 つでもあれば出す。配信元の段は 2 種類以上のときだけ（1 種類なら絞る意味が無い）
     val publishers = filtered?.publishers.orEmpty()
     if (showFilterSheet && publishers.isNotEmpty() && filterable) {
         FilterSheet(
@@ -242,7 +242,7 @@ internal fun ProgramListContent(
     BackHandler(enabled = filtered?.isFiltering == true && !showFilterSheet && filterable, onBack = actions.clearFilters)
     Scaffold(
         topBar = {
-            // 検索（#44）と配信元（#45）の入口を 1 つの「絞り込み」に統合（#55）。効いている間は点を付け、
+            // 検索と配信元の入口を 1 つの「絞り込み」に統合。効いている間は点を付け、
             // 何で絞っているかはタブの下のチップで示す
             Column {
                 TopAppBar(
@@ -285,7 +285,7 @@ internal fun ProgramListContent(
         bottomBar = bottomBar,
     ) { padding ->
         HorizontalPager(pagerState, Modifier.padding(padding).fillMaxSize()) { page ->
-            // 引っ張って更新はどのタブでもライブラリ全体の同期（いままでの番組一覧と同じ）
+            // 引っ張って更新はどのタブでもライブラリ全体の同期
             PullToRefreshBox(
                 isRefreshing = isRefreshing,
                 onRefresh = { if (canRefresh) actions.refresh() },
@@ -319,7 +319,7 @@ internal fun ProgramListContent(
                             // 番組自体が無い（配信元も集まらない）なら、検索中でも「一致なし」ではなく空の案内
                             state.publishers.isEmpty() -> EmptyPrograms(canRefresh)
                             state.programs.isEmpty() -> NoMatch(query, state.publisher)
-                            // 節に分けず全番組を 1 本に（#151。いままでの「その他」と同じ並び）。よく聴く番組は ★ で見分ける
+                            // 節に分けず全番組を 1 本に（最新の各回の公開日順）。よく聴く番組は ★ で見分ける
                             else -> ProgramsList(state.programs, allListState, onProgramClick, actions.setStarred)
                         }
                     }
@@ -344,7 +344,7 @@ private fun ProgramsList(
     onProgramClick: (ProgramId) -> Unit,
     onSetStarred: (ProgramId, Boolean) -> Unit,
 ) {
-    // 画像を持つ番組が 1 つでもあれば、無い番組の行も画像の場所を空けて文字をそろえる。1 つも無ければ詰める（#264）
+    // 画像を持つ番組が 1 つでもあれば、無い番組の行も画像の場所を空けて文字をそろえる。1 つも無ければ詰める
     val reserveImage = list.any { it.program.image != null }
     LazyColumn(Modifier.fillMaxSize(), state = listState) {
         programItems(list, reserveImage, onProgramClick, onSetStarred)
@@ -442,7 +442,7 @@ private fun ProgramListContentPreview() {
 }
 
 /**
- * 番組の画像あり（#264）。画像の無い「週末の旅」も 48dp を空けて、番組名の位置がそろう。
+ * 番組の画像あり。画像の無い「週末の旅」も 48dp を空けて、番組名の位置がそろう。
  * 画像はプレビューの中では単色（[ProgramImagePreview]）。画像を持つ番組が無い一覧は [ProgramListContentPreview]（詰める）。
  */
 @Preview

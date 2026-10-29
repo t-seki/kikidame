@@ -83,7 +83,7 @@ object PlaybackSharingRules {
         return next.takeIf { PlaybackRules.isWorthRecording(existing, it) }
     }
 
-    /** ▶ の直前の読み込みの待ち時間の上限（ADR 0010 の決定 5。目安 2 秒。#352 の決定 7）。超えたら手元の値で鳴らす。 */
+    /** ▶ の直前の読み込みの待ち時間の上限（ADR 0010 の決定 5。目安 2 秒）。超えたら手元の値で鳴らす。 */
     val READ_BEFORE_PLAY_TIMEOUT: Duration = 2.seconds
 }
 

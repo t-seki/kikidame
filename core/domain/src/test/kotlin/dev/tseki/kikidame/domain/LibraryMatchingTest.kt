@@ -194,7 +194,7 @@ class LibraryMatchingTest {
         assertTrue(match.programLinks.isEmpty())
         assertEquals(listOf("NEW-P"), match.newPrograms.map { it.sourceId.value })
     }
-    // --- 第二段: 公開日 ＋ 尺（#9） ---
+    // --- 第二段: 公開日 ＋ 尺 ---
     @Test
     fun `seeded episodes with different titles link by published day and runtime`() {
         val match = LibraryMatching.match(

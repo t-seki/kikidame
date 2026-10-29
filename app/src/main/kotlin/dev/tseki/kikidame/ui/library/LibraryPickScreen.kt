@@ -37,7 +37,7 @@ import dev.tseki.kikidame.domain.LibraryView
 import dev.tseki.kikidame.ui.resolve
 
 /**
- * ライブラリ選択。全ライブラリを列挙し、音楽とブックのライブラリだけ選べる（#354。他はグレーアウトし、理由は一覧の上に 1 回）。
+ * ライブラリ選択。全ライブラリを列挙し、音楽とブックのライブラリだけ選べる（他はグレーアウトし、理由は一覧の上に 1 回）。
  * 選べるライブラリが 1 つでも画面は出す。同じサーバ・同じユーザーのまま選び直しても、手元は消さない（ADR 0010 の決定 7）。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -90,7 +90,7 @@ fun LibraryPickScreen(
                 TextButton(onClick = viewModel::load) { Text(stringResource(R.string.library_pick_reload)) }
             }
             else -> LazyColumn(Modifier.padding(padding)) {
-                // 選べない理由は行ごとに繰り返さず、一覧の上に 1 回だけ（#71）。選べないライブラリ（音楽とブックのほか。#354）が無ければ出さない
+                // 選べない理由は行ごとに繰り返さず、一覧の上に 1 回だけ。選べないライブラリ（音楽とブックのほか）が無ければ出さない
                 if (state.libraries.orEmpty().any { !it.isSelectable }) {
                     item(key = "note") {
                         Text(

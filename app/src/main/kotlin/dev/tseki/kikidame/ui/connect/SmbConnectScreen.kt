@@ -21,7 +21,7 @@ import dev.tseki.kikidame.R
 import dev.tseki.kikidame.ui.resolve
 
 /**
- * NAS の共有フォルダ（SMB）に接続する（#198）。ホスト・共有名・共有の中のパス・ユーザー名・パスワード。ゲスト接続も選べる。
+ * NAS の共有フォルダ（SMB）に接続する。ホスト・共有名・共有の中のパス・ユーザー名・パスワード。ゲスト接続も選べる。
  * 成功するとセッション状態が変わり、NavHost が番組一覧へ導く。[onBack] は取得元の選択から来たときだけ渡す。
  */
 @Composable

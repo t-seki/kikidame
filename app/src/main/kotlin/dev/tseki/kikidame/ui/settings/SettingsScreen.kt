@@ -78,7 +78,7 @@ import dev.tseki.kikidame.ui.toDateTimeText
 import dev.tseki.kikidame.ui.toText
 
 /**
- * 設定の「最終同期」の補足の行（#346 の決定 4）。全走査の最後の試みが最終同期（[SessionState.Ready.lastFetchedAt]）より新しく、
+ * 設定の「最終同期」の補足の行。全走査の最後の試みが最終同期（[SessionState.Ready.lastFetchedAt]）より新しく、
  * しかも成功でないときだけ出す。
  */
 internal sealed interface LastSyncNote {
@@ -103,17 +103,17 @@ internal fun SessionState.Ready.lastSyncNote(): LastSyncNote? {
     }
 }
 
-/** 電池の最適化の対象から外す OS の確認のダイアログを出す Intent（#347）。`package:` の URI 付き。 */
+/** 電池の最適化の対象から外す OS の確認のダイアログを出す Intent。`package:` の URI 付き。 */
 internal fun ignoreBatteryOptimizationsIntent(packageName: String): Intent =
     Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.fromParts("package", packageName, null))
 
-/** このアプリが電池の最適化の対象のとき true（対象外なら行ごと出さない。#347）。 */
+/** このアプリが電池の最適化の対象のとき true（対象外なら行ごと出さない）。 */
 internal fun isBatteryOptimized(context: Context): Boolean =
     !context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
 
 /**
  * 「最終同期」の行。値は最後に成功した時刻（[SessionState.Ready.lastFetchedAt]）。[LastSyncNote] があれば補足の行を 1 行足す
- * （失敗は `error` の色で「<時刻> に失敗: <理由>」、見送りは通常の色で「<時刻> は Wi-Fi ではないため見送り」。#346 の決定 4）。
+ * （失敗は `error` の色で「<時刻> に失敗: <理由>」、見送りは通常の色で「<時刻> は Wi-Fi ではないため見送り」）。
  */
 @Composable
 private fun LastSyncRow(ready: SessionState.Ready?) {
@@ -139,7 +139,7 @@ private fun LastSyncRow(ready: SessionState.Ready?) {
 }
 
 /**
- * 「再生の共有」の行（ADR 0010 の決定 8、#355）。値は最後に共有できた時刻（無ければ「まだ共有していません」）。
+ * 「再生の共有」の行（ADR 0010 の決定 8）。値は最後に共有できた時刻（無ければ「まだ共有していません」）。
  * 最後に送れなかったのがそれより新しければ、`error` の色で「<時刻> に送れませんでした: <理由>。送れなかった分は次の同期で送ります」を足す。
  * 理由は同期の失敗と同じ文言（[reason]）。通知は出さない。
  */
@@ -185,7 +185,7 @@ fun SettingsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val context = LocalContext.current
-    // 電池の最適化の判定は、画面に戻るたびにやり直す（OS の確認のダイアログから戻ったとき、行を消すため。#347）
+    // 電池の最適化の判定は、画面に戻るたびにやり直す（OS の確認のダイアログから戻ったとき、行を消すため）
     var batteryOptimized by remember { mutableStateOf(isBatteryOptimized(context)) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { batteryOptimized = isBatteryOptimized(context) }
     LaunchedEffect(message) {
@@ -268,8 +268,8 @@ internal fun SettingsContent(
             val smb = (connected as? ConnectedSource.Smb)?.connection
             val deviceFolder = (connected as? ConnectedSource.Device)?.folder
             val isConnected = jellyfinSession != null || smb != null || deviceFolder != null
-            // 値を見せる行はラベル上・値下（#58、各回の詳細と同じ向き）。操作の行は操作名が上で説明が下
-            // 今の取得元（種類と場所）を出す（#198）。取得元は同時に 1 つ
+            // 値を見せる行はラベル上・値下（各回の詳細と同じ向き）。操作の行は操作名が上で説明が下
+            // 今の取得元（種類と場所）を出す。取得元は同時に 1 つ
             SectionTitle(stringResource(R.string.settings_section_source))
             ValueRow(
                 stringResource(R.string.settings_source),
@@ -286,7 +286,7 @@ internal fun SettingsContent(
                 ValueRow(stringResource(R.string.settings_smb_path), smb.path.ifEmpty { stringResource(R.string.settings_smb_path_root) })
                 ValueRow(stringResource(R.string.settings_user), if (smb.guest) stringResource(R.string.settings_smb_guest) else smb.userName)
             } else if (deviceFolder != null) {
-                // 端末のフォルダ（#199）は端末の中のパス（ツリーの URI は利用者に読めない形なので出さない）
+                // 端末のフォルダは端末の中のパス（ツリーの URI は利用者に読めない形なので出さない）
                 ValueRow(stringResource(R.string.settings_device_folder), deviceFolder.displayPath().resolve())
             } else if (jellyfinSession != null) {
                 ValueRow("URL", jellyfinSession.serverUrl)
@@ -299,18 +299,18 @@ internal fun SettingsContent(
                 )
             }
             LastSyncRow(s as? SessionState.Ready)
-            // 再生の共有（ADR 0010 の決定 8、#355）: Jellyfin のブックのライブラリのときだけ（ほかでは null で出さない）
+            // 再生の共有（ADR 0010 の決定 8）: Jellyfin のブックのライブラリのときだけ（ほかでは null で出さない）
             playbackShare?.let { PlaybackSharingRow(it) }
             HorizontalDivider()
             SectionTitle(stringResource(R.string.settings_section_download))
-            // 手元のファイルの合計（#42）。保持ルールや固定を調整する動機は容量なので、見えるようにする。押すと内訳の画面（#335）
+            // 手元のファイルの合計。保持ルールや固定を調整する動機は容量なので、見えるようにする。押すと内訳の画面
             ValueRow(
                 stringResource(R.string.settings_storage),
                 localStorage?.toText()?.resolve() ?: "-",
                 modifier = Modifier.clickable(onClick = onOpenStorage),
                 supporting = stringResource(R.string.settings_storage_tap),
             )
-            // 取得元に見つからない番組（消失・取得元 ID 無し）をまとめて消す（#317）。無ければ行ごと出さない。同期の間は押せない
+            // 取得元に見つからない番組（消失・取得元 ID 無し）をまとめて消す。無ければ行ごと出さない。同期の間は押せない
             if (unmatched.programCount > 0) {
                 ListItem(
                     modifier = Modifier.clickable(enabled = !isSyncing, onClick = onRemoveUnmatched),
@@ -333,7 +333,7 @@ internal fun SettingsContent(
                 supportingContent = { Text(stringResource(R.string.settings_wifi_only_description)) },
                 trailingContent = { Switch(checked = wifiOnly, onCheckedChange = onSetWifiOnly) },
             )
-            // 電池の最適化の対象のときだけ出す（#347）。外すと裏の同期が遅れにくくなる。押すと OS の確認のダイアログ
+            // 電池の最適化の対象のときだけ出す。外すと裏の同期が遅れにくくなる。押すと OS の確認のダイアログ
             if (batteryOptimized) {
                 ListItem(
                     modifier = Modifier.clickable {
@@ -349,7 +349,7 @@ internal fun SettingsContent(
             }
             HorizontalDivider()
             SectionTitle(stringResource(R.string.settings_section_display))
-            // テーマ（#62）。ラベル上・選択肢下。選んだ瞬間に MainActivity 側で切り替わる（再起動不要）
+            // テーマ。ラベル上・選択肢下。選んだ瞬間に MainActivity 側で切り替わる（再起動不要）
             ListItem(
                 overlineContent = { Text(stringResource(R.string.settings_theme)) },
                 headlineContent = {
@@ -365,7 +365,7 @@ internal fun SettingsContent(
                     }
                 },
             )
-            // 言語（#104）。切替は OS のアプリ別言語設定（Android 13+）に任せ、ここはそこへのリンクだけ（ADR 0006）
+            // 言語。切替は OS のアプリ別言語設定（Android 13+）に任せ、ここはそこへのリンクだけ（ADR 0006）
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 ListItem(
                     modifier = Modifier.clickable {
@@ -376,7 +376,7 @@ internal fun SettingsContent(
                 )
             }
             HorizontalDivider()
-            // 見出しが無いと「表示」の続きに見えるので群にする（#62 のレビュー指摘）
+            // 見出しが無いと「表示」の続きに見えるので群にする
             SectionTitle(stringResource(R.string.settings_section_account))
             ListItem(
                 modifier = Modifier.clickable(enabled = isConnected) { confirmSignOut = true },
@@ -389,7 +389,7 @@ internal fun SettingsContent(
                 supportingContent = { Text(stringResource(R.string.settings_connect_elsewhere_description)) },
             )
             HorizontalDivider()
-            // ライセンス（#91）。MPL-2.0 で公開し、LGPL-3.0 の jellyfin-sdk-kotlin を同梱しているので、出どころと依存の一覧をここに置く
+            // ライセンス。MPL-2.0 で公開し、LGPL-3.0 の jellyfin-sdk-kotlin を同梱しているので、出どころと依存の一覧をここに置く
             SectionTitle(stringResource(R.string.settings_section_about))
             ValueRow(stringResource(R.string.settings_version), BuildConfig.VERSION_NAME)
             val uriHandler = LocalUriHandler.current
@@ -505,7 +505,7 @@ private fun SettingsContentSmbPreview() {
         SessionState.Ready(
             ConnectedSource.Smb(SmbConnection(host = "nas.local", share = "radio", path = "録音/2026", userName = "alice", password = "")),
             lastFetchedAt = Instant.fromEpochSeconds(1_760_000_000),
-            // 最終同期の後の全走査が失敗した（「最終同期」の補足の行が赤字で出る。#346）
+            // 最終同期の後の全走査が失敗した（「最終同期」の補足の行が赤字で出る）
             lastSyncAttempt = SyncAttempt(Instant.fromEpochSeconds(1_760_090_000), SyncOutcome.Unreachable),
         ),
     )

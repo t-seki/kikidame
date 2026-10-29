@@ -54,7 +54,7 @@ class DataStoreAppSettingsTest {
         dataStore.value.edit { it[stringPreferencesKey("theme_mode")] = "AMOLED" }
         assertEquals(ThemeMode.SYSTEM, settings.themeMode.first())
     }
-    /** 番組の画面のタブ（#151）: 初回は「続きから」、選んだタブは再起動後も残る。読めない値は「続きから」に戻る。 */
+    /** 番組の画面のタブ: 初回は「続きから」、選んだタブは再起動後も残る。読めない値は「続きから」に戻る。 */
     @Test
     fun programListTabDefaultsToContinueListeningAndPersists() = runTest {
         assertEquals(ProgramListTab.CONTINUE_LISTENING, settings.programListTab.first())

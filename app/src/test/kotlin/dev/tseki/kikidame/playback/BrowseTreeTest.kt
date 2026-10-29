@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
-/** Android Auto のブラウズツリー（#96）: タブの出し分け、手元にある回だけ、再生済み／途中の印、「続きから」と「最近」（#108）。 */
+/** Android Auto のブラウズツリー: タブの出し分け、手元にある回だけ、再生済み／途中の印、「続きから」と「最近」。 */
 @RunWith(AndroidJUnit4::class)
 class BrowseTreeTest {
     private val now = Instant.parse("2026-09-20T00:00:00Z")
@@ -51,7 +51,7 @@ class BrowseTreeTest {
     }
     private fun started(id: Long, minutes: Int, at: Instant, played: Boolean = false) =
         PlaybackState(EpisodeId(id), minutes.minutes, played = played, updatedAt = at)
-    /** 「続きから」は途中の回が 1 つでもあればルートの先頭に出て、無ければタブごと出さない（#108）。 */
+    /** 「続きから」は途中の回が 1 つでもあればルートの先頭に出て、無ければタブごと出さない。 */
     @Test
     fun rootHasContinueTabFirstOnlyWhenSomethingIsInProgress() = runTest {
         setUp(episode(10, harai.id, "2026-09-18", playback = started(10, 20, now)), episode(20, ann.id, "2026-09-19"))
@@ -136,7 +136,7 @@ class BrowseTreeTest {
         assertEquals("2026-09-18", newest.title)
         assertEquals("ハライチのターン！", newest.artist)
         assertEquals("TBSラジオ", newest.albumTitle)
-        assertEquals("2026-09-18", newest.displayTitle) // 置かないと legacy 変換で subtitle が捨てられる（#113）
+        assertEquals("2026-09-18", newest.displayTitle) // 置かないと legacy 変換で subtitle が捨てられる
         assertEquals("2026-09-19 · ハライチのターン！", newest.subtitle) // JST の公開日 · 番組名
         assertEquals("TBSラジオ", newest.description)
         assertTrue(newest.isPlayable == true && newest.isBrowsable == false)
@@ -158,7 +158,7 @@ class BrowseTreeTest {
         val fresh = byId.getValue("12").mediaMetadata.extras!!
         assertEquals(MediaConstants.EXTRAS_VALUE_COMPLETION_STATUS_NOT_PLAYED, fresh.getInt(MediaConstants.EXTRAS_KEY_COMPLETION_STATUS))
     }
-    /** タイトルが公開日と同じ文字列の回では公開日を省き、2 行目は番組名だけ（アプリの各回一覧と同じ規則。#66）。 */
+    /** タイトルが公開日と同じ文字列の回では公開日を省き、2 行目は番組名だけ（アプリの各回一覧と同じ規則）。 */
     @Test
     fun subtitleOmitsPublishedDateWhenTitleEqualsIt() {
         assertEquals("ANN", BrowseTree.episodeSubtitle("2026-09-19", "2026-09-19", "ANN"))

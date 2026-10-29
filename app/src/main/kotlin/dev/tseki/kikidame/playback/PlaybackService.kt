@@ -45,10 +45,10 @@ import javax.inject.Inject
 import kotlin.time.Clock
 /**
  * 通知・ロック画面を持つ再生サービス。再生専用（ADR 0002）。
- * Android Auto（#96）には [MediaLibraryService] として [BrowseTree] を出す。Auto は車載機からアプリの外で bind するので、
+ * Android Auto には [MediaLibraryService] として [BrowseTree] を出す。Auto は車載機からアプリの外で bind するので、
  * 画面を開かずにこのサービスが起動する経路がある（ADR 0004）。
  */
-// Media3 の MediaLibrarySession / LibraryResult は unstable API。クラス単位で opt-in する（#111）
+// Media3 の MediaLibrarySession / LibraryResult は unstable API。クラス単位で opt-in する
 @OptIn(UnstableApi::class)
 @AndroidEntryPoint
 class PlaybackService : MediaLibraryService() {
@@ -77,7 +77,7 @@ class PlaybackService : MediaLibraryService() {
     private lateinit var browseTree: BrowseTree
     /**
      * 再生に失敗したら（原因を問わず）キューを空にし、理由を UI へ渡す。空にすれば聴いている回も無くなり、
-     * ミニプレイヤーと通知が消える。典型は、聴き終えて止まっている回を同期が消した（#27）後に ▶ を押してファイルが無い場合。
+     * ミニプレイヤーと通知が消える。典型は、聴き終えて止まっている回を同期が消した後に ▶ を押してファイルが無い場合。
      */
     private val errorListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
@@ -120,9 +120,9 @@ class PlaybackService : MediaLibraryService() {
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        // 再生の共有（ADR 0010、#355）: セッションには ▶ の直前に取得元の値を読むプレイヤーを渡す。ほかの部品は ExoPlayer を直接見る
+        // 再生の共有（ADR 0010）: セッションには ▶ の直前に取得元の値を読むプレイヤーを渡す。ほかの部品は ExoPlayer を直接見る
         val sessionPlayer = ReadBeforePlayPlayer(player, scope, playbackSharing::refreshBeforePlay)
-        // ▶ の直前の読み込みを待っている間に出力先が外れたら、待っていた ▶ を取り消す（#358）。鳴っている最中は ExoPlayer の
+        // ▶ の直前の読み込みを待っている間に出力先が外れたら、待っていた ▶ を取り消す。鳴っている最中は ExoPlayer の
         // setHandleAudioBecomingNoisy(true) に任せる（sessionPlayer は待っていなければ何もしない）
         noisyReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
@@ -160,12 +160,12 @@ class PlaybackService : MediaLibraryService() {
             send = { rows, except -> playbackSharing.sendPending(rows, except) },
         ).also { it.attach() }
         nowPlayingListener = nowPlaying.listener(player, scope).also(player::addListener)
-        // 回の画像（#283）: 聴く回に替わるたび、埋め込み画像（無ければ番組の画像）を現在の項目に載せる
+        // 回の画像: 聴く回に替わるたび、埋め込み画像（無ければ番組の画像）を現在の項目に載せる
         episodeImageAttacher = EpisodeImageAttacher(player, scope, episodeImage::load).also { it.attach() }
         player.addListener(errorListener)
-        // 倍速（#35）: アプリ全体で 1 つ。設定が変われば即反映。ピッチは変えない
+        // 倍速: アプリ全体で 1 つ。設定が変われば即反映。ピッチは変えない
         speedJob = scope.launch { settings.playbackSpeed.collect { speed -> player.setPlaybackSpeed(speed) } }
-        // スリープタイマー（#36）: 画面を閉じても動くようここに住む
+        // スリープタイマー: 画面を閉じても動くようここに住む
         sleepTimerRunner = SleepTimerRunner(player, sleepTimer, clock, scope) { player.pauseAtEndOfMediaItems = it }
             .also { it.attach() }
     }
@@ -234,7 +234,7 @@ class PlaybackService : MediaLibraryService() {
             programQueueStartingAt(target)
         }
         /**
-         * 再開（#108）: プレイヤーが空のとき（プロセス死後の通知の ▶、Auto の「最近」、端末の再起動後）に
+         * 再開: プレイヤーが空のとき（プロセス死後の通知の ▶、Auto の「最近」、端末の再起動後）に
          * 最後に聴いていた回を復元する。「続きから」の各回（[dev.tseki.kikidame.domain.LibraryRepository.getContinueListening]）の
          * 先頭から、[onSetMediaItems] と同じ番組のキューを組む。無ければ空のリスト（Media3 の既定と同じ扱い）。
          * 「聴いている回」（ADR 0004）はこの結果がプレイヤーに載った時点で立つ。
@@ -258,13 +258,13 @@ class PlaybackService : MediaLibraryService() {
             val program = libraryRepository.getProgram(episode.episode.programId)
             EpisodeMediaItems.toMediaItem(episode, program)
         }
-        /** ルート。「最近」（`isRecent`。端末起動後にシステムが出す再開の候補）は [BrowseTree.recentRoot]（#108）。 */
+        /** ルート。「最近」（`isRecent`。端末起動後にシステムが出す再開の候補）は [BrowseTree.recentRoot]。 */
         override fun onGetLibraryRoot(
             session: MediaLibrarySession,
             browser: MediaSession.ControllerInfo,
             params: LibraryParams?,
         ): ListenableFuture<LibraryResult<MediaItem>> = scope.future {
-            // 「最近」（isRecent）は再開候補 1 件だけのルート（#108）。それ以外は通常のツリー
+            // 「最近」（isRecent）は再開候補 1 件だけのルート。それ以外は通常のツリー
             if (params?.isRecent == true) LibraryResult.ofItem(browseTree.recentRoot(), params)
             else LibraryResult.ofItem(browseTree.root(), params)
         }

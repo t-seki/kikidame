@@ -37,10 +37,10 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 /**
- * 「続きから」タブ（#151）の中身。行のタップは各回一覧と同じく再生画面を開いて続きから再生する（キューはその番組の手元の回）。
+ * 「続きから」タブの中身。行のタップは各回一覧と同じく再生画面を開いて続きから再生する（キューはその番組の手元の回）。
  * 空なら案内を出す。
  *
- * 値とラムダだけを取り、ViewModel を受け取らない（#269）。[items] と [nowPlaying] は [ContinueListeningViewModel] から
+ * 値とラムダだけを取り、ViewModel を受け取らない。[items] と [nowPlaying] は [ContinueListeningViewModel] から
  * 外側の [ProgramListScreen] が集めて渡す。[items] が null なら読み込み前。
  */
 @Composable
@@ -99,7 +99,7 @@ internal fun ContinueListeningPage(
 }
 
 /**
- * 行の補足（#151）: `番組名 · 残り N 分`。残りは次に再生したとき始まる位置（[dev.tseki.kikidame.domain.EpisodeWithState.resumePosition]。
+ * 行の補足: `番組名 · 残り N 分`。残りは次に再生したとき始まる位置（[dev.tseki.kikidame.domain.EpisodeWithState.resumePosition]。
  * バーと同じ）から末尾までで、分に切り上げる（「残り 0 分」は出さない）。尺が分からない回（runtime 0）は残りを省いて番組名だけ。
  */
 internal fun ContinueListeningViewModel.Item.toSupportingText(): UiText {

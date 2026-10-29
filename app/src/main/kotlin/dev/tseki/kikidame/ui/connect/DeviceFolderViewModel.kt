@@ -22,15 +22,15 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class DeviceFolderUiState(
-    /** ログアウトしたフォルダの、端末の中の場所（[displayPath]。#199 の決定 5）。選び直しを案内する。 */
+    /** ログアウトしたフォルダの、端末の中の場所（[displayPath]）。選び直しを案内する。 */
     val lostFolder: UiText? = null,
     val isSubmitting: Boolean = false,
     val error: UiText? = null,
 )
 
 /**
- * 端末のフォルダ（SAF、#199）を選ぶ画面。OS のフォルダ選択の結果を受け、端末のストレージのフォルダか確かめ（決定 3）、
- * 直下が読めたら保存して初回の全走査を始める（決定 8）。
+ * 端末のフォルダ（SAF）を選ぶ画面。OS のフォルダ選択の結果を受け、端末のストレージのフォルダか確かめ、
+ * 直下が読めたら保存して初回の全走査を始める。
  */
 @HiltViewModel
 class DeviceFolderViewModel @Inject constructor(

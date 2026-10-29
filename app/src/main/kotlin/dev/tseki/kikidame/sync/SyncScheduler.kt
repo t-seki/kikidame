@@ -25,10 +25,10 @@ import kotlin.time.toJavaDuration
 
 /**
  * 同期の起点を WorkManager に登録する。
- * - 定期: 3 時間ごと（#347）。起動のたびに `UPDATE` で登録し直し、「Wi-Fi のみ」の変更を拾う
+ * - 定期: 3 時間ごと。起動のたびに `UPDATE` で登録し直し、「Wi-Fi のみ」の変更を拾う
  * - 起動時: 前回同期（または前回の試み。失敗を含む）から 15 分以上なら一度だけ（`KEEP`）。制約を満たすまで待つ
  * 制約は `DownloadWorker` と同じ（Wi-Fi のみなら UNMETERED、そうでなければ CONNECTED。取得元が端末のフォルダならネットワークの条件をかけない
- * （NOT_REQUIRED）。[dev.tseki.kikidame.work.requiredNetworkType]）。充電中は課さない。取得元によって制約が変わるので、取得元を接続したら [schedulePeriodic] で組み直す（#199）。
+ * （NOT_REQUIRED）。[dev.tseki.kikidame.work.requiredNetworkType]）。充電中は課さない。取得元によって制約が変わるので、取得元を接続したら [schedulePeriodic] で組み直す。
  */
 @Singleton
 class SyncScheduler @Inject constructor(
@@ -45,7 +45,7 @@ class SyncScheduler @Inject constructor(
         syncOnceIfStale()
     }
 
-    /** 「Wi-Fi のみ」を変えたとき、取得元を接続したとき（#199）にも呼んで制約を組み直す。 */
+    /** 「Wi-Fi のみ」を変えたとき、取得元を接続したときにも呼んで制約を組み直す。 */
     suspend fun schedulePeriodic() {
         val request = PeriodicWorkRequestBuilder<SyncWorker>(PERIOD.toJavaDuration())
             .setConstraints(constraints())
@@ -53,7 +53,7 @@ class SyncScheduler @Inject constructor(
         workManager.enqueueUniquePeriodicWork(SyncWorker.PERIODIC_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
     }
 
-    /** 「取得元を変える」（#50）の前に、定期同期と起動時同期を止めて完了を待つ（消している最中に行を作り直さない）。 */
+    /** 「取得元を変える」の前に、定期同期と起動時同期を止めて完了を待つ（消している最中に行を作り直さない）。 */
     suspend fun cancelAll() {
         workManager.cancelUniqueAndAwait(SyncWorker.PERIODIC_NAME)
         workManager.cancelUniqueAndAwait(SyncWorker.ONCE_NAME)
@@ -75,7 +75,7 @@ class SyncScheduler @Inject constructor(
 
         /**
          * 起動時同期を積むか。前回同期（成功）と前回の試み（失敗を含む）の新しい方から [STALE_AFTER] たっていれば積む。
-         * どちらも無ければ積む。失敗した直後に前面に出ても、到達できない取得元に接続し直さない（#135）。
+         * どちらも無ければ積む。失敗した直後に前面に出ても、到達できない取得元に接続し直さない。
          */
         internal fun isStale(ready: SessionState.Ready, now: Instant): Boolean {
             val last = listOfNotNull(ready.lastFetchedAt, ready.lastAttemptedAt).maxOrNull() ?: return true

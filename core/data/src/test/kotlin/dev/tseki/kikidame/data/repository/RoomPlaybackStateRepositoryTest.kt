@@ -55,7 +55,7 @@ class RoomPlaybackStateRepositoryTest : RoomTestBase() {
         val id = seedEpisode()
         val result = repo.update(id) { PlaybackRules.advance(it, 3.seconds, 30.minutes, now) }
         assertEquals(3.seconds, result.position)
-        assertNull(repo.get(id), "位置 5 秒未満・未再生・行なし → 書かない (#7)")
+        assertNull(repo.get(id), "位置 5 秒未満・未再生・行なし → 書かない")
     }
 
     @Test

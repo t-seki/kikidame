@@ -6,7 +6,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** 端末のフォルダ（#199）として受け付けるツリーの URI と、取得元が端末のフォルダかの判定。 */
+/** 端末のフォルダとして受け付けるツリーの URI と、取得元が端末のフォルダかの判定。 */
 class DeviceFolderTest {
     @Test
     fun internalStorageAndSdCardTreesAreDeviceStorage() {

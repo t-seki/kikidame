@@ -39,7 +39,7 @@ class ProgramListViewModel @Inject constructor(
     private val settings: AppSettingsRepository,
 ) : ViewModel() {
     /**
-     * 起動時に開くタブ（#151）= 前回最後に開いていたタブ（初回は「続きから」）。null は読み込み前で、画面は読めるまで何も出さない
+     * 起動時に開くタブ = 前回最後に開いていたタブ（初回は「続きから」）。null は読み込み前で、画面は読めるまで何も出さない
      * （先にタブ 0 を出してから飛ぶのを避ける）。読むのは ViewModel ができたときの 1 回だけで、その後のタブは画面の状態が持つ
      * （番組を開いて戻っても、この ViewModel と画面の状態は残る）。
      */
@@ -47,13 +47,13 @@ class ProgramListViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /**
-     * 検索語（#44）。ViewModel に持つので、画面回転でも、番組を開いて戻っても残る
+     * 検索語。ViewModel に持つので、画面回転でも、番組を開いて戻っても残る
      * （番組一覧はバックスタックの根で、この ViewModel は生き続ける）。プロセス死からは復元しない。
      * 絞り込みシートの開閉は画面側の remember（他のシートと同じ）。
      */
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
-    /** 配信元の絞り込み（#45）の選択。null は「すべて」。検索とは独立で、検索を閉じても残る。 */
+    /** 配信元の絞り込みの選択。null は「すべて」。検索とは独立で、検索を閉じても残る。 */
     private val _publisher = MutableStateFlow<PublisherKey?>(null)
     /**
      * 絞り込みの入力（検索語・配信元）と手元の番組から導いた、画面が出すもの一式。
@@ -68,7 +68,7 @@ class ProgramListViewModel @Inject constructor(
         val publisher: PublisherKey?,
         /** 絞り込みが効いているか（戻るボタンで解除する対象があるか）。 */
         val isFiltering: Boolean,
-        /** 「よく聴く」タブ（#151）に出す番組。[programs] のうちよく聴く番組だけ（並びはそのまま）。 */
+        /** 「よく聴く」タブに出す番組。[programs] のうちよく聴く番組だけ（並びはそのまま）。 */
         val starred: List<ProgramSummary>,
         /** 絞り込む前によく聴く番組が 1 つでもあるか。無ければ「よく聴く」タブは案内を出し、あれば「一致なし」を出す。 */
         val hasStarred: Boolean,
@@ -99,9 +99,9 @@ class ProgramListViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     val isRefreshing: StateFlow<Boolean> = refresher.isRefreshing
-    /** 裏の同期（定期・起動時）のうち、手動が合流していない間だけ true。トップバーの下に細いバーを出す（#138）。 */
+    /** 裏の同期（定期・起動時）のうち、手動が合流していない間だけ true。トップバーの下に細いバーを出す。 */
     val isSyncingInBackground: StateFlow<Boolean> = refresher.isSyncingInBackground
-    /** 全走査でタグを読んでいる数（#209）。タグを読む回がある間だけ null でない。番組の画面のタブの下に件数を出す。 */
+    /** 全走査でタグを読んでいる数。タグを読む回がある間だけ null でない。番組の画面のタブの下に件数を出す。 */
     val tagProgress: StateFlow<ScanProgress?> = refresher.tagProgress
     /** 更新の結果と、ミニプレイヤーが消えた理由をスナックバーへ。 */
     val messages: Flow<UiText> = merge(refresher.messages, nowPlaying.messages)
@@ -123,7 +123,7 @@ class ProgramListViewModel @Inject constructor(
     fun selectTab(tab: ProgramListTab) {
         viewModelScope.launch { settings.setProgramListTab(tab) }
     }
-    /** 番組一覧の「引っ張って更新」= 全体の同期。`applicationScope` で走らせ、画面を離れても最後まで続ける（#311 の決定 9）。 */
+    /** 番組一覧の「引っ張って更新」= 全体の同期。`applicationScope` で走らせ、画面を離れても最後まで続ける。 */
     fun refresh() = refresher.launchRefresh()
     /** よく聴くの印を付ける／外す（表示にだけ効く）。 */
     fun setStarred(programId: ProgramId, starred: Boolean) {

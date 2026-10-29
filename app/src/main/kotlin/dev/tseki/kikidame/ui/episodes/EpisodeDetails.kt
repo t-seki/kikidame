@@ -12,7 +12,7 @@ import dev.tseki.kikidame.ui.toDateTimeText
 import dev.tseki.kikidame.ui.toSizeText
 
 /**
- * 各回の詳細画面（#43）に並べる値。Room にあるものを整形するだけで、取得元へは問い合わせない。
+ * 各回の詳細画面に並べる値。Room にあるものを整形するだけで、取得元へは問い合わせない。
  * 利用者向けの群と、デバッグ向けの「技術的な詳細」に分ける（後者は折り畳み、長押しでコピー）。
  * ラベルと定型の値は [UiText]（ADR 0006）。取得元から来た値・日付・尺は [UiText.Plain]。
  */
@@ -28,7 +28,7 @@ object EpisodeDetails {
 
     /**
      * 利用者向け: 各回・手元・再生の 3 群。手元に無い／再生記録が無いときはその群を 1 行に畳む。サイズが記録されていなければ「不明」。
-     * 出演者と配信元（#70）は「全部の値を並べる」画面なので無くても行を出す（出演者は「なし」、配信元が無い番組は「不明」）。
+     * 出演者と配信元は「全部の値を並べる」画面なので無くても行を出す（出演者は「なし」、配信元が無い番組は「不明」）。
      */
     fun sections(item: EpisodeWithState, program: Program): List<Section> {
         val e = item.episode

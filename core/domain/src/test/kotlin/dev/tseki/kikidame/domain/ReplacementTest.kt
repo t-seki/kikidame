@@ -3,7 +3,7 @@ package dev.tseki.kikidame.domain
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
-/** 差し替え（ADR 0011、#371）の判断。共有フォルダは一覧が大きさを返し、Jellyfin は返さない（listedFileSize = null）。 */
+/** 差し替え（ADR 0011）の判断。共有フォルダは一覧が大きさを返し、Jellyfin は返さない（listedFileSize = null）。 */
 class ReplacementTest {
     @Test
     fun sameVersionIsKept() {

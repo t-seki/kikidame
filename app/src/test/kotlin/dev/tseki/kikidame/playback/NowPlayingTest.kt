@@ -64,7 +64,7 @@ class NowPlayingTest {
         assertEquals(EpisodeId(2), nowPlaying.excludedFromSync)
     }
 
-    /** 聴き終えた回は載ったまま（ミニプレイヤーは残る）だが、同期の削除除外からは外れる（#27）。 */
+    /** 聴き終えた回は載ったまま（ミニプレイヤーは残る）だが、同期の削除除外からは外れる。 */
     @Test
     fun endedKeepsTheItemLoadedButReleasesItToSync() {
         load(item(1, "第 1 回", "番組 A"))
@@ -80,7 +80,7 @@ class NowPlayingTest {
         assertNull(nowPlaying.excludedFromSync)
     }
 
-    /** スリープタイマーの「この回の終わりまで」で途中の回を止めたとき（#36）も聴き終えた扱い。再開すれば戻る。 */
+    /** スリープタイマーの「この回の終わりまで」で途中の回を止めたときも聴き終えた扱い。再開すれば戻る。 */
     @Test
     fun pausedAtEndOfItemCountsAsEnded() {
         load(item(1, "第 1 回", "番組 A"), item(2, "第 2 回", "番組 A"))
@@ -95,7 +95,7 @@ class NowPlayingTest {
         assertEquals(EpisodeId(1), nowPlaying.excludedFromSync)
     }
 
-    /** 止まっていてもシークで位置が変わる（ミニプレイヤーの線、#59）。 */
+    /** 止まっていてもシークで位置が変わる（ミニプレイヤーの線）。 */
     @Test
     fun seekingUpdatesThePositionWhilePaused() {
         load(item(1, "第 1 回", "番組 A"))
@@ -105,7 +105,7 @@ class NowPlayingTest {
         assertEquals(600_000L, nowPlaying.state.value?.positionMs)
         assertEquals(1_800_000L, nowPlaying.state.value?.durationMs)
     }
-    /** 「回の終わりまで」で止めた後に次の回へシークしても、新しい回に聴き終えた印が一瞬でも付かない（#59 で onPositionDiscontinuity を読むようにした）。 */
+    /** 「回の終わりまで」で止めた後に次の回へシークしても、新しい回に聴き終えた印が一瞬でも付かない（回をまたぐシークは onPositionDiscontinuity で印を下ろす）。 */
     @Test
     fun seekingToTheNextItemDropsPausedAtEndOfItem() = runTest {
         load(item(1, "第 1 回", "番組 A"), item(2, "第 2 回", "番組 A"))

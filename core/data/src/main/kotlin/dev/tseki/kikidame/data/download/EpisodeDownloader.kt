@@ -37,7 +37,7 @@ sealed interface DownloadOutcome {
  * 取得元が応じずに全体を返したら書き直す。取得元には [SourceGateway] だけを通して触る（ADR 0007）。約 1 MB（[CHECK_EVERY]）ごとにキャンセルを見る。
  * 状態の更新（RUNNING / DONE / FAILED）はここで [DownloadQueue] に対して行う。
  *
- * 差し替え（[dev.tseki.kikidame.domain.LocalFile.replacing]、ADR 0011、#371）は [replace] で落とす。行は DONE のまま（今のファイルで聴ける）で、
+ * 差し替え（[dev.tseki.kikidame.domain.LocalFile.replacing]、ADR 0011）は [replace] で落とす。行は DONE のまま（今のファイルで聴ける）で、
  * いつも頭から落とし（`.part` の続きを要求しない）、落とし終えたら今のファイルの場所へ移して差し替える。
  * 落とし終えた時点でその回が聴いている回なら、差し替えずに `.part` を捨てる（[DownloadOutcome.Postponed]）。
  * 失敗したら `.part` を捨てて差し替えをやめる（今のファイルと落としたときの版は残る）。

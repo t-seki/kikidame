@@ -130,7 +130,7 @@ class DownloadWorkerTest {
 
         assertEquals(ListenableWorker.Result.success(), result)
         assertTrue(sessions.signedOut)
-        assertNull(notifier.showing, "signing out clears the sync failure notification (#346)")
+        assertNull(notifier.showing, "signing out clears the sync failure notification")
         assertEquals(DownloadState.PENDING, queue.state[EpisodeId(1)], "row goes back to PENDING for next time")
         assertEquals(DownloadState.PENDING, queue.state[EpisodeId(2)])
     }

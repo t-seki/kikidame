@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/check-adr-notes.sh の落ちる例と通る例（#324）。使い方: scripts/test-check-adr-notes.sh（repo 直下で）
+# scripts/check-adr-notes.sh の落ちる例と通る例。使い方: scripts/test-check-adr-notes.sh（repo 直下で）
 set -euo pipefail
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT

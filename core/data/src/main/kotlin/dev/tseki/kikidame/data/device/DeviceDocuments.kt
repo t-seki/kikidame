@@ -4,7 +4,7 @@ import dev.tseki.kikidame.domain.SourceException
 import java.io.FileNotFoundException
 
 /**
- * 端末のフォルダ（SAF、#199）の文書を引く窓口。[DeviceFolderTree] が使い、実装（[ContentResolverDeviceDocuments]）は
+ * 端末のフォルダ（SAF）の文書を引く窓口。[DeviceFolderTree] が使い、実装（[ContentResolverDeviceDocuments]）は
  * `ContentResolver` と `DocumentsContract` で引く。テストではメモリ上のものに差し替える。
  *
  * どのメソッドも blocking。権限が無い・取り消されたときは [SecurityException] を投げてよい（[DeviceFolderTree] が

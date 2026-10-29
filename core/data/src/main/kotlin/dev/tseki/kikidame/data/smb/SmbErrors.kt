@@ -9,7 +9,7 @@ import java.util.concurrent.CancellationException
 
 /**
  * smbj の失敗を、[dev.tseki.kikidame.data.sharedfolder.FolderTree] の約束（接続・認証・権限の失敗は必ず例外にし、
- * 「無い」だけを戻り値で表す）と [SourceException] に合わせる（#198）。
+ * 「無い」だけを戻り値で表す）と [SourceException] に合わせる。
  *
  * - 認証の失敗は [SourceException.Unauthorized]（Jellyfin の 401/403 と同じく接続をやり直させる）
  * - 届かない（名前が引けない、タイムアウトなど）は smbj が [java.io.IOException] で投げるので、そのまま返す。

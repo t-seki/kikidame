@@ -16,10 +16,10 @@ import dev.tseki.kikidame.text.UiText
 import dev.tseki.kikidame.ui.resolve
 
 /**
- * 端末のフォルダ（SAF、#199 の決定 8）の説明と選択。3 段の構成の例と、内部ストレージの直下や Download そのものは選べないこと、
- * コピーするので容量が二重になることと、フォルダのファイルを消すと手元のコピーも消えること（#199 の「決定の追記」）を示し、
+ * 端末のフォルダ（SAF）の説明と選択。3 段の構成の例と、内部ストレージの直下や Download そのものは選べないこと、
+ * コピーするので容量が二重になることと、フォルダのファイルを消すと手元のコピーも消えることを示し、
  * 「フォルダを選ぶ」で OS のフォルダ選択（`ACTION_OPEN_DOCUMENT_TREE`）を開く。選んだフォルダの直下が読めたら保存し、
- * セッション状態が変わって NavHost が番組一覧へ導く。アクセスが切れてログアウトした後は、選び直しの案内を出す（決定 5）。
+ * セッション状態が変わって NavHost が番組一覧へ導く。アクセスが切れてログアウトした後は、選び直しの案内を出す。
  * [onBack] は取得元の選択から来たときだけ渡す。
  */
 @Composable
@@ -44,7 +44,7 @@ fun DeviceFolderScreen(
             fontFamily = FontFamily.Monospace,
         )
         Text(stringResource(R.string.device_folder_pick_hint), style = MaterialTheme.typography.bodyMedium)
-        // コピーしてから聴く形（#199 の決定 1）から来る制約（#199 の「決定の追記」: 容量が二重になる、フォルダのファイルは消さずに置いておく）
+        // コピーしてから聴く形から来る制約（容量が二重になる、フォルダのファイルは消さずに置いておく）
         for (hint in listOf(R.string.device_folder_copy_hint, R.string.device_folder_storage_hint, R.string.device_folder_keep_hint)) {
             Text(
                 stringResource(hint),
@@ -63,7 +63,7 @@ fun DeviceFolderScreen(
 }
 
 /**
- * 端末のフォルダの、画面に出す場所（設定の取得元の行と、選び直しの案内。PR #214 のマージ前の検証で、人の判断で足した）。
+ * 端末のフォルダの、画面に出す場所（設定の取得元の行と、選び直しの案内）。
  * 例「内部ストレージ / KikidameTest / Radio」。ツリーの文書 ID（[DeviceFolder.location]）から作る。
  *
  * - 内部ストレージ（ボリューム `primary`）は「内部ストレージ」と出す

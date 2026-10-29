@@ -15,8 +15,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
 /**
- * アプリ全体の設定（セッションとは別の DataStore `settings`）。「Wi-Fi のみ」（handoff）・倍速（#35）・テーマ（#62）・
- * 番組の画面で最後に開いていたタブ（#151）。
+ * アプリ全体の設定（セッションとは別の DataStore `settings`）。「Wi-Fi のみ」（docs/architecture.md の「ダウンロード」）・倍速・テーマ・
+ * 番組の画面で最後に開いていたタブ。
  * 1 つの DataStore なので、どれかを書くと全部の Flow が再度流れる。値が変わったときだけ下流に伝える。
  */
 class DataStoreAppSettings(private val dataStore: DataStore<Preferences>) : AppSettingsRepository {

@@ -24,7 +24,7 @@ import kotlin.time.Duration.Companion.seconds
  * 書き込みは [persistScope] に載せる。サービス破棄で [playerScope] が cancel されても
  * 最後の保存が失われないよう、こちらはプロセス寿命のスコープを渡す。
  */
-// Player.PositionInfo の mediaItem / mediaItemIndex が unstable API。クラス単位で opt-in する（#111）
+// Player.PositionInfo の mediaItem / mediaItemIndex が unstable API。クラス単位で opt-in する
 @OptIn(UnstableApi::class)
 class PositionPersister(
     private val player: Player,

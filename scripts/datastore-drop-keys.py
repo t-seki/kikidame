@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Preferences DataStore のファイル（protobuf の PreferenceMap）から指定したキーを落とす（#140）。
+# Preferences DataStore のファイル（protobuf の PreferenceMap）から指定したキーを落とす。
 #
 #   scripts/datastore-drop-keys.py session.pb session.pb last_fetched_at last_attempted_at
 #
@@ -8,7 +8,7 @@
 # （セッションのファイルにはトークンの暗号文が入っている）。出力は 0600 で書く。
 #
 # 裏の同期をすぐ起こす手順（debug 版の run-as でファイルを取り出して書き戻す）は docs/device-testing.md の
-# 「実機で試す（M3-b: 同期）」にある。python3 だけで動く（protobuf のライブラリは要らない）。
+# 同期の節にある。python3 だけで動く（protobuf のライブラリは要らない）。
 import os
 import sys
 

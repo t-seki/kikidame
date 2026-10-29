@@ -6,10 +6,10 @@ import java.io.InputStream
 import kotlin.time.Instant
 
 /**
- * 共有フォルダ（CONTEXT.md）の中身をたどるための、フォルダの木の最小の抽象（#197）。
- * SMB（#198）と端末のフォルダ（SAF、#199）がこれを実装し、[SharedFolderSource] がこの上で走査する。
+ * 共有フォルダ（CONTEXT.md）の中身をたどるための、フォルダの木の最小の抽象。
+ * SMB と端末のフォルダ（SAF）がこれを実装し、[SharedFolderSource] がこの上で走査する。
  * 取得元に共通の抽象（この interface、[CloseableFolderTree]、[FolderTreeFactory]）は `sharedfolder/` に置き、
- * 実装は `smb/`（`SmbFolderTree`）と `device/`（`DeviceFolderTree`）に置く（#233）。
+ * 実装は `smb/`（`SmbFolderTree`）と `device/`（`DeviceFolderTree`）に置く。
  *
  * - パスは共有フォルダの根からの相対パスで、区切りは `/`。根は空文字列
  * - 読むだけで、書き込み・削除はしない（ADR 0007 の決定 6）
@@ -30,7 +30,7 @@ interface FolderTree {
     fun open(path: String, offset: Long): FolderFileStream
 
     /**
-     * 接続を捨て、次の操作で張り直させる（#209）。操作が失敗した後、同じ操作をやり直す前に [SharedFolderSource] が呼ぶ。
+     * 接続を捨て、次の操作で張り直させる。操作が失敗した後、同じ操作をやり直す前に [SharedFolderSource] が呼ぶ。
      * 切れた接続が「つながっている」と見えたまま残り、やり直しが同じ失敗を繰り返さないようにするため。
      * 接続を持たない木（端末のフォルダなど）は何もしない。失敗しても例外を投げない。
      */
@@ -42,7 +42,7 @@ interface CloseableFolderTree : FolderTree, AutoCloseable
 
 /**
  * 共有フォルダの取得元から木を作る。1 回の取得元の操作ごとに作って閉じる（接続の寿命を呼び出しの外に持ち出さない）。
- * SMB（#198）と端末のフォルダ（SAF、#199）。
+ * SMB と端末のフォルダ（SAF）。
  */
 interface FolderTreeFactory {
     fun open(connection: SmbConnection): CloseableFolderTree

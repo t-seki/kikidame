@@ -6,9 +6,9 @@ import dev.tseki.kikidame.domain.PlaybackRules
 import dev.tseki.kikidame.domain.PlaybackStateRepository
 import javax.inject.Inject
 /**
- * 番組のキュー（#231）: ある回を聴き始めるとき、その番組の手元にある回を古い順に全部積み、その回から、
+ * 番組のキュー: ある回を聴き始めるとき、その番組の手元にある回を古い順に全部積み、その回から、
  * 保存位置の規則（[PlaybackRules.resumePosition]）で始める。
- * 再生画面（`PlayerViewModel.open`）と、サービスの Auto での選択（`onSetMediaItems`）・再開（`onPlaybackResumption`、#108）が使う。
+ * 再生画面（`PlayerViewModel.open`）と、サービスの Auto での選択（`onSetMediaItems`）・再開（`onPlaybackResumption`）が使う。
  * プレイヤーには触らない（今のキューと比べて `seekTo` だけで済ますかの判定は呼び出し側に残す）。
  */
 class ProgramQueue @Inject constructor(

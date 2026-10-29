@@ -17,7 +17,7 @@ import org.junit.Test
 import kotlin.test.assertEquals
 
 /**
- * Jellyfin の接続画面の、接続に失敗したときの文言（#237）。ローカルネットワークの権限の案内は、届かない（Unreachable）うえに
+ * Jellyfin の接続画面の、接続に失敗したときの文言。ローカルネットワークの権限の案内は、届かない（Unreachable）うえに
  * 権限が無いときだけ続ける。権限の確かめは `Context` の代わりに注入した関数で差し替える。
  */
 @OptIn(ExperimentalCoroutinesApi::class)

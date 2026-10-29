@@ -14,7 +14,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import dev.tseki.kikidame.domain.EpisodeId
 
 /**
- * 再生画面の左右スワイプによるシーク（#29）の状態。計算は [SwipeSeek]、ジェスチャは [swipeToSeek]、ここは
+ * 再生画面の左右スワイプによるシークの状態。計算は [SwipeSeek]、ジェスチャは [swipeToSeek]、ここは
  * 「ドラッグ中か・開始時の位置・移動量」と、開始・ドラッグ・終了・取り消しだけを持つ。
  * 中身は Compose の snapshot の state だけで、コンポジションの外（JVM のユニットテスト）でも動く。
  *

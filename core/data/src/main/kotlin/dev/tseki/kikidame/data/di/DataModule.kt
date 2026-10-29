@@ -77,7 +77,7 @@ object SharedFolderModule {
     fun provideDeviceDocuments(@ApplicationContext context: Context): DeviceDocuments =
         ContentResolverDeviceDocuments(context.contentResolver)
 
-    /** 共有フォルダの木。SMB（#198）か端末のフォルダ（SAF、#199）。 */
+    /** 共有フォルダの木。SMB か端末のフォルダ（SAF）。 */
     @Provides
     @Singleton
     fun provideFolderTreeFactory(documents: DeviceDocuments): FolderTreeFactory = DefaultFolderTreeFactory(documents)

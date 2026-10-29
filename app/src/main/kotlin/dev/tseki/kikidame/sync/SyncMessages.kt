@@ -20,7 +20,7 @@ private fun sentences(parts: List<UiText>): UiText =
     UiText.Joined(parts, UiText.Res(R.string.sync_sentence_separator))
 
 /**
- * 手元の変化の文（#142）: 「新しい回 N 件」「M 回をダウンロード予約、L 回を削除」。0 のものは省き、何も無ければ「最新の状態です」。
+ * 手元の変化の文: 「新しい回 N 件」「M 回をダウンロード予約、L 回を削除」。0 のものは省き、何も無ければ「最新の状態です」。
  * 取得した番組数・各回数は出さない（毎回ほぼ同じで、変化が埋もれる）。
  */
 private fun RefreshResult.changes(): List<UiText> {

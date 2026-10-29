@@ -23,7 +23,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 手元のファイルの内訳と、選んだ回の削除（#335）。消すのは 1 回ずつ [DownloadRepository.deleteLocal]（範囲は `deletionScopeFor`）。
+ * 手元のファイルの内訳と、選んだ回の削除。消すのは 1 回ずつ [DownloadRepository.deleteLocal]（範囲は `deletionScopeFor`）。
  * 問い合わせは `playback_states` も見るので、再生中の再生位置の保存（10 秒ごと）でも再実行される。結果が同じなら下流に流さない。
  */
 @Singleton
@@ -80,8 +80,8 @@ class RoomLocalStorageRepository @Inject constructor(
 }
 
 /**
- * [RoomLocalStorageRepository] の束ね（#335）。ほかの束ねは `di/DataModule.kt` の `RepositoryModule` にあるが、
- * #335 の触るファイルが `repository/` までなので、ここに置いた。
+ * [RoomLocalStorageRepository] の束ね。ほかの束ねは `di/DataModule.kt` の `RepositoryModule` にあるが、
+ * これは実装の隣に置いている。
  */
 @Module
 @InstallIn(SingletonComponent::class)

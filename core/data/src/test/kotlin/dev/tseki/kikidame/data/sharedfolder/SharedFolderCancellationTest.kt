@@ -12,8 +12,8 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /**
- * 取り消された走査は、共有の残りを読み続けない（#198。取得元を変えた後も古い共有全体の走査が走り続け、
- * 新しい取得元の同期を妨げた不具合）。木の操作は blocking でコルーチンの取り消しに気づかないので、走査が自分で見る。
+ * 取り消された走査は、共有の残りを読み続けない（読み続けると、取得元を変えた後も古い共有全体の走査が走り続け、
+ * 新しい取得元の同期を妨げる）。木の操作は blocking でコルーチンの取り消しに気づかないので、走査が自分で見る。
  */
 class SharedFolderCancellationTest {
     private val folder = MemoryFolderTree()

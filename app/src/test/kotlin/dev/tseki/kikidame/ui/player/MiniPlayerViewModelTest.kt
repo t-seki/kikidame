@@ -31,7 +31,7 @@ import kotlin.test.assertNull
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
-/** ミニプレイヤーに出す、聴いている回の番組の画像（#289）。 */
+/** ミニプレイヤーに出す、聴いている回の番組の画像。 */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class MiniPlayerViewModelTest {

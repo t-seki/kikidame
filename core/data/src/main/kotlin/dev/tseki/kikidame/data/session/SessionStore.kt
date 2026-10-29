@@ -24,8 +24,8 @@ import kotlin.time.Instant
 
 /**
  * セッションの永続化（Preferences DataStore）。取得元は同時に 1 つで、Jellyfin のキー（`server_url` など。
- * 以前のバージョンから変えていないので、更新の後も接続が残る。epic #195 の決定 12）、SMB のキー（`smb_*`）、
- * 端末のフォルダのキー（`device_*`、#199）のどれか 1 つを持つ。`smb_host` があれば SMB、`device_tree_uri` があれば端末のフォルダ、
+ * 以前のバージョンから変えていないので、更新の後も接続が残る）、SMB のキー（`smb_*`）、
+ * 端末のフォルダのキー（`device_*`）のどれか 1 つを持つ。`smb_host` があれば SMB、`device_tree_uri` があれば端末のフォルダ、
  * どちらも無ければ Jellyfin とみなす。
  * Jellyfin のトークンと SMB のパスワードは [CredentialCipher] で暗号化して置く。Jellyfin のパスワードは保存しない。
  */
@@ -70,7 +70,7 @@ class SessionStore(
         }
     }
 
-    /** 端末のフォルダを保存する（#199）。Jellyfin と SMB の接続は消す（取得元は同時に 1 つ）。 */
+    /** 端末のフォルダを保存する。Jellyfin と SMB の接続は消す（取得元は同時に 1 つ）。 */
     suspend fun saveDeviceFolder(folder: DeviceFolder) {
         dataStore.edit {
             it.removeJellyfin()
@@ -98,13 +98,13 @@ class SessionStore(
         dataStore.edit { it[LAST_FETCHED_AT] = at.toEpochMilliseconds() }
     }
 
-    /** 全走査を試みた時刻。サーバに問い合わせる直前に、成功・失敗を問わず記録する（#135）。 */
+    /** 全走査を試みた時刻。サーバに問い合わせる直前に、成功・失敗を問わず記録する。 */
     suspend fun saveLastAttemptedAt(at: Instant) {
         dataStore.edit { it[LAST_ATTEMPTED_AT] = at.toEpochMilliseconds() }
     }
 
     /**
-     * 全走査の最後の試みの結果と時刻（#346）。[LAST_ATTEMPTED_AT] とは別のキーに置く。成功なら、同期の失敗の通知を出した記録も消す。
+     * 全走査の最後の試みの結果と時刻。[LAST_ATTEMPTED_AT] とは別のキーに置く。成功なら、同期の失敗の通知を出した記録も消す。
      */
     suspend fun saveSyncAttempt(attempt: SyncAttempt) {
         val (kind, detail) = when (val outcome = attempt.outcome) {
@@ -122,14 +122,14 @@ class SessionStore(
         }
     }
 
-    /** 同期の失敗の通知を出した記録（#346）。全走査が成功したとき（[saveSyncAttempt]）と、同期の時刻を消すときに消える。 */
+    /** 同期の失敗の通知を出した記録。全走査が成功したとき（[saveSyncAttempt]）と、同期の時刻を消すときに消える。 */
     suspend fun saveSyncFailureNotified() {
         dataStore.edit { it[SYNC_FAILURE_NOTIFIED] = true }
     }
 
     /**
      * ログアウト。サーバ URL とユーザー名（SMB はホスト・共有名・パス・ユーザー名）は次回の入力補助として残す。
-     * 端末のフォルダは、URI と名前を残してログアウトの印を立てる（アクセスが切れたフォルダを選び直させる。#199）。
+     * 端末のフォルダは、URI と名前を残してログアウトの印を立てる（アクセスが切れたフォルダを選び直させる）。
      */
     suspend fun clearCredentials() {
         dataStore.edit {
@@ -178,7 +178,7 @@ class SessionStore(
 
     /**
      * 取得元が変わったときとログアウトのときに、同期の時刻（最終同期・最終の試み）を消す。全走査の最後の試みの結果と、
-     * 同期の失敗の通知を出した記録も一緒に消す（#346 の決定 6）。
+     * 同期の失敗の通知を出した記録も一緒に消す。
      */
     private fun MutablePreferences.removeSyncTimes() {
         remove(LAST_FETCHED_AT)
@@ -276,7 +276,7 @@ class SessionStore(
         val LIBRARY_ID = stringPreferencesKey("library_id")
         val LIBRARY_NAME = stringPreferencesKey("library_name")
 
-        /** ライブラリの種類（#354）。`music` か `books`。前の版は書いていない（無ければ音楽）。 */
+        /** ライブラリの種類。`music` か `books`。前の版は書いていない（無ければ音楽）。 */
         val LIBRARY_KIND = stringPreferencesKey("library_kind")
         val LAST_FETCHED_AT = longPreferencesKey("last_fetched_at")
         val LAST_ATTEMPTED_AT = longPreferencesKey("last_attempted_at")

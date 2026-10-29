@@ -70,7 +70,7 @@ class RoomLibraryRepositoryTest : RoomTestBase() {
         assertEquals(false, repo.observeProgram(programId).first()?.starred)
     }
 
-    /** 未再生の数（#41）: 手元にあって再生済みでない回。再生済みの切替と、ファイルが手元に無くなる（DONE でなくなる）ことに追従する。 */
+    /** 未再生の数: 手元にあって再生済みでない回。再生済みの切替と、ファイルが手元に無くなる（DONE でなくなる）ことに追従する。 */
     @Test
     fun unplayedLocalCountFollowsPlayedAndLocalFiles() = runTest {
         val programId = seedProgram()
@@ -91,7 +91,7 @@ class RoomLibraryRepositoryTest : RoomTestBase() {
         db.playbackStateDao().upsert(PlaybackStateEntity(id("X 2026-06-19"), positionTicks = 0, played = false, updatedAt = now))
         assertEquals(3, summary().unplayedLocalCount)
     }
-    /** 手元のファイルの合計（#42）: DONE でパスがある回の sizeBytes を足す。ダウンロード途中・パス無しは数えない。 */
+    /** 手元のファイルの合計: DONE でパスがある回の sizeBytes を足す。ダウンロード途中・パス無しは数えない。 */
     @Test
     fun localStorageSumsDoneFilesOnly() = runTest {
         val programId = seedProgram()
@@ -105,7 +105,7 @@ class RoomLibraryRepositoryTest : RoomTestBase() {
         db.localFileDao().delete(id("X 2026-06-12"))
         assertEquals(LocalStorageUsage(30_000_000 + 1024L, 2), repo.observeLocalStorage().first())
     }
-    /** 出演者（#70）は 1 列に畳んで保存し、複数名も空も元の一覧のまま読める。 */
+    /** 出演者は 1 列に畳んで保存し、複数名も空も元の一覧のまま読める。 */
     @Test
     fun performersRoundTripThroughTheColumn() = runTest {
         val programId = seedProgram()
@@ -119,7 +119,7 @@ class RoomLibraryRepositoryTest : RoomTestBase() {
     }
 
     /**
-     * 「続きから」の各回（#108）: 手元にあり・未再生・聴き始めている回だけを、記録の新しい順に上限まで。
+     * 「続きから」の各回: 手元にあり・未再生・聴き始めている回だけを、記録の新しい順に上限まで。
      * 手元に無い回、再生済みの回、聴き始めていない（位置が閾値未満の）回、記録の無い回は出ない。
      */
     @Test
@@ -156,7 +156,7 @@ class RoomLibraryRepositoryTest : RoomTestBase() {
         assertEquals(listOf("X 2026-06-05"), repo.getContinueListening(20).map { it.episode.title })
     }
     /**
-     * 「続きから」タブ（#151）の読み出し: [RoomLibraryRepository.getContinueListening] と同じ条件・順で件数の上限が無く、
+     * 「続きから」タブの読み出し: [RoomLibraryRepository.getContinueListening] と同じ条件・順で件数の上限が無く、
      * 再生位置の保存（順が入れ替わる）・再生済み・手元のファイルの削除・同期での各回の削除に追従する。
      */
     @Test

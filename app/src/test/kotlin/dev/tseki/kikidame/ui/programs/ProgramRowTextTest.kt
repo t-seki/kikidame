@@ -16,7 +16,7 @@ import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.time.Instant
 
-/** 番組一覧の行の補足（#41）。並び・省略を見るので、[UiText] を日本語（`values-ja/`）で解決した文字列で比較する（Robolectric）。 */
+/** 番組一覧の行の補足。並び・省略を見るので、[UiText] を日本語（`values-ja/`）で解決した文字列で比較する（Robolectric）。 */
 @RunWith(AndroidJUnit4::class)
 @Config(qualifiers = "ja")
 class ProgramRowTextTest {

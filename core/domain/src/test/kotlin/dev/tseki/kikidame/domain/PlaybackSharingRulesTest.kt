@@ -9,7 +9,7 @@ import kotlin.time.Duration.Companion.microseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
-/** 再生の共有の衝突の規則（ADR 0010 の決定 4、#355）。 */
+/** 再生の共有の衝突の規則（ADR 0010 の決定 4）。 */
 class PlaybackSharingRulesTest {
     private val episode = EpisodeId(1)
     private val t0 = Instant.parse("2026-10-27T00:00:00Z")
@@ -26,7 +26,7 @@ class PlaybackSharingRulesTest {
         assertEquals(Decision.Keep, PlaybackSharingRules.decide(record, seen))
     }
 
-    /** サーバの `LastPlayedDate` のミリ秒未満の端数は、ミリ秒で持つ最後に見た値と比べる前に切り捨てる（#357 の 1 周目 3）。 */
+    /** サーバの `LastPlayedDate` のミリ秒未満の端数は、ミリ秒で持つ最後に見た値と比べる前に切り捨てる。 */
     @Test
     fun `a sub-millisecond fraction of the server time is not a change`() {
         val seen = shared(10.minutes, at = t0)

@@ -1,6 +1,6 @@
 package dev.tseki.kikidame.domain
 import kotlin.time.Instant
-/** 番組。Jellyfin の音楽のライブラリでは MusicAlbum、ブックのライブラリでは各回の Album のタグに対応する（#354）。 */
+/** 番組。Jellyfin の音楽のライブラリでは MusicAlbum、ブックのライブラリでは各回の Album のタグに対応する。 */
 data class Program(
     val id: ProgramId,
     val sourceItemId: SourceItemId?,
@@ -19,7 +19,7 @@ data class Program(
     val isGone: Boolean get() = goneSince != null
 }
 /**
- * 手元に持っている番組の画像（ADR 0009、#264）。同期のときに取得元から取ってアプリの領域に置いたファイル。
+ * 手元に持っている番組の画像（ADR 0009）。同期のときに取得元から取ってアプリの領域に置いたファイル。
  * [path] は絶対パス。画像が変わると別の名前のファイルになる（表示側のキャッシュが古い画像を出さないように）。
  */
 data class ProgramImage(val path: String)

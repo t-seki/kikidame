@@ -17,7 +17,7 @@ android {
         versionCode = 9
         versionName = "0.9.0"
     }
-    // release の署名（#94）。鍵とパスフレーズは repo に置かず環境変数から読む。
+    // release の署名。鍵とパスフレーズは repo に置かず環境変数から読む。
     // 無ければ署名設定を付けずにビルドする（CI の test、CI の release-build（署名なしで assembleRelease）、鍵を持たない人の assembleRelease を通すため）。
     // KIKIDAME_KEYSTORE=/path/to/kikidame-upload.jks KIKIDAME_KEYSTORE_PASSWORD=… KIKIDAME_KEY_ALIAS=kikidame KIKIDAME_KEY_PASSWORD=…
     val keystorePath = System.getenv("KIKIDAME_KEYSTORE")
@@ -32,8 +32,8 @@ android {
         }
     }
     buildTypes {
-        // 実機では Releases の release 版（普段使い）と並べて入れる。PR の検証ビルドやスキーマを上げたビルドを
-        // 入れても release 版のデータに触れない（#128）。アプリ名は src/debug/res で「Kikidame (debug)」
+        // 端末に Releases の release 版と並べて入れる。開発中のビルドやスキーマを上げたビルドを
+        // 入れても release 版のデータに触れない。アプリ名は src/debug/res で「Kikidame (debug)」
         debug {
             applicationIdSuffix = ".debug"
         }
@@ -49,7 +49,7 @@ android {
         buildConfig = true
     }
     androidResources {
-        // OS の「アプリの言語」（Android 13+）に載せる locales_config.xml を、res/values-* と resources.properties から生成する（#104、ADR 0006）
+        // OS の「アプリの言語」（Android 13+）に載せる locales_config.xml を、res/values-* と resources.properties から生成する（ADR 0006）
         generateLocaleConfig = true
     }
     lint {
@@ -91,7 +91,7 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
     implementation(libs.compose.material.icons.extended)
-    // 番組の画像（ADR 0009、#264）。手元のファイルだけを読むので、ネットワークの部品（coil-network-*）は入れない
+    // 番組の画像（ADR 0009）。手元のファイルだけを読むので、ネットワークの部品（coil-network-*）は入れない
     implementation(libs.coil.compose)
     debugImplementation(libs.compose.ui.tooling)
     implementation(libs.media3.exoplayer)

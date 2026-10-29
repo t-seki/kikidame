@@ -8,8 +8,8 @@ import dev.tseki.kikidame.domain.isDeviceFolder
 import kotlinx.coroutines.flow.first
 
 /**
- * 同期とダウンロードの Worker のネットワークの制約。取得元が端末のフォルダなら NOT_REQUIRED（ネットワークの条件をかけない。
- * #199 の「決定の追記」）。Jellyfin と SMB は「Wi-Fi のみ」なら UNMETERED、そうでなければ CONNECTED。
+ * 同期とダウンロードの Worker のネットワークの制約。取得元が端末のフォルダなら NOT_REQUIRED（ネットワークの条件をかけない）。
+ * Jellyfin と SMB は「Wi-Fi のみ」なら UNMETERED、そうでなければ CONNECTED。
  * 「Wi-Fi のみ」が効くかの規則は domain の `wifiOnlyApplies` と同じ（端末のフォルダには効かせない）で、ここは WorkManager の [NetworkType] への写像。
  * `sync` と `download` の両方が使うので、どちらのパッケージにも置かない（パッケージを循環させない）。
  */

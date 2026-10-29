@@ -11,7 +11,7 @@
       "platformAutomerge": false
     },
     {
-      "description": "kotlinx-datetime の -0.6.x-compat 版は旧 Instant / Clock を残した互換版で、新しい版ではない。この repo は kotlin.time.Instant を使うので候補から外す(#182)",
+      "description": "kotlinx-datetime の -0.6.x-compat 版は旧 Instant / Clock を残した互換版で、新しい版ではない。この repo は kotlin.time.Instant を使うので候補から外す",
       "matchPackageNames": ["org.jetbrains.kotlinx:kotlinx-datetime"],
       "allowedVersions": "!/-compat$/"
     }

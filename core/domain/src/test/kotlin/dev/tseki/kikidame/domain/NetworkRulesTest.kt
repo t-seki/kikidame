@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** 取得元（[SessionState]）だけで決まるネットワークの規則。「Wi-Fi のみ」が効くか（#199 の決定 4）、ローカルネットワークを使うか（決定 7）。 */
+/** 取得元（[SessionState]）だけで決まるネットワークの規則。「Wi-Fi のみ」が効くか、ローカルネットワークを使うか。 */
 class NetworkRulesTest {
     private val folder = DeviceFolder("content://com.android.externalstorage.documents/tree/primary%3ARadio", "Radio")
     private val device = SessionState.Ready(ConnectedSource.Device(folder), null)

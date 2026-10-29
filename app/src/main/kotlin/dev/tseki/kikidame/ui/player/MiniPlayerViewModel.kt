@@ -36,8 +36,8 @@ class MiniPlayerViewModel @Inject constructor(
     val state: StateFlow<NowPlayingState?> = nowPlaying.state
 
     /**
-     * 聴いている回の番組の画像（ADR 0009、#289）。無ければ null。[state] は再生位置で毎秒変わるので、回の ID が変わったときだけ引き直す。
-     * 番組を購読するので、同期が画像を取り直しても追従する。回の画像（#283）は使わない。
+     * 聴いている回の番組の画像（ADR 0009）。無ければ null。[state] は再生位置で毎秒変わるので、回の ID が変わったときだけ引き直す。
+     * 番組を購読するので、同期が画像を取り直しても追従する。回の画像は使わない。
      */
     val programImage: StateFlow<ProgramImage?> = nowPlaying.state
         .map { it?.episodeId }

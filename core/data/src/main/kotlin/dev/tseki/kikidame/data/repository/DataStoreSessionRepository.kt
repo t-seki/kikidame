@@ -101,7 +101,7 @@ class DataStoreSessionRepository @Inject constructor(
         gateway.listLibraries(requireSession().credentials())
 
     /**
-     * 音楽かブックのライブラリだけを受け付ける（#354）。選び直しても手元は消さず（ADR 0010 の決定 7）、
+     * 音楽かブックのライブラリだけを受け付ける。選び直しても手元は消さず（ADR 0010 の決定 7）、
      * 次の同期で未結合になった番組・各回を突合で結び直す（ADR 0001）。
      */
     override suspend fun selectLibrary(library: LibraryView) {

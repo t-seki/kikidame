@@ -27,10 +27,9 @@ import dev.tseki.kikidame.LocalNetworkPermission
 import dev.tseki.kikidame.R
 
 /**
- * 初回の取得元の選択画面（#198、epic #195 の決定 3）。「Jellyfin に接続」「NAS の共有フォルダ（SMB）」「端末のフォルダ」（#199）。
- * SMB は、走査を作り直すまで debug 版だけで出していた（#198 の追加の決定）。#209 で作り直したので、release 版でも出す。
+ * 初回の取得元の選択画面。「Jellyfin に接続」「NAS の共有フォルダ（SMB）」「端末のフォルダ」。
  * 選ぶだけで何も保存せず、次の接続画面（端末のフォルダは説明の画面）へ進む。
- * Jellyfin か SMB を選んだら、ローカルネットワークの権限が要って無ければ要求してから進む（#199 の決定 7。拒否されても進む。
+ * Jellyfin か SMB を選んだら、ローカルネットワークの権限が要って無ければ要求してから進む（拒否されても進む。
  * 届かなかったときは接続画面が権限の案内を出す）。端末のフォルダでは要求しない。
  */
 @OptIn(ExperimentalMaterial3Api::class)

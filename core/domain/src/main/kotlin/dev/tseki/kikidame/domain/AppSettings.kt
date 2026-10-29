@@ -14,14 +14,14 @@ interface AppSettingsRepository {
     /** 倍速。[PlaybackSpeed.CHOICES] のどれか。既定 1.0。 */
     val playbackSpeed: Flow<Float>
     suspend fun setPlaybackSpeed(value: Float)
-    /** テーマ（#62）。既定は [ThemeMode.SYSTEM]。 */
+    /** テーマ。既定は [ThemeMode.SYSTEM]。 */
     val themeMode: Flow<ThemeMode>
     suspend fun setThemeMode(value: ThemeMode)
-    /** 番組の画面で最後に開いていたタブ（#151）。起動時にこれを開く。既定は [ProgramListTab.CONTINUE_LISTENING]。 */
+    /** 番組の画面で最後に開いていたタブ。起動時にこれを開く。既定は [ProgramListTab.CONTINUE_LISTENING]。 */
     val programListTab: Flow<ProgramListTab>
     suspend fun setProgramListTab(value: ProgramListTab)
 }
-/** 番組の画面のタブ（#151）。並びは画面の左からの順。 */
+/** 番組の画面のタブ。並びは画面の左からの順。 */
 enum class ProgramListTab {
     CONTINUE_LISTENING, STARRED, ALL_PROGRAMS;
     companion object {
@@ -29,7 +29,7 @@ enum class ProgramListTab {
         fun fromStorageName(name: String?): ProgramListTab = entries.firstOrNull { it.name == name } ?: CONTINUE_LISTENING
     }
 }
-/** ダーク／ライトの選び方（#62）。SYSTEM は端末の設定に追従。 */
+/** ダーク／ライトの選び方。SYSTEM は端末の設定に追従。 */
 enum class ThemeMode {
     SYSTEM, DARK, LIGHT;
     companion object {
