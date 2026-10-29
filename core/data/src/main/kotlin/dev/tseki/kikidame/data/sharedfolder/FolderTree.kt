@@ -7,7 +7,7 @@ import kotlin.time.Instant
 
 /**
  * 共有フォルダ（CONTEXT.md）の中身をたどるための、フォルダの木の最小の抽象。
- * SMBと端末のフォルダ（SAF）がこれを実装し、[SharedFolderSource] がこの上で走査する。
+ * SMB と端末のフォルダ（SAF）がこれを実装し、[SharedFolderSource] がこの上で走査する。
  * 取得元に共通の抽象（この interface、[CloseableFolderTree]、[FolderTreeFactory]）は `sharedfolder/` に置き、
  * 実装は `smb/`（`SmbFolderTree`）と `device/`（`DeviceFolderTree`）に置く。
  *
@@ -42,7 +42,7 @@ interface CloseableFolderTree : FolderTree, AutoCloseable
 
 /**
  * 共有フォルダの取得元から木を作る。1 回の取得元の操作ごとに作って閉じる（接続の寿命を呼び出しの外に持ち出さない）。
- * SMBと端末のフォルダ（SAF）。
+ * SMB と端末のフォルダ（SAF）。
  */
 interface FolderTreeFactory {
     fun open(connection: SmbConnection): CloseableFolderTree

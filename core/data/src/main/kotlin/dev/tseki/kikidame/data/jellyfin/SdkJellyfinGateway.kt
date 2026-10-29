@@ -138,7 +138,7 @@ class SdkJellyfinGateway @Inject constructor(
     }
 
     /**
-     * ブックのライブラリでは、`albums=` の絞り込みが AudioBook に効かない版がある（10.11.11 では全件が返った）ので、
+     * ブックのライブラリでは、`albums=` の絞り込みが AudioBook に効かない版がある（10.11 では全件が返った）ので、
      * ライブラリ全体を取ってタグでまとめた中から選ぶ（ADR 0010 の決定 2）。
      */
     override suspend fun fetchProgramEpisodes(

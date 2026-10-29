@@ -28,7 +28,7 @@ class DeviceFolderDisplayPathTest {
         assertEquals(UiText.Joined(listOf(UiText.Plain("1234-5678"), UiText.Plain("Radio")), separator), folder.displayPath())
     }
 
-    /** 文書 ID が想定の形でなければ、保存済みの表示名に戻す（保存済みの `name` は今までどおり使える）。 */
+    /** 文書 ID が想定の形でなければ、保存済みの表示名に戻す（保存済みの `name` も使える）。 */
     @Test
     fun malformedIdFallsBackToTheSavedName() {
         val folder = DeviceFolder("content://com.android.externalstorage.documents/tree/Radio", "Radio")

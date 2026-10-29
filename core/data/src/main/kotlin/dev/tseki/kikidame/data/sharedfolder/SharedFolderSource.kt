@@ -46,7 +46,7 @@ import kotlin.time.Instant
  * - 木の操作が例外を投げたら（全走査ではやり直しても失敗したら）[SourceException.Unreachable]（今の Jellyfin と同じく到達不能、判断保留）。
  *   番組のフォルダが無ければ [fetchProgram] が null（消失）
  *
- * 接続の情報は [tree] の側で持つ。取得元の種類による切り替えは `SessionSourceGateway`が行う。
+ * 接続の情報は [tree] の側で持つ。取得元の種類による切り替えは `SessionSourceGateway` が行う。
  */
 class SharedFolderSource(
     private val tree: FolderTree,
@@ -80,7 +80,7 @@ class SharedFolderSource(
             val programEpisodes = ArrayList<SourceEpisode>(files.size)
             var readHere = false
             for (file in files) {
-                // タグの読み取り（まとめ読みの前の計測で m4a は 1 本 0.9〜1.3 秒）の合間に、取り消されていれば止まる
+                // タグの読み取り（まとめ読みなしで m4a は 1 本 0.9〜1.3 秒）の合間に、取り消されていれば止まる
                 currentCoroutineContext().ensureActive()
                 programEpisodes += episodeFor(program.sourceId, file, previous) { path, size ->
                     val tags = retry { tags.read(tree, path, size) }

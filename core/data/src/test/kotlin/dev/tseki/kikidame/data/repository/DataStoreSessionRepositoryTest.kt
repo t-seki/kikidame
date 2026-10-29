@@ -347,7 +347,7 @@ class DataStoreSessionRepositoryTest {
         assertNull(ready.lastFetchedAt)
     }
 
-    /** 端末のストレージ以外の providerは、権限を取らずに断る。 */
+    /** 端末のストレージ以外の provider は、権限を取らずに断る。 */
     @Test
     fun otherProvidersAreRejectedBeforeTakingThePermission() = runTest {
         val drive = "content://com.google.android.apps.docs.storage/tree/acc%3D1%3Bdoc%3Dabc"

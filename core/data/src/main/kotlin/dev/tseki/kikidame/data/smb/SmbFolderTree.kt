@@ -181,7 +181,7 @@ private fun fileInputStream(file: File, offset: Long) = PositionalInputStream(
 private const val SMB_READ_CHUNK = 512 * 1024
 
 /**
- * SMB のファイルを読むストリームの、読み取り中の例外を変える（順は `SmbFileInputStream` の catch の並びと同じ）。
+ * SMB のファイルを読むストリームの、読み取り中の例外を変える。
  *
  * - [SMBApiException] は [IOException] に変える
  * - [IOException]（`InterruptedIOException` を含む）と [CancellationException] は、そのまま投げる。

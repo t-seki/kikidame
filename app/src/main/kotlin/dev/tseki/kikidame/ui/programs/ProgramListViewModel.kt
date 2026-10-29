@@ -39,7 +39,7 @@ class ProgramListViewModel @Inject constructor(
     private val settings: AppSettingsRepository,
 ) : ViewModel() {
     /**
-     * 起動時に開くタブ= 前回最後に開いていたタブ（初回は「続きから」）。null は読み込み前で、画面は読めるまで何も出さない
+     * 起動時に開くタブ = 前回最後に開いていたタブ（初回は「続きから」）。null は読み込み前で、画面は読めるまで何も出さない
      * （先にタブ 0 を出してから飛ぶのを避ける）。読むのは ViewModel ができたときの 1 回だけで、その後のタブは画面の状態が持つ
      * （番組を開いて戻っても、この ViewModel と画面の状態は残る）。
      */

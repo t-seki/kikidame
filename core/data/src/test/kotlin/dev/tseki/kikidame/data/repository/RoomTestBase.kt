@@ -31,7 +31,7 @@ abstract class RoomTestBase {
     fun closeDatabase() {
         db.close()
     }
-    /** 取得元 ID を持たない手元の行（ADR 0001。かつてのシードが作っていた形）をテスト用に組み立てる。 */
+    /** 取得元 ID を持たない手元の行（ADR 0001）をテスト用に組み立てる。 */
     data class LocalRow(
         val publisher: String,
         val program: String,

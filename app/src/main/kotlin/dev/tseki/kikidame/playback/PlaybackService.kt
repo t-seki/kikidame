@@ -45,7 +45,7 @@ import javax.inject.Inject
 import kotlin.time.Clock
 /**
  * 通知・ロック画面を持つ再生サービス。再生専用（ADR 0002）。
- * Android Autoには [MediaLibraryService] として [BrowseTree] を出す。Auto は車載機からアプリの外で bind するので、
+ * Android Auto には [MediaLibraryService] として [BrowseTree] を出す。Auto は車載機からアプリの外で bind するので、
  * 画面を開かずにこのサービスが起動する経路がある（ADR 0004）。
  */
 // Media3 の MediaLibrarySession / LibraryResult は unstable API。クラス単位で opt-in する
