@@ -1,4 +1,4 @@
-<!-- Debug build only: orange instead of the release blue, so the icon alone tells the two apps apart (#146). -->
+<!-- Debug build only: orange instead of the release blue, so the icon alone tells the two apps apart. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"

@@ -4,7 +4,7 @@ import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-/** SMB の共有の中のパスの組み立て（#198）。smbj を使わない部分。 */
+/** SMB の共有の中のパスの組み立て。smbj を使わない部分。 */
 class SmbPathsTest {
     @Test
     fun baseIsNormalisedToSlashSeparatedWithoutEdges() {

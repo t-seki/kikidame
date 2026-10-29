@@ -17,7 +17,7 @@ import kotlin.test.assertNull
 import kotlin.time.Instant
 
 /**
- * 端末のフォルダ（SAF、#199）の木。パスから文書への対応、null（無い）と例外（アクセスが切れた）の使い分け、部分読みと続きからの読み出し。
+ * 端末のフォルダ（SAF）の木。パスから文書への対応、null（無い）と例外（アクセスが切れた）の使い分け、部分読みと続きからの読み出し。
  * 文書はメモリ上のもの（[MemoryDeviceDocuments]）。
  */
 class DeviceFolderTreeTest {
@@ -69,7 +69,7 @@ class DeviceFolderTreeTest {
 
     @Test
     fun missingRootIsUnauthorizedNotNull() {
-        // 根が無いのを null で返すと、全走査が到達不能で終わるか、番組ごとの取得が全番組を消失と判断する（#199 の決定 5）
+        // 根が無いのを null で返すと、全走査が到達不能で終わるか、番組ごとの取得が全番組を消失と判断する
         documents.rootGone = true
         assertFailsWith<SourceException.Unauthorized> { tree().list("") }
         assertFailsWith<SourceException.Unauthorized> { tree().list("TBS/Junk") }
@@ -77,7 +77,7 @@ class DeviceFolderTreeTest {
 
     /**
      * 根を問い合わせて例外になったときは、無いと分かったわけではない（provider が落ちた、SD カードが一時的に外れたなども同じ形で来うる）ので、
-     * ログアウトにせず通常の失敗にする（PR #214 1 周目 #2）。cursor が null のときも、実装（`ContentResolverDeviceDocuments`）が例外にするので同じ
+     * ログアウトにせず通常の失敗にする。cursor が null のときも、実装（`ContentResolverDeviceDocuments`）が例外にするので同じ
      */
     @Test
     fun failingToQueryTheRootIsAnOrdinaryFailureNotUnauthorized() {
@@ -184,7 +184,7 @@ class DeviceFolderTreeTest {
 
     @Test
     fun lostAccessDuringAScanIsUnauthorizedWithoutRetrying() = runTest {
-        // アクセスが切れたらやり直さずにログアウトへ（到達不能にしない。#199 の決定 5）
+        // アクセスが切れたらやり直さずにログアウトへ（到達不能にしない）
         documents.rootGone = true
         val source = SharedFolderSource(tree(), { _, _, _ -> AudioTags() }, { emptyMap() })
         assertFailsWith<SourceException.Unauthorized> { source.fetchAll() }

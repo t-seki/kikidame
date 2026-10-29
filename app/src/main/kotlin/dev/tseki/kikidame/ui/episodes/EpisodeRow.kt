@@ -56,7 +56,7 @@ private val MARK_SIZE = 14.dp
 private val MARK_GAP = 4.dp
 
 /**
- * 各回の行。各回一覧と「続きから」（#151）が共通で使う（#153）。
+ * 各回の行。各回一覧と「続きから」が共通で使う。
  * 右端のアイコンは状態を表し、タップで最も自然な 1 操作をする（[trailing] で画面ごとに渡す）。
  * 残りの操作は長押しのボトムシート（[EpisodeActionsSheet]）。手元に無い回はタップで再生画面へ行かない。
  * タイトルの前に印を出す: 固定（ダウンロード済みで固定された回）のピンと、聴いている回（[nowPlaying] がこの回。背景も変える）の
@@ -79,7 +79,7 @@ internal fun EpisodeRow(
     val local = item.localFile
     val state = local?.state
     // ListItem は補足が折り返すと 3 行の項目になり、右端の要素を上寄せにする（上下 12dp・最小 88dp）。
-    // 行が何行でも右端を上下の真ん中に置くため、ListItem を使わず Row で組む（#162。#157 の ProgramRow と同じ）。
+    // 行が何行でも右端を上下の真ん中に置くため、ListItem を使わず Row で組む（ProgramRow と同じ）。
     // 余白・最小の高さ・文字・色は ListItem の 1〜2 行のときと同じ（上下 8dp・最小 72dp）。
     Surface(
         modifier = Modifier
@@ -95,7 +95,7 @@ internal fun EpisodeRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                // 印（固定・再生中／一時停止）はタイトルの前に置くが、印の無い行にも同じ幅の枠を確保してタイトルの開始位置を揃える（#56）。
+                // 印（固定・再生中／一時停止）はタイトルの前に置くが、印の無い行にも同じ幅の枠を確保してタイトルの開始位置を揃える。
                 // 固定と聴いている回は独立した状態なので両方出す（両方ある行だけ 1 つ分右にずれるが、背景色で目立つ 1 行なので許容）
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val pinned = local?.pinned == true && state == DownloadState.DONE
@@ -124,7 +124,7 @@ internal fun EpisodeRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     if (playable && resume != null && runtime > Duration.ZERO) {
-                        // 再生済みと未再生の間の隙間（gapSize の既定）は無くす。隙間を無くす点だけミニプレイヤーの線（#59）と同じで、色・端の形・端の点は既定のまま
+                        // 再生済みと未再生の間の隙間（gapSize の既定）は無くす。隙間を無くす点だけミニプレイヤーの線と同じで、色・端の形・端の点は既定のまま
                         LinearProgressIndicator(
                             progress = { (resume / runtime).toFloat().coerceIn(0f, 1f) },
                             modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
@@ -143,8 +143,8 @@ internal fun EpisodeRow(
 }
 
 /**
- * 長押しのシート（#153: 各回一覧と「続きから」で共通）。ダウンロード（[onDownload]）は null なら出さない
- * （「続きから」の回は必ず手元にある）。固定する（[onPin]）の出す条件は手元にあり固定していない回で、番組が同期対象かは見ない（#280）。[syncEnabled] は番組が同期対象か（固定を外す操作の条件）。
+ * 長押しのシート（各回一覧と「続きから」で共通）。ダウンロード（[onDownload]）は null なら出さない
+ * （「続きから」の回は必ず手元にある）。固定する（[onPin]）の出す条件は手元にあり固定していない回で、番組が同期対象かは見ない。[syncEnabled] は番組が同期対象か（固定を外す操作の条件）。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -190,7 +190,7 @@ internal fun SheetAction(icon: ImageVector, label: String, onClick: () -> Unit) 
 }
 
 /**
- * 行の右端の再生済みの切り替え（#230）。各回一覧（手元にある回）と「続きから」が共通で使う。
+ * 行の右端の再生済みの切り替え。各回一覧（手元にある回）と「続きから」が共通で使う。
  * アイコンと読み上げは今の状態（再生済み／未再生）を表し、タップで反対に切り替える。
  */
 @Composable

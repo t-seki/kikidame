@@ -31,7 +31,7 @@ import kotlin.time.Clock
 /**
  * ダウンロードの状態（`local_files`）と手元のファイルをまとめて扱う。
  * 削除の規則は [deletionScopeFor]: 取得元 ID がある回はファイルと行だけ、無い回は各回ごと。
- * 差し替え（ADR 0011、#371）は、DONE の行に `replaceState` を立てて同じ待ち行列に入れる。手元の回を消すと、差し替えも一緒に消える（行と `.part` が消える）。
+ * 差し替え（ADR 0011）は、DONE の行に `replaceState` を立てて同じ待ち行列に入れる。手元の回を消すと、差し替えも一緒に消える（行と `.part` が消える）。
  */
 @Singleton
 class RoomDownloadRepository @Inject constructor(
@@ -111,7 +111,7 @@ class RoomDownloadRepository @Inject constructor(
     }
 
     override suspend fun cancel(episodeId: EpisodeId) {
-        // パスを読むだけ。消すかどうか（DONE でないか）は消す文の中で見る: 読んだ後に完了した回の行を消さない（#261）
+        // パスを読むだけ。消すかどうか（DONE でないか）は消す文の中で見る: 読んだ後に完了した回の行を消さない
         val row = db.localFileDao().findByEpisode(episodeId.value) ?: return
         if (db.localFileDao().deleteUnlessDone(episodeId.value) == 0) return
         row.path?.let { withContext(Dispatchers.IO) { File(it + PART_SUFFIX).delete() } }
@@ -250,7 +250,7 @@ class RoomDownloadRepository @Inject constructor(
     /**
      * `local_files` の行を読み、あれば [change] で変えて書く。行が無いときと、[change] が null を返したときは書かない。書いたら true。
      * トランザクションは張らない（囲むかどうかは呼ぶ側が決める）。読んでから書くまでの間に別の経路が書くと、その書き込みを古い行で戻し、
-     * 消された行を生き返らせるので、トランザクションの中でだけ呼ぶ（今は [markDone] だけ）。ほかの 1 回の更新は `LocalFileDao` の 1 つの文で行う（#261）
+     * 消された行を生き返らせるので、トランザクションの中でだけ呼ぶ（今は [markDone] だけ）。ほかの 1 回の更新は `LocalFileDao` の 1 つの文で行う
      */
     private suspend fun updateRow(episodeId: EpisodeId, change: (LocalFileEntity) -> LocalFileEntity?): Boolean {
         val row = db.localFileDao().findByEpisode(episodeId.value) ?: return false
@@ -264,7 +264,7 @@ class RoomDownloadRepository @Inject constructor(
         return row.state == DownloadState.RUNNING || row.state == DownloadState.PENDING
     }
 
-    // --- 差し替え（ADR 0011、#371）。行は DONE のまま ---
+    // --- 差し替え（ADR 0011）。行は DONE のまま ---
 
     override suspend fun markReplaceRunning(episodeId: EpisodeId) {
         db.localFileDao().markReplaceRunning(episodeId.value, clock.now())

@@ -27,7 +27,7 @@ data class LibraryPickUiState(
     val isSaving: Boolean = false,
     val error: UiText? = null,
 ) {
-    /** 選べる（音楽かブックの）ライブラリの数（#354）。 */
+    /** 選べる（音楽かブックの）ライブラリの数。 */
     val selectableCount: Int get() = libraries.orEmpty().count { it.isSelectable }
     val canConfirm: Boolean get() = !isSaving && selectedId != null
 }
@@ -52,14 +52,14 @@ class LibraryPickViewModel @Inject constructor(
                 val libraries = sessionRepository.listLibraries()
                 val current = ((sessionRepository.state.first() as? SessionState.Ready)?.source as? ConnectedSource.Jellyfin)?.library?.id
                 val selectable = libraries.filter { it.isSelectable }
-                // 選べる（音楽かブックの。#354）ライブラリが 1 つならそれを選択済みにする。画面自体は常に出す
+                // 選べる（音楽かブックの）ライブラリが 1 つならそれを選択済みにする。画面自体は常に出す
                 val preselected = current?.takeIf { id -> selectable.any { it.id == id } }
                     ?: selectable.singleOrNull()?.id
                 _uiState.update { it.copy(libraries = libraries, selectedId = preselected, isLoading = false) }
             } catch (e: SourceException.Unauthorized) {
                 // 401 はログアウトと同じ扱い。セッション状態が変わり、NavHost が接続画面へ導く
                 _uiState.update { it.copy(isLoading = false, error = e.toUserMessage()) }
-                // ライブラリを選び直しに来た接続済みの人もいるので、同期の失敗の通知も消す（#346 の決定 6）
+                // ライブラリを選び直しに来た接続済みの人もいるので、同期の失敗の通知も消す
                 syncFailureNotifier.cancel()
                 sessionRepository.signOut()
             } catch (e: SourceException) {

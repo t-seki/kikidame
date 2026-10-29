@@ -26,7 +26,7 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
 /**
- * 番組の画像（ADR 0009、#264）: 共有フォルダは番組のフォルダの `folder.jpg` だけを読み、同期が手元のファイルにそろえる。
+ * 番組の画像（ADR 0009）: 共有フォルダは番組のフォルダの `folder.jpg` だけを読み、同期が手元のファイルにそろえる。
  * 取得元はメモリ上の木（[MemoryFolderTree]）の [SharedFolderSource] で、画像の中身を取った回数と失敗を [CountingSource] で見る。
  */
 @RunWith(AndroidJUnit4::class)
@@ -122,7 +122,7 @@ class ProgramImageTest : RefreshTestBase() {
 
     /**
      * 上限（10 MiB）を超える `folder.jpg` は画像なしとして扱う。手元のファイルは消し、版は書いて同じファイルを取り直さない。
-     * ファイルが変われば取り直す（PR #288 1 周目 #5 の決定）。
+     * ファイルが変われば取り直す。
      */
     @Test
     fun tooLargeImageIsTreatedAsNoImageAndNotFetchedAgainUntilItChanges() = runTest {

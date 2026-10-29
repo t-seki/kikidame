@@ -11,7 +11,7 @@ import dev.tseki.kikidame.domain.SourceItemId
 import org.junit.Test
 import kotlin.test.assertEquals
 
-/** 同期とダウンロードの Worker のネットワークの制約（#199 の決定 4 と「決定の追記」）。端末のフォルダにはネットワークの条件をかけない。 */
+/** 同期とダウンロードの Worker のネットワークの制約。端末のフォルダにはネットワークの条件をかけない。 */
 class NetworkConstraintsTest {
     private val device = SessionState.Ready(
         ConnectedSource.Device(DeviceFolder("content://com.android.externalstorage.documents/tree/primary%3ARadio", "Radio")),

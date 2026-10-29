@@ -11,7 +11,7 @@ import kotlin.test.assertNull
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
-/** 設定の「最終同期」の補足の行（#346 の決定 4）。最後の試みが最終同期より新しく、成功でないときだけ出す。 */
+/** 設定の「最終同期」の補足の行。最後の試みが最終同期より新しく、成功でないときだけ出す。 */
 class LastSyncNoteTest {
     private val fetchedAt = Instant.parse("2026-10-25T05:00:00Z")
     private val later = fetchedAt + 3.hours

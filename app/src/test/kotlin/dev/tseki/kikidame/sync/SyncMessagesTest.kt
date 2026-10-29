@@ -7,7 +7,7 @@ import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.time.Instant
 
-/** 更新・同期の結果の文言（`SyncMessages.kt`。#243 で `LibraryRefresherTest` から分けた）。 */
+/** 更新・同期の結果の文言（`SyncMessages.kt`）。 */
 class SyncMessagesTest {
     private val now = Instant.parse("2026-09-17T00:00:00Z")
 

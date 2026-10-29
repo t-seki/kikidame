@@ -11,9 +11,9 @@ import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
 /**
- * 番組一覧の「最新」用の短い日付（#41）。今年なら MM-DD、それ以外は YYYY-MM-DD（古い番組は年が要る）。
+ * 番組一覧の「最新」用の短い日付。今年なら MM-DD、それ以外は YYYY-MM-DD（古い番組は年が要る）。
  * 各回一覧の公開日は [dev.tseki.kikidame.text.toPublishedDateText] のまま年を落とさない（一覧内で年をまたぐ）。出すかどうかは各回一覧側で決める
- * （タイトルが公開日と同じ回では丸ごと省く。#66）。
+ * （タイトルが公開日と同じ回では丸ごと省く）。
  */
 fun Instant.toLatestDateText(today: LocalDate = Clock.System.todayIn(PublishedAt.ZONE)): String {
     val date = toLocalDateTime(PublishedAt.ZONE).date
@@ -23,7 +23,7 @@ fun Instant.toDateTimeText(): String = toLocalDateTime(PublishedAt.ZONE).let { d
     "%s %02d:%02d".format(dt.date, dt.hour, dt.minute)
 }
 /**
- * ファイル容量（#42）。10 進（1 GB = 1,000,000,000 B。Android の「設定 → ストレージ」と同じ基数）で、
+ * ファイル容量。10 進（1 GB = 1,000,000,000 B。Android の「設定 → ストレージ」と同じ基数）で、
  * 1 GB 以上は GB、それ未満は MB の 1 桁小数。KB は出さない（録音は 1 回 10〜100 MB）。
  */
 fun Long.toSizeText(): String {
@@ -34,7 +34,7 @@ fun Long.toSizeText(): String {
 /** 「12.3 GB（123 回）」。手元のファイルの合計と回数を並べる。括弧と「回」は言語で変わるので [UiText]。 */
 fun LocalStorageUsage.toText(): UiText = UiText.Plural(R.plurals.common_storage_usage, episodeCount, totalBytes.toSizeText(), episodeCount)
 /**
- * 出演者（#70）を 1 つの文言に。「岩井勇気、澤部佑」。無ければ null（一覧と再生画面はその部分を省き、詳細は「なし」と出す）。
+ * 出演者を 1 つの文言に。「岩井勇気、澤部佑」。無ければ null（一覧と再生画面はその部分を省き、詳細は「なし」と出す）。
  * 区切りは言語で変わる（`R.string.common_list_separator`）ので [UiText.Joined] にして Composable に解決させる。
  */
 fun List<String>.toPerformersText(): UiText? =

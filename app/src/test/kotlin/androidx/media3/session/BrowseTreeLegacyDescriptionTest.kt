@@ -8,7 +8,7 @@ import org.junit.runner.RunWith
 import kotlin.test.assertEquals
 
 /**
- * Android Auto が一覧に出す legacy の `MediaDescriptionCompat` に、`BrowseTree` が置く subtitle が本当に届くか（#113）。
+ * Android Auto が一覧に出す legacy の `MediaDescriptionCompat` に、`BrowseTree` が置く subtitle が本当に届くか。
  * `LegacyConversions` はパッケージ非公開なので、同じパッケージ名に置いて呼ぶ。Media3 の実装（1.11.1 の
  * `LegacyConversions.convertToMediaDescriptionCompat`）が変わって subtitle が捨てられるようになったらここで気づく。
  */
@@ -39,7 +39,7 @@ class BrowseTreeLegacyDescriptionTest {
         assertEquals("TBSラジオ", description.description.toString())
     }
 
-    /** `displayTitle` が無いと title → artist → album の順で埋まり、subtitle は無視される（#113 で番組名だけが出た理由）。 */
+    /** `displayTitle` が無いと title → artist → album の順で埋まり、subtitle は無視される（Auto の 2 行目に番組名だけが出る理由）。 */
     @Test
     fun withoutDisplayTitleArtistBecomesTheSubtitle() {
         val description = LegacyConversions.convertToMediaDescriptionCompat(item(displayTitle = null), null)

@@ -17,14 +17,14 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /*
- * 各回一覧（EpisodeListViewModel）と「続きから」（ContinueListeningViewModel）が共通で使う、各回の行の操作（#230）。
+ * 各回一覧（EpisodeListViewModel）と「続きから」（ContinueListeningViewModel）が共通で使う、各回の行の操作。
  * 2 つの画面は同じ行（[EpisodeRow]）と同じボトムシート（[EpisodeActionsSheet]）を出すので、操作の結果の文言と失敗の扱いも揃える。
  * 再生済みの切り替え（setPlayed）は画面ごとに違う（「続きから」だけ失敗を文言にし、［元に戻す］の合図を出す）ので、ここには置かない。
  */
 
 /**
  * 「ファイルを削除」の結果の文言。[syncEnabled] はその回の番組が同期対象か。
- * 同期対象なら保持すべき回は次の同期で落とし直される（handoff「手動削除と同期の往復」）ので、そう伝える。
+ * 同期対象なら保持すべき回は次の同期で落とし直される（docs/architecture.md の「同期エンジンの設計」の「手動削除と同期の往復」）ので、そう伝える。
  */
 internal fun LocalDeletionScope.toMessage(syncEnabled: Boolean): UiText = when (this) {
     LocalDeletionScope.FILE_ONLY ->

@@ -90,7 +90,7 @@ class DataStoreSessionRepositoryTest {
         assertFailsWith<IllegalArgumentException> { repo.selectLibrary(movies) }
         assertIs<SessionState.NeedsLibrary>(repo.state.first())
 
-        // ブックのライブラリも選べ、種類が読み戻せる（#354）
+        // ブックのライブラリも選べ、種類が読み戻せる
         repo.selectLibrary(books)
         val library = assertIs<ConnectedSource.Jellyfin>(assertIs<SessionState.Ready>(repo.state.first()).source).library
         assertEquals(SelectedLibrary(SourceItemId("lib-books"), "Radio (books)", LibraryKind.BOOKS), library)
@@ -116,7 +116,7 @@ class DataStoreSessionRepositoryTest {
         assertEquals(LibraryKind.MUSIC, assertIs<ConnectedSource.Jellyfin>(assertIs<SessionState.Ready>(repo.state.first()).source).library.kind)
     }
 
-    /** ログアウトと再ログインで、ライブラリの種類もライブラリと一緒に消える（#354）。 */
+    /** ログアウトと再ログインで、ライブラリの種類もライブラリと一緒に消える。 */
     @Test
     fun libraryKindIsClearedWithTheLibrary() = runTest {
         repo.signIn("jellyfin.lab.example", "alice", "secret")
@@ -131,7 +131,7 @@ class DataStoreSessionRepositoryTest {
         assertFalse("library_kind" in dataStore.data.first().asMap().keys.map { it.name })
     }
 
-    /** 読めない種類（新しい版が書いた値など）は、ライブラリを選び直させる（#354）。 */
+    /** 読めない種類（新しい版が書いた値など）は、ライブラリを選び直させる。 */
     @Test
     fun unknownLibraryKindNeedsALibrary() = runTest {
         repo.signIn("jellyfin.lab.example", "alice", "secret")
@@ -150,7 +150,7 @@ class DataStoreSessionRepositoryTest {
         assertEquals("alice", signedOut.lastUserName)
     }
 
-    /** 全走査を試みた時刻（#135）は最終同期の時刻と一緒に、ログアウト・再ログインで消える。 */
+    /** 全走査を試みた時刻は最終同期の時刻と一緒に、ログアウト・再ログインで消える。 */
     @Test
     fun signOutAndSignInClearTheSyncTimes() = runTest {
         val at = Instant.parse("2026-09-24T00:00:00Z")
@@ -174,7 +174,7 @@ class DataStoreSessionRepositoryTest {
         assertFalse("last_attempted_at" in keys)
     }
 
-    /** 全走査の最後の試み（#346）は結果ごとに読み戻せ、成功で通知の記録が消える。ログアウト・取得元の接続し直しで消える（決定 6）。 */
+    /** 全走査の最後の試みは結果ごとに読み戻せ、成功で通知の記録が消える。ログアウト・取得元の接続し直しで消える。 */
     @Test
     fun syncAttemptRoundTripsAndIsClearedWithTheSyncTimes() = runTest {
         val at = Instant.parse("2026-10-26T05:00:00Z")
@@ -226,7 +226,7 @@ class DataStoreSessionRepositoryTest {
         assertFailsWith<IllegalArgumentException> { normalize("   ") }
     }
 
-    /** 更新の前のバージョンが書いた DataStore（Jellyfin のキーだけ）が、更新の後も Jellyfin の接続として読める（epic #195 の決定 12）。 */
+    /** 更新の前のバージョンが書いた DataStore（Jellyfin のキーだけ）が、更新の後も Jellyfin の接続として読める。 */
     @Test
     fun jellyfinKeysWrittenByThePreviousVersionStillReadAsReady() = runTest {
         dataStore.edit {
@@ -244,7 +244,7 @@ class DataStoreSessionRepositoryTest {
         assertEquals("https://jellyfin.lab.example/", jellyfin.session.serverUrl)
         assertEquals("token-alice", jellyfin.session.accessToken)
         assertEquals(SourceItemId("lib-music"), jellyfin.library.id)
-        // 前の版は種類を書いていない（音楽のライブラリだけを選べた）。音楽として読む（#354）
+        // 前の版は種類を書いていない（音楽のライブラリだけを選べた）。音楽として読む
         assertEquals(LibraryKind.MUSIC, jellyfin.library.kind)
         assertEquals(Instant.fromEpochMilliseconds(1_000L), ready.lastFetchedAt)
         assertEquals(Instant.fromEpochMilliseconds(2_000L), ready.lastAttemptedAt)
@@ -334,7 +334,7 @@ class DataStoreSessionRepositoryTest {
         assertFailsWith<SourceException.Unauthorized> { repo.listLibraries() }
     }
 
-    /** 端末のフォルダ（#199）: 永続権限を取り、直下が読めたらフォルダ名と一緒に保存する。 */
+    /** 端末のフォルダ: 永続権限を取り、直下が読めたらフォルダ名と一緒に保存する。 */
     @Test
     fun connectDeviceFolderTakesThePermissionChecksTheRootThenReachesReady() = runTest {
         repo.connectDeviceFolder(folderUri)
@@ -347,7 +347,7 @@ class DataStoreSessionRepositoryTest {
         assertNull(ready.lastFetchedAt)
     }
 
-    /** 端末のストレージ以外の provider（#199 の決定 3）は、権限を取らずに断る。 */
+    /** 端末のストレージ以外の providerは、権限を取らずに断る。 */
     @Test
     fun otherProvidersAreRejectedBeforeTakingThePermission() = runTest {
         val drive = "content://com.google.android.apps.docs.storage/tree/acc%3D1%3Bdoc%3Dabc"
@@ -373,7 +373,7 @@ class DataStoreSessionRepositoryTest {
         assertEquals(listOf(folderUri, folderUri, folderUri), documents.released)
     }
 
-    /** アクセスが切れてログアウトしても（#199 の決定 5）、どのフォルダだったかは残り、選び直せば接続に戻る。 */
+    /** アクセスが切れてログアウトしても、どのフォルダだったかは残り、選び直せば接続に戻る。 */
     @Test
     fun signOutOfADeviceFolderKeepsTheFolderAndCanPickAgain() = runTest {
         repo.connectDeviceFolder(folderUri)

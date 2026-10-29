@@ -286,7 +286,7 @@
     <string name="player_sleep_timer">Sleep timer</string>
     <!-- Short label of the sleep timer button when no timer is set -->
     <string name="player_sleep">Sleep</string>
-    <!-- Button under the seek bar and title of the chapter list sheet (#348) -->
+    <!-- Button under the seek bar and title of the chapter list sheet -->
     <string name="player_chapters">Chapters</string>
     <!-- Sleep timer label when set to stop at the end of the episode -->
     <string name="player_end_of_episode">End of episode</string>
@@ -326,11 +326,11 @@
     <string name="settings_library_none">Not selected</string>
     <string name="settings_library_tap">Tap to change</string>
     <string name="settings_last_sync">Last sync</string>
-    <!-- Line under "Last sync" when the latest full sync after the last successful one failed (#346). %1$s = date and time like "2026-10-26 14:00", %2$s = the reason (one of the sync_error_* texts) -->
+    <!-- Line under "Last sync" when the latest full sync after the last successful one failed. %1$s = date and time like "2026-10-26 14:00", %2$s = the reason (one of the sync_error_* texts) -->
     <string name="settings_last_sync_failed">Failed at %1$s: %2$s</string>
-    <!-- Line under "Last sync" when the latest full sync was skipped because "Wi-Fi only" is on and the network is metered (#346). %1$s = date and time -->
+    <!-- Line under "Last sync" when the latest full sync was skipped because "Wi-Fi only" is on and the network is metered. %1$s = date and time -->
     <string name="settings_last_sync_skipped">Skipped at %1$s: not on Wi-Fi</string>
-    <!-- Row under "Last sync", shown only for a Jellyfin book library: sharing the playback position and played state with the server (ADR 0010, #355) -->
+    <!-- Row under "Last sync", shown only for a Jellyfin book library: sharing the playback position and played state with the server (ADR 0010) -->
     <string name="settings_playback_sharing">Playback sharing</string>
     <!-- Value of "Playback sharing": the last time positions were exchanged with the server. %1$s = date and time like "2026-10-26 14:00" -->
     <string name="settings_playback_sharing_ok">Shared at %1$s</string>
@@ -340,7 +340,7 @@
     <string name="settings_playback_sharing_failed">Failed to send at %1$s: %2$s. Unsent positions are sent on the next sync</string>
     <string name="settings_section_download">Downloads</string>
     <string name="settings_storage">Files on device</string>
-    <!-- Under the total of "Files on device". Opens the breakdown screen (#335) -->
+    <!-- Under the total of "Files on device". Opens the breakdown screen -->
     <string name="settings_storage_tap">Tap to see the breakdown</string>
     <!-- Row under "Files on device" (shown only when there are such programs). %1$d = number of programs -->
     <plurals name="settings_remove_unmatched">
@@ -372,7 +372,7 @@
         <item quantity="other">Kept %1$d programs you are listening to</item>
     </plurals>
 
-    <!-- storage: breakdown of the files on the device (#335). Opened from "Files on device" in Settings -->
+    <!-- storage: breakdown of the files on the device. Opened from "Files on device" in Settings -->
     <string name="storage_tab_programs">By program</string>
     <string name="storage_tab_episodes">All episodes</string>
     <!-- Filter chips on "All episodes". Both selected = episodes that are pinned AND played -->
@@ -452,7 +452,7 @@
     <!-- ===== sync: shown under the top bar while syncing ===== -->
     <!-- Small text under the top bar while a scheduled or on-start sync runs, next to a thin progress bar -->
     <string name="sync_in_background">Syncing in background…</string>
-    <!-- #209: shared-folder scan: files whose tags were read / files to read -->
+    <!-- Shared-folder scan: files whose tags were read / files to read -->
     <string name="sync_reading_tags">Reading tags %1$,d / %2$,d</string>
 
     <!-- ===== sync: results of refresh / sync, shown in a snackbar ===== -->
@@ -499,7 +499,7 @@
     <!-- %1$s = message from the source -->
     <string name="sync_error_server_failed">The source returned an error: %1$s</string>
 
-    <!-- ===== sync_failure: the notification shown when background sync has kept failing (#346). Resolved where the notification is built (ADR 0006 の例外) ===== -->
+    <!-- ===== sync_failure: the notification shown when background sync has kept failing. Resolved where the notification is built (ADR 0006 の例外) ===== -->
     <!-- Name of the notification channel, shown in the system's notification settings for the app -->
     <string name="sync_failure_channel_name">Sync</string>
     <string name="sync_failure_notification_title">Sync is not working</string>
@@ -515,8 +515,8 @@
     <!-- Snackbar shown when playback failed for another reason. %1$s = Media3 error code name, e.g. ERROR_CODE_DECODING_FAILED -->
     <string name="playback_error_failed">Stopped because playback failed (%1$s)</string>
 
-    <!-- ===== auto: Android Auto browse tree (#96) ===== -->
-    <!-- Browse tab (first): episodes the user has started but not finished, most recently listened first (#108) -->
+    <!-- ===== auto: Android Auto browse tree ===== -->
+    <!-- Browse tab (first): episodes the user has started but not finished, most recently listened first -->
     <string name="auto_root_continue">Continue</string>
     <!-- Browse tab: programs the user marked as Starred (CONTEXT.md「よく聴く (Starred)」) -->
     <string name="auto_root_starred">Starred</string>

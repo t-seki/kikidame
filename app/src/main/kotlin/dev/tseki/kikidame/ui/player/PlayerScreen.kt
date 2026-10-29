@@ -113,7 +113,7 @@ fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel(
 /**
  * 再生画面の中身。ViewModel を受け取らず、値とラムダだけで描く（プレビューから呼べるように）。
  * [swipeSeek] はふつう既定値のまま（[state] の位置・尺と [onSeek] で動く）。プレビューではスワイプ中の状態を渡す。
- * [episodeImage]（回の画像。サービスが載せたバイト列、#283）があればそれを、無ければ [programImage] を、タイトルの上の正方形の枠に、切らずに全体を出す（#264、#301。`ContentScale.Fit`。横長・縦長の画像は余りに何も置かない）。幅の 6 割を上限に、縦に収まらなければボタン類を押し出さない大きさまで縮める。
+ * [episodeImage]（回の画像。サービスが載せたバイト列）があればそれを、無ければ [programImage] を、タイトルの上の正方形の枠に、切らずに全体を出す（`ContentScale.Fit`。横長、縦長の画像は余りに何も置かない）。幅の 6 割を上限に、縦に収まらなければボタン類を押し出さない大きさまで縮める。
  * 無ければ何も置かない。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -154,7 +154,7 @@ internal fun PlayerContent(
             )
         },
     ) { padding ->
-        // 左右スワイプで秒単位のシーク（#29）。拾う条件とジェスチャは SwipeSeekState.kt。
+        // 左右スワイプで秒単位のシーク。拾う条件とジェスチャは SwipeSeekState.kt。
         // ドラッグ中は開始時の位置からの差分と目標位置を表示し、指を離した時点で 1 回だけシークする
         val swipeTargetMs = swipeSeek.targetMs
         Column(
@@ -166,7 +166,7 @@ internal fun PlayerContent(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            // 番組の画像（#264）。スワイプのシークを拾う範囲（この Column）に含める。weight(fill = false) で、ほかの要素を置いた残りの高さを上限にする
+            // 番組の画像。スワイプのシークを拾う範囲（この Column）に含める。weight(fill = false) で、ほかの要素を置いた残りの高さを上限にする
             if (episodeImage != null || programImage != null) {
                 Box(Modifier.weight(1f, fill = false).fillMaxWidth(0.6f), contentAlignment = Alignment.Center) {
                     if (episodeImage != null) EpisodeImageView(episodeImage, Modifier.aspectRatio(1f), ContentScale.Fit)
@@ -175,7 +175,7 @@ internal fun PlayerContent(
                 Spacer(Modifier.height(16.dp))
             }
             Text(state.title, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
-            // `配信元 · 出演者`（#70）。無い回や読み込み前も 1 行分の場所は確保して、回が進んだときにタイトルが跳ねないようにする
+            // `配信元 · 出演者`。無い回や読み込み前も 1 行分の場所は確保して、回が進んだときにタイトルが跳ねないようにする
             Spacer(Modifier.height(4.dp))
             Text(
                 subtitle?.resolve() ?: " ",
@@ -188,7 +188,7 @@ internal fun PlayerContent(
                 Text(it.resolve(), color = MaterialTheme.colorScheme.error)
             }
             Spacer(Modifier.height(8.dp))
-            // スワイプ中は差分と目標位置（primary）、普段は今のチャプターの題（#348。控えめな色で 1 行。1 行に収まらないときだけ `basicMarquee` で横に流す（回数は限らず、各回の間に 2.5 秒止まる）。スワイプ中は流さない）。
+            // スワイプ中は差分と目標位置（primary）、普段は今のチャプターの題（控えめな色で 1 行。1 行に収まらないときだけ `basicMarquee` で横に流す（回数は限らず、各回の間に 2.5 秒止まる）。スワイプ中は流さない）。
             // チャプターの無い回・最初のチャプターの前は空白。場所は常に確保してレイアウトが跳ねないようにする
             val chapterTitle = currentChapter(state.chapters, state.positionMs)?.title
             Text(
@@ -209,7 +209,7 @@ internal fun PlayerContent(
                 durationMs = state.durationMs,
                 onSeek = onSeek,
             )
-            // シークバーの下: 倍速（#35）・再生済み・スリープタイマー（#36）を中央 3 列に（#57）。チャプターのある回だけ 4 列目にチャプター（#348）。
+            // シークバーの下: 倍速・再生済み・スリープタイマーを中央 3 列に。チャプターのある回だけ 4 列目にチャプター。
             // 片手で使うので、親指が届かない TopAppBar ではなく主操作のすぐ上にまとめる。
             // アイコンの contentDescription はラベルが名前にならないもの（倍速の「1×」、スリープの残り時間）にだけ文脈を足す
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
@@ -273,7 +273,7 @@ internal fun PlayerContent(
         )
     }
 }
-/** シークバー下の 3〜4 列の 1 つ。アイコン＋短いラベル。左右のパディングを詰めて、3 列のときは、狭い画面（360dp）でも `1.75×` `再生済み` `1:00:00` が並ぶことを確かめた。4 列（チャプターのある回）は 360dp でも英語でも収まるか未確認（#348 の実機チェックリスト）。 */
+/** シークバー下の 3〜4 列の 1 つ。アイコン＋短いラベル。左右のパディングを詰めて、3 列のときは、狭い画面（360dp）でも `1.75×` `再生済み` `1:00:00` が並ぶことを確かめた。4 列（チャプターのある回）は 360dp でも英語でも収まるか未確認。 */
 @Composable
 private fun SubAction(icon: ImageVector, contentDescription: String?, label: String, enabled: Boolean = true, onClick: () -> Unit) {
     TextButton(onClick = onClick, enabled = enabled, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)) {
@@ -283,7 +283,7 @@ private fun SubAction(icon: ImageVector, contentDescription: String?, label: Str
     }
 }
 /**
- * チャプターの一覧のシート（#348）。各行は開始の時刻と題。今のチャプターは面の色を変えて再生中の印を付け、開いたときにその行までスクロールする。
+ * チャプターの一覧のシート。各行は開始の時刻と題。今のチャプターは面の色を変えて再生中の印を付け、開いたときにその行までスクロールする。
  * 行を選ぶとその開始へシークして閉じる（再生中か一時停止中かは変えない）。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -363,7 +363,7 @@ private fun SleepTimerSheet(
     }
 }
 
-/** ドラッグ中は指の位置を表示し、離した時点で 1 回だけシークする。時間は titleMedium（#75。labelMedium は小さくて読みにくかった。大きな時間表示は見送り）。 */
+/** ドラッグ中は指の位置を表示し、離した時点で 1 回だけシークする。時間は titleMedium（labelMedium は小さくて読みにくかった。大きな時間表示は見送り）。 */
 @Composable
 private fun SeekBar(positionMs: Long, durationMs: Long, onSeek: (Long) -> Unit) {
     var dragging by remember { mutableStateOf<Float?>(null) }
@@ -440,14 +440,14 @@ private fun PlayerContentPreview() {
     PlayerContentPreviewHost(previewState)
 }
 
-/** 番組の画像あり（#264）。タイトルの上の正方形の枠に切らずに全体が出る。プレビューの中では単色。 */
+/** 番組の画像あり。タイトルの上の正方形の枠に切らずに全体が出る。プレビューの中では単色。 */
 @Preview(showBackground = true)
 @Composable
 private fun PlayerContentWithImagePreview() {
     PlayerContentPreviewHost(previewState, programImage = previewProgramImage)
 }
 
-/** 回の画像あり（#283）。番組の画像より優先して出る。プレビューの中では単色（バイト列は読まれない）。 */
+/** 回の画像あり。番組の画像より優先して出る。プレビューの中では単色（バイト列は読まれない）。 */
 @Preview(showBackground = true)
 @Composable
 private fun PlayerContentWithEpisodeImagePreview() {
@@ -482,7 +482,7 @@ private fun PlayerContentUnknownDurationPreview() {
     )
 }
 
-/** チャプターのある回（#348）。題の行に今のチャプターの題、4 列目に「チャプター」。 */
+/** チャプターのある回。題の行に今のチャプターの題、4 列目に「チャプター」。 */
 @Preview(showBackground = true)
 @Composable
 private fun PlayerContentWithChaptersPreview() {

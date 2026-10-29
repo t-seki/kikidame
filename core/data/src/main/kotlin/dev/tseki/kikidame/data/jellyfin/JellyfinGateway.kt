@@ -37,7 +37,7 @@ interface JellyfinGateway {
     /** ライブラリ全体を取得する。番組に属さない各回は含めない。 */
     suspend fun fetchLibrary(credentials: ServerCredentials, library: SelectedLibrary): SourceSnapshot
 
-    /** 1 番組の各回だけを取得する（#12）。他の番組に属する各回は含めない。 */
+    /** 1 番組の各回だけを取得する。他の番組に属する各回は含めない。 */
     suspend fun fetchProgramEpisodes(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId): List<SourceEpisode>
 
     /**
@@ -47,8 +47,8 @@ interface JellyfinGateway {
     suspend fun fetchProgram(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId): SourceProgram?
 
     /**
-     * 番組の画像の中身を取る（#282、ADR 0009）。音楽のライブラリは MusicAlbum の Primary、ブックのライブラリは番組のフォルダ（Folder）の
-     * Primary（#354）。画像が無い・大きすぎるときは null。版は [SourceProgram.image]（Primary の ImageTag）で、取り直すかは呼び出し側が決める。
+     * 番組の画像の中身を取る（ADR 0009）。音楽のライブラリは MusicAlbum の Primary、ブックのライブラリは番組のフォルダ（Folder）の
+     * Primary。画像が無い・大きすぎるときは null。版は [SourceProgram.image]（Primary の ImageTag）で、取り直すかは呼び出し側が決める。
      */
     suspend fun fetchProgramImage(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId): ByteArray?
 
@@ -60,7 +60,7 @@ interface JellyfinGateway {
     suspend fun openDownload(credentials: ServerCredentials, episodeSourceId: SourceItemId, rangeStart: Long): DownloadStream
 
     /**
-     * 原本のファイルの大きさ（ADR 0011、#371）。`/Items/{id}/Download` に `Range: bytes=0-0` を付けて、`Content-Range` の全長から取る
+     * 原本のファイルの大きさ（ADR 0011）。`/Items/{id}/Download` に `Range: bytes=0-0` を付けて、`Content-Range` の全長から取る
      * （HEAD は 405 で使えない。10.10.7 と 12.0 で確かめた）。全長が分からなければ null。
      */
     suspend fun fetchFileSize(credentials: ServerCredentials, episodeSourceId: SourceItemId): Long?

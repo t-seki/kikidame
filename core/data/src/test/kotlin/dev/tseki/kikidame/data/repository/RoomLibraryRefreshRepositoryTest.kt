@@ -62,7 +62,7 @@ class RoomLibraryRefreshRepositoryTest : JellyfinRefreshTestBase() {
 
         assertEquals(1, result.linkedPrograms)
         assertEquals(2, result.linkedEpisodes)
-        assertEquals(1, result.newEpisodes, "relinked episodes are not new (#142)")
+        assertEquals(1, result.newEpisodes, "relinked episodes are not new")
         assertEquals(listOf(SourceItemId("lib-1")), gateway.fetchedLibraries)
 
         val programs = library.observePrograms().first()
@@ -109,7 +109,7 @@ class RoomLibraryRefreshRepositoryTest : JellyfinRefreshTestBase() {
         assertTrue(library.observeEpisodes(summary.program.id).first().any { it.episode.title == "renamed" })
     }
 
-    /** 出演者（#70）: 取り込みで各回に入り、次の取り込みでサーバの値で上書きされる（サーバに無くなれば空になる）。 */
+    /** 出演者: 取り込みで各回に入り、次の取り込みでサーバの値で上書きされる（サーバに無くなれば空になる）。 */
     @Test
     fun performersAreStoredAndOverwrittenBySync() = runTest {
         signInAndSelect()
@@ -144,7 +144,7 @@ class RoomLibraryRefreshRepositoryTest : JellyfinRefreshTestBase() {
         assertEquals(listOf("向井慧"), episodes.performersOf("audio-2"))
     }
 
-    /** 新しい回（#142）: 取り込みで手元に増えた回だけを数える。2 回目以降は、サーバに回が増えた分だけ。 */
+    /** 新しい回: 取り込みで手元に増えた回だけを数える。2 回目以降は、サーバに回が増えた分だけ。 */
     @Test
     fun newEpisodesCountOnlyWhatTheDeviceDidNotHave() = runTest {
         signInAndSelect()
@@ -158,7 +158,7 @@ class RoomLibraryRefreshRepositoryTest : JellyfinRefreshTestBase() {
         assertTrue(result.hasChanges)
     }
 
-    /** 1 番組の同期も新しい回を数える（#142）。 */
+    /** 1 番組の同期も新しい回を数える。 */
     @Test
     fun syncProgramCountsNewEpisodes() = runTest {
         signInAndSelect()
@@ -198,7 +198,7 @@ class RoomLibraryRefreshRepositoryTest : JellyfinRefreshTestBase() {
         assertEquals(1, library.observePrograms().first().size)
     }
 
-    /** 全走査を試みた時刻は、サーバに届かず失敗しても記録される。最終同期の時刻は成功したときだけ（#135）。 */
+    /** 全走査を試みた時刻は、サーバに届かず失敗しても記録される。最終同期の時刻は成功したときだけ。 */
     @Test
     fun anUnreachableRefreshStillRecordsTheAttempt() = runTest {
         signInAndSelect()
@@ -230,7 +230,7 @@ class RoomLibraryRefreshRepositoryTest : JellyfinRefreshTestBase() {
         assertEquals(attemptedAt, assertIs<SessionState.Ready>(session.state.first()).lastAttemptedAt)
     }
 
-    /** 「取得元を変える」は行・セッションに加えて音声ファイルも消す（#50。残しても到達する手段が無い）。 */
+    /** 「取得元を変える」は行・セッションに加えて音声ファイルも消す（残しても到達する手段が無い）。 */
     @Test
     fun resetAllClearsRowsSessionAndFiles() = runTest {
         signInAndSelect()

@@ -7,7 +7,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 /**
- * 聴く回が替わったら、その回の画像（[load]）を現在の [MediaItem] の `artworkData` に載せる（#283）。
+ * 聴く回が替わったら、その回の画像（[load]）を現在の [MediaItem] の `artworkData` に載せる。
  * キューは番組の手元の回を全部積む（[ProgramQueue]）ので、全件の画像は読まず、再生に入った回の分だけ読む。
  * 載せるのは同じ回の項目の差し替え（`replaceMediaItem`）で、URI は変えない。画像が無い（[load] が null）ときは何もしない。
  * 通知・ロック画面・Auto・再生画面はこの `artworkData` を読む。

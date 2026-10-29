@@ -22,7 +22,7 @@ import kotlin.time.Clock
  * [LibraryRefresher.syncProgram] は、既定では null を返して終わるが、`orFullSync = true`（各回一覧の
  * 「引っ張って更新」）ではリポジトリが null を返すと全走査に落ちるので、同じく取り込み失敗の文言になる。
  * 更新・同期そのものは `LibraryRefresherTest` で確かめる。
- * 1 番組の同期が呼ばれたかを見たいときは [IdleRefreshRepository] を渡し、その [IdleRefreshRepository.syncedPrograms] を見る（#311）。
+ * 1 番組の同期が呼ばれたかを見たいときは [IdleRefreshRepository] を渡し、その [IdleRefreshRepository.syncedPrograms] を見る。
  */
 fun idleLibraryRefresher(
     scope: CoroutineScope,

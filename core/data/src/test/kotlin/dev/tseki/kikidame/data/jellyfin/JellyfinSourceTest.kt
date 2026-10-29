@@ -52,7 +52,7 @@ class JellyfinSourceTest {
         assertEquals(listOf(SelectedLibrary(SourceItemId("lib-music"), "Radio", LibraryKind.MUSIC)), gateway.usedLibraries)
     }
 
-    /** ブックのライブラリ（#354）は、一覧も 1 番組の取得もライブラリの種類と一緒に渡す。 */
+    /** ブックのライブラリは、一覧も 1 番組の取得もライブラリの種類と一緒に渡す。 */
     @Test
     fun programCallsPassTheSelectedBookLibrary() = runTest {
         store.saveSession(session)
@@ -87,7 +87,7 @@ class JellyfinSourceTest {
         assertEquals(listOf(credentials), gateway.usedCredentials)
     }
 
-    /** 番組の画像（#282）は、番組の取得と同じ認証の情報で取る。 */
+    /** 番組の画像は、番組の取得と同じ認証の情報で取る。 */
     @Test
     fun fetchProgramImageUsesTheStoredCredentials() = runTest {
         store.saveSession(session)
@@ -100,7 +100,7 @@ class JellyfinSourceTest {
     }
 
     /**
-     * ライブラリを選ぶ前は、番組の組み方（ライブラリの種類。#354）が決まらないので、番組についての呼び出しは失敗にする。
+     * ライブラリを選ぶ前は、番組の組み方（ライブラリの種類）が決まらないので、番組についての呼び出しは失敗にする。
      * ログアウトにはしない（[SourceException.Unauthorized] ではない）。
      */
     @Test

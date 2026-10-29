@@ -39,7 +39,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         requestRuntimePermissionsIfNeeded()
         setContent {
-            // テーマの設定（#62）を読むまで何も出さない（読めてから描けば既定色で一度描いてから切り替わる「ちらつき」が無い）。
+            // テーマの設定を読むまで何も出さない（読めてから描けば既定色で一度描いてから切り替わる「ちらつき」が無い）。
             // この後 NavHost もセッションを読むまで描かないので待ちは直列になるが、どちらも小さな DataStore の読み込みで一瞬
             val themeMode by produceState<ThemeMode?>(initialValue = null) { settings.themeMode.collect { value = it } }
             val mode = themeMode ?: return@setContent
@@ -60,7 +60,7 @@ class MainActivity : ComponentActivity() {
      * - Android 13+: 通知の表示に `POST_NOTIFICATIONS` が要る。無いと再生通知が出ない
      * - Android 17+（targetSdk 37）: LAN 内のサーバへ接続するのに `ACCESS_LOCAL_NETWORK` が要る。
      *   無いと LAN 宛の TCP が黙って落ちる（DNS だけは通る）。取得元が Jellyfin か SMB のとき（ログアウト中で前回のものがあるときを含む）だけ
-     *   起動時に要求する（#199 の決定 7）。端末のフォルダの人には要求しない。まだ取得元を選んでいない人には、取得元の選択で
+     *   起動時に要求する。端末のフォルダの人には要求しない。まだ取得元を選んでいない人には、取得元の選択で
      *   Jellyfin か SMB を選んだときに要求する（[dev.tseki.kikidame.ui.source.SourcePickScreen]）
      */
     private fun requestRuntimePermissionsIfNeeded() {

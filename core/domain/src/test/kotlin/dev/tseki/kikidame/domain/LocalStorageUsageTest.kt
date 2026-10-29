@@ -3,7 +3,7 @@ import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
-/** 手元のファイルの合計（#42）を一覧から数える。 */
+/** 手元のファイルの合計を一覧から数える。 */
 class LocalStorageUsageTest {
     private val now = Instant.parse("2026-09-16T00:00:00Z")
     private fun item(id: Long, sizeBytes: Long, state: DownloadState?, path: String? = "/x/$id.m4a") = EpisodeWithState(

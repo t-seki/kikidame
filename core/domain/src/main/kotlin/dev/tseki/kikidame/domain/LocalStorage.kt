@@ -4,7 +4,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
 
 /*
- * 手元のファイルの内訳（#335）。設定の「手元のファイル」の行から開く画面が使う。
+ * 手元のファイルの内訳。設定の「手元のファイル」の行から開く画面が使う。
  * 手元の回は `DONE` でパスがある回（[EpisodeWithState.isPlayable]、[LocalStorageUsage] と同じ定義）で、ダウンロード中の回は入らない。
  * 容量は各回の `sizeBytes` の合計（[LocalStorageUsage] と同じ。ストレージ上の実際のファイルサイズは測らない）。
  */
@@ -42,7 +42,7 @@ data class LocalEpisode(
 /** [LocalStorageRepository.deleteLocalEpisodes] の結果。[kept] は聴いている回なので消さずに残した数。 */
 data class DeletedLocalEpisodes(val deleted: Int, val kept: Int)
 
-/** 手元のファイルの内訳を見て、選んだ回を消す（#335）。 */
+/** 手元のファイルの内訳を見て、選んだ回を消す。 */
 interface LocalStorageRepository {
     /** 手元の回のある番組だけを、容量の大きい順に。変わるたびに流す。 */
     fun observePrograms(): Flow<List<ProgramStorage>>

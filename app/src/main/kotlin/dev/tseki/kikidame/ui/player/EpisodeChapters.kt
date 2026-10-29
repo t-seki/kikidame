@@ -7,7 +7,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.extractor.metadata.Chapter
 
 /**
- * 各回のファイルに埋め込まれたチャプター（#348、CONTEXT.md の「チャプター」）。開始の時刻と題。
+ * 各回のファイルに埋め込まれたチャプター（CONTEXT.md の「チャプター」）。開始の時刻と題。
  * アプリは作らない・変えない。ファイルから読むだけ。
  */
 data class EpisodeChapter(val startMs: Long, val title: String)

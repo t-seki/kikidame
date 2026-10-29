@@ -6,7 +6,7 @@ import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-/** 再生画面のタイトル下 `配信元 · 出演者`（#70）。 */
+/** 再生画面のタイトル下 `配信元 · 出演者`。 */
 class PlayerSubtitleTest {
     @Test
     fun joinsPublisherAndPerformers() {

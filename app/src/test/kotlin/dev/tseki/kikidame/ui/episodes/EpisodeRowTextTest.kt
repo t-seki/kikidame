@@ -20,7 +20,7 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
 /**
- * 各回一覧の行の補足（#66）: タイトルが公開日と同じ文字列のときだけ公開日を省く。
+ * 各回一覧の行の補足: タイトルが公開日と同じ文字列のときだけ公開日を省く。
  * 並び・省略・区切りを見るテストなので、[UiText] を日本語（`values-ja/`）で解決した文字列で比較する（Robolectric）。
  */
 @RunWith(AndroidJUnit4::class)
@@ -68,7 +68,7 @@ class EpisodeRowTextTest {
         assertEquals("2:00:00", item(title = "2026-08-02", state = DownloadState.DONE).text())
     }
 
-    /** 出演者（#70）は公開日と尺の間。無い回は今までどおり。 */
+    /** 出演者は公開日と尺の間。無い回は出演者の項を出さない。 */
     @Test
     fun performersSitBetweenPublishedDateAndRuntime() {
         assertEquals("岩井勇気、澤部佑 · 2:00:00", item(title = "2026-08-02", performers = listOf("岩井勇気", "澤部佑")).text())

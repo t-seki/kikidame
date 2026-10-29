@@ -22,7 +22,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * 選んだ回（#335）。[episodes] は選んで見えている回だけ（聴いている回と、絞り込みで隠れた回は入らない）。
+ * 選んだ回。[episodes] は選んで見えている回だけ（聴いている回と、絞り込みで隠れた回は入らない）。
  * 確認のダイアログと「N 回を消す」のボタンに出す数と容量はここから取る。
  */
 data class StorageSelection(val episodes: List<LocalEpisode>) {
@@ -41,9 +41,9 @@ data class StorageSelection(val episodes: List<LocalEpisode>) {
 }
 
 /**
- * 手元の回を選んで消す画面（内訳の画面の「すべての回」と、番組ごとの一覧。#335）が共通で持つ、選択と削除。
+ * 手元の回を選んで消す画面（内訳の画面の「すべての回」と、番組ごとの一覧）が共通で持つ、選択と削除。
  * 行を押すとチェックが付く・外れる。聴いている回（[NowPlaying.excludedFromSync] と同じ定義）は選べず、消す時点でももう一度除く
- * （選んだ後に再生を始めた場合に備える。#317 と同じ考え方）。同期の間（操作による同期も裏の同期も）は消せない。
+ * （選んだ後に再生を始めた場合に備える。取得元に見つからない番組をまとめて消す操作と同じ考え方）。同期の間（操作による同期も裏の同期も）は消せない。
  */
 abstract class StorageSelectionViewModel(
     private val storage: LocalStorageRepository,
@@ -141,7 +141,7 @@ abstract class StorageSelectionViewModel(
     }
 }
 
-/** 消した後のスナックバー。聴いている回を残したときは、#317 の「聴いている番組 N 件は残しました」に倣って続けて知らせる。 */
+/** 消した後のスナックバー。聴いている回を残したときは、取得元に見つからない番組をまとめて消したときの「聴いている番組 N 件は残しました」に倣って続けて知らせる。 */
 internal fun deletedMessage(deleted: Int, kept: Int): UiText? {
     val parts = listOfNotNull(
         UiText.Plural(R.plurals.storage_msg_deleted, deleted).takeIf { deleted > 0 },

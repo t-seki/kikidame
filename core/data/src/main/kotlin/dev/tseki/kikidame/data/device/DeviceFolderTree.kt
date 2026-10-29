@@ -13,13 +13,13 @@ import java.io.IOException
 import kotlin.time.Instant
 
 /**
- * 端末のフォルダ（SAF、#199）を [FolderTree] として見せる。[treeUri] は `ACTION_OPEN_DOCUMENT_TREE` で選んだツリー。
+ * 端末のフォルダ（SAF）を [FolderTree] として見せる。[treeUri] は `ACTION_OPEN_DOCUMENT_TREE` で選んだツリー。
  * 読むだけで、書き込み・削除はしない（ADR 0007 の決定 6）。
  *
  * - 相対パスから文書 ID への対応は、親のフォルダを一覧して名前で探し、この木の中に持つ（木は 1 回の操作ごとに作って捨てる）。
  *   文書 ID の形（`primary:Radio/...` など）を組み立てる前提にはしない
  * - 最初の操作で、永続的な読み取りの権限があることと、選んだフォルダ（根）があることを確かめる。権限が無い・取り消された、
- *   または根が無いと**分かった**ときだけ [SourceException.Unauthorized]（ログアウトにして選び直させる。#199 の決定 5）。分かったとするのは次のとき:
+ *   または根が無いと**分かった**ときだけ [SourceException.Unauthorized]（ログアウトにして選び直させる）。分かったとするのは次のとき:
  *   - 持っている永続権限（`persistedUriPermissions`）に、このツリーの読み取りが無い。Android Developers の documents-files のページは、
  *     選んだフォルダの移動・削除で永続権限が失われるとしているので、フォルダが移された・消されたときも多くはここで分かる
  *   - provider が [SecurityException] を投げた（`ContentResolver` は URI の権限の無いアクセスを [SecurityException] で断る）
@@ -27,8 +27,7 @@ import kotlin.time.Instant
  *
  *   それ以外の失敗（cursor が null、[IllegalArgumentException] などの例外）は、無いのか一時的な失敗（provider が落ちた、SD カードが
  *   一時的に外れたなど）なのかを見分けられないので、そのまま投げて通常の失敗に倒す（全走査は [SharedFolderSource] がやり直し、
- *   続けば到達不能。手元のデータを守るため、SMB と同じ扱い）。根が消えたときに provider がどれを返すかは実機で確かめていない（未確認。
- *   `docs/device-checklists.md` の「実機チェックリスト（#199）」）
+ *   続けば到達不能。手元のデータを守るため、SMB と同じ扱い）。根が消えたときに provider がどれを返すかは端末で確かめていない（未確認）
  * - 根が無いのを [list] の null で返さない（全走査が到達不能で終わるか、`fetchProgram` が全番組を消失と判断するため）。
  *   [list] が null を返すのは、根はあって、そのパスのフォルダが無い（またはフォルダでない）ときだけ
  * - [list]・[read]・[open] の呼び出しの中で出た [SecurityException] は [SourceException.Unauthorized] に変える。そのほかの失敗はそのまま投げる。

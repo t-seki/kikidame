@@ -20,7 +20,7 @@ data class ProgramSummaryRow(
 /** 取得元に見つからない番組（消失・取得元 ID 無し）の件数。手元の回は [LOCAL_FILE_PRESENT] と同じ定義。 */
 data class UnmatchedRow(val programCount: Int, val localEpisodeCount: Int, val pinnedEpisodeCount: Int)
 data class LocalUsageRow(val totalBytes: Long, val episodeCount: Int)
-/** 番組ごとの手元のファイル（#335）。内訳は重ならない 3 つ（固定・固定でない再生済み・固定でない未再生）。 */
+/** 番組ごとの手元のファイル。内訳は重ならない 3 つ（固定・固定でない再生済み・固定でない未再生）。 */
 data class ProgramStorageRow(
     val programId: Long,
     val programName: String,
@@ -30,7 +30,7 @@ data class ProgramStorageRow(
     val playedUnpinnedCount: Int,
     val unplayedUnpinnedCount: Int,
 )
-/** 手元の回 1 つ（#335）。 */
+/** 手元の回 1 つ。 */
 data class LocalEpisodeRow(
     val episodeId: Long,
     val programId: Long,
@@ -46,7 +46,7 @@ data class LocalEpisodeRow(
 /** 突合に必要な列だけ。 */
 data class ProgramKeyRow(val id: Long, val sourceItemId: String?, val publisherName: String?, val name: String)
 data class EpisodeKeyRow(val id: Long, val sourceItemId: String?, val programId: Long, val title: String, val publishedAt: Instant, val runtimeTicks: Long)
-/** 共有フォルダで前に取り込んだ回の、タグ由来の値とファイルのサイズ・更新日時（#197）。 */
+/** 共有フォルダで前に取り込んだ回の、タグ由来の値とファイルのサイズ・更新日時。 */
 data class ScannedFileRow(
     val sourceItemId: String,
     val title: String,
@@ -56,7 +56,7 @@ data class ScannedFileRow(
     val sourceFileSize: Long,
     val sourceModifiedAt: Instant,
 )
-/** 差し替え（ADR 0011、#371）を考える手元の回: 手元にあり（DONE でパスがある）、取得元 ID を持ち、まだ差し替えを予約していない回。 */
+/** 差し替え（ADR 0011）を考える手元の回: 手元にあり（DONE でパスがある）、取得元 ID を持ち、まだ差し替えを予約していない回。 */
 data class ReplaceCandidateRow(
     val episodeId: Long,
     val sourceItemId: String,
@@ -159,7 +159,7 @@ private const val UNMATCHED_COUNTS = """
       LEFT JOIN local_files lf ON lf.episodeId = e.id
     """
 
-/** 手元の回（#335）の行（[LocalEpisodeRow]）を返す問い合わせの本体。条件を足すときは AND で続け、並びは呼ぶ側が足す。 */
+/** 手元の回の行（[LocalEpisodeRow]）を返す問い合わせの本体。条件を足すときは AND で続け、並びは呼ぶ側が足す。 */
 private const val LOCAL_EPISODES = """
     SELECT e.id AS episodeId, e.programId AS programId, p.name AS programName, e.title AS title,
            e.publishedAt AS publishedAt, e.sizeBytes AS sizeBytes, lf.pinned AS pinned,
@@ -172,7 +172,7 @@ private const val LOCAL_EPISODES = """
     WHERE $LOCAL_FILE_PRESENT
     """
 
-/** 「続きから」（#108）の条件と順。Auto・再開の上限付きの読み出しと、アプリの「続きから」タブ（#151）の追従する読み出しで共有する。 */
+/** 「続きから」の条件と順。Auto・再開の上限付きの読み出しと、アプリの「続きから」タブの追従する読み出しで共有する。 */
 private const val CONTINUE_LISTENING = """
     SELECT e.* FROM episodes e
       JOIN local_files lf ON lf.episodeId = e.id
@@ -192,14 +192,14 @@ interface EpisodeDao {
     @Query("SELECT * FROM episodes WHERE id = :id")
     suspend fun findById(id: Long): EpisodeRow?
     /**
-     * 「続きから」の各回（#108）: 手元にあり、再生済みでなく、聴き始めている（位置が [notStartedTicks] 以上）各回を
+     * 「続きから」の各回: 手元にあり、再生済みでなく、聴き始めている（位置が [notStartedTicks] 以上）各回を
      * 記録の新しい順に。閾値の値は [dev.tseki.kikidame.domain.PlaybackRules.NOT_STARTED_THRESHOLD] から呼び出し側が渡す
      * （規則の由来は 1 箇所のまま、絞り込みは SQL で。LIMIT の前に絞らないと上位が未開始の回で埋まったとき空になる）。
      */
     @Transaction
     @Query("$CONTINUE_LISTENING LIMIT :limit")
     suspend fun listContinueListening(limit: Int, notStartedTicks: Long): List<EpisodeRow>
-    /** [listContinueListening] と同じ条件・順で、件数の上限なし。変化（再生位置の保存・再生済み・ファイルの削除）に追従する（#151 の「続きから」タブ）。 */
+    /** [listContinueListening] と同じ条件・順で、件数の上限なし。変化（再生位置の保存・再生済み・ファイルの削除）に追従する（「続きから」タブ）。 */
     @Transaction
     @Query(CONTINUE_LISTENING)
     fun observeContinueListening(notStartedTicks: Long): Flow<List<EpisodeRow>>
@@ -207,7 +207,7 @@ interface EpisodeDao {
     suspend fun findBySourceItemId(sourceItemId: String): EpisodeEntity?
     @Query("SELECT id, sourceItemId, programId, title, publishedAt, runtimeTicks FROM episodes")
     suspend fun listKeys(): List<EpisodeKeyRow>
-    /** 共有フォルダで取り込んだ回（ファイルのサイズと更新日時を持つ行）だけ。タグを読み直すかの判定に使う（#197）。 */
+    /** 共有フォルダで取り込んだ回（ファイルのサイズと更新日時を持つ行）だけ。タグを読み直すかの判定に使う。 */
     @Query(
         """
         SELECT sourceItemId, title, publishedAt, runtimeTicks, performers, sourceFileSize, sourceModifiedAt
@@ -246,7 +246,7 @@ interface EpisodeDao {
 @Dao
 interface LocalFileDao {
     /**
-     * 手元のファイルの合計（#42）。sizeBytes はダウンロード完了時に実サイズで上書きされている
+     * 手元のファイルの合計。sizeBytes はダウンロード完了時に実サイズで上書きされている
      * （`SdkJellyfinGateway` はサイズを返さないので、同期の取り込みで上書きされることはない。返すようにするなら DONE の行は守ること。
      * 差し替えのために問い合わせた大きさ（ADR 0011）は `SourceEpisode.sizeBytes` に載せない）。
      */
@@ -259,7 +259,7 @@ interface LocalFileDao {
     )
     fun observeUsage(): Flow<LocalUsageRow>
     /**
-     * 番組ごとの手元のファイル（#335）。[observeUsage] と同じ定義の手元の回だけを数え、手元の回の無い番組は出さない。
+     * 番組ごとの手元のファイル。[observeUsage] と同じ定義の手元の回だけを数え、手元の回の無い番組は出さない。
      * 容量の大きい順、同じなら番組名・id の順。再生済みの行が無い回は未再生。
      */
     @Query(
@@ -279,10 +279,10 @@ interface LocalFileDao {
         """,
     )
     fun observeProgramStorage(): Flow<List<ProgramStorageRow>>
-    /** 全番組の手元の回（#335）。[observeUsage] と同じ定義。容量の大きい順、同じなら公開日の新しい順・id の順。 */
+    /** 全番組の手元の回。[observeUsage] と同じ定義。容量の大きい順、同じなら公開日の新しい順・id の順。 */
     @Query("$LOCAL_EPISODES ORDER BY e.sizeBytes DESC, e.publishedAt DESC, e.id ASC")
     fun observeLocalEpisodes(): Flow<List<LocalEpisodeRow>>
-    /** [programId] の番組の手元の回（#335）。並びは呼ぶ側が決める（公開日の新しい順。タイトルの比べ方を Kotlin 側に揃えるため）。 */
+    /** [programId] の番組の手元の回。並びは呼ぶ側が決める（公開日の新しい順。タイトルの比べ方を Kotlin 側に揃えるため）。 */
     @Query("$LOCAL_EPISODES AND e.programId = :programId")
     fun observeLocalEpisodesByProgram(programId: Long): Flow<List<LocalEpisodeRow>>
     @Query("SELECT * FROM local_files WHERE path = :path")
@@ -329,12 +329,12 @@ interface LocalFileDao {
     @Query("DELETE FROM local_files WHERE episodeId = :episodeId")
     suspend fun delete(episodeId: Long)
 
-    // 以下は 1 回の状態の更新を 1 つの文で行う（#261）。行を読んでから upsert すると、間に別の経路が書いた列を古い値で戻し、
+    // 以下は 1 回の状態の更新を 1 つの文で行う。行を読んでから upsert すると、間に別の経路が書いた列を古い値で戻し、
     // 間に消された行を生き返らせる。1 つの文にすると読み書きの間が無くなり、行が無ければ何も書かず、変える列だけを書く。
     // 状態を条件にするもの（deleteUnlessDone・retryFailed・resetToPending）は、条件を見ることと書くことも同じ文で行う。
     // markRunning と markFailed は状態を条件にしない（WHERE episodeId だけ）。防ぐのは、消された行を生き返らせることと、
     // ほかの列を巻き戻すことだけで、DONE の行を RUNNING / FAILED にすることは防がない。置き換え前の upsert も状態を見ておらず、
-    // 状態の遷移は変えない（#261 の非目標）ので、そのままにしている
+    // 防ぐのは状態の遷移ではないので、そのままにしている
     @Query("DELETE FROM local_files WHERE episodeId = :episodeId AND state != 'DONE'")
     suspend fun deleteUnlessDone(episodeId: Long): Int
     @Query("UPDATE local_files SET state = 'PENDING', enqueuedAt = :enqueuedAt WHERE episodeId = :episodeId AND state = 'FAILED'")
@@ -350,7 +350,7 @@ interface LocalFileDao {
     @Query("UPDATE local_files SET state = 'FAILED', attemptCount = attemptCount + 1, lastAttemptAt = :at WHERE episodeId = :episodeId")
     suspend fun markFailed(episodeId: Long, at: Instant)
 
-    // 差し替え（ADR 0011、#371）。どれも state（DONE）には触らない。上と同じく 1 回の更新を 1 つの文で行う
+    // 差し替え（ADR 0011）。どれも state（DONE）には触らない。上と同じく 1 回の更新を 1 つの文で行う
     /** 落としたときの版を書く（差し替えずに、中身が同じと分かったとき）。手元にある行だけ。 */
     @Query("UPDATE local_files SET sourceVersion = :version WHERE episodeId = :episodeId AND state = 'DONE'")
     suspend fun setSourceVersion(episodeId: Long, version: String)
@@ -389,7 +389,7 @@ interface PlaybackStateDao {
     @Upsert
     suspend fun upsert(state: PlaybackStateEntity)
 
-    /** 取得元 ID を持つ各回すべてと、その再生の状態（再生の共有の突き合わせ。#355）。 */
+    /** 取得元 ID を持つ各回すべてと、その再生の状態（再生の共有の突き合わせ）。 */
     @Query(
         """SELECT e.id AS episodeId, e.sourceItemId AS sourceItemId,
             ps.episodeId AS ps_episodeId, ps.positionTicks AS ps_positionTicks, ps.played AS ps_played, ps.updatedAt AS ps_updatedAt,
@@ -442,7 +442,7 @@ interface PlaybackStateDao {
         sentUpdatedAt: Instant,
     )
 
-    /** 突合で取得元 ID が変わった回（ADR 0010 の決定 7、#352 の決定 8）。未送信にし、前の ID で見た値は忘れる。 */
+    /** 突合で取得元 ID が変わった回（ADR 0010 の決定 7）。未送信にし、前の ID で見た値は忘れる。 */
     @Query(
         """UPDATE playback_states SET sharePending = 1, sharedPositionTicks = NULL, sharedPlayed = NULL, sharedLastPlayedAt = NULL
         WHERE episodeId = :episodeId""",

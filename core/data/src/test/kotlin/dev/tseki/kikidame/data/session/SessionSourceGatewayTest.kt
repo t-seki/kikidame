@@ -34,7 +34,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 
-/** 今の接続の種類で Jellyfin か共有フォルダに振り分けること（#198）。共有フォルダの木はメモリ上のもの。 */
+/** 今の接続の種類で Jellyfin か共有フォルダに振り分けること。共有フォルダの木はメモリ上のもの。 */
 @RunWith(AndroidJUnit4::class)
 class SessionSourceGatewayTest {
     @get:Rule
@@ -80,7 +80,7 @@ class SessionSourceGatewayTest {
         assertEquals(1, trees.closes, "the connection is closed after the scan")
     }
 
-    /** 途中経過の受け手も共有フォルダへ渡す（渡さないと全部読んでから取り込む形に戻る。#209）。 */
+    /** 途中経過の受け手も共有フォルダへ渡す（渡さないと全部読んでから取り込む形に戻る）。 */
     @Test
     fun sharedFolderScanStreamsProgramsToTheListener() = runTest {
         store.saveSmb(smb)
@@ -143,7 +143,7 @@ class SessionSourceGatewayTest {
         assertFalse(trees.opened.isNotEmpty(), "a signed-out shared folder is not opened")
     }
 
-    /** 端末のフォルダ（#199）も共有フォルダとして、その木で走査して閉じる。 */
+    /** 端末のフォルダも共有フォルダとして、その木で走査して閉じる。 */
     @Test
     fun deviceFolderScansItsTreeAndClosesIt() = runTest {
         store.saveDeviceFolder(deviceFolder)

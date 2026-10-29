@@ -20,7 +20,7 @@ import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.Instant
 
 /**
- * 共有フォルダの走査（#197、epic #195 の決定 5・7・8・9）をメモリ上の木で確かめる。
+ * 共有フォルダの走査をメモリ上の木で確かめる。
  * タグの読み取りはフェイク（[FakeTagReader]）。前の走査の結果は Room の回の行から読む（[RoomScannedFiles]）。
  */
 @RunWith(AndroidJUnit4::class)
@@ -73,7 +73,7 @@ class SharedFolderSourceTest : RefreshTestBase() {
         assertEquals(setOf(SourceItemId("TBSラジオ/ハライチのターン！")), snapshot.episodes.map { it.programSourceId }.toSet())
     }
 
-    /** 名前が `.`・`@`・`#` で始まるフォルダとファイルは、どの段でも無視する（#197 の追加の決定）。 */
+    /** 名前が `.`・`@`・`#` で始まるフォルダとファイルは、どの段でも無視する。 */
     @Test
     fun namesStartingWithDotAtOrHashAreIgnoredOnEveryLevel() = runTest {
         folder.put("TBSラジオ/番組/2026-09-18.m4a")
@@ -158,7 +158,7 @@ class SharedFolderSourceTest : RefreshTestBase() {
 
     @Test
     fun unchangedFilesAreNotReadAgain() = runTest {
-        // ms より細かい更新日時が来ても（SMB の実装から何が来るかは #198 で確かめる。未確認）、Room は ms で持つので同じとみなすこと
+        // ms より細かい更新日時が来ても（SMB の実装から何が来るかは未確認）、Room は ms で持つので同じとみなすこと
         val modified = Instant.parse("2026-09-17T16:00:00Z") + 1234.nanoseconds
         folder.put("P/番組/a.m4a", ByteArray(10), modified)
         tags.tagsByPath["P/番組/a.m4a"] = AudioTags(title = "タグの題", duration = 30.minutes)
@@ -193,7 +193,7 @@ class SharedFolderSourceTest : RefreshTestBase() {
         assertEquals(listOf("P/番組/size.m4a", "P/番組/time.m4a"), tags.calls.sorted())
     }
 
-    /** 差し替え（ADR 0011、#371）: 各回の版は大きさと更新日時（ms）の組。大きさは一覧からも 1 本ずつでも取れる。 */
+    /** 差し替え（ADR 0011）: 各回の版は大きさと更新日時（ms）の組。大きさは一覧からも 1 本ずつでも取れる。 */
     @Test
     fun theFileVersionIsTheSizeAndModifiedTime() = runTest {
         val modified = Instant.parse("2026-09-17T16:00:00Z") + 1234.nanoseconds
@@ -288,7 +288,7 @@ class SharedFolderSourceTest : RefreshTestBase() {
         assertIs<SourceException.Failed>(missing)
     }
 
-    // --- ファイル名を変えたときの突合（epic #195 の決定 7） ---
+    // --- ファイル名を変えたときの突合 ---
 
     private suspend fun markDone(sourceId: String): String {
         val row = db.episodeDao().findBySourceItemId(sourceId)!!

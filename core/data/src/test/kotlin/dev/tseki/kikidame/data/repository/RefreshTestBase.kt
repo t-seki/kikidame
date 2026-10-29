@@ -44,7 +44,7 @@ abstract class RefreshTestBase : RoomTestBase() {
     @After
     fun cancelScope() = scope.cancel()
 
-    /** 再生の共有（#355）が UserData を読み書きする先。Jellyfin のテストでは [JellyfinRefreshTestBase.gateway] と同じもの。 */
+    /** 再生の共有が UserData を読み書きする先。Jellyfin のテストでは [JellyfinRefreshTestBase.gateway] と同じもの。 */
     protected open val sharingGateway: JellyfinGateway get() = defaultSharingGateway
     private val defaultSharingGateway by lazy { FakeJellyfinGateway() }
     protected val shareStatus by lazy { PlaybackShareStatusStore(testDataStore(File(tmp.root, "share").apply { mkdirs() }, scope), store) }

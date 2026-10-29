@@ -20,10 +20,10 @@ import kotlinx.coroutines.flow.first
 
 /**
  * `local_files` の待ち行列を 1 本ずつ落とす（順序は `LocalFileDao.nextPending`: 手動が先、その中はキューに入れた順）。並列にはしない。
- * 待ち行列に入るのは、`state` が PENDING の行と、差し替え（ADR 0011、#371）を予約した行（`state` は DONE のまま、`replaceState` が PENDING）。
+ * 待ち行列に入るのは、`state` が PENDING の行と、差し替え（ADR 0011）を予約した行（`state` は DONE のまま、`replaceState` が PENDING）。
  * 1 本の失敗は行に記録して（FAILED にし、試行回数を数えて）次へ進む。差し替えの失敗は行に記録せず、差し替えの印（`replaceState`）を
  * 下ろすだけ（試行回数も数えず、今のファイルと版は残る。次の同期でまた予約される）。
- * 401 はログアウトして止まる（同期の失敗の通知も消す。#346）。
+ * 401 はログアウトして止まる（同期の失敗の通知も消す）。
  * 進捗は `setProgress` で各回 ID と割合を流す（一覧の進捗リング。リングは `state` が RUNNING の行にだけ出るので、差し替えの間は出ない）。
  * 差し替えは、落とし終えた時点で聴いている回（[NowPlaying.excludedFromSync]）なら差し替えない。
  */
@@ -56,7 +56,7 @@ class DownloadWorker @AssistedInject constructor(
                 }
             } catch (e: SourceException.Unauthorized) {
                 Log.w(TAG, "download unauthorized; signing out")
-                // ログアウトでは同期の失敗の通知も消す（記録はセッションと一緒に消える。#346 の決定 6）
+                // ログアウトでは同期の失敗の通知も消す（記録はセッションと一緒に消える）
                 syncFailureNotifier.cancel()
                 sessionRepository.signOut()
                 return Result.success()

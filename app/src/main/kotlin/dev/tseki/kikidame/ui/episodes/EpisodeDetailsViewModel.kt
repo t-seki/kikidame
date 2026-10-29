@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
-/** 各回の詳細画面（#43）。番組の各回一覧から該当の回を引き、ダウンロードや再生で変わればそのまま追従する。 */
+/** 各回の詳細画面。番組の各回一覧から該当の回を引き、ダウンロードや再生で変わればそのまま追従する。 */
 @HiltViewModel
 class EpisodeDetailsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -27,7 +27,7 @@ class EpisodeDetailsViewModel @Inject constructor(
     val item: StateFlow<EpisodeWithState?> = library.observeEpisodes(ProgramId(route.programId))
         .map { list -> list.firstOrNull { it.episode.id == episodeId } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-    /** 番組（配信元の行に使う、#70）。 */
+    /** 番組（配信元の行に使う）。 */
     val program: StateFlow<Program?> = library.observeProgram(ProgramId(route.programId))
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 }

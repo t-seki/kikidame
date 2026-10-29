@@ -1,7 +1,7 @@
 package dev.tseki.kikidame.data.smb
 
 /**
- * SMB の共有の中のパスの組み立て（#198）。smbj の外の、単体でテストできる部分。
+ * SMB の共有の中のパスの組み立て。smbj の外の、単体でテストできる部分。
  *
  * 利用者が入力する「共有の中のパス」（[normalizeBase]）に、[dev.tseki.kikidame.data.sharedfolder.FolderTree] の相対パス
  * （区切りは `/`、根は空文字列）をつなぎ、smbj に渡す共有の根からのパス（区切りは `\`、共有の直下は空文字列）にする（[resolve]）。

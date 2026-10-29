@@ -33,7 +33,7 @@ data class SmbConnectUiState(
         get() = !isSubmitting && host.isNotBlank() && share.isNotBlank() && (guest || userName.isNotBlank())
 }
 
-/** SMB の共有に接続する画面（#198）。共有の直下が読めたら保存し、初回の全走査を始める。 */
+/** SMB の共有に接続する画面。共有の直下が読めたら保存し、初回の全走査を始める。 */
 @HiltViewModel
 class SmbConnectViewModel @Inject constructor(
     private val sessionRepository: SessionRepository,

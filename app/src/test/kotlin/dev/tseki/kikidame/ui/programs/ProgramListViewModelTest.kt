@@ -27,7 +27,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** 番組一覧の ViewModel の [ProgramListViewModel.filtered]（検索語 #44・配信元の絞り込み #45・よく聴く #151）。 */
+/** 番組一覧の ViewModel の [ProgramListViewModel.filtered]（検索語・配信元の絞り込み・よく聴く）。 */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class ProgramListViewModelTest {

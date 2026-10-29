@@ -13,7 +13,7 @@ import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 
 /**
- * [DeviceDocuments] を `ContentResolver` と `DocumentsContract` で引く（#199）。依存（`androidx.documentfile`）は足さず、SDK の標準だけで書く。
+ * [DeviceDocuments] を `ContentResolver` と `DocumentsContract` で引く。依存（`androidx.documentfile`）は足さず、SDK の標準だけで書く。
  * 単体テストしない（provider と ParcelFileDescriptor が要るため）。パスの解決と失敗の扱いは [DeviceFolderTree] の側で試す。
  */
 class ContentResolverDeviceDocuments(private val resolver: ContentResolver) : DeviceDocuments {

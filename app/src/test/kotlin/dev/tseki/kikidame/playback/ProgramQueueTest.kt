@@ -20,7 +20,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
-/** 番組のキュー（#231）: 手元にある回を古い順に積み、対象の回から、保存位置の規則（[PlaybackRules.resumePosition]）で始める。 */
+/** 番組のキュー: 手元にある回を古い順に積み、対象の回から、保存位置の規則（[PlaybackRules.resumePosition]）で始める。 */
 @RunWith(AndroidJUnit4::class)
 class ProgramQueueTest {
     private val now = Instant.parse("2026-09-20T00:00:00Z")

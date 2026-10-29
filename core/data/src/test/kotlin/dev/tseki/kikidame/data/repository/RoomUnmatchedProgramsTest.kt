@@ -20,7 +20,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
-/** 「取得元に見つからない番組」（消失・取得元 ID 無し）の数え方と、まとめて消す処理（#317）。 */
+/** 「取得元に見つからない番組」（消失・取得元 ID 無し）の数え方と、まとめて消す処理。 */
 @RunWith(AndroidJUnit4::class)
 class RoomUnmatchedProgramsTest : RefreshTestBase() {
     private val published = Instant.parse("2026-09-15T15:00:00Z")

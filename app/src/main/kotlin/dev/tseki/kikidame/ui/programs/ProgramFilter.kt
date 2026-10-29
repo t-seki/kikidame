@@ -5,8 +5,8 @@ import dev.tseki.kikidame.domain.ProgramSummary
 import dev.tseki.kikidame.text.UiText
 
 /**
- * 番組一覧の絞り込み。検索（#44）は番組名と配信元名の部分一致で、大文字小文字は区別しない。
- * 配信元の絞り込み（#45）は配信元名の完全一致。両方あれば AND。
+ * 番組一覧の絞り込み。検索は番組名と配信元名の部分一致で、大文字小文字は区別しない。
+ * 配信元の絞り込みは配信元名の完全一致。両方あれば AND。
  * 全角・半角やかなの表記揺れは吸収しない（取得元の表記そのまま）。
  */
 object ProgramFilter {

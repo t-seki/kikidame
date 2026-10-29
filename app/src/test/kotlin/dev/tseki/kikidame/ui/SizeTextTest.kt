@@ -4,7 +4,7 @@ import dev.tseki.kikidame.domain.LocalStorageUsage
 import dev.tseki.kikidame.text.UiText
 import org.junit.Test
 import kotlin.test.assertEquals
-/** 容量の書式（#42）。10 進、GB / MB の 1 桁小数。 */
+/** 容量の書式。10 進、GB / MB の 1 桁小数。 */
 class SizeTextTest {
     @Test
     fun decimalUnitsWithOneFraction() {

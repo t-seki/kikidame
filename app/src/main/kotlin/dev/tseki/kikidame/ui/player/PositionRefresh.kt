@@ -9,7 +9,7 @@ internal const val IDLE_POSITION_REFRESH_MS = 500L
 internal const val POSITION_REFRESH_MARGIN_MS = 30L
 
 /**
- * 次に位置を読むまでの待ち時間（ms。#367）。
+ * 次に位置を読むまでの待ち時間（ms）。
  * 再生中は、次の秒の境目と次のチャプターの開始のうち早い方（壁時計の時間なので倍速で割る）に [POSITION_REFRESH_MARGIN_MS] を足す（ms 未満は切り上げ）。
  * 止まっている間、倍速が 0 以下のときは [IDLE_POSITION_REFRESH_MS]。再生中は必ず [POSITION_REFRESH_MARGIN_MS] 以上になる。
  * [chapters] は [chaptersOf] が返す、開始の順のもの。開始が [positionMs] より後で最も早いものだけを見る。

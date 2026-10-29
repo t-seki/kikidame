@@ -58,7 +58,7 @@ class EpisodeListViewModel @Inject constructor(
 
     val episodes: StateFlow<List<EpisodeWithState>?> = library.observeEpisodes(programId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-    /** この番組の手元のファイルの合計（#42）。一覧から数えるので新しいクエリは要らない。null は読み込み前。 */
+    /** この番組の手元のファイルの合計。一覧から数えるので新しいクエリは要らない。null は読み込み前。 */
     val localStorage: StateFlow<LocalStorageUsage?> = episodes
         .map { list -> list?.let(LocalStorageUsage::of) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -69,7 +69,7 @@ class EpisodeListViewModel @Inject constructor(
 
     val isRefreshing: StateFlow<Boolean> = refresher.isRefreshing
 
-    /** 裏の同期（定期・起動時）のうち、手動が合流していない間だけ true。トップバーの下に細いバーを出す（#138）。 */
+    /** 裏の同期（定期・起動時）のうち、手動が合流していない間だけ true。トップバーの下に細いバーを出す。 */
     val isSyncingInBackground: StateFlow<Boolean> = refresher.isSyncingInBackground
 
     /**
@@ -93,12 +93,12 @@ class EpisodeListViewModel @Inject constructor(
     val messages: Flow<UiText> = merge(refresher.messages, localMessages, nowPlaying.messages)
 
     /**
-     * 各回一覧の「引っ張って更新」= 1 番組の同期（#279）。番組の行が無い・取得元 ID が無いときは全走査に切り替える。
-     * `applicationScope` で走らせ、画面を離れても最後まで続ける（#311 の決定 9）。
+     * 各回一覧の「引っ張って更新」= 1 番組の同期。番組の行が無い・取得元 ID が無いときは全走査に切り替える。
+     * `applicationScope` で走らせ、画面を離れても最後まで続ける。
      */
     fun refresh() = refresher.launchSyncProgram(programId, orFullSync = true)
 
-    // --- 同期対象・保持ルール（変えている間は保存するだけ。シートを閉じたとき、変わっていればこの番組を同期する。#311） ---
+    // --- 同期対象・保持ルール（変えている間は保存するだけ。シートを閉じたとき、変わっていればこの番組を同期する） ---
 
     /**
      * 設定の書き込みと、シートを閉じたときの読み直しを、この順に並べる。チップを押してすぐ閉じても、書き込みが済んでから比べる
@@ -115,7 +115,7 @@ class EpisodeListViewModel @Inject constructor(
     }
 
     /**
-     * 同期のシートを閉じた（閉じる経路は問わない。#311 の決定 1）。開いたときから同期の設定が変わっていれば、この番組だけを同期する。
+     * 同期のシートを閉じた（閉じる経路は問わない）。開いたときから同期の設定が変わっていれば、この番組だけを同期する。
      * 同期は `applicationScope` で走り、走っている同期があれば終わるのを待つ（[LibraryRefresher.launchSyncProgramAfterRunning]）。
      * 設定を書き終えてから比べるため、比べるのは同期を走らせる直前（待った後）にする。
      */
@@ -205,8 +205,7 @@ class EpisodeListViewModel @Inject constructor(
 
     /**
      * 同期に効く番組の設定。同期対象でない番組の同期は保持ルールを見ない（`SyncPlanner.planProgram`）ので、OFF のときは保持ルールを
-     * 比べない。ON にすると上限の既定の 3 が入るため、OFF の番組を ON にして OFF に戻しても、保持ルールの違いで「変わった」とはしない
-     * （#311 の決定 1）。
+     * 比べない。ON にすると上限の既定の 3 が入るため、OFF の番組を ON にして OFF に戻しても、保持ルールの違いで「変わった」とはしない。
      */
     private data class EffectiveSyncSettings(val syncEnabled: Boolean, val retentionRule: RetentionRule?) {
         constructor(program: Program) : this(program.syncEnabled, program.retentionRule.takeIf { program.syncEnabled })

@@ -1,7 +1,7 @@
 package dev.tseki.kikidame.data.sharedfolder
 
 /**
- * 最後に開いたファイルを、パスと組にして 1 つだけ持ち回す（#233）。[FolderTree.read] は同じファイルを続けて読むことが多いので、
+ * 最後に開いたファイルを、パスと組にして 1 つだけ持ち回す。[FolderTree.read] は同じファイルを続けて読むことが多いので、
  * SMB（`SmbFolderTree`）と端末のフォルダ（`DeviceFolderTree`）の木が、開いたハンドルを使い回すのに使う。
  *
  * - [get] は、持っているもののパスが同じならそれを返す。違えば先に新しいものを開き、開けてから古いものを静かに閉じて付け替える。

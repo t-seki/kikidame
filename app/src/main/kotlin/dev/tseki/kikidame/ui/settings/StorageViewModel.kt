@@ -20,12 +20,12 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
-/** 「すべての回」の絞り込み（#335）。両方を選べば両方に当たる回（AND）だけ。見え方だけを変え、何も消さない。 */
+/** 「すべての回」の絞り込み。両方を選べば両方に当たる回（AND）だけ。見え方だけを変え、何も消さない。 */
 data class StorageFilter(val pinned: Boolean = false, val played: Boolean = false) {
     fun matches(episode: LocalEpisode): Boolean = (!pinned || episode.pinned) && (!played || episode.played)
 }
 
-/** 内訳の画面（#335）: 上に合計、「番組ごと」と「すべての回」のタブ。「すべての回」で選んだ回を消す。 */
+/** 内訳の画面: 上に合計、「番組ごと」と「すべての回」のタブ。「すべての回」で選んだ回を消す。 */
 @HiltViewModel
 class StorageViewModel @Inject constructor(
     storage: LocalStorageRepository,
@@ -58,7 +58,7 @@ class StorageViewModel @Inject constructor(
     }
 }
 
-/** 番組ごとの手元の回の一覧（#335）。公開日の新しい順。手元の回が 0 になったら内訳の画面に戻る。 */
+/** 番組ごとの手元の回の一覧。公開日の新しい順。手元の回が 0 になったら内訳の画面に戻る。 */
 @HiltViewModel
 class StorageProgramViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,

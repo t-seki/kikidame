@@ -29,13 +29,13 @@ import java.util.concurrent.TimeUnit
 import kotlin.time.Instant
 
 /**
- * SMB の共有を [FolderTree] として見せる（#198）。smbj の SMB2/3 を使う（SMB1 は非対応）。
+ * SMB の共有を [FolderTree] として見せる。smbj の SMB2/3 を使う（SMB1 は非対応）。
  * 接続は最初に木を使うときに張り、[close] で閉じる。読むだけで、書き込み・削除はしない。
  *
  * - 接続・認証・権限の失敗は必ず例外にする。[list] が null を返すのは、そのパスが無いときだけ（[SmbErrors]）。
- *   null で返すと、共有が外れたときに `fetchProgram` が全番組を消失と判断する（PR #202（#197）1 周目 #3）
+ *   null で返すと、共有が外れたときに `fetchProgram` が全番組を消失と判断する
  * - ゲスト接続は smbj の [AuthenticationContext.guest]。NAS ごとに通るかは実機で確かめる（未確認）
- * - 全走査が失敗した操作をやり直す前に [reset] を呼ぶので、そこで接続を閉じ、次の操作で張り直す（#209）。
+ * - 全走査が失敗した操作をやり直す前に [reset] を呼ぶので、そこで接続を閉じ、次の操作で張り直す。
  *   切れた接続を smbj が「つながっている」と見せたまま残すかは確かめていない（未確認）ので、[share] の `isConnected` だけに頼らない
  * - 単体テストしない（ネットワークに出るため）。パスの組み立てと失敗の分類は [SmbPaths] と [SmbErrors] で試す
  *
@@ -91,7 +91,7 @@ class SmbFolderTree(private val connection: SmbConnection) : CloseableFolderTree
         }
     }
 
-    /** 接続を閉じる（#209）。次の操作が [share] で張り直す。[close] と同じで、木はその後も使える。 */
+    /** 接続を閉じる。次の操作が [share] で張り直す。[close] と同じで、木はその後も使える。 */
     @Synchronized
     override fun reset() {
         close()
@@ -181,7 +181,7 @@ private fun fileInputStream(file: File, offset: Long) = PositionalInputStream(
 private const val SMB_READ_CHUNK = 512 * 1024
 
 /**
- * SMB のファイルを読むストリームの、読み取り中の例外を変える（#233 で `SmbFileInputStream` の catch の並びから移した。順も同じ）。
+ * SMB のファイルを読むストリームの、読み取り中の例外を変える（順は `SmbFileInputStream` の catch の並びと同じ）。
  *
  * - [SMBApiException] は [IOException] に変える
  * - [IOException]（`InterruptedIOException` を含む）と [CancellationException] は、そのまま投げる。

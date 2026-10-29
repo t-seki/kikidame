@@ -5,7 +5,7 @@ import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-/** タグの日付は年月日まであるときだけ使う（#197、epic #195 の決定 9）。 */
+/** タグの日付は年月日まであるときだけ使う。 */
 class TagDateTest {
     @Test
     fun fullDatesAreRead() {

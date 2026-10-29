@@ -42,7 +42,7 @@ import dev.tseki.kikidame.ui.theme.KikidameTheme
 import androidx.compose.ui.tooling.preview.Preview
 
 /**
- * 一覧の下に出す「聴いている回」のバー。左に番組の画像（あれば、#289）、番組名 / 回タイトルと再生／一時停止、上端に再生位置の線（#59）を持ち、
+ * 一覧の下に出す「聴いている回」のバー。左に番組の画像（あれば）、番組名 / 回タイトルと再生／一時停止、上端に再生位置の線を持ち、
  * バーのタップで再生画面へ行く。聴いている回が無ければ何も描かない。
  * `Scaffold(bottomBar)` に置く前提で、ナビゲーションバーの inset はここで取る。
  */
@@ -56,12 +56,12 @@ fun MiniPlayer(onClick: (EpisodeId) -> Unit, viewModel: MiniPlayerViewModel = hi
 
 @Composable
 internal fun MiniPlayerBar(state: NowPlayingState, programImage: ProgramImage?, onClick: () -> Unit, onTogglePlayPause: () -> Unit) {
-    // 面は surfaceContainer に primary を少し混ぜたアンバー系（#59、docs/ui.md）。primaryContainer だと濃すぎる
+    // 面は surfaceContainer に primary を少し混ぜたアンバー系（docs/ui.md）。primaryContainer だと濃すぎる
     val tint = lerp(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.colorScheme.primary, 0.18f)
     // 混ぜた色は contentColorFor で引けないので、文字色は明示する
     Surface(color = tint, contentColor = MaterialTheme.colorScheme.onSurface) {
         Column(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
-            // 上端の再生位置の線（#59）。尺が分からないときは出さない
+            // 上端の再生位置の線。尺が分からないときは出さない
             if (state.durationMs > 0) {
                 LinearProgressIndicator(
                     progress = { (state.positionMs.toFloat() / state.durationMs).coerceIn(0f, 1f) },
@@ -79,7 +79,7 @@ internal fun MiniPlayerBar(state: NowPlayingState, programImage: ProgramImage?, 
                     .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // 聴いている回の番組の画像（#289）。無い番組では場所を空けず、今の見た目のまま
+                // 聴いている回の番組の画像。無い番組では場所を空けず、今の見た目のまま
                 if (programImage != null) {
                     ProgramImageView(programImage, Modifier.padding(end = 12.dp).size(40.dp))
                 }

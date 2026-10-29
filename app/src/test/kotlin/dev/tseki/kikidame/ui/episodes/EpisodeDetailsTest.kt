@@ -23,7 +23,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
-/** 各回の詳細（#43）の値の組み立て。ラベルと定型の値は [UiText] なので、日本語（`values-ja/`）で解決して比較する（Robolectric）。 */
+/** 各回の詳細の値の組み立て。ラベルと定型の値は [UiText] なので、日本語（`values-ja/`）で解決して比較する（Robolectric）。 */
 @RunWith(AndroidJUnit4::class)
 @Config(qualifiers = "ja")
 class EpisodeDetailsTest {
@@ -70,7 +70,7 @@ class EpisodeDetailsTest {
         assertEquals(listOf(Row("再生位置", "12:00 / 1:00:00"), Row("再生済み", "未再生")), sections[2].rows.text())
     }
 
-    /** 出演者（#70）は「、」で並べ、配信元は番組から。配信元の無い番組は「不明」。 */
+    /** 出演者は「、」で並べ、配信元は番組から。配信元の無い番組は「不明」。 */
     @Test
     fun performersAndPublisherRows() {
         val item = EpisodeWithState(episode.copy(performers = listOf("岩井勇気", "澤部佑")), null, null)
@@ -95,7 +95,7 @@ class EpisodeDetailsTest {
         assertFalse(rows.any { it.first.contains("同期") || it.first.contains("synced") })
     }
 
-    /** 1 回で成功した回: 失敗 0 回でも最終試行（開始時刻）はある。以前は「試行 0 回（最終 …）」と矛盾して見えた。 */
+    /** 1 回で成功した回: 失敗 0 回でも最終試行（開始時刻）はある（「試行 0 回（最終 …）」と矛盾して見せない）。 */
     @Test
     fun successfulDownloadShowsZeroFailuresAndLastAttempt() {
         val rows = EpisodeDetails.technicalRows(

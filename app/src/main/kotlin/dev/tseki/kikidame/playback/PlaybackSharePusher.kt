@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 /**
- * 再生の共有（ADR 0010 の決定 5、#355）の「送る」。未送信の回（[pending]）のうち、いま鳴っている回を除いたものを [send] に渡す。
+ * 再生の共有（ADR 0010 の決定 5）の「送る」。未送信の回（[pending]）のうち、いま鳴っている回を除いたものを [send] に渡す。
  * これで一時停止・停止・回の終わり（鳴っている回でなくなった）と、再生済みの手動切替（鳴っていない回の印が立つ）の後に送られ、
  * 再生中の定期保存（鳴っている回）では送られない。
  *

@@ -43,7 +43,7 @@ import dev.tseki.kikidame.ui.resolve
 import dev.tseki.kikidame.ui.ValueRow
 import kotlinx.coroutines.launch
 /**
- * 各回の詳細（#43）。利用者向けの 3 群を出し、末尾の「技術的な詳細」を展開すると ID・記録の生の値・パスが等幅で並ぶ。
+ * 各回の詳細。利用者向けの 3 群を出し、末尾の「技術的な詳細」を展開すると ID・記録の生の値・パスが等幅で並ぶ。
  * 展開した行は長押しでコピー。Android 13 以降は OS がコピーを通知するので何も出さず、それより前（minSdk 31）は Toast で知らせる。
  * 当初はボトムシートだったが、スクロールする長い一覧はシートのドラッグと取り合いになるので画面にした（2026-09-19）。
  */

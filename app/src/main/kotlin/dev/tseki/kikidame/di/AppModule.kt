@@ -29,7 +29,7 @@ object AppModule {
     @ApplicationScope
     fun provideApplicationScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    /** 接続画面の ViewModel が `Context` を持たずに権限を確かめるため（#237）。確かめるのは呼ぶたび（権限は途中で変わる）。 */
+    /** 接続画面の ViewModel が `Context` を持たずに権限を確かめるため。確かめるのは呼ぶたび（権限は途中で変わる）。 */
     @Provides
     fun provideLocalNetworkPermissionCheck(@ApplicationContext context: Context): LocalNetworkPermissionCheck =
         LocalNetworkPermissionCheck { LocalNetworkPermission.isRequiredAndMissing(context) }

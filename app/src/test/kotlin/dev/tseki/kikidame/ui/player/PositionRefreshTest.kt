@@ -4,7 +4,7 @@ import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** 位置を次に読むまでの待ち時間（#367）。 */
+/** 位置を次に読むまでの待ち時間。 */
 class PositionRefreshTest {
     private fun delayOf(playing: Boolean, pos: Long, speed: Float, next: Long? = null): Long =
         nextPositionRefreshDelayMs(playing, pos, speed, listOfNotNull(EpisodeChapter(0, "a"), next?.let { EpisodeChapter(it, "b") }))

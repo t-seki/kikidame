@@ -10,7 +10,7 @@ sealed interface SourceEpisodes {
     /** 完全な一覧が取れた。削除の権限を持つのはこの形だけ（ADR 0003）。 */
     data class Known(val sourceIds: Set<SourceItemId>) : SourceEpisodes
 
-    /** 一覧を取得できなかった。M3-b では全走査しか無いので番組ごとにこの形になる経路は無いが、型は残す。 */
+    /** 一覧を取得できなかった。今の取得元の実装にはこの形を作る経路が無いが、型は残す。 */
     data object Unavailable : SourceEpisodes
 
     /** 番組の取得元 ID が取得元の番組一覧に無い。 */
@@ -65,7 +65,7 @@ data class SyncPlan(
 }
 
 /**
- * 同期の純粋関数（handoff「同期エンジンの設計（M3）」「M3-b の範囲」）。I/O はしない。
+ * 同期の純粋関数（docs/architecture.md の「同期エンジンの設計」）。I/O はしない。
  *
  * - `Unavailable` / `Gone` → 判断保留。何も出さない
  * - `Known` → 取得元の一覧に無い `sourceItemId != null` の各回は固定でも [SyncProgramPlan.remove]
@@ -148,7 +148,7 @@ object SyncInputs {
 }
 
 /**
- * **差し替え**（CONTEXT.md、ADR 0011、#371）の判断。手元にある回（`DONE`）1 本ごとに、落としたときの版と、今の一覧の版・大きさから決める。I/O はしない。
+ * **差し替え**（CONTEXT.md、ADR 0011）の判断。手元にある回（`DONE`）1 本ごとに、落としたときの版と、今の一覧の版・大きさから決める。I/O はしない。
  * 聴いている回を外すのと、取得元への大きさの問い合わせは呼び出し側が行う。
  *
  * - 一覧の版が null なら、比べず、版も書き換えない（[ReplacementCheck.Keep]）

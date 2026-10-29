@@ -27,7 +27,7 @@ import javax.inject.Inject
 import kotlin.time.Clock
 
 /**
- * 番組の画面の「続きから」タブ（#151）。途中まで聴いた各回を番組をまたいで最後に聴いた順に、件数の上限なしで出す
+ * 番組の画面の「続きから」タブ。途中まで聴いた各回を番組をまたいで最後に聴いた順に、件数の上限なしで出す
  * （条件は Android Auto の「続きから」と同じ [LibraryRepository.observeContinueListening]）。
  * 行の操作は各回一覧と同じ（右端で再生済みの切り替え、長押しで固定する・固定を外す・ファイルの削除・詳細）。
  * 再生済みにしたときだけ［元に戻す］を出すので、その合図を [markedPlayed] で画面へ渡す。

@@ -3,7 +3,7 @@ package dev.tseki.kikidame.data.sharedfolder
 import kotlinx.datetime.LocalDate
 import kotlin.time.Duration
 
-/** 音声ファイルのタグから読んだ値（#197）。どれも読めなければ null。 */
+/** 音声ファイルのタグから読んだ値。どれも読めなければ null。 */
 data class AudioTags(
     val title: String? = null,
     /** タグの日付の文字列そのまま。解釈は [TagDate.parse]。 */
@@ -13,7 +13,7 @@ data class AudioTags(
 )
 
 /**
- * 共有フォルダの 1 ファイルのタグを読む（#197）。Android では [RetrieverTagReader]。テストではフェイクにする。
+ * 共有フォルダの 1 ファイルのタグを読む。Android では [RetrieverTagReader]。テストではフェイクにする。
  * ファイルを解釈できない（音声として読めない）ときは空の [AudioTags] を返す。
  * 木の読み取り（[FolderTree.read]）が失敗したときは、その例外を投げる（到達不能として扱う。タグ無しとして保存しない）。
  */
@@ -21,7 +21,7 @@ fun interface TagReader {
     fun read(tree: FolderTree, path: String, sizeBytes: Long): AudioTags
 }
 
-/** タグの日付の文字列の解釈（#197、epic #195 の決定 9）。 */
+/** タグの日付の文字列の解釈。 */
 object TagDate {
     private val ISO = Regex("""^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:\D.*)?$""")
     private val COMPACT = Regex("""^(\d{4})(\d{2})(\d{2})(?:T.*)?$""")

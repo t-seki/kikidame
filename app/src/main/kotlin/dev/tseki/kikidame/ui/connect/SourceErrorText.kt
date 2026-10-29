@@ -4,7 +4,7 @@ import dev.tseki.kikidame.R
 import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.text.UiText
 
-/** 接続画面の文言（#243: 文言は ui の持ち物なので sync/ から移した）。 */
+/** 接続画面の文言（文言は ui の持ち物なので ui/ に置く）。 */
 fun SourceException.toUserMessage(): UiText = when (this) {
     is SourceException.Unauthorized -> UiText.Res(R.string.sync_error_unauthorized)
     is SourceException.Unreachable -> UiText.Res(R.string.sync_error_unreachable_connect)

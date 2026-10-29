@@ -3,14 +3,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlin.time.Duration
 import kotlin.time.Instant
-/** 番組一覧の 1 行。[LibraryRepository.observePrograms] は最新の各回の公開日順で返す（「よく聴く」タブはそのうちよく聴く番組だけを同じ順で出す。#151）。 */
+/** 番組一覧の 1 行。[LibraryRepository.observePrograms] は最新の各回の公開日順で返す（「よく聴く」タブはそのうちよく聴く番組だけを同じ順で出す）。 */
 data class ProgramSummary(
     val program: Program,
     /** 取得元にしか無い分も含めた各回の数。 */
     val episodeCount: Int,
     /** 手元にファイルがある各回の数。 */
     val localEpisodeCount: Int,
-    /** 手元にファイルがあって再生済みでない各回の数（#41）。途中まで聴いた回・聴いている回も再生済みでなければ数える。取得元にしか無い回は数えない。 */
+    /** 手元にファイルがあって再生済みでない各回の数。途中まで聴いた回・聴いている回も再生済みでなければ数える。取得元にしか無い回は数えない。 */
     val unplayedLocalCount: Int,
     val latestPublishedAt: Instant?,
 )
@@ -29,7 +29,7 @@ data class EpisodeWithState(
         get() = playback?.let { PlaybackRules.resumePosition(it.position, episode.runtime) }
             ?.takeIf { it > Duration.ZERO }
 }
-/** 手元のファイルの合計（#42）。手元にある（DONE でパスがある）各回だけで、ダウンロード途中の分は入らない。 */
+/** 手元のファイルの合計。手元にある（DONE でパスがある）各回だけで、ダウンロード途中の分は入らない。 */
 data class LocalStorageUsage(val totalBytes: Long, val episodeCount: Int) {
     companion object {
         /** 一覧（番組の各回など）から数える。[LibraryRepository.observeLocalStorage] の全体の集計と同じ定義。 */
@@ -45,7 +45,7 @@ interface LibraryRepository {
     /** 手元のファイルの合計。ダウンロード・削除で追従する。 */
     fun observeLocalStorage(): Flow<LocalStorageUsage>
     fun observeProgram(programId: ProgramId): Flow<Program?>
-    /** 番組を 1 回だけ読む。無ければ null。既定は [observeProgram] の最初の値（実装が DB に問い合わせを足さずに済むように。#244）。 */
+    /** 番組を 1 回だけ読む。無ければ null。既定は [observeProgram] の最初の値（実装が DB に問い合わせを足さずに済むように）。 */
     suspend fun getProgram(programId: ProgramId): Program? = observeProgram(programId).first()
     /** [EpisodeOrder.newestFirst]（公開日の新しい順、同着はタイトルの辞書順）。 */
     fun observeEpisodes(programId: ProgramId): Flow<List<EpisodeWithState>>
@@ -53,14 +53,14 @@ interface LibraryRepository {
     /** 連続再生用。[EpisodeOrder] の順（古い順）で、手元にあるものだけ。 */
     suspend fun getPlayableEpisodes(programId: ProgramId): List<EpisodeWithState>
     /**
-     * 「続きから」の各回（#108）: 手元にあり（[EpisodeWithState.isPlayable]）、再生済みでなく、聴き始めている
+     * 「続きから」の各回: 手元にあり（[EpisodeWithState.isPlayable]）、再生済みでなく、聴き始めている
      * （[PlaybackRules.isNotStarted] が false）各回を、[PlaybackState.updatedAt] の新しい順に [limit] 件まで。
      * Android Auto の「続きから」と、プレイヤーが空のときの再開（`onPlaybackResumption`）が使う。
      */
     suspend fun getContinueListening(limit: Int): List<EpisodeWithState>
     /**
      * [getContinueListening] と同じ条件・順で件数の上限なし。再生位置の保存・再生済みの切り替え・ファイルの削除や同期に追従する。
-     * 番組一覧の「続きから」タブ（#151）が使う。
+     * 番組一覧の「続きから」タブが使う。
      */
     fun observeContinueListening(): Flow<List<EpisodeWithState>>
 

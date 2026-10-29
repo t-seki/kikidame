@@ -16,7 +16,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * 再生の共有（ADR 0010 の決定 5、#355）の「▶ の直前の読み込み」。セッションに渡すプレイヤーで、鳴らし始める（playWhenReady を立てる）前に
+ * 再生の共有（ADR 0010 の決定 5）の「▶ の直前の読み込み」。セッションに渡すプレイヤーで、鳴らし始める（playWhenReady を立てる）前に
  * [refresh] で取得元の値を 1 回だけ読み、取得元の値を採ると決まったら、その位置（[PlaybackRules.resumePosition]）へ移ってから鳴らす。
  * 一時停止からの再開も同じ。画面・通知・Android Auto・ヘッドセットのボタンのどれから押しても、ここを通る。
  *
@@ -24,11 +24,11 @@ import kotlin.time.Duration.Companion.seconds
  * [refresh] がすぐ null を返す。待っている間に一時停止が来たら、読み込みを捨てて鳴らさない。
  * 待っている間に出力先が外れた（ヘッドセットや Bluetooth が切れた。ACTION_AUDIO_BECOMING_NOISY）ときも、受ける側（PlaybackService）が
  * [cancelPendingPlay] を呼んで待っていた ▶ を取り消す。待っている間は中の ExoPlayer の「出力先が外れたら止める」（setHandleAudioBecomingNoisy）が
- * まだ効かず、そのままだと読み込みの後にスピーカーで鳴り始めるため（#358）。
+ * まだ効かず、そのままだと読み込みの後にスピーカーで鳴り始めるため。
  *
  * [scope] は [player] のアプリケーションスレッドで動くこと（Player はスレッド拘束）。
  */
-// ForwardingSimpleBasePlayer は unstable API。クラス単位で opt-in する（#111）
+// ForwardingSimpleBasePlayer は unstable API。クラス単位で opt-in する
 @OptIn(UnstableApi::class)
 class ReadBeforePlayPlayer(
     private val player: Player,

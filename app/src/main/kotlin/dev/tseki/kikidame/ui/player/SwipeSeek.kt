@@ -5,7 +5,7 @@ import dev.tseki.kikidame.text.UiText
 import kotlin.math.roundToLong
 
 /**
- * 再生画面の左右スワイプによる秒単位のシーク。移動量に比例し、指を離した時点で 1 回だけシークする（#29）。
+ * 再生画面の左右スワイプによる秒単位のシーク。移動量に比例し、指を離した時点で 1 回だけシークする。
  * 粒度は [DP_PER_SECOND] だけで決まる（実機で試して調整する）。
  */
 object SwipeSeek {

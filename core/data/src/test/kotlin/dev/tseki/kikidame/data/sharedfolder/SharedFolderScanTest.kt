@@ -32,7 +32,7 @@ import kotlin.time.Duration.Companion.minutes
 
 /**
  * 共有フォルダの全走査を番組ごとに取り込むこと、途中で止まっても続きから読めること、接続が切れたらやり直すこと、
- * 進み具合が流れること（#209 の決定 1・2・4・6）。木はメモリ上のもの、タグの読み取りはフェイク。
+ * 進み具合が流れること。木はメモリ上のもの、タグの読み取りはフェイク。
  */
 @RunWith(AndroidJUnit4::class)
 class SharedFolderScanTest : RefreshTestBase() {
@@ -74,7 +74,7 @@ class SharedFolderScanTest : RefreshTestBase() {
 
     private suspend fun hasEpisode(id: String) = db.episodeDao().findBySourceItemId(id) != null
 
-    // --- 番組ごとの取り込み（決定 1） ---
+    // --- 番組ごとの取り込み ---
 
     /** 次の番組のタグを読む時点で、前の番組はもう取り込まれている（番組が読んだ順に一覧に出る）。 */
     @Test
@@ -131,7 +131,7 @@ class SharedFolderScanTest : RefreshTestBase() {
         assertEquals(listOf("P/B"), streamed)
     }
 
-    // --- 途中で止まっても続きから読む（決定 2）。消失の判断は読み終えたときだけ ---
+    // --- 途中で止まっても続きから読む。消失の判断は読み終えたときだけ ---
 
     @Test
     fun aFailedScanKeepsTheImportedProgramsAndTheNextScanSkipsTheirTags() = runTest {
@@ -261,7 +261,7 @@ class SharedFolderScanTest : RefreshTestBase() {
         assertEquals(listOf(2), enqueued)
     }
 
-    // --- 張り直し（決定 4） ---
+    // --- 張り直し ---
 
     @Test
     fun aDroppedConnectionIsResetAndTheSameFileIsReadAgain() = runTest {
@@ -332,7 +332,7 @@ class SharedFolderScanTest : RefreshTestBase() {
         assertEquals(0, resets)
     }
 
-    // --- 進み具合（決定 6） ---
+    // --- 進み具合 ---
 
     @Test
     fun progressCountsTheFilesWhoseTagsAreRead() = runTest {

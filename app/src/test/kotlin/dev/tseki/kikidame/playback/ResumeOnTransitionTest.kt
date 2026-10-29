@@ -53,7 +53,7 @@ class ResumeOnTransitionTest {
         player.update { }
         assertEquals(0L, player.currentPosition)
     }
-    /** 再生の共有（#355）: 手元の位置へ移った後に取得元の値を読み、採ると決まればその位置へ移り直す。 */
+    /** 再生の共有: 手元の位置へ移った後に取得元の値を読み、採ると決まればその位置へ移り直す。 */
     @Test
     fun movesAgainToANewerServerPosition() = runTest(StandardTestDispatcher()) {
         repo.states.value = mapOf(EpisodeId(2) to PlaybackState(EpisodeId(2), 7.minutes, played = false, updatedAt = now))
@@ -67,7 +67,7 @@ class ResumeOnTransitionTest {
         assertEquals(listOf(EpisodeId(2)), reads)
         assertEquals(12.minutes.inWholeMilliseconds, player.currentPosition)
     }
-    /** 取得元の値を採ったら、先頭（ほかで聴き終えた）でも移る（#357 の 1 周目 4）。 */
+    /** 取得元の値を採ったら、先頭（ほかで聴き終えた）でも移る。 */
     @Test
     fun movesToTheStartWhenTheServerValueIsTaken() = runTest(StandardTestDispatcher()) {
         repo.states.value = mapOf(EpisodeId(2) to PlaybackState(EpisodeId(2), 7.minutes, played = false, updatedAt = now))

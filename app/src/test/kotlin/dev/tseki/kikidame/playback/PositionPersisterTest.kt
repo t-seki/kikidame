@@ -62,7 +62,7 @@ class PositionPersisterTest {
         assertFalse(saved.played)
     }
     /**
-     * 倍速（#35）: プレイヤーの位置は音源の時間なので、そのまま保存する。この番人は
+     * 倍速: プレイヤーの位置は音源の時間なので、そのまま保存する。この番人は
      * PositionPersister に速度で位置を換算する処理を持ち込んだら落ちる（今は速度を見ていない）。
      */
     @Test
@@ -98,7 +98,7 @@ class PositionPersisterTest {
         advanceTimeBy(60.seconds)
         assertEquals(afterPause, repo.updateCount, "ticker must stop when paused")
     }
-    /** 開いてすぐ ⏭ した回（位置 0〜数秒・未再生）には行を作らない（#7）。 */
+    /** 開いてすぐ ⏭ した回（位置 0〜数秒・未再生）には行を作らない。 */
     @Test
     fun skippingPastAnUnstartedEpisodeLeavesNoRow() = runTest(StandardTestDispatcher()) {
         setup(this)

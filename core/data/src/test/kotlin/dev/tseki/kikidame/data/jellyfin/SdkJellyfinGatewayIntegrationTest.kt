@@ -30,10 +30,10 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 /**
- * 実サーバに対する [SdkJellyfinGateway] の統合テスト（#97）。`scripts/jellyfin-testserver.sh up 1010|12` で立てた
- * 合成ライブラリ（音楽の `radio` は番組 2 × 各回 3、ブックの `radio-book` はそれに各回が 1 本だけの番組 C を足したもの。#354）を前提に、
+ * 実サーバに対する [SdkJellyfinGateway] の統合テスト。`scripts/jellyfin-testserver.sh up 1010|12` で立てた
+ * 合成ライブラリ（音楽の `radio` は番組 2 × 各回 3、ブックの `radio-book` はそれに各回が 1 本だけの番組 C を足したもの）を前提に、
  * [JellyfinGateway] の全メソッドを、音楽とブックのライブラリでそれぞれ 1 回ずつ呼ぶ。
- * ブックの各回の UserData の書き込みと読み戻し（再生の共有、#355）も見る。
+ * ブックの各回の UserData の書き込みと読み戻し（再生の共有）も見る。
  *
  * 環境変数 `KIKIDAME_JELLYFIN_URL`（と `KIKIDAME_JELLYFIN_USER` / `KIKIDAME_JELLYFIN_PASSWORD`、既定は
  * スクリプトと同じ `kikidame` / `kikidame-test`）が無ければスキップするので、CI と普段の `./gradlew test` には影響しない:
@@ -147,7 +147,7 @@ class SdkJellyfinGatewayIntegrationTest {
         assertNull(gateway.fetchProgramImage(credentials, music, SourceItemId("ニッポン放送/テスト番組A")))
     }
 
-    /** 番組の画像（#282）: `folder.jpg` のある番組 A だけ Primary の ImageTag を持ち、中身が JPEG で取れる。番組 B は画像なし。 */
+    /** 番組の画像: `folder.jpg` のある番組 A だけ Primary の ImageTag を持ち、中身が JPEG で取れる。番組 B は画像なし。 */
     @Test
     fun programImageComesFromThePrimaryImage() = runTest {
         val credentials = signIn()
@@ -186,7 +186,7 @@ class SdkJellyfinGatewayIntegrationTest {
             bytes.size.toLong()
         }
 
-        // 差し替え（ADR 0011、#371）: 一覧は Etag をファイルの版として返し、大きさは中身を落とさずに取れる
+        // 差し替え（ADR 0011）: 一覧は Etag をファイルの版として返し、大きさは中身を落とさずに取れる
         assertTrue(!episode.version.isNullOrBlank(), "一覧に Etag が無い")
         assertEquals(total, gateway.fetchFileSize(credentials, episode.sourceId), "Range: bytes=0-0 の全長と本文の長さ")
 
@@ -205,7 +205,7 @@ class SdkJellyfinGatewayIntegrationTest {
     }
 
     /**
-     * ブックのライブラリ（#354、ADR 0010 の決定 2）: 各回は AudioBook で、番組は Album と AlbumArtist のタグでまとまる。
+     * ブックのライブラリ（ADR 0010 の決定 2）: 各回は AudioBook で、番組は Album と AlbumArtist のタグでまとまる。
      * 番組の取得元 ID は `<AlbumArtist>/<Album>`。各回が 1 本だけの番組 C もまとまる。
      */
     @Test
@@ -272,7 +272,7 @@ class SdkJellyfinGatewayIntegrationTest {
     }
 
     /**
-     * ブックのライブラリの番組の画像は、番組のフォルダ（Folder）の Primary（#354）。`folder.jpg` のある番組 A だけ画像を持つ。
+     * ブックのライブラリの番組の画像は、番組のフォルダ（Folder）の Primary。`folder.jpg` のある番組 A だけ画像を持つ。
      * 各回が 1 本だけの番組 C は、各回の親が配信元のフォルダ（`folder.jpg` を置いてある）になるが、それを番組 C の画像にしない。
      */
     @Test
@@ -305,7 +305,7 @@ class SdkJellyfinGatewayIntegrationTest {
     }
 
     /**
-     * 再生の共有（#355、ADR 0010 の決定 3）: ブックの各回の UserData に `POST /UserItems/{itemId}/UserData` で書いた位置・再生済み・
+     * 再生の共有（ADR 0010 の決定 3）: ブックの各回の UserData に `POST /UserItems/{itemId}/UserData` で書いた位置・再生済み・
      * `LastPlayedDate` が、そのまま読み戻せる。5 分未満の位置（テストのファイルは 12 秒なので尺の中の 7 秒）も 0 に戻されずに残る。
      * 書いた後の値は、書き込みの応答・1 件の読み込み・一覧（同期で読む経路）のどれでも同じ（「最後に見たサーバの値」と比べるため）。
      */

@@ -15,7 +15,7 @@ data class PlaybackState(
             PlaybackState(episodeId, Duration.ZERO, played = false, updatedAt = now)
     }
 }
-/** 倍速の選択肢（#35）。アプリ全体で 1 つ。ピッチは変えない。再生位置は音源の時間なので倍速の影響を受けない。 */
+/** 倍速の選択肢。アプリ全体で 1 つ。ピッチは変えない。再生位置は音源の時間なので倍速の影響を受けない。 */
 object PlaybackSpeed {
     const val DEFAULT = 1.0f
     val CHOICES: List<Float> = listOf(1.0f, 1.25f, 1.5f, 1.75f, 2.0f)
@@ -36,7 +36,7 @@ object PlaybackRules {
     val PLAYED_THRESHOLD: Duration = 2.minutes
 
     /**
-     * 位置がこれ未満で未再生なら「聴き始めていない」（#7）。⏭ の連打や誤タップで進む時間は数秒で、
+     * 位置がこれ未満で未再生なら「聴き始めていない」。⏭ の連打や誤タップで進む時間は数秒で、
      * 再生中 10 秒ごとの定期保存の最初より小さい。開いて数秒で一時停止した回もこれに含まれ、
      * 行が無ければ記録されない（先頭から始まるので失うものは無い）。
      */

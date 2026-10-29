@@ -66,7 +66,7 @@ internal fun EmptyPrograms(canRefresh: Boolean) {
     }
 }
 
-/** 空のタブの案内（#151。「続きから」「よく聴く」）。引っ張って更新できるよう LazyColumn で包む。 */
+/** 空のタブの案内（「続きから」「よく聴く」）。引っ張って更新できるよう LazyColumn で包む。 */
 @Composable
 internal fun PageMessage(text: String) {
     CenteredPageMessage {

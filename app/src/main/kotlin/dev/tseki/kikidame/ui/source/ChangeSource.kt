@@ -29,10 +29,10 @@ import dev.tseki.kikidame.sync.SyncScheduler
 import javax.inject.Inject
 
 /**
- * 「取得元を変える」の処理（epic #195 の決定 2）。設定と、ログアウト後の接続画面（Jellyfin・SMB）と端末のフォルダの選択画面（#199）が共有する。
+ * 「取得元を変える」の処理。設定と、ログアウト後の接続画面（Jellyfin・SMB）と端末のフォルダの選択画面が共有する。
  * 再生とダウンロード・同期の Worker を止めてから、手元のデータと音声ファイルを全部消す。止めずに消すと、
- * 開いているファイルを消したり、Worker が行を作り直したりする（#50）。
- * 最後に、端末のフォルダ（#199）の永続的な権限を全部手放す（決定 6）。保存した URI に頼らず、持っているものを全部手放す。
+ * 開いているファイルを消したり、Worker が行を作り直したりする。
+ * 最後に、端末のフォルダの永続的な権限を全部手放す。保存した URI に頼らず、持っているものを全部手放す。
  */
 class SourceChanger @Inject constructor(
     private val connection: PlayerConnection,
@@ -61,7 +61,7 @@ class SourceChanger @Inject constructor(
 
 /**
  * 「取得元を変える」を画面から呼ぶための ViewModel。ログアウト後の接続画面（Jellyfin・SMB）と端末のフォルダの選択画面が
- * [dev.tseki.kikidame.ui.connect.SourceConnectScaffold] を通して共有する（#237）。処理は [viewModelScope] で走らせ、画面が離れても止めない。
+ * [dev.tseki.kikidame.ui.connect.SourceConnectScaffold] を通して共有する。処理は [viewModelScope] で走らせ、画面が離れても止めない。
  */
 @HiltViewModel
 class ChangeSourceViewModel @Inject constructor(
@@ -92,7 +92,7 @@ fun ChangeSourceButton(onConfirm: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 /**
- * 「取得元を変える」の確認ダイアログ。設定と [ChangeSourceButton] が共有する（#237）。開いているかは呼び出し側が持つ。
+ * 「取得元を変える」の確認ダイアログ。設定と [ChangeSourceButton] が共有する。開いているかは呼び出し側が持つ。
  * [onConfirm] は確認ボタン、[onDismiss] は取り消しとダイアログの外を押したとき。どちらもダイアログを閉じるのは呼び出し側。
  */
 @Composable

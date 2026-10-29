@@ -274,7 +274,7 @@
         <item quantity="other">聴いている番組 %1$d 件は残しました</item>
     </plurals>
 
-    <!-- storage（手元のファイルの内訳、#335） -->
+    <!-- storage（手元のファイルの内訳） -->
     <string name="storage_tab_programs">番組ごと</string>
     <string name="storage_tab_episodes">すべての回</string>
     <string name="storage_filter_pinned">固定</string>
@@ -335,7 +335,7 @@
 
     <!-- sync: 同期中の表示（トップバーの下） -->
     <string name="sync_in_background">バックグラウンドで同期中…</string>
-    <!-- #209: 共有フォルダの全走査でタグを読み終えた数 / タグを読む回の数 -->
+    <!-- 共有フォルダの全走査でタグを読み終えた数 / タグを読む回の数 -->
     <string name="sync_reading_tags">タグを読み込み中 %1$,d / %2$,d</string>
 
     <!-- sync: 結果（スナックバー） -->

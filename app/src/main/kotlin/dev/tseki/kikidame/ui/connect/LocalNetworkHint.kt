@@ -6,7 +6,7 @@ import dev.tseki.kikidame.text.UiText
 
 /**
  * Android 17 のローカルネットワークの権限が要るのに無いか（[dev.tseki.kikidame.LocalNetworkPermission.isRequiredAndMissing]）。
- * 接続画面の ViewModel に `Context` の代わりに注入する（#237。実装は [dev.tseki.kikidame.di.AppModule]）。テストはラムダで渡す。
+ * 接続画面の ViewModel に `Context` の代わりに注入する（実装は [dev.tseki.kikidame.di.AppModule]）。テストはラムダで渡す。
  */
 fun interface LocalNetworkPermissionCheck {
     fun isRequiredAndMissing(): Boolean

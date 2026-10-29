@@ -13,7 +13,7 @@ import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-/** 埋め込みチャプターの取り出しと、今のチャプターの決め方（#348）。 */
+/** 埋め込みチャプターの取り出しと、今のチャプターの決め方。 */
 @UnstableApi
 class EpisodeChaptersTest {
     private fun chapter(startMs: Long, title: String, hidden: Boolean = false): Chapter =

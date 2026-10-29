@@ -6,7 +6,7 @@ import dev.tseki.kikidame.text.UiText
 import org.junit.Test
 import kotlin.test.assertEquals
 
-/** 端末のフォルダの、画面に出す場所（PR #214 のマージ前の検証で足した）。 */
+/** 端末のフォルダの、画面に出す場所。 */
 class DeviceFolderDisplayPathTest {
     private val separator = UiText.Plain(" / ")
 

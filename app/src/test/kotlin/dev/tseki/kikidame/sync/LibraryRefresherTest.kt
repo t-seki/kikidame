@@ -48,11 +48,11 @@ class LibraryRefresherTest {
         var gate: CompletableDeferred<Unit>? = null
         var calls = 0
         var lastExcluded: Set<EpisodeId> = emptySet()
-        /** 全走査の途中で流す進み具合（#209）。[gate] の前に流す。 */
+        /** 全走査の途中で流す進み具合。[gate] の前に流す。 */
         var progress: List<ScanProgress> = emptyList()
-        /** 全走査の途中で番組ごとに予約した数（#209）。[gate] の前に流す。 */
+        /** 全走査の途中で番組ごとに予約した数。[gate] の前に流す。 */
         var enqueuedOnTheWay: List<Int> = emptyList()
-        /** 渡された「再生中の回」を読む関数（番組ごとに読み直すことを試す。#209）。 */
+        /** 渡された「再生中の回」を読む関数（番組ごとに読み直すことを試す）。 */
         var excludedReader: (() -> Set<EpisodeId>)? = null
         /** [gate] を取り消しに気づかずに待つ（ブロッキングの I/O の代わり）。その後に [error] を投げる。 */
         var ignoresCancellation = false
@@ -114,7 +114,7 @@ class LibraryRefresherTest {
     private fun nowPlaying(episodeId: Long, ended: Boolean = false) =
         NowPlayingState(EpisodeId(episodeId), "title", "program", isPlaying = !ended, isEnded = ended)
 
-    /** 手動で変化が無ければ「最新の状態です」。取得した件数は出さない（#142）。 */
+    /** 手動で変化が無ければ「最新の状態です」。取得した件数は出さない。 */
     @Test
     fun manualRefreshWithoutChangesSaysUpToDate() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { result = RefreshResult(3, 40, 1, 6, now) }
@@ -149,7 +149,7 @@ class LibraryRefresherTest {
         assertEquals(setOf(EpisodeId(42)), repo.lastExcluded)
     }
 
-    /** 聴き終えて止まっている回は除外しない（#27）。「再生済みなら削除」で次の同期に消える。 */
+    /** 聴き終えて止まっている回は除外しない。「再生済みなら削除」で次の同期に消える。 */
     @Test
     fun endedNowPlayingIsNotExcluded() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now) }
@@ -186,7 +186,7 @@ class LibraryRefresherTest {
         assertEquals(1, refresher.refresh()?.programs)
     }
 
-    /** 端末のフォルダには「Wi-Fi のみ」をかけない（端末の中から端末の中へのコピー。#199 の決定 4）。 */
+    /** 端末のフォルダには「Wi-Fi のみ」をかけない（端末の中から端末の中へのコピー）。 */
     @Test
     fun meteredNetworkIsFineForADeviceFolderEvenWithWifiOnly() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now) }
@@ -216,7 +216,7 @@ class LibraryRefresherTest {
         }
     }
 
-    /** 裏の同期でも手元に変化があれば、手動と同じ文言を出す（#142）。 */
+    /** 裏の同期でも手元に変化があれば、手動と同じ文言を出す。 */
     @Test
     fun silentRefreshWithChangesReportsThem() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 9, 0, 0, now, enqueued = 2, newEpisodes = 3) }
@@ -259,7 +259,7 @@ class LibraryRefresherTest {
         assertEquals(0, repo.calls)
     }
 
-    /** 各回一覧の引っ張って更新（orFullSync）も 1 番組の同期。削除・予約の文言が出て、全走査は走らない（#279）。 */
+    /** 各回一覧の引っ張って更新（orFullSync）も 1 番組の同期。削除・予約の文言が出て、全走査は走らない。 */
     @Test
     fun syncProgramOrFullSyncUsesTheProgramPath() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { syncProgramResult = RefreshResult(1, 7, 0, 0, now, deleted = 1) }
@@ -326,7 +326,7 @@ class LibraryRefresherTest {
         assertTrue(session.signedOut)
     }
 
-    /** 端末のフォルダのアクセスが切れたら、ログアウトして「フォルダを選び直して」と出す（#199 の決定 5）。 */
+    /** 端末のフォルダのアクセスが切れたら、ログアウトして「フォルダを選び直して」と出す。 */
     @Test
     fun lostDeviceFolderSignsOutAndAsksToPickAgain() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { error = SourceException.Unauthorized() }
@@ -388,7 +388,7 @@ class LibraryRefresherTest {
         assertFalse(refresher.isSyncingInBackground.value)
     }
 
-    /** 手動だけの実行では裏の同期の表示を出さない（#138）。 */
+    /** 手動だけの実行では裏の同期の表示を出さない。 */
     @Test
     fun manualRefreshDoesNotShowTheBackgroundBar() = runTest(StandardTestDispatcher()) {
         val gate = CompletableDeferred<Unit>()
@@ -432,8 +432,8 @@ class LibraryRefresherTest {
     fun syncProgramJoinsASilentRefresh() = joinsASilentRefresh { syncProgram(ProgramId(1)) }
 
     /**
-     * silent な全走査の最中に [manual] を呼ぶと、裏の同期の表示が消えてクルクルに切り替わり（#138）、
-     * 走っている全走査の結果が 1 回だけ出て返る。変化が無くても手動なので「最新の状態です」が出る（#142）。
+     * silent な全走査の最中に [manual] を呼ぶと、裏の同期の表示が消えてクルクルに切り替わり、
+     * 走っている全走査の結果が 1 回だけ出て返る。変化が無くても手動なので「最新の状態です」が出る。
      */
     private fun joinsASilentRefresh(manual: suspend LibraryRefresher.() -> RefreshResult?) = runTest(StandardTestDispatcher()) {
         val gate = CompletableDeferred<Unit>()
@@ -468,7 +468,7 @@ class LibraryRefresherTest {
         assertEquals(0, repo.syncProgramCalls)
     }
 
-    /** silent なうちに変化を出した後（Worker を起こしている間）に合流しても、その文言は二度は出ない（#142）。 */
+    /** silent なうちに変化を出した後（Worker を起こしている間）に合流しても、その文言は二度は出ない。 */
     @Test
     fun joiningAfterASilentReportDoesNotRepeatIt() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { result = RefreshResult(3, 40, 0, 0, now, enqueued = 2) }
@@ -548,7 +548,7 @@ class LibraryRefresherTest {
     }
 
     /**
-     * 「取得元を変える」とログアウトの前に、走っている同期を取り消して終わるのを待つ（#198）。
+     * 「取得元を変える」とログアウトの前に、走っている同期を取り消して終わるのを待つ。
      * 古い取得元の実行が残って、新しい取得元の同期が「同時に 1 つ」で捨てられない。
      */
     @Test
@@ -572,7 +572,7 @@ class LibraryRefresherTest {
         assertEquals(3, refresher.refresh()?.programs, "a refresh right after the change is not dropped")
     }
 
-    /** タグを読んでいる間は件数が流れ、終われば消える（#209 の決定 6）。silent な同期でも出す。 */
+    /** タグを読んでいる間は件数が流れ、終われば消える。silent な同期でも出す。 */
     @Test
     fun tagProgressFlowsWhileScanningAndClearsAfterwards() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply {
@@ -627,7 +627,7 @@ class LibraryRefresherTest {
         }
     }
 
-    /** 全走査が途中で失敗しても、番組ごとに予約していれば Worker を起こす（#209）。 */
+    /** 全走査が途中で失敗しても、番組ごとに予約していれば Worker を起こす。 */
     @Test
     fun aFailedScanStillKicksTheWorkerForDownloadsEnqueuedOnTheWay() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply {
@@ -696,7 +696,7 @@ class LibraryRefresherTest {
         assertEquals(0, kicker.kicks)
     }
 
-    /** 再生中の回は、走査の開始時の値でなく、読むたびに今の値を返す（長い走査の途中で再生を始めた回を消さない。#209）。 */
+    /** 再生中の回は、走査の開始時の値でなく、読むたびに今の値を返す（長い走査の途中で再生を始めた回を消さない）。 */
     @Test
     fun theExcludedEpisodeIsReadAgainDuringTheScan() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply {
@@ -740,7 +740,7 @@ class LibraryRefresherTest {
         refresher(FakeRefreshRepository()).cancelAndAwait()
     }
 
-    /** シートを閉じたときの同期は、走っている同期が無ければすぐ走り、引っ張って更新と同じ文言を出す（#311 の決定 5）。 */
+    /** シートを閉じたときの同期は、走っている同期が無ければすぐ走り、引っ張って更新と同じ文言を出す。 */
     @Test
     fun syncAfterRunningRunsAtOnceWhenIdle() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { syncProgramResult = RefreshResult(1, 6, 0, 0, now) }
@@ -756,7 +756,7 @@ class LibraryRefresherTest {
         assertFalse(refresher.isRefreshing.value)
     }
 
-    /** 走らせる直前の判定が false なら走らせない（設定が開いたときと同じなら同期しない。#311 の決定 1）。 */
+    /** 走らせる直前の判定が false なら走らせない（設定が開いたときと同じなら同期しない）。 */
     @Test
     fun syncAfterRunningSkipsWhenShouldSyncSaysNo() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { syncProgramResult = RefreshResult(1, 6, 0, 0, now) }
@@ -786,7 +786,7 @@ class LibraryRefresherTest {
         assertFalse(refresher.isRefreshing.value)
     }
 
-    /** 手動の同期の最中に閉じても捨てられず、それが終わった後にその番組を同期する（#311 の決定 3）。 */
+    /** 手動の同期の最中に閉じても捨てられず、それが終わった後にその番組を同期する。 */
     @Test
     fun syncAfterRunningWaitsForAManualRefresh() = runTest(StandardTestDispatcher()) {
         val gate = CompletableDeferred<Unit>()
@@ -818,7 +818,7 @@ class LibraryRefresherTest {
 
     /**
      * 裏の同期の最中に閉じても合流せず（裏の同期の表示はそのまま）、それが終わった後にその番組を同期する。
-     * 走らせる直前の判定は、待った後に呼ばれる（#311 の決定 3）。
+     * 走らせる直前の判定は、待った後に呼ばれる。
      */
     @Test
     fun syncAfterRunningDoesNotJoinASilentRefresh() = runTest(StandardTestDispatcher()) {
@@ -853,7 +853,7 @@ class LibraryRefresherTest {
         assertFalse(refresher.isSyncingInBackground.value)
     }
 
-    /** 待っている間に取り消されたら（取得元を変える・ログアウトの前）、閉じたときの同期は走らせない（#311）。 */
+    /** 待っている間に取り消されたら（取得元を変える・ログアウトの前）、閉じたときの同期は走らせない。 */
     @Test
     fun syncAfterRunningIsDroppedWhenTheRunningSyncIsCancelled() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply {
@@ -878,7 +878,7 @@ class LibraryRefresherTest {
         assertEquals(3, refresher.refresh()?.programs, "a refresh after the change still runs")
     }
 
-    /** 閉じたときの同期の最中に来た引っ張って更新は、今までどおり何もしない（合流は silent な実行にだけ。#134）。 */
+    /** 閉じたときの同期の最中に来た引っ張って更新は何もしない（合流は silent な実行にだけ）。 */
     @Test
     fun aManualCallDuringASyncAfterRunningIsIgnored() = runTest(StandardTestDispatcher()) {
         val downloads = FakeDownloadRepository(gate = CompletableDeferred())
@@ -892,7 +892,7 @@ class LibraryRefresherTest {
         refresher.cancelAndAwait()
     }
 
-    /** 引っ張って更新（番組一覧・各回一覧）は applicationScope で走る（呼び出し側のコルーチンに縛られない。#311 の決定 9）。 */
+    /** 引っ張って更新（番組一覧・各回一覧）は applicationScope で走る（呼び出し側のコルーチンに縛られない）。 */
     @Test
     fun launchedRefreshesRunInTheApplicationScope() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply {
@@ -910,9 +910,9 @@ class LibraryRefresherTest {
         assertEquals(1, repo.syncProgramCalls)
     }
 
-    // ===== 全走査の最後の試みの記録と、同期の失敗の通知を消すこと（#346） =====
+    // ===== 全走査の最後の試みの記録と、同期の失敗の通知を消すこと =====
 
-    /** 手動の全走査の成功を時刻と一緒に記録し、同期の失敗の通知を消す（決定 3・5）。 */
+    /** 手動の全走査の成功を時刻と一緒に記録し、同期の失敗の通知を消す。 */
     @Test
     fun aSuccessfulFullSyncIsRecordedAndClearsTheNotification() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now) }
@@ -926,7 +926,7 @@ class LibraryRefresherTest {
         assertNull(notifier.showing, "a success clears the notification")
     }
 
-    /** 裏の同期でも同じように記録する。成功なら通知を消す（手動と裏を区別しない。決定 3・5）。 */
+    /** 裏の同期でも同じように記録する。成功なら通知を消す（手動と裏を区別しない）。 */
     @Test
     fun aBackgroundFullSyncIsRecordedToo() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now) }
@@ -942,7 +942,7 @@ class LibraryRefresherTest {
         assertNull(notifier.showing)
     }
 
-    /** 失敗の 3 種類を、スナックバーと同じ文言を出せる値と一緒に記録する（決定 2・3）。裏の同期なら失敗を返す。 */
+    /** 失敗の 3 種類を、スナックバーと同じ文言を出せる値と一緒に記録する。裏の同期なら失敗を返す。 */
     @Test
     fun failuresAreRecordedWithTheirReasons() = runTest(StandardTestDispatcher()) {
         val cases = listOf(
@@ -969,7 +969,7 @@ class LibraryRefresherTest {
         }
     }
 
-    /** 「Wi-Fi ではない」は見送りとして記録する。取得元には問い合わせない（lastAttemptedAt は今どおり更新されない）。失敗としては返さない（決定 2・3）。 */
+    /** 「Wi-Fi ではない」は見送りとして記録する。取得元には問い合わせない（lastAttemptedAt は今どおり更新されない）。失敗としては返さない。 */
     @Test
     fun skippingOnAMeteredNetworkIsRecordedAsSkipped() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { result = RefreshResult(1, 1, 0, 0, now) }
@@ -983,7 +983,7 @@ class LibraryRefresherTest {
         assertNull((session.state.value as SessionState.Ready).lastAttemptedAt)
     }
 
-    /** 1 番組の同期は、成功も失敗も「Wi-Fi ではない」も記録しない（決定 3）。 */
+    /** 1 番組の同期は、成功も失敗も「Wi-Fi ではない」も記録しない。 */
     @Test
     fun syncingOneProgramIsNotRecorded() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { syncProgramResult = RefreshResult(1, 6, 0, 0, now) }
@@ -1007,7 +1007,7 @@ class LibraryRefresherTest {
         assertEquals(0, notifier.cancels, "a program sync does not clear the notification")
     }
 
-    /** 各回一覧の引っ張って更新が全走査に切り替えたら、それは全走査なので記録する（#279）。 */
+    /** 各回一覧の引っ張って更新が全走査に切り替えたら、それは全走査なので記録する。 */
     @Test
     fun aProgramSyncThatFallsBackToAFullSyncIsRecorded() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { syncProgramResult = null; result = RefreshResult(2, 9, 0, 0, now) }
@@ -1019,7 +1019,7 @@ class LibraryRefresherTest {
         assertEquals(listOf(SyncAttempt(now, SyncOutcome.Succeeded)), session.syncAttempts)
     }
 
-    /** 401 は失敗として記録せず（ログアウトで記録ごと消える）、同期の失敗の通知を消す（決定 2・6）。 */
+    /** 401 は失敗として記録せず（ログアウトで記録ごと消える）、同期の失敗の通知を消す。 */
     @Test
     fun unauthorizedIsNotRecordedAndClearsTheNotification() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply { error = SourceException.Unauthorized() }
@@ -1034,7 +1034,7 @@ class LibraryRefresherTest {
         assertTrue(session.signedOut)
     }
 
-    /** 取り消し（ログアウト・取得元を変える前）は記録しない。[LibraryRefresher.cancelAndAwait] は同期の失敗の通知を消す（決定 2・6）。 */
+    /** 取り消し（ログアウト・取得元を変える前）は記録しない。[LibraryRefresher.cancelAndAwait] は同期の失敗の通知を消す。 */
     @Test
     fun cancellingIsNotRecordedAndCancelAndAwaitClearsTheNotification() = runTest(StandardTestDispatcher()) {
         val repo = FakeRefreshRepository().apply {
@@ -1050,7 +1050,7 @@ class LibraryRefresherTest {
         runCurrent()
         val cancelling = async { refresher.cancelAndAwait() }
         runCurrent()
-        assertEquals(0, notifier.cancels, "the notification is cleared only after the run has finished (#198)")
+        assertEquals(0, notifier.cancels, "the notification is cleared only after the run has finished")
         repo.gate!!.complete(Unit)
         cancelling.await()
 
@@ -1059,7 +1059,7 @@ class LibraryRefresherTest {
         assertNull(notifier.showing)
     }
 
-    /** 手動が合流した裏の同期は手動として扱い、失敗しても通知のための失敗を返さない（記録はする。決定 3・5）。 */
+    /** 手動が合流した裏の同期は手動として扱い、失敗しても通知のための失敗を返さない（記録はする）。 */
     @Test
     fun aBackgroundSyncJoinedByAManualOneDoesNotReturnTheFailure() = runTest(StandardTestDispatcher()) {
         val gate = CompletableDeferred<Unit>()
@@ -1078,7 +1078,7 @@ class LibraryRefresherTest {
         assertEquals(listOf(SyncAttempt(now, SyncOutcome.Unreachable)), session.syncAttempts)
     }
 
-    /** ほかの実行が走っていて裏の同期が何もしなかったときは、その実行の失敗を返さない（決定 5）。 */
+    /** ほかの実行が走っていて裏の同期が何もしなかったときは、その実行の失敗を返さない。 */
     @Test
     fun aBackgroundCallIgnoredDuringAManualRefreshReturnsNoFailure() = runTest(StandardTestDispatcher()) {
         val gate = CompletableDeferred<Unit>()

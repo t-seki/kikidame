@@ -8,7 +8,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
-/** 位置を指定して読む関数を [java.io.InputStream] にする部品（#233）。 */
+/** 位置を指定して読む関数を [java.io.InputStream] にする部品。 */
 class PositionalInputStreamTest {
     private val bytes = ByteArray(10) { it.toByte() }
     private val positions = mutableListOf<Long>()

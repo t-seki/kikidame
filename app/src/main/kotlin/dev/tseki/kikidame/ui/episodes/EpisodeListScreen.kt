@@ -154,9 +154,9 @@ internal class EpisodeListActions(
     val removeProgram: () -> Unit,
     val cancelDisableSync: () -> Unit,
     val confirmDisableSync: () -> Unit,
-    /** 同期のシートを開いた（閉じたときに比べる設定を覚える。#311）。 */
+    /** 同期のシートを開いた（閉じたときに比べる設定を覚える）。 */
     val syncSheetOpened: () -> Unit,
-    /** 同期のシートを閉じた（経路は問わない。設定が変わっていればこの番組を同期する。#311）。 */
+    /** 同期のシートを閉じた（経路は問わない。設定が変わっていればこの番組を同期する）。 */
     val syncSheetClosed: () -> Unit,
 )
 
@@ -182,7 +182,7 @@ internal fun EpisodeListContent(
 ) {
     var sheetFor by remember { mutableStateOf<EpisodeId?>(null) }
     var syncSheet by remember { mutableStateOf(SyncSheetState.Hidden) }
-    // 開いたとき・閉じたときを ViewModel に伝える（#311）。閉じたときは Open から外れたとき（onDismiss でも「番組を手元から消す」の
+    // 開いたとき・閉じたときを ViewModel に伝える。閉じたときは Open から外れたとき（onDismiss でも「番組を手元から消す」の
     // 確認への遷移でも）と、開いたまま画面が作り直されたとき（回転など。syncSheet は Hidden に戻る）のどれでも 1 回だけ呼ぶ
     if (syncSheet == SyncSheetState.Open) {
         DisposableEffect(Unit) {
@@ -197,7 +197,7 @@ internal fun EpisodeListContent(
                 TopAppBar(
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            // 番組の画像（#289）。戻るボタンの右、タイトルの左。無い番組では場所を空けず、今の見た目のまま
+                            // 番組の画像。戻るボタンの右、タイトルの左。無い番組では場所を空けず、今の見た目のまま
                             program?.image?.let { ProgramImageView(it, Modifier.padding(end = 12.dp).size(40.dp)) }
                             Column {
                                 Text(program?.name ?: "")
@@ -283,7 +283,7 @@ internal fun EpisodeListContent(
             onPin = { actions.pin(target.episode.id) },
             onUnpin = { actions.unpin(target.episode.id) },
             onDelete = { actions.deleteLocal(target.episode.id) },
-            // 詳細（#43）は画面へ。シートは閉じてから遷移する
+            // 詳細は画面へ。シートは閉じてから遷移する
             onDetails = { sheetFor = null; onEpisodeDetails(target.episode.programId, target.episode.id) },
         )
     }
@@ -325,9 +325,9 @@ private fun EpisodeTrailingAction(
 }
 
 /**
- * 行の補足: `公開日 · 出演者 · 尺 · 状態`。出演者（#70）は無い回では省き、状態はダウンロードの待機／進行／失敗のときだけ付く。
+ * 行の補足: `公開日 · 出演者 · 尺 · 状態`。出演者は無い回では省き、状態はダウンロードの待機／進行／失敗のときだけ付く。
  * 録音側が各回のタイトルを `YYYY-MM-DD` と付けるので、タイトルが公開日と同じ文字列なら同じ日付が 2 段に並んで
- * 冗長になる。そのときだけ公開日を省いて `出演者 · 尺 · 状態` にする（#66）。判定は完全一致で、表記ゆれ（`2026/08/02`）や
+ * 冗長になる。そのときだけ公開日を省いて `出演者 · 尺 · 状態` にする。判定は完全一致で、表記ゆれ（`2026/08/02`）や
  * `(1)` 付きは一致とみなさない（そういう回では両方の値に意味がある）。
  */
 internal fun EpisodeWithState.toSupportingText(waitingForNetwork: Boolean): UiText {
