@@ -1,5 +1,4 @@
 ---
-status: accepted
 date: 2026-09-18
 ---
 一覧の聴いている回のマークとミニプレイヤーは「聴いている回」を知る必要があるが、これらの画面では Media3 の正規の経路である `MediaController` の購読は採らない。`MediaController` を作ると `PlaybackService` に bind してサービスが起動するため、番組一覧を開くだけで再生サービスが立ち上がり、「何も載っていなければ出さない」判定が起動と競合する。代わりに、`PlaybackService` が `Player.Listener` で書き込むプロセス内のシングルトン `NowPlaying`（同期が削除の対象から外す回を知るのにも使う）を UI が読む。再生／一時停止などの**操作**だけは `PlayerConnection` の `MediaController` を使う（ミニプレイヤーが見えている時点でサービスは生きているので、新たな起動にはならない）。

@@ -1,5 +1,4 @@
 ---
-status: accepted
 date: 2026-09-20
 ---
 UI の文言は `res/values*/strings.xml` に置き、**文字列に解決するのは Compose だけ**にする。Composable の外で文言を作る場所（`LibraryRefresher` のスナックバー、`NowPlaying.messages`、ViewModel の `uiState.error`、`EpisodeDetails` の行のラベル）は `String` ではなく `UiText`（`Res(@StringRes id, args)` / `Plural(@PluralsRes id, quantity, args)` / `Plain(text)` / `Joined(parts, separator)` の sealed interface）を返し、表示する Composable が `resolve()` する。`resolve(Context)` は `ui/` の Composable から呼ぶ Composable でないラムダ（`LaunchedEffect` でスナックバーに渡すとき）のためのもので、`ui/` の外では使わない。`Context.getString` は `ui/` の外に書かない。
