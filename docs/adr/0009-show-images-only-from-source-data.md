@@ -36,6 +36,6 @@ date: 2026-10-12
 
 ## 結果
 
-- 取得元の境界（`SourceGateway`）に、番組の画像の中身を取る口（`fetchProgramImage`）がある。版は `SourceProgram.image` に載せ、取り直すかは取り込みの側が決める。口の形と置き場は `docs/claude-code-handoff.md` の「番組の画像」節
+- 取得元の境界（`SourceGateway`）に、番組の画像の中身を取る口（`fetchProgramImage`）がある。版は `SourceProgram.image` に載せ、取り直すかは取り込みの側が決める。口の形と置き場は `docs/architecture.md` の「番組の画像」節
 - 回の画像は、再生に入った回の分だけ手元のファイルから読み、長辺 512px 以下に縮めて Media3 の `artworkData` で通知・ロック画面・Auto・再生画面に渡す（外のプロセスへ公開する ContentProvider は足さない）
 - 依存に Coil（`coil-compose`）が加わり、ライセンスの一覧（`aboutlibraries.json`）に載っている
