@@ -22,7 +22,7 @@ date: 2026-10-10
 - **SMB をアプリに組み込む（4）**: SMB を SAF に出す現役のアプリは、CIFS Documents Provider（最終リリース 2025-05、SMB3 の暗号化に未対応）と RSAF（rclone 経由）くらいしか見つからなかった。smbj（`com.hierynomus:smbj`）は Apache-2.0、0.15.0（2026-08-21）、SMB2/3 対応、BouncyCastle に依存し、Material Files・CIFS Documents Provider・SambaLite が Android で使っている
 - **NFS を対象外にする（4）**: NFS を SAF に出すアプリは見つからず、Android に組み込める現役の NFS クライアントのライブラリも見つからなかった（nfs4j はサーバの実装、EMC nfs-client-java は 2022 年で止まっている）
 - **端末のフォルダを SAF で選ぶ（4）**: SAF の永続権限は再起動の後も残り、1 アプリあたり 512 件（上限を超えると古いものから外れる）。対象の移動・削除、アプリのデータの消去で失効する（AOSP `UriGrantsManagerService.java` の `MAX_PERSISTED_URI_GRANTS`、Android Developers の documents-files のページ）
-- **ローカルネットワークへの接続**: SMB の接続が `ACCESS_LOCAL_NETWORK`（決定 7。仕組みは `docs/architecture/fetching.md`）だけで足りるかは未確認
+- **ローカルネットワークへの接続**: SMB の接続が `ACCESS_LOCAL_NETWORK`（「端末のフォルダ」節の 7。仕組みは `docs/architecture/fetching.md`）だけで足りるかは未確認
 
 ## 退けた案
 
