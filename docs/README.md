@@ -10,7 +10,6 @@
    - [adr/](./adr/) — 設計の決定とその理由（1 決定 1 ファイル）。一覧は [adr/README.md](./adr/README.md)
    - [development.md](./development.md) — ビルド・テスト・リリースの手順と、docs と ADR の決まり
    - [device-testing.md](./device-testing.md) — 実機（ワイヤレスデバッグ、Android Auto、共有フォルダ）での確かめ方
-   - [maintainer.md](./maintainer.md) — メンテナ（作者）の手元の環境（署名鍵とテスト用の音声の置き場、複数の PC で作業するときの注意）。コントリビューターは読まなくてよい
    - [ui.md](./ui.md) — UI の方針（色・文字・画面ごとの役割）
    - [sources.md](./sources.md) — 取得元（Jellyfin・NAS の共有フォルダ・端末のフォルダ）ごとの使える条件と制約、どこまで確かめたかの記録
 

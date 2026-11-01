@@ -136,7 +136,7 @@ release APK をビルドし、`kikidame-<version>.apk` と R8 の `mapping-<vers
 ### 署名鍵
 
 - upload 鍵は repo の外に置く（alias `kikidame`）。**失うと以後の更新を配れない**ので、
-  keystore ファイルとパスフレーズをパスワードマネージャとオフラインの 2 箇所に控える。作者の手元の置き場は [maintainer.md](./maintainer.md)
+  keystore ファイルとパスフレーズをパスワードマネージャとオフラインの 2 箇所に控える
 - ビルドは環境変数から読む。無ければ署名無しでビルドする（CI の `test`、CI の `release-build`（署名なしで `assembleRelease`）、鍵を持たない人の `assembleRelease` を通すため）
 
   ```bash

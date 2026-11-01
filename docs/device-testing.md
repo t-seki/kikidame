@@ -184,7 +184,7 @@ Auto はブラウズツリーを開き直すたびに `onGetChildren` を呼ぶ�
 - 初回はスマホに「この車で使う」許可画面（FRX）が出る。5 秒以内に進めないと `PROJECTION_NOT_STARTED` で切れる（logcat に `CarInfo authorization: UNKNOWN` → `Triggering FRX`）ので、スマホの画面を見ながら繋ぐ
 - DHU を途中で落とすとスマホのヘッドユニットサーバーが「Already connected」で固まる（`DeveloperHeadUnitNetworkService` の FATAL）。DHU 側は「Waiting for phone」のまま。Android Auto の ⋮ から「ヘッドユニット サーバーを停止」→「起動」で直る
 - portaudio の `Device unavailable` は無視してよい（DHU 側で音は出ないが再生は進む）
-- `installDebug` は applicationId が別なので release ビルドに触らない。release ビルドそのものをデータを残したまま手元のビルドで更新するなら、release 署名で上書きする（署名鍵を持つメンテナ向け。鍵の置き場は [maintainer.md](./maintainer.md)）:
+- `installDebug` は applicationId が別なので release ビルドに触らない。release ビルドそのものをデータを残したまま手元のビルドで更新するなら、release 署名で上書きする（署名鍵を持つ人向け）:
 
   ```bash
   source <env ファイル>          # export KIKIDAME_KEYSTORE=… 等を書いた chmod 600 のファイル（git 管理外）
