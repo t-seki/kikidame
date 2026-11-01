@@ -38,8 +38,6 @@ LAN 上の端末には TCP で届くので、USB が見えない環境でもつ�
 
 `adb mdns services` は、adb サーバを起動した直後には何も出さず、少し待つと出る場合がある。空なら少し待って打ち直す。
 
-マシンごとに初回は `adb pair` が要る（ペア設定は端末とマシンの組ごと）。`adb mdns services` で端末が見つからない場合がある。そのときは、端末のワイヤレスデバッグ画面に出ている IP:ポートを見て、`adb connect` する。
-
 つないだ後は、同じ端末が「IP:ポート」と「mDNS の名前（`adb-…._adb-tls-connect._tcp`）」の 2 つで `adb devices` に出ることがある。`-s` も `ANDROID_SERIAL` も無いと `more than one device` で失敗するので、`ANDROID_SERIAL` に IP:ポートを入れて export する（手順 4 と同じ）。
 
 ```bash
@@ -62,10 +60,6 @@ $ADB shell getprop ro.product.model
   ```
 - 機内モードのテストで TCP のワイヤレス接続が切れることがある。`$ADB devices` の mDNS 側の名前
   （`adb-…_adb-tls-connect._tcp`）を `ANDROID_SERIAL` に使えばそのまま届く
-
-### 別の PC でビルドした debug ビルドが入っているとき
-
-debug の APK は PC ごとの `~/.android/debug.keystore` で署名される。別の PC でビルドした debug ビルドが端末に入っていると、この PC のビルドの上書きインストールが `INSTALL_FAILED_UPDATE_INCOMPATIBLE` で失敗する。`uninstall` すれば入れ直せるが、debug ビルドのデータは消える。
 
 ## ダウンロード
 
@@ -184,10 +178,10 @@ Auto はブラウズツリーを開き直すたびに `onGetChildren` を呼ぶ�
 - 初回はスマホに「この車で使う」許可画面（FRX）が出る。5 秒以内に進めないと `PROJECTION_NOT_STARTED` で切れる（logcat に `CarInfo authorization: UNKNOWN` → `Triggering FRX`）ので、スマホの画面を見ながら繋ぐ
 - DHU を途中で落とすとスマホのヘッドユニットサーバーが「Already connected」で固まる（`DeveloperHeadUnitNetworkService` の FATAL）。DHU 側は「Waiting for phone」のまま。Android Auto の ⋮ から「ヘッドユニット サーバーを停止」→「起動」で直る
 - portaudio の `Device unavailable` は無視してよい（DHU 側で音は出ないが再生は進む）
-- `installDebug` は applicationId が別なので release ビルドに触らない。release ビルドそのものをデータを残したまま手元のビルドで更新するなら、release 署名で上書きする:
+- `installDebug` は applicationId が別なので release ビルドに触らない。release ビルドそのものをデータを残したまま手元のビルドで更新するなら、release 署名で上書きする（署名鍵を持つメンテナ向け。鍵の置き場は [maintainer.md](./maintainer.md)）:
 
   ```bash
-  source ~/.android-keys/kikidame.env          # export KIKIDAME_KEYSTORE=… 等を書いた chmod 600 のファイル（git 管理外）
+  source <env ファイル>          # export KIKIDAME_KEYSTORE=… 等を書いた chmod 600 のファイル（git 管理外）
   ./gradlew :app:assembleRelease
   $ADB pull "$($ADB shell pm path dev.tseki.kikidame | cut -d: -f2)" installed.apk
   APKSIGNER=~/Android/Sdk/build-tools/36.0.0/apksigner   # バージョンは ls ~/Android/Sdk/build-tools/ で確かめる
@@ -214,9 +208,9 @@ Auto はブラウズツリーを開き直すたびに `onGetChildren` を呼ぶ�
 ### 準備
 
 - debug ビルドを実機に入れておく（[接続](#接続)）
-- 端末の内部ストレージに、試験用の 3 段のフォルダを `adb push` で置く。`SRC` は手元の m4a と mp3（タグの付いたものと無いもの）を置いたフォルダに読み替える。`@eaDir` のような無視する名前のフォルダと、音声でないファイルも混ぜる:
+- 端末の内部ストレージに、試験用の 3 段のフォルダを `adb push` で置く。`SRC` には、m4a と mp3（タグの付いたものと無いもの）を置いたフォルダを入れる（`tagged.m4a` と `untagged.mp3` の名前で置く）。`@eaDir` のような無視する名前のフォルダと、音声でないファイルも混ぜる:
   ```bash
-  SRC=~/kikidame-test-audio
+  SRC=<音声のフォルダ>
   $ADB shell mkdir -p /sdcard/KikidameTest/Radio/TBS/Junk /sdcard/KikidameTest/Radio/TBS/Empty /sdcard/KikidameTest/Radio/@eaDir
   $ADB push "$SRC/tagged.m4a" /sdcard/KikidameTest/Radio/TBS/Junk/2026-10-01.m4a
   $ADB push "$SRC/untagged.mp3" /sdcard/KikidameTest/Radio/TBS/Junk/2026-10-08.mp3

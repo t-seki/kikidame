@@ -135,18 +135,18 @@ release APK をビルドし、`kikidame-<version>.apk` と R8 の `mapping-<vers
 
 ### 署名鍵
 
-- upload 鍵は repo の外（例: `~/.android-keys/kikidame-upload.jks`、alias `kikidame`）。**失うと以後の更新を配れない**ので、
-  keystore ファイルとパスフレーズをパスワードマネージャとオフラインの 2 箇所に控える
+- upload 鍵は repo の外に置く（alias `kikidame`）。**失うと以後の更新を配れない**ので、
+  keystore ファイルとパスフレーズをパスワードマネージャとオフラインの 2 箇所に控える。作者の手元の置き場は [maintainer.md](./maintainer.md)
 - ビルドは環境変数から読む。無ければ署名無しでビルドする（CI の `test`、CI の `release-build`（署名なしで `assembleRelease`）、鍵を持たない人の `assembleRelease` を通すため）
 
   ```bash
-  export KIKIDAME_KEYSTORE=~/.android-keys/kikidame-upload.jks
+  export KIKIDAME_KEYSTORE=<keystore のパス>
   export KIKIDAME_KEYSTORE_PASSWORD=…   # 鍵のパスワードが別なら KIKIDAME_KEY_PASSWORD も
   export KIKIDAME_KEY_ALIAS=kikidame
   ./gradlew :app:assembleRelease         # app/build/outputs/apk/release/app-release.apk
   ```
 
-- 手元では上の `export` を `~/.android-keys/kikidame.env`（chmod 600、git 管理外）に書いて `source` する。値を表示するコマンド（`cat` / `grep`）は打たない
+- 上の `export` は、repo の外の chmod 600 のファイルに書いて `source` すると毎回打たずに済む。値を表示するコマンド（`cat` / `grep`）は打たない
 - GitHub Actions 用の Secrets: `KEYSTORE_BASE64`（`base64 -w0 kikidame-upload.jks`）、`KEYSTORE_PASSWORD`、`KEY_ALIAS`、`KEY_PASSWORD`
 - 署名を確かめる: `apksigner verify --print-certs app-release.apk`（`build-tools/<バージョン>/apksigner`）。Releases の APK と手元のビルドで証明書の SHA-256 が一致すること
 
