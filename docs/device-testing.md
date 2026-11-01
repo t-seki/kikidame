@@ -30,9 +30,9 @@ LAN 上の端末には TCP で届くので、USB が見えない環境でもつ�
    tail -n 20 /tmp/adb.$(id -u).log
    ```
    `SSLV3_ALERT_CERTIFICATE_UNKNOWN` なら、端末がこの PC の鍵（`~/.android/adbkey`）を知らない。1 からペアリングし直す（adb デーモンの起動時に鍵が新しく作られた場合にも起きる）。端末の開発者向けオプションの「ADB 認証のタイムアウトを無効にする」が OFF だと、7 日使わなかった PC の承認も切れる
-4. インストールは Gradle から。複数に見えるときは `ANDROID_SERIAL` で接続用の名前を指定する:
+4. インストールは Gradle から。同じ端末が複数に見えるときは、先に下の「同じ端末が複数に見えるとき」で端末を指定する:
    ```bash
-   export JAVA_HOME=~/.local/jdk/current ANDROID_SERIAL=<接続用の IP:ポート>
+   export JAVA_HOME=~/.local/jdk/current
    ./gradlew :app:installDebug
    ```
 
@@ -40,7 +40,9 @@ LAN 上の端末には TCP で届くので、USB が見えない環境でもつ�
 
 マシンごとに初回は `adb pair` が要る（ペア設定は端末とマシンの組ごと）。`adb mdns services` で端末が見つからない場合がある。そのときは、端末のワイヤレスデバッグ画面に出ている IP:ポートを見て、`adb connect` する。
 
-つないだ後は、同じ端末が「IP:ポート」と「mDNS の名前（`adb-…._adb-tls-connect._tcp`）」の 2 つで `adb devices` に出ることがある。`-s` も `ANDROID_SERIAL` も無いと `more than one device` で失敗するので、`ANDROID_SERIAL` に IP:ポートを入れて export する（手順 4 と同じ）。
+#### 同じ端末が複数に見えるとき
+
+つないだ後は、同じ端末が「IP:ポート」と「mDNS の名前（`adb-…._adb-tls-connect._tcp`）」の 2 つで `adb devices` に出ることがある。`-s` も `ANDROID_SERIAL` も無いと `more than one device` で失敗するので、`ANDROID_SERIAL` に IP:ポートを入れて export する。`adb` も Gradle の `installDebug` も、この指定に従う。
 
 ```bash
 export ANDROID_SERIAL=<IP:ポート>
@@ -48,11 +50,12 @@ $ADB devices
 $ADB shell getprop ro.product.model
 ```
 
+機内モードのテストで TCP のワイヤレス接続が切れることがある。そのときは、`$ADB devices` の mDNS 側の名前を `ANDROID_SERIAL` に入れる（そのまま届く）。
+
 ### つながらないときの切り分け
 
-- **Android 17 / targetSdk 37 は `ACCESS_LOCAL_NETWORK` が要る**。無いと LAN 内のサーバ宛の TCP が黙って落ち、
-  DNS だけ通る（名前解決は成功し、接続がタイムアウトする）。初回起動の権限ダイアログで許可する。
-  `adb shell` の `nc` は対象外なので疎通確認に使えない。アプリの UID で試す:
+- **LAN 内のサーバに届かない**ときは、`ACCESS_LOCAL_NETWORK` を許可しているかを疑う（症状と理由は [architecture/fetching.md](./architecture/fetching.md) の「取得元の境界とセッション」）。
+  初回起動の権限ダイアログで許可する。疎通確認は、アプリの UID で試す:
   ```bash
   $ADB shell "run-as $PKG sh -c 'timeout 6 nc -z <host> 443; echo rc=\$?'"   # rc=124 なら落ちている
   ```
@@ -60,8 +63,7 @@ $ADB shell getprop ro.product.model
   ```bash
   $ADB logcat -d | grep -E "JellyfinGateway|o.j.s.a.o.OkHttpClient" | tail
   ```
-- 機内モードのテストで TCP のワイヤレス接続が切れることがある。`$ADB devices` の mDNS 側の名前
-  （`adb-…_adb-tls-connect._tcp`）を `ANDROID_SERIAL` に使えばそのまま届く
+- 機内モードのテストで TCP のワイヤレス接続が切れることがある。対処は「同じ端末が複数に見えるとき」
 
 ### 別の PC でビルドした debug ビルドが入っているとき
 

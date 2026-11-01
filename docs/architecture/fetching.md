@@ -16,7 +16,7 @@
   - 木は `DeviceFolderTree`（`FolderTree` の SAF 実装。`DocumentsContract` の窓口 `DeviceDocuments` を `ContentResolverDeviceDocuments` が実装し、テストは `MemoryDeviceDocuments`）で、相対パスから文書 ID への対応は親を一覧して名前で引く
   - 最初の操作で永続権限と根があることを確かめ、無いと分かったら `SourceException.Unauthorized`（`LibraryRefresher`・`DownloadWorker` がログアウトし、フォルダの選び直しへ）。「無いと分かった」とするのは、永続権限の一覧に読み取りが無い、provider が `SecurityException` を投げた、根の問い合わせに provider が「無い」（行の無い結果）と答えたときだけで、それ以外の失敗は SMB と同じく通常の失敗（到達不能）にする。根が無いのを null で返さない（全番組が消失扱いになるため）
   - 画面に出す場所は `DeviceFolder.displayPath` がツリーの文書 ID から作る（`primary:Dir/Sub` の形は `ExternalStorageProvider` の実装の決まりで、公開の契約ではない）。形が崩れていれば保存済みの `name` に戻す
-- Android 17+（targetSdk 37）の `ACCESS_LOCAL_NETWORK` ランタイム権限が要る。無いと LAN 内のサーバ宛の TCP が黙って落ちる（DNS だけ通るので名前解決は成功し、接続がタイムアウトする）。`adb shell` や古い targetSdk のアプリは対象外なので、切り分けでは `run-as <pkg> nc -z <host> <port>` でアプリの UID から試す。要求するのは、取得元が Jellyfin か SMB のとき（ログアウト中で前回の取得元が Jellyfin か SMB のときを含む）の起動時と、取得元の選択で Jellyfin か SMB のカードを押したときだけ（domain の `SessionState.usesLocalNetwork`。端末のフォルダには要求しない）
+- Android 17+（targetSdk 37）の `ACCESS_LOCAL_NETWORK` ランタイム権限が要る。無いと LAN 内のサーバ宛の TCP が黙って落ちる（DNS だけ通るので名前解決は成功し、接続がタイムアウトする）。`adb shell` や古い targetSdk のアプリは対象外なので、疎通の切り分けはアプリの UID で行う（[device-testing.md](../device-testing.md) の「つながらないときの切り分け」）。要求する場面は ADR 0007 の決定 7 で、判定は domain の `SessionState.usesLocalNetwork`
 
 ## Jellyfin サーバの前提
 
