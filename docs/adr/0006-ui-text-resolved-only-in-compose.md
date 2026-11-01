@@ -1,7 +1,7 @@
 ---
 date: 2026-09-20
 ---
-UI の文言は `res/values*/strings.xml` に置き、**文字列に解決するのは Compose だけ**にする。Composable の外で文言を作る場所（同期の結果のスナックバー、聴いている回の通知、画面の状態のエラー、各回の詳細の行のラベル）は `String` ではなく、文言の識別子と引数を持つ型 `UiText` を返し、表示する Composable が解決する。`Context.getString` は UI の外に書かない。型と解決の仕組みは `docs/architecture.md` の「UI の文言（i18n）」節。
+UI の文言は `res/values*/strings.xml` に置き、**文字列に解決するのは Compose だけ**にする。Composable の外で文言を作る場所（同期の結果のスナックバー、聴いている回の通知、画面の状態のエラー、各回の詳細の行のラベル）は `String` ではなく、文言の識別子と引数を持つ型 `UiText` を返し、表示する Composable が解決する。`Context.getString` は UI の外に書かない。型と解決の仕組みは `docs/architecture/i18n.md` の「UI の文言（i18n）」節。
 
 例外は、プロセスの外（システムの UI・車載機）へ `String` を渡すしかない次の 2 か所で、そこでは `getString` する。
 

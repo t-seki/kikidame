@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
 
 /**
  * 「ファイルを削除」の結果の文言。[syncEnabled] はその回の番組が同期対象か。
- * 同期対象なら保持すべき回は次の同期で落とし直される（docs/architecture.md の「同期エンジンの設計」の「手動削除と同期の往復」）ので、そう伝える。
+ * 同期対象なら保持すべき回は次の同期で落とし直される（docs/architecture/sync.md の「同期エンジンの設計」の「手動削除と同期の往復」）ので、そう伝える。
  */
 internal fun LocalDeletionScope.toMessage(syncEnabled: Boolean): UiText = when (this) {
     LocalDeletionScope.FILE_ONLY ->

@@ -193,7 +193,7 @@
 
 ## 文言の足し方
 
-UI の文言は英語と日本語の 2 言語で、OS の「アプリの言語」（Android 13+）で切り替わる。既定は英語（日英以外の端末には英語が出る）。解決の仕組み（`UiText`・例外）は [architecture.md](architecture.md) の「UI の文言（i18n）」、決定は ADR 0006。
+UI の文言は英語と日本語の 2 言語で、OS の「アプリの言語」（Android 13+）で切り替わる。既定は英語（日英以外の端末には英語が出る）。解決の仕組み（`UiText`・例外）は [architecture/i18n.md](architecture/i18n.md) の「UI の文言（i18n）」、決定は ADR 0006。
 
 - 文言は `app/src/main/res/values/strings.xml`（英語、既定）と `values-ja/strings.xml`（日本語）の**両方**に足す。片方だけだと lint の `MissingTranslation` でビルドが落ちる。`values/` には英語だけでは文脈が分からないキー（書式引数の意味、どの画面のどこか、`CONTEXT.md` の用語）に翻訳者向けの短いコメントを付け、書式引数は `%1$s` のように番号付きにし、数+単位（「3 回」「15 分」）は `<plurals>` にする
 - キーは `<area>_<what>` の snake_case。area は `common` / `connect` / `source_pick` / `smb_connect` / `library_pick` / `program_list` / `episode_list` / `episode_details` / `player` / `settings` / `sync` / `playback` / `auto`。英語の用語は `CONTEXT.md` の英語名（Program / Episode / Publisher / Pinned / Starred / Played …）に揃える
