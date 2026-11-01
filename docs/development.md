@@ -67,7 +67,7 @@ Entity を変えたらスキーマの版を上げ、書き出された JSON も�
 
 ## docs と ADR の決まり
 
-ADR（`docs/adr/`）を足したら、`docs/architecture.md` の「参照」の ADR の一覧にも足す。CI の `test` job の先頭で `scripts/check-adr-index.sh` が、`docs/adr/*.md` のファイル名が `docs/architecture.md` に出ているかを確かめ、欠けていれば名前を出して落とす（手元でも repo 直下で流せる）。一覧の文面が正しいかは確かめない。
+ADR（`docs/adr/`）を足したら、`docs/adr/README.md` の ADR の一覧にも足す。CI の `test` job の先頭で `scripts/check-adr-index.sh` が、`docs/adr/*.md` のファイル名（`README.md` を除く）が `docs/adr/README.md` に出ているかを確かめ、欠けていれば名前を出して落とす（手元でも repo 直下で流せる）。一覧の文面が正しいかは確かめない。
 
 同じく `test` job で `scripts/check-issue-refs.sh` が、repo が追跡している Markdown の全部（`git ls-files '*.md'`）に、自 repo の issue・PR の番号（`#` と 1〜5 桁の数字）があると落とす。他の repo の参照（`owner/repo` の後ろの番号）と URL のアンカーは通す。コード（`.kt` など）は見ない（色の 16 進と当たるため）。手元でも repo 直下で流せる。落ちる例と通る例は `scripts/test-check-issue-refs.sh` が流す（これも CI で流す）。
 
@@ -75,7 +75,7 @@ ADR（`docs/adr/`）を足したら、`docs/architecture.md` の「参照」の 
 
 ADR（`docs/adr/`）は、今の決定を書く文書にする。決定が変わったら、本文をそのまま書き換えて改める。経緯は git の履歴に任せ、末尾の注記・`superseded`・`status` は使わない。決定ごと取り消すときは、その ADR を消すか、別の ADR の「退けた案」に移す。
 - frontmatter は `date:` だけにする。`date:` は最初に決めた日のままにし、書き換えても動かさない（最後に書き換えた日は git で分かる）。ほかの ADR から分けて新しく作った ADR の `date:` は、分けた元の ADR の日付にする（番号は足した順の通し番号で、日付の順とずれてよい）
-- ADR に書くのは、決定・理由・退けた案・確かめた事実（根拠）だけ。どう作ったか（クラス・口・列・数値の細部）は `docs/architecture.md` に書き、ADR からは参照する
+- ADR に書くのは、決定・理由・退けた案・確かめた事実（根拠）だけ。どう作ったか（クラス・口・列・数値の細部）は `docs/architecture/` の該当するテーマのファイルに書き、ADR からは参照する
 - 同じ決定は 1 本の ADR にだけ書く。ほかの ADR からは、その ADR を参照する
 
 docs・ADR・README・`CONTEXT.md`・コードのコメントには、自 repo の issue・PR の番号（`#` と数字）を書かない。issue・PR への URL のリンクは書いてよいが、理由を issue の中にしか書かない形にはしない（理由は docs の本文に書く）。docs は今の挙動とその理由を書き、経緯は issue・PR・git に任せるため。Markdown は `scripts/check-issue-refs.sh` が CI で確かめる。

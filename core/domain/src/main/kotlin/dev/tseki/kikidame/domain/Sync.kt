@@ -65,7 +65,7 @@ data class SyncPlan(
 }
 
 /**
- * 同期の純粋関数（docs/architecture.md の「同期エンジンの設計」）。I/O はしない。
+ * 同期の純粋関数（docs/architecture/sync.md の「同期エンジンの設計」）。I/O はしない。
  *
  * - `Unavailable` / `Gone` → 判断保留。何も出さない
  * - `Known` → 取得元の一覧に無い `sourceItemId != null` の各回は固定でも [SyncProgramPlan.remove]
