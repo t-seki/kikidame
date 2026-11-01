@@ -1,0 +1,48 @@
+package dev.tseki.kikidame.ui.programs
+
+import dev.tseki.kikidame.R
+import dev.tseki.kikidame.domain.ProgramSummary
+import dev.tseki.kikidame.text.UiText
+
+/**
+ * 番組一覧の絞り込み。検索は番組名と配信元名の部分一致で、大文字小文字は区別しない。
+ * 配信元の絞り込みは配信元名の完全一致。両方あれば AND。
+ * 全角・半角やかなの表記揺れは吸収しない（取得元の表記そのまま）。
+ */
+object ProgramFilter {
+    /** 配信元の選択の鍵。[name] が null は「配信元なし」（配信元を持たない番組）。未選択は [PublisherKey] 自体を null にして区別する。 */
+    data class PublisherKey(val name: String?) {
+        val label: UiText get() = name?.let(UiText::Plain) ?: UiText.Res(R.string.program_list_no_publisher)
+    }
+
+    /** 配信元を選ぶシートの 1 行分。[programCount] は手元の番組全体での数で、検索語では絞らない。 */
+    data class Publisher(val key: PublisherKey, val programCount: Int)
+
+    /** 検索語として意味のある形にする（前後の空白を落とす）。空なら絞り込みなし。 */
+    fun normalize(query: String): String = query.trim()
+
+    /** 絞り込みが効いているか（検索語か配信元のどちらか）。 */
+    fun isActive(query: String, publisher: PublisherKey? = null): Boolean =
+        normalize(query).isNotEmpty() || publisher != null
+
+    /** 配信元が無い番組は番組名だけで検索語を判定する。 */
+    fun apply(list: List<ProgramSummary>, query: String, publisher: PublisherKey? = null): List<ProgramSummary> {
+        val q = normalize(query)
+        if (q.isEmpty() && publisher == null) return list
+        return list.filter { (publisher == null || it.program.publisherName == publisher.name) && (q.isEmpty() || it.matches(q)) }
+    }
+
+    /** 手元の番組から集めた配信元。番組数が多い順、同数は配信元名の辞書順（同期のたびに順序が入れ替わらない）。「配信元なし」は番組数に関わらず最後。 */
+    fun publishers(list: List<ProgramSummary>): List<Publisher> =
+        list.groupingBy { it.program.publisherName }.eachCount()
+            .map { (name, count) -> Publisher(PublisherKey(name), count) }
+            .sortedWith(
+                compareBy<Publisher> { it.key.name == null }
+                    .thenByDescending { it.programCount }
+                    .thenBy { it.key.name },
+            )
+
+    private fun ProgramSummary.matches(q: String): Boolean =
+        program.name.contains(q, ignoreCase = true) ||
+            program.publisherName?.contains(q, ignoreCase = true) == true
+}

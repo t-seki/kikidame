@@ -1,0 +1,366 @@
+package dev.tseki.kikidame.data.sharedfolder
+
+import dev.tseki.kikidame.data.source.DownloadStream
+import dev.tseki.kikidame.data.source.ScanListener
+import dev.tseki.kikidame.data.source.SourceGateway
+import dev.tseki.kikidame.domain.PublishedAt
+import dev.tseki.kikidame.domain.SourceException
+import dev.tseki.kikidame.domain.SourceEpisode
+import dev.tseki.kikidame.domain.SourceImage
+import dev.tseki.kikidame.domain.SourceItemId
+import dev.tseki.kikidame.domain.SourceProgram
+import dev.tseki.kikidame.domain.SourceSnapshot
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
+import kotlin.coroutines.coroutineContext
+import kotlinx.datetime.toLocalDateTime
+import java.io.FileNotFoundException
+import java.io.IOException
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
+
+/**
+ * 共有フォルダ（CONTEXT.md）を取得元（[SourceGateway]）として見せる（ADR 0007）。[FolderTree] の上で走査する。
+ *
+ * - 構成はちょうど `<配信元>/<番組>/<各回のファイル>` の 3 段。2 段目のフォルダはすべて番組
+ *   （音声ファイルが 0 本でも番組）。3 段目の、拡張子が [AUDIO_EXTENSIONS] のファイルだけを各回とし、
+ *   それ以外（1・2 段目のファイル、4 段目以下、音声でないファイル）は黙って無視する。配信元と番組はフォルダの名前で決める
+ * - 例外は番組のフォルダ（2 段目）の [PROGRAM_IMAGE_NAME]（`folder.jpg`。名前は大文字小文字まで一致するものだけ）で、
+ *   番組の画像（CONTEXT.md）として読む（ADR 0009）。一覧の大きさと更新日時を [SourceProgram.image] の版にし、
+ *   中身は [fetchProgramImage] で読む。`folder.png` など、ほかの画像は読まない
+ * - 名前が `.`・`@`・`#` で始まるフォルダとファイル（NAS や OS が作るもの）は、どの段でも無視する（[isIgnoredName]）。
+ *   [fetchProgram]・[fetchProgramEpisodes] も同じ規則で、そういう名前の番組は無いものとして扱う
+ * - 取得元 ID は相対パス。番組は `<配信元>/<番組>`、各回は `<配信元>/<番組>/<ファイル名>`
+ * - 各回のファイルの版（[SourceEpisode.version]、ADR 0011）は大きさと更新日時（ms）の組（[fileVersion]）。どちらかが変われば**差し替え**る
+ * - 回の情報はタグから読む。取得元 ID・サイズ・更新日時がどれも前の走査（[ScannedFiles]）と同じ回は、
+ *   タグを読み直さずに前の値を使う
+ * - 全走査は一覧を先に全部取ってから番組ごとにタグを読み、読み終えた番組を [ScanListener] に流す。
+ *   取り込み済みの回は DB に大きさと更新日時を持つので、途中で止まっても次の走査は
+ *   その回のタグを読まない。木の操作が失敗したら接続を張り直してやり直し、続けて 3 回失敗したら到達不能
+ * - 木の操作が例外を投げたら（全走査ではやり直しても失敗したら）[SourceException.Unreachable]（今の Jellyfin と同じく到達不能、判断保留）。
+ *   番組のフォルダが無ければ [fetchProgram] が null（消失）
+ *
+ * 接続の情報は [tree] の側で持つ。取得元の種類による切り替えは `SessionSourceGateway` が行う。
+ */
+class SharedFolderSource(
+    private val tree: FolderTree,
+    private val tags: TagReader,
+    private val scanned: ScannedFiles,
+    private val io: CoroutineDispatcher = Dispatchers.IO,
+    private val retryDelay: Duration = RETRY_DELAY,
+) : SourceGateway {
+
+    /**
+     * 全走査。返す一覧は完全な一覧（ADR 0003）。共有フォルダの根が無ければ到達不能。
+     *
+     * 1. 一覧（名前・大きさ・更新日時）を先に全部取り、タグを読む回の数を数える
+     * 2. 番組ごとにタグを読む（前の走査と同じ回は読まない）。1 本読むごとに [ScanListener.onTagProgress]、
+     *    タグを読んだ番組は読み終えるたびに [ScanListener.onProgramScanned] に流す
+     *
+     * 木の操作（一覧・タグの読み取り）が失敗したら、[FolderTree.reset] で接続を捨ててから同じ操作をやり直す（タグは同じファイルの頭から）。
+     * 続けて [MAX_CONSECUTIVE_FAILURES] 回失敗したら到達不能で終わる。成功を挟めば数え直す。
+     * [SourceException]（認証・権限など、やり直しても変わらない失敗）はやり直さずにそのまま投げる。ファイルが無い（[FileNotFoundException]）も
+     * やり直さず、[SourceException.Unreachable] に包んで投げる。
+     */
+    override suspend fun fetchAll(listener: ScanListener): SourceSnapshot {
+        val previous = scanned.load()
+        val retry = Retry()
+        val listed = listLibrary(retry)
+        val total = listed.sumOf { (program, files) -> files.count { cachedValues(program.sourceId, it, previous) == null } }
+        var read = 0
+        if (total > 0) listener.onTagProgress(0, total)
+        val episodes = ArrayList<SourceEpisode>()
+        for ((program, files) in listed) {
+            val programEpisodes = ArrayList<SourceEpisode>(files.size)
+            var readHere = false
+            for (file in files) {
+                // タグの読み取り（まとめ読みなしで m4a は 1 本 0.9〜1.3 秒）の合間に、取り消されていれば止まる
+                currentCoroutineContext().ensureActive()
+                programEpisodes += episodeFor(program.sourceId, file, previous) { path, size ->
+                    val tags = retry { tags.read(tree, path, size) }
+                    read++
+                    readHere = true
+                    listener.onTagProgress(read, total)
+                    tags
+                }
+            }
+            if (readHere) listener.onProgramScanned(program, programEpisodes)
+            episodes += programEpisodes
+        }
+        return SourceSnapshot(listed.map { it.first }, episodes)
+    }
+
+    /** 全走査の 1 段目: 番組と、その各回のファイル（並べ替え・絞り込み済み）の一覧。 */
+    private suspend fun listLibrary(retry: Retry): List<Pair<SourceProgram, List<FolderEntry>>> {
+        val root = retry { tree.list(ROOT) }
+            ?: throw SourceException.Unreachable(IOException("shared folder root not found"))
+        val listed = ArrayList<Pair<SourceProgram, List<FolderEntry>>>()
+        for (publisher in root.directories()) {
+            currentCoroutineContext().ensureActive()
+            val publisherPath = publisher.name
+            // 走査の途中で消えたフォルダは、無いものとして扱う
+            val programDirs = retry { tree.list(publisherPath) }?.directories() ?: continue
+            for (program in programDirs) {
+                currentCoroutineContext().ensureActive()
+                val programPath = "$publisherPath/${program.name}"
+                val files = retry { tree.list(programPath) } ?: continue
+                val sourceProgram = SourceProgram(
+                    sourceId = SourceItemId(programPath),
+                    name = program.name,
+                    publisherName = publisher.name,
+                    image = files.programImage(),
+                )
+                listed += sourceProgram to files.audioFiles()
+            }
+        }
+        return listed
+    }
+
+    /**
+     * 全走査の 1 回分の、木の操作のやり直し。続けて失敗した数を持つ。
+     * [op] は blocking なので IO のスレッドで呼ぶ。
+     */
+    private inner class Retry {
+        private var failures = 0
+
+        suspend operator fun <T> invoke(op: () -> T): T {
+            while (true) {
+                val error = try {
+                    val result = withContext(io) { op() }
+                    failures = 0
+                    return result
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: SourceException) {
+                    throw e
+                } catch (e: FileNotFoundException) {
+                    throw SourceException.Unreachable(e)
+                } catch (e: Exception) {
+                    e
+                }
+                failures++
+                if (failures >= MAX_CONSECUTIVE_FAILURES) throw SourceException.Unreachable(error)
+                withContext(io) { tree.reset() }
+                delay(retryDelay)
+            }
+        }
+    }
+
+    /** その番組のフォルダの中身だけで答える。フォルダが無ければ空。 */
+    override suspend fun fetchProgramEpisodes(programId: SourceItemId): List<SourceEpisode> {
+        if (programSegments(programId) == null) return emptyList()
+        val previous = scanned.load()
+        return onTree { checkActive ->
+            episodesIn(programId, tree.list(programId.value).orEmpty(), previous, checkActive)
+        }
+    }
+
+    /** 番組のフォルダが無ければ null（消失）。取得元 ID が `<配信元>/<番組>` の形でない（無視する名前を含む）ときも null。 */
+    override suspend fun fetchProgram(programId: SourceItemId): SourceProgram? {
+        val (publisher, program) = programSegments(programId) ?: return null
+        return onTree {
+            tree.list(programId.value)?.let {
+                SourceProgram(sourceId = programId, name = program, publisherName = publisher, image = it.programImage())
+            }
+        }
+    }
+
+    /**
+     * 番組のフォルダの [PROGRAM_IMAGE_NAME] を全部読む（ADR 0009）。無ければ null。取得元 ID が番組の形でなければ null。
+     * [MAX_PROGRAM_IMAGE_BYTES] より大きいファイルは読まずに null（画像なしとして扱う）。
+     */
+    override suspend fun fetchProgramImage(programId: SourceItemId): ByteArray? {
+        if (programSegments(programId) == null) return null
+        return onTree {
+            val file = try {
+                tree.open("${programId.value}/$PROGRAM_IMAGE_NAME", 0)
+            } catch (e: FileNotFoundException) {
+                return@onTree null
+            }
+            file.body.use { body ->
+                if (file.sizeBytes > MAX_PROGRAM_IMAGE_BYTES) null else body.readBytes()
+            }
+        }
+    }
+
+    /**
+     * 各回のファイルを [rangeStart] から開く。木はオフセットから読めるので、[rangeStart] > 0 なら常に続きから返す。
+     * ファイルが無ければ [SourceException.Failed]、それ以外の失敗は [SourceException.Unreachable]。
+     */
+    override suspend fun openDownload(episodeId: SourceItemId, rangeStart: Long): DownloadStream {
+        val file = onTree {
+            try {
+                tree.open(episodeId.value, rangeStart)
+            } catch (e: FileNotFoundException) {
+                throw SourceException.Failed("not found: ${episodeId.value}", e)
+            }
+        }
+        return DownloadStream(
+            resumedFrom = rangeStart.takeIf { it > 0 },
+            totalBytes = file.sizeBytes,
+            body = file.body,
+        )
+    }
+
+    /**
+     * 各回のファイルの大きさ（ADR 0011）。番組のフォルダの一覧から読む。ファイルが無い・取得元 ID が各回の形でなければ null。
+     * 一覧が大きさを返すので、同期の差し替えの判断では呼ばない（口をそろえるために持つ）。
+     */
+    override suspend fun fetchFileSize(episodeId: SourceItemId): Long? {
+        val programPath = episodeId.value.substringBeforeLast('/', missingDelimiterValue = "")
+        val name = episodeId.value.substringAfterLast('/')
+        if (programSegments(SourceItemId(programPath)) == null || isIgnoredName(name)) return null
+        return onTree { tree.list(programPath)?.firstOrNull { !it.isDirectory && it.name == name }?.sizeBytes }
+    }
+
+    private fun episodesIn(
+        programId: SourceItemId,
+        entries: List<FolderEntry>,
+        previous: Map<SourceItemId, ScannedFile>,
+        checkActive: () -> Unit,
+    ): List<SourceEpisode> =
+        entries.audioFiles().map {
+            // タグの読み取り（ファイルごとに数秒）の合間に、取り消されていれば止まる
+            checkActive()
+            episodeFor(programId, it, previous) { path, size -> tags.read(tree, path, size) }
+        }
+
+    /**
+     * 1 本の各回を作る。全走査（[fetchAll]）と 1 番組の取得（[episodesIn]）の両方がこれを呼ぶ。
+     * 前の走査と同じ回なら前の値（[cachedValues]）、違えば [readTags] でタグを読み、無い値を補う（[tagValues]）。
+     *
+     * タグの読み方（全走査は [Retry] を通す、1 番組は直接読む）と、読んだときの数え上げ・通知（全走査だけ）は [readTags] で渡す。
+     * [readTags] には各回の取得元 ID（相対パス）とファイルの大きさが渡る。取り消しの見方は呼び出し側で行う。
+     * 全走査の [readTags] は suspend の [Retry] を呼ぶので、inline にしてラムダを呼び出し側に展開する。
+     */
+    private inline fun episodeFor(
+        programId: SourceItemId,
+        file: FolderEntry,
+        previous: Map<SourceItemId, ScannedFile>,
+        readTags: (path: String, size: Long) -> AudioTags,
+    ): SourceEpisode {
+        val values = cachedValues(programId, file, previous)
+            ?: tagValues(readTags(episodeIdOf(programId, file).value, file.sizeBytes), file.name, file.modifiedAt.truncatedToMillis())
+        return episodeOf(programId, file, values)
+    }
+
+    private fun episodeIdOf(programId: SourceItemId, file: FolderEntry) = SourceItemId("${programId.value}/${file.name}")
+
+    /**
+     * 取得元 ID・サイズ・更新日時がどれも前の走査と同じなら、その回の前の値（タグを読み直さない）。違えば null。
+     * Room には ms で入るので、ms に揃えてから比べる（ms より細かい更新日時が来ても同じとみなす。SMB の実装（smbj）が端末で何の精度を返すかは未確認）
+     */
+    private fun cachedValues(programId: SourceItemId, file: FolderEntry, previous: Map<SourceItemId, ScannedFile>): TagValues? {
+        val modifiedAt = file.modifiedAt.truncatedToMillis()
+        val cached = previous[episodeIdOf(programId, file)]?.takeIf { it.sizeBytes == file.sizeBytes && it.modifiedAt == modifiedAt }
+        return cached?.let { TagValues(it.title, it.publishedAt, it.runtime, it.performers) }
+    }
+
+    private fun episodeOf(programId: SourceItemId, file: FolderEntry, values: TagValues): SourceEpisode {
+        val modifiedAt = file.modifiedAt.truncatedToMillis()
+        return SourceEpisode(
+            sourceId = episodeIdOf(programId, file),
+            programSourceId = programId,
+            title = values.title,
+            publishedAt = values.publishedAt,
+            addedAt = modifiedAt,
+            runtime = values.runtime,
+            sizeBytes = file.sizeBytes,
+            container = extensionOf(file.name),
+            performers = values.performers,
+            sourceFileSize = file.sizeBytes,
+            sourceModifiedAt = modifiedAt,
+            version = fileVersion(file.sizeBytes, modifiedAt),
+        )
+    }
+
+    private data class TagValues(val title: String, val publishedAt: Instant, val runtime: Duration, val performers: List<String>)
+
+    /** タグが無いときの補い方。取り込み日時はファイルの更新日時。 */
+    private fun tagValues(tags: AudioTags, fileName: String, modifiedAt: Instant): TagValues {
+        return TagValues(
+            title = tags.title?.trim()?.takeIf { it.isNotEmpty() } ?: fileName.substringBeforeLast('.'),
+            publishedAt = PublishedAt.of(TagDate.parse(tags.date), modifiedAt.toLocalDateTime(PublishedAt.ZONE).date),
+            runtime = tags.duration?.takeIf { it.isPositive() } ?: Duration.ZERO,
+            performers = listOfNotNull(tags.artist?.trim()?.takeIf { it.isNotEmpty() }),
+        )
+    }
+
+    /**
+     * 木の操作の失敗を到達不能に正規化する。木の操作は blocking でコルーチンの取り消しに気づかないので、
+     * [block] には取り消されていれば [CancellationException] を投げる関数を渡す。1 番組の取得（[fetchProgramEpisodes]）はファイルごとにこれを呼び、
+     * 取り消されたら残りを読まない。全走査（[fetchAll]）はこれを通らず、[Retry] でやり直し、ファイルごと・フォルダごとに取り消しを見る。
+     */
+    private suspend fun <T> onTree(block: (checkActive: () -> Unit) -> T): T = withContext(io) {
+        val context = coroutineContext
+        try {
+            block { context.ensureActive() }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: SourceException) {
+            throw e
+        } catch (e: Exception) {
+            throw SourceException.Unreachable(e)
+        }
+    }
+
+    companion object {
+        private const val ROOT = ""
+
+        /** 全走査で、木の操作が続けてこの回数だけ失敗したら到達不能で終わる。 */
+        const val MAX_CONSECUTIVE_FAILURES: Int = 3
+
+        /** やり直す前に待つ時間。切れた直後にすぐ張り直して同じ失敗を重ねないため。長さに根拠は無い（測っていない）。 */
+        val RETRY_DELAY: Duration = 2.seconds
+
+        /** 番組の画像として読む、番組のフォルダの中のファイルの名前（ADR 0009。ラジオ録音ツールが番組のフォルダに画像を置く付け方に合わせる）。 */
+        const val PROGRAM_IMAGE_NAME: String = "folder.jpg"
+
+        /**
+         * 番組の画像として読むファイルの大きさの上限。これより大きいものはメモリに読まず、画像なしとして扱う
+         * （10 MiB。値に根拠は無く、測っていない）。
+         */
+        const val MAX_PROGRAM_IMAGE_BYTES: Long = 10L * 1024 * 1024
+
+        /** 各回とみなす拡張子（小文字で比べる）。 */
+        val AUDIO_EXTENSIONS: Set<String> = setOf("m4a", "mp3", "aac", "ogg", "opus", "flac", "wav")
+
+        private fun extensionOf(name: String): String =
+            name.substringAfterLast('.', missingDelimiterValue = "").lowercase()
+
+        /** 無視する名前の頭文字。NAS や OS が作るフォルダ・ファイル（`@eaDir`・`#recycle`・`._<名前>.m4a`・`.DS_Store` など）。 */
+        private val IGNORED_PREFIXES = charArrayOf('.', '@', '#')
+
+        /** 名前が `.`・`@`・`#` で始まるフォルダとファイルは、どの段でも無視する。 */
+        fun isIgnoredName(name: String): Boolean = name.firstOrNull()?.let { it in IGNORED_PREFIXES } ?: true
+
+        /** 各回とみなすファイル（3 段目の音声ファイル）を名前の順に。 */
+        private fun List<FolderEntry>.audioFiles(): List<FolderEntry> =
+            filter { !it.isDirectory && !isIgnoredName(it.name) && extensionOf(it.name) in AUDIO_EXTENSIONS }.sortedBy { it.name }
+
+        /** 番組のフォルダの一覧から番組の画像の目印を作る。版は大きさと更新日時（ms）。無ければ null。 */
+        private fun List<FolderEntry>.programImage(): SourceImage? =
+            firstOrNull { !it.isDirectory && it.name == PROGRAM_IMAGE_NAME }
+                ?.let { SourceImage("${it.sizeBytes}:${it.modifiedAt.toEpochMilliseconds()}") }
+
+        private fun List<FolderEntry>.directories(): List<FolderEntry> =
+            filter { it.isDirectory && !isIgnoredName(it.name) }.sortedBy { it.name }
+
+        /** `<配信元>/<番組>` を 2 つに分ける。形が違う、または無視する名前を含むなら null（[fetchAll] に現れない番組）。 */
+        private fun programSegments(id: SourceItemId): Pair<String, String>? {
+            val parts = id.value.split('/')
+            return if (parts.size == 2 && parts.none(::isIgnoredName)) parts[0] to parts[1] else null
+        }
+
+        /** 各回のファイルの版（ADR 0011）。大きさと更新日時（ms）の組。 */
+        fun fileVersion(sizeBytes: Long, modifiedAt: Instant): String = "$sizeBytes:${modifiedAt.toEpochMilliseconds()}"
+
+        private fun Instant.truncatedToMillis(): Instant = Instant.fromEpochMilliseconds(toEpochMilliseconds())
+    }
+}

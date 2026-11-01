@@ -1,0 +1,70 @@
+package dev.tseki.kikidame.data.sharedfolder
+
+import dev.tseki.kikidame.domain.DeviceFolder
+import dev.tseki.kikidame.domain.SmbConnection
+import java.io.InputStream
+import kotlin.time.Instant
+
+/**
+ * 共有フォルダ（CONTEXT.md）の中身をたどるための、フォルダの木の最小の抽象。
+ * SMB と端末のフォルダ（SAF）がこれを実装し、[SharedFolderSource] がこの上で走査する。
+ * 取得元に共通の抽象（この interface、[CloseableFolderTree]、[FolderTreeFactory]）は `sharedfolder/` に置き、
+ * 実装は `smb/`（`SmbFolderTree`）と `device/`（`DeviceFolderTree`）に置く。
+ *
+ * - パスは共有フォルダの根からの相対パスで、区切りは `/`。根は空文字列
+ * - 読むだけで、書き込み・削除はしない（ADR 0007 の決定 6）
+ * - どのメソッドも blocking。呼び出し側が IO のスレッドで呼ぶ（[android.media.MediaDataSource.readAt] が同期で呼ぶため）
+ * - 失敗（接続・権限・読み取りの失敗）は例外を投げる。「無い」は例外でなく戻り値で表す（[list] の null）
+ */
+interface FolderTree {
+    /** [path] のフォルダの直下の子。フォルダが無い（またはフォルダでない）なら null。 */
+    fun list(path: String): List<FolderEntry>?
+
+    /**
+     * ファイルの部分読み（タグの読み取り用）。[position] から最大 [size] バイトを [buffer] の [offset] 以降に読み、
+     * 読んだバイト数を返す。[position] がファイルの末尾以降なら -1。
+     */
+    fun read(path: String, position: Long, buffer: ByteArray, offset: Int, size: Int): Int
+
+    /** ファイルを [offset] から読むストリーム（ダウンロードの続きから取る `.part` の再開用）。ファイルが無ければ [java.io.FileNotFoundException]。 */
+    fun open(path: String, offset: Long): FolderFileStream
+
+    /**
+     * 接続を捨て、次の操作で張り直させる。操作が失敗した後、同じ操作をやり直す前に [SharedFolderSource] が呼ぶ。
+     * 切れた接続が「つながっている」と見えたまま残り、やり直しが同じ失敗を繰り返さないようにするため。
+     * 接続を持たない木（端末のフォルダなど）は何もしない。失敗しても例外を投げない。
+     */
+    fun reset() {}
+}
+
+/** 使い終わったら閉じる [FolderTree]。閉じると接続も閉じる。 */
+interface CloseableFolderTree : FolderTree, AutoCloseable
+
+/**
+ * 共有フォルダの取得元から木を作る。1 回の取得元の操作ごとに作って閉じる（接続の寿命を呼び出しの外に持ち出さない）。
+ * SMB と端末のフォルダ（SAF）。
+ */
+interface FolderTreeFactory {
+    fun open(connection: SmbConnection): CloseableFolderTree
+
+    fun open(folder: DeviceFolder): CloseableFolderTree
+}
+
+/** フォルダの子の 1 件。 */
+data class FolderEntry(
+    val name: String,
+    val isDirectory: Boolean,
+    /** ファイルのサイズ（バイト）。フォルダでは意味を持たない。 */
+    val sizeBytes: Long,
+    /**
+     * 更新日時。必須で、null にしない（取り込み日時と、タグを読み直すかの判定と、大きさと組にしたファイルの版（差し替えの判断、ADR 0011）に使う）。
+     * 更新日時を取れない取得元では、実装の側で補う。
+     */
+    val modifiedAt: Instant,
+)
+
+/** [FolderTree.open] の結果。[sizeBytes] はファイル全体のサイズ（[body] の残りではない）。 */
+class FolderFileStream(
+    val sizeBytes: Long,
+    val body: InputStream,
+)

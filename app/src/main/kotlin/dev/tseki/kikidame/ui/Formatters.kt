@@ -1,0 +1,44 @@
+package dev.tseki.kikidame.ui
+import dev.tseki.kikidame.R
+import dev.tseki.kikidame.domain.PublishedAt
+import dev.tseki.kikidame.domain.LocalStorageUsage
+import dev.tseki.kikidame.text.UiText
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.todayIn
+import kotlinx.datetime.toLocalDateTime
+import java.util.Locale
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Instant
+/**
+ * 番組一覧の「最新」用の短い日付。今年なら MM-DD、それ以外は YYYY-MM-DD（古い番組は年が要る）。
+ * 各回一覧の公開日は [dev.tseki.kikidame.text.toPublishedDateText] のまま年を落とさない（一覧内で年をまたぐ）。出すかどうかは各回一覧側で決める
+ * （タイトルが公開日と同じ回では丸ごと省く）。
+ */
+fun Instant.toLatestDateText(today: LocalDate = Clock.System.todayIn(PublishedAt.ZONE)): String {
+    val date = toLocalDateTime(PublishedAt.ZONE).date
+    return if (date.year == today.year) "%02d-%02d".format(date.monthNumber, date.dayOfMonth) else date.toString()
+}
+fun Instant.toDateTimeText(): String = toLocalDateTime(PublishedAt.ZONE).let { dt ->
+    "%s %02d:%02d".format(dt.date, dt.hour, dt.minute)
+}
+/**
+ * ファイル容量。10 進（1 GB = 1,000,000,000 B。Android の「設定 → ストレージ」と同じ基数）で、
+ * 1 GB 以上は GB、それ未満は MB の 1 桁小数。KB は出さない（録音は 1 回 10〜100 MB）。
+ */
+fun Long.toSizeText(): String {
+    // 999.95 MB 以上は丸めると「1000.0 MB」になるので、丸めた後の値で単位を決める。小数点はロケールに依らず「.」
+    val mb = Math.round(this / 1e5) / 10.0
+    return if (mb >= 1000.0) "%.1f GB".format(Locale.ROOT, this / 1e9) else "%.1f MB".format(Locale.ROOT, mb)
+}
+/** 「12.3 GB（123 回）」。手元のファイルの合計と回数を並べる。括弧と「回」は言語で変わるので [UiText]。 */
+fun LocalStorageUsage.toText(): UiText = UiText.Plural(R.plurals.common_storage_usage, episodeCount, totalBytes.toSizeText(), episodeCount)
+/**
+ * 出演者を 1 つの文言に。「岩井勇気、澤部佑」。無ければ null（一覧と再生画面はその部分を省き、詳細は「なし」と出す）。
+ * 区切りは言語で変わる（`R.string.common_list_separator`）ので [UiText.Joined] にして Composable に解決させる。
+ */
+fun List<String>.toPerformersText(): UiText? =
+    takeIf { it.isNotEmpty() }?.let { UiText.Joined(it.map(UiText::Plain), UiText.Res(R.string.common_list_separator)) }
+fun Duration.toClockText(): String = toComponents { hours, minutes, seconds, _ ->
+    if (hours > 0) "%d:%02d:%02d".format(hours, minutes, seconds) else "%d:%02d".format(minutes, seconds)
+}

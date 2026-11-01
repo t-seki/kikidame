@@ -1,0 +1,3 @@
+- New sources besides Jellyfin: an SMB share on your NAS, or a folder on this device
+- Shared folder scans add each program as soon as it is read, show tag-reading progress, and retry after a dropped connection; files already read are not read again
+- Settings: "Connect to another server" is now "Change source"; episode details show "Source ID" instead of "Server ID"

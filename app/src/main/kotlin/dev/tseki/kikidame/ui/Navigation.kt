@@ -1,0 +1,282 @@
+package dev.tseki.kikidame.ui
+
+import android.util.Log
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewModelScope
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.tseki.kikidame.domain.SessionRepository
+import dev.tseki.kikidame.domain.SessionState
+import dev.tseki.kikidame.download.DownloadScheduler
+import dev.tseki.kikidame.ui.connect.ConnectScreen
+import dev.tseki.kikidame.ui.connect.DeviceFolderScreen
+import dev.tseki.kikidame.ui.connect.SmbConnectScreen
+import dev.tseki.kikidame.ui.source.SourcePickScreen
+import dev.tseki.kikidame.ui.episodes.EpisodeDetailsScreen
+import dev.tseki.kikidame.ui.episodes.EpisodeListScreen
+import dev.tseki.kikidame.ui.library.LibraryPickScreen
+import dev.tseki.kikidame.ui.player.PlayerScreen
+import dev.tseki.kikidame.ui.programs.ProgramListScreen
+import dev.tseki.kikidame.ui.settings.LicensesScreen
+import dev.tseki.kikidame.ui.settings.SettingsScreen
+import dev.tseki.kikidame.ui.settings.StorageProgramScreen
+import dev.tseki.kikidame.ui.settings.StorageScreen
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import javax.inject.Inject
+import kotlin.reflect.KClass
+
+/** 番組ごとの手元の回の一覧で最後の回を消して戻るとき、消した後の文言を内訳の画面へ渡すキー。 */
+private const val STORAGE_RETURNED_MESSAGE = "storage_returned_message"
+
+/** 初回の取得元の選択。 */
+@Serializable
+object SourcePickRoute
+
+/** Jellyfin への接続。 */
+@Serializable
+object ConnectRoute
+
+/** NAS の共有フォルダ（SMB）への接続。 */
+@Serializable
+object SmbConnectRoute
+
+/** 端末のフォルダ（SAF）の説明と選択。 */
+@Serializable
+object DeviceFolderRoute
+
+@Serializable
+object LibraryPickRoute
+
+@Serializable
+object SettingsRoute
+@Serializable
+object LicensesRoute
+
+/** 手元のファイルの内訳。設定の「手元のファイル」の行から開く。 */
+@Serializable
+object StorageRoute
+
+/** 番組ごとの手元の回の一覧。内訳の画面の番組の行から開く。番組名は、最後の回を消して番組ごと消えてもトップバーに出せるように持つ。 */
+@Serializable
+data class StorageProgramRoute(val programId: Long, val programName: String)
+
+@Serializable
+object ProgramListRoute
+
+@Serializable
+data class EpisodeListRoute(val programId: Long)
+/** 各回の詳細。番組の各回一覧と「続きから」タブの長押しから開く。番組から引くので programId も持つ。 */
+@Serializable
+data class EpisodeDetailsRoute(val programId: Long, val episodeId: Long)
+
+/** [play] が false なら再生を始めない（ミニプレイヤーから「見に行く」だけの遷移）。載っている回は触らず、載っていなければ積むだけ。 */
+@Serializable
+data class PlayerRoute(val episodeId: Long, val play: Boolean = true)
+
+@HiltViewModel
+class SessionViewModel @Inject constructor(
+    sessionRepository: SessionRepository,
+    scheduler: DownloadScheduler,
+) : ViewModel() {
+    val state: StateFlow<SessionState?> = sessionRepository.state
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    init {
+        // 起動時に PENDING が残っていれば Worker を起こす（kill 後の再開）。失敗しても起動は妨げない
+        viewModelScope.launch { runCatching { scheduler.kick() }.onFailure { Log.w("SessionViewModel", "kick failed", it) } }
+    }
+}
+
+/**
+ * 番組の画面（根。「続きから・よく聴く・番組一覧」のタブ）→ 各回一覧 → 再生画面 の 3 階層に、取得元の選択・Jellyfin の接続画面・SMB の接続画面・
+ * 端末のフォルダの説明と選択・ライブラリ選択・設定・各回の詳細と、設定から開く手元のファイルの内訳・番組ごとの手元の回の一覧を足したもの。
+ * 「続きから」タブの行からは、各回一覧を経ずに再生画面と各回の詳細へ直接行く。
+ * 起動時はセッション状態で開始画面を決め、その後は状態の**変化**（ログアウト・401・ライブラリ選択）で遷移する。
+ * デバッグ用に接続画面から番組一覧へ抜けても、状態が変わらない限り戻されない。
+ */
+@Composable
+fun KikidameNavHost(sessionViewModel: SessionViewModel = hiltViewModel()) {
+    val session by sessionViewModel.state.collectAsStateWithLifecycle()
+    val initial = session ?: return // DataStore を読むまで何も出さない（一瞬）
+    val navController = rememberNavController()
+    val startDestination = remember { initial.startDestination() }
+
+    LaunchedEffect(session) {
+        navController.followSessionChange(session ?: return@LaunchedEffect)
+    }
+
+    NavHost(navController = navController, startDestination = startDestination) {
+        composable<SourcePickRoute> {
+            SourcePickScreen(
+                onPickJellyfin = { navController.navigate(ConnectRoute) },
+                onPickSmb = { navController.navigate(SmbConnectRoute) },
+                onPickDeviceFolder = { navController.navigate(DeviceFolderRoute) },
+            )
+        }
+        composable<ConnectRoute> { entry ->
+            ConnectScreen(
+                onBack = navController.rememberBackOrNull(entry),
+                onSourceChanged = navController::restartFromSourcePick,
+            )
+        }
+        composable<SmbConnectRoute> { entry ->
+            SmbConnectScreen(
+                onBack = navController.rememberBackOrNull(entry),
+                onSourceChanged = navController::restartFromSourcePick,
+            )
+        }
+        composable<DeviceFolderRoute> { entry ->
+            DeviceFolderScreen(
+                onBack = navController.rememberBackOrNull(entry),
+                onSourceChanged = navController::restartFromSourcePick,
+            )
+        }
+        composable<LibraryPickRoute> { entry ->
+            val onBack = navController.rememberBackOrNull(entry)
+            val fromSettings = onBack != null
+            LibraryPickScreen(
+                onDone = {
+                    if (fromSettings) navController.popIfNotRoot() else navController.navigate(ProgramListRoute) { popUpTo(0) }
+                },
+                onBack = onBack,
+            )
+        }
+        composable<SettingsRoute> {
+            SettingsScreen(
+                onBack = navController::popIfNotRoot,
+                onChangeLibrary = { navController.navigate(LibraryPickRoute) },
+                onOpenLicenses = { navController.navigate(LicensesRoute) },
+                onOpenStorage = { navController.navigate(StorageRoute) },
+            )
+        }
+        composable<LicensesRoute> {
+            LicensesScreen(onBack = navController::popIfNotRoot)
+        }
+        composable<StorageRoute> { entry ->
+            val returnedMessage by entry.savedStateHandle.getStateFlow<String?>(STORAGE_RETURNED_MESSAGE, null).collectAsStateWithLifecycle()
+            StorageScreen(
+                onBack = navController::popIfNotRoot,
+                onProgramClick = { navController.navigate(StorageProgramRoute(it.programId.value, it.programName)) },
+                returnedMessage = returnedMessage,
+                onReturnedMessageShown = { entry.savedStateHandle[STORAGE_RETURNED_MESSAGE] = null },
+            )
+        }
+        composable<StorageProgramRoute> { entry ->
+            val popOnce = navController.popOnce(entry)
+            StorageProgramScreen(
+                onBack = navController::popIfNotRoot,
+                onEmptied = { message ->
+                    if (navController.currentBackStackEntry == entry) {
+                        navController.previousBackStackEntry?.savedStateHandle?.set(STORAGE_RETURNED_MESSAGE, message)
+                    }
+                    popOnce()
+                },
+            )
+        }
+        composable<ProgramListRoute> {
+            ProgramListScreen(
+                onProgramClick = { navController.navigate(EpisodeListRoute(it.value)) },
+                onSettingsClick = { navController.navigate(SettingsRoute) },
+                onNowPlayingClick = { navController.navigate(PlayerRoute(it.value, play = false)) },
+                // 「続きから」タブの行は各回一覧の行と同じ行き先
+                onEpisodeClick = { navController.navigate(PlayerRoute(it.value)) },
+                onEpisodeDetails = { programId, episodeId -> navController.navigate(EpisodeDetailsRoute(programId.value, episodeId.value)) },
+            )
+        }
+        composable<EpisodeListRoute> {
+            EpisodeListScreen(
+                onEpisodeClick = { navController.navigate(PlayerRoute(it.value)) },
+                onNowPlayingClick = { navController.navigate(PlayerRoute(it.value, play = false)) },
+                onEpisodeDetails = { programId, episodeId -> navController.navigate(EpisodeDetailsRoute(programId.value, episodeId.value)) },
+                onBack = navController::popIfNotRoot,
+            )
+        }
+        composable<EpisodeDetailsRoute> {
+            EpisodeDetailsScreen(onBack = navController::popIfNotRoot)
+        }
+        composable<PlayerRoute> {
+            PlayerScreen(onBack = navController::popIfNotRoot)
+        }
+    }
+}
+
+/**
+ * 戻り先があるときだけポップする。← の連打などで唯一の画面までポップするとバックスタックが空になり、
+ * NavHost が何も描かない（真っ暗な画面）まま Activity が残る。
+ */
+private fun NavHostController.popIfNotRoot() {
+    if (previousBackStackEntry != null) popBackStack()
+}
+
+/**
+ * [entry] の画面を 1 回だけ閉じる。画面が自分から戻るとき（番組ごとの手元の回が 0 になった）に、
+ * 戻る操作と重なっても 2 画面戻らないように、[entry] が最上位のときだけポップする。
+ */
+@Composable
+private fun NavHostController.popOnce(entry: NavBackStackEntry): () -> Unit =
+    remember(entry) { { if (currentBackStackEntry == entry) popIfNotRoot() } }
+
+private fun SessionState.startDestination(): Any = when (this) {
+    is SessionState.SignedOut -> signedOutDestination()
+    is SessionState.NeedsLibrary -> LibraryPickRoute
+    is SessionState.Ready -> ProgramListRoute
+}
+
+/** ログアウト中の行き先: 直前に使っていた取得元の接続画面。一度も接続していなければ取得元の選択。 */
+private fun SessionState.SignedOut.signedOutDestination(): Any = when {
+    lastSmb != null -> SmbConnectRoute
+    lastDeviceFolder != null -> DeviceFolderRoute
+    lastServerUrl != null -> ConnectRoute
+    else -> SourcePickRoute
+}
+
+/**
+ * [backOrNull] を、その画面の back stack entry ごとに入った時点で 1 回だけ決める。
+ * 事実: composition のたびに [backOrNull] を読むと、← で戻るとき、消えていく接続画面に
+ * 「取得元を変える」が一瞬出る（端末で確かめた）。
+ * 推測（未確認）: 退場のアニメーションの間に描き直され、そのとき `previousBackStackEntry` が
+ * 新しい最上位から見たものに変わって null になるためと見ている。
+ */
+@Composable
+private fun NavHostController.rememberBackOrNull(entry: NavBackStackEntry): (() -> Unit)? =
+    remember(entry) { backOrNull() }
+
+/** 取得元を選んで接続する画面（まだ番組一覧に入っていない）。 */
+private val SIGN_IN_ROUTES: List<KClass<*>> =
+    listOf(SourcePickRoute::class, ConnectRoute::class, SmbConnectRoute::class, DeviceFolderRoute::class)
+
+/** 戻り先があるときだけ ← を出す（戻り先が無い画面では null）。 */
+private fun NavHostController.backOrNull(): (() -> Unit)? =
+    if (previousBackStackEntry != null) ::popIfNotRoot else null
+
+/** 取得元の選択からやり直す（スタックを空にして積み直す）。 */
+private fun NavHostController.restartFromSourcePick() {
+    navigate(SourcePickRoute) { popUpTo(0) }
+}
+
+/** セッション状態が変わったときだけ呼ぶ。今いる画面と食い違う場合にスタックを作り直す。 */
+private fun NavHostController.followSessionChange(state: SessionState) {
+    val current = currentBackStackEntry?.destination ?: return
+    val onSignInScreen = SIGN_IN_ROUTES.any { current.hasRoute(it) }
+    when (state) {
+        // 取得元を選んでいる途中の画面にいる間は動かさない
+        is SessionState.SignedOut -> if (!onSignInScreen) navigate(state.signedOutDestination()) { popUpTo(0) }
+        is SessionState.NeedsLibrary -> if (!current.hasRoute<LibraryPickRoute>()) navigate(LibraryPickRoute) { popUpTo(0) }
+        is SessionState.Ready ->
+            if (onSignInScreen || (current.hasRoute<LibraryPickRoute>() && previousBackStackEntry == null)) navigate(ProgramListRoute) { popUpTo(0) }
+    }
+}

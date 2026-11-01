@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Feature requests (Ideas)
+    url: https://github.com/t-seki/kikidame/discussions
+    about: Suggest a feature in the Ideas category of Discussions. Please read the Non-goals section of README.md first.
+  - name: Questions (Q&A)
+    url: https://github.com/t-seki/kikidame/discussions
+    about: Ask a question in the Q&A category of Discussions.

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "local>t-seki/renovate-config"
+  ],
+  "packageRules": [
+    {
+      "description": "kikidame では自動マージしない。preset の automerge を上書きする(この repo は platform の auto-merge が無効で、そのとき Renovate は自分の自動マージに切り替えるため、実機で確かめる前にマージされないようにする)",
+      "matchPackageNames": ["*"],
+      "automerge": false,
+      "platformAutomerge": false
+    },
+    {
+      "description": "kotlinx-datetime の -0.6.x-compat 版は旧 Instant / Clock を残した互換版で、新しい版ではない。この repo は kotlin.time.Instant を使うので候補から外す",
+      "matchPackageNames": ["org.jetbrains.kotlinx:kotlinx-datetime"],
+      "allowedVersions": "!/-compat$/"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+- Android Auto: browse Continue / Starred / Programs on the car screen and play with the same rules as on the phone
+- Resume the last episode after the process was killed (media button, car)
+- English UI, switchable per app on Android 13 and later
+- Jellyfin 10.10 and later (verified on 10.10 / 10.11 / 12.0)

@@ -1,0 +1,248 @@
+package dev.tseki.kikidame.data.repository
+
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.tseki.kikidame.data.files.EpisodesDirectory
+import dev.tseki.kikidame.domain.EpisodeWithState
+import dev.tseki.kikidame.domain.PlaybackRules
+import dev.tseki.kikidame.domain.SourceException
+import dev.tseki.kikidame.domain.SourceItemId
+import dev.tseki.kikidame.domain.SourceProgram
+import dev.tseki.kikidame.domain.SourceSnapshot
+import dev.tseki.kikidame.domain.SessionState
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runTest
+import org.junit.Test
+import org.junit.runner.RunWith
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+import kotlin.test.assertNull
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
+
+@RunWith(AndroidJUnit4::class)
+class RoomLibraryRefreshRepositoryTest : JellyfinRefreshTestBase() {
+    private val program = "パンサー向井のふらっと"
+    private val publisher = "TBSラジオ"
+
+    private val snapshot = SourceSnapshot(
+        programs = listOf(SourceProgram(SourceItemId("album-1"), program, publisher)),
+        episodes = listOf(
+            sourceEpisode("audio-1", "$program 2026-09-14-1", "2026-09-13T15:00:00Z"),
+            sourceEpisode("audio-2", "$program 2026-09-14-2", "2026-09-13T15:00:00Z", runtime = 60.minutes),
+            sourceEpisode("audio-3", "$program 2026-09-17-1", "2026-09-16T15:00:00Z"),
+        ),
+    )
+
+    @Test
+    fun refreshRequiresASelectedLibrary() = runTest {
+        assertFailsWith<SourceException.Unauthorized> { repo.refresh() }
+        session.signIn("jellyfin.lab.example", "alice", "secret")
+        assertFailsWith<SourceException.Unauthorized> { repo.refresh() }
+    }
+
+    @Test
+    fun linksSeededRowsAndAddsServerOnlyEpisodes() = runTest {
+        seed(
+            listOf(
+                scanned(publisher = publisher, program = program, title = "$program 2026-09-14-1", publishedAt = "2026-09-13T15:00:00Z"),
+                scanned(publisher = publisher, program = program, title = "$program 2026-09-14-2", publishedAt = "2026-09-13T15:00:00Z"),
+            ),
+        )
+        val seeded = library.observePrograms().first().single()
+        val listened = library.observeEpisodes(seeded.program.id).first().first { it.episode.title.endsWith("-2") }
+        playback.update(listened.episode.id) { PlaybackRules.advance(it, 24.minutes, 60.minutes, now) }
+        signInAndSelect()
+        gateway.snapshot = snapshot
+
+        val result = repo.refresh()
+
+        assertEquals(1, result.linkedPrograms)
+        assertEquals(2, result.linkedEpisodes)
+        assertEquals(1, result.newEpisodes, "relinked episodes are not new")
+        assertEquals(listOf(SourceItemId("lib-1")), gateway.fetchedLibraries)
+
+        val programs = library.observePrograms().first()
+        assertEquals(1, programs.size, "the seeded program must not be duplicated")
+        val summary = programs.single()
+        assertEquals("album-1", summary.program.sourceItemId?.value)
+        assertEquals(3, summary.episodeCount)
+        assertEquals(2, summary.localEpisodeCount)
+
+        val episodes = library.observeEpisodes(summary.program.id).first()
+        assertEquals(listOf("$program 2026-09-17-1", "$program 2026-09-14-1", "$program 2026-09-14-2"), episodes.map { it.episode.title })
+        val serverOnly = episodes.first()
+        assertEquals("audio-3", serverOnly.episode.sourceItemId?.value)
+        assertNull(serverOnly.localFile)
+        assertTrue(!serverOnly.isPlayable)
+
+        val relinked = episodes.first { it.episode.title.endsWith("-2") }
+        assertEquals("audio-2", relinked.episode.sourceItemId?.value)
+        assertEquals(24.minutes, relinked.playback?.position, "playback state survives matching")
+        assertEquals(60.minutes, relinked.episode.runtime, "server metadata overwrites the seeded values")
+        assertEquals(1024, relinked.episode.sizeBytes, "a value the server does not send keeps the seeded one")
+        assertEquals(Instant.parse("2026-09-16T02:00:00Z"), relinked.episode.addedAt)
+        assertTrue(relinked.localFile?.pinned == true)
+
+        assertIs<SessionState.Ready>(session.state.first()).let { assertEquals(now, it.lastFetchedAt) }
+    }
+
+    @Test
+    fun secondRefreshOverwritesServerRowsWithoutDuplicating() = runTest {
+        signInAndSelect()
+        gateway.snapshot = snapshot
+        repo.refresh()
+
+        gateway.snapshot = snapshot.copy(
+            programs = listOf(SourceProgram(SourceItemId("album-1"), "$program（改）", publisher)),
+            episodes = snapshot.episodes.map { if (it.sourceId.value == "audio-3") it.copy(title = "renamed") else it },
+        )
+        val result = repo.refresh()
+
+        assertEquals(0, result.linkedPrograms)
+        val summary = library.observePrograms().first().single()
+        assertEquals("$program（改）", summary.program.name)
+        assertEquals(3, summary.episodeCount)
+        assertTrue(library.observeEpisodes(summary.program.id).first().any { it.episode.title == "renamed" })
+    }
+
+    /** 出演者: 取り込みで各回に入り、次の取り込みでサーバの値で上書きされる（サーバに無くなれば空になる）。 */
+    @Test
+    fun performersAreStoredAndOverwrittenBySync() = runTest {
+        signInAndSelect()
+        gateway.snapshot = snapshot.copy(
+            episodes = snapshot.episodes.map {
+                when (it.sourceId.value) {
+                    "audio-1" -> it.copy(performers = listOf("向井慧", "ゲスト A"))
+                    else -> it
+                }
+            },
+        )
+        repo.refresh()
+        val programId = library.observePrograms().first().single().program.id
+        fun List<EpisodeWithState>.performersOf(id: String) =
+            first { it.episode.sourceItemId?.value == id }.episode.performers
+        var episodes = library.observeEpisodes(programId).first()
+        assertEquals(listOf("向井慧", "ゲスト A"), episodes.performersOf("audio-1"))
+        assertEquals(emptyList(), episodes.performersOf("audio-2"))
+
+        gateway.snapshot = snapshot.copy(
+            episodes = snapshot.episodes.map {
+                when (it.sourceId.value) {
+                    "audio-1" -> it.copy(performers = emptyList())
+                    "audio-2" -> it.copy(performers = listOf("向井慧"))
+                    else -> it
+                }
+            },
+        )
+        repo.refresh()
+        episodes = library.observeEpisodes(programId).first()
+        assertEquals(emptyList(), episodes.performersOf("audio-1"))
+        assertEquals(listOf("向井慧"), episodes.performersOf("audio-2"))
+    }
+
+    /** 新しい回: 取り込みで手元に増えた回だけを数える。2 回目以降は、サーバに回が増えた分だけ。 */
+    @Test
+    fun newEpisodesCountOnlyWhatTheDeviceDidNotHave() = runTest {
+        signInAndSelect()
+        gateway.snapshot = snapshot
+        assertEquals(3, repo.refresh().newEpisodes)
+        assertEquals(0, repo.refresh().newEpisodes)
+
+        gateway.snapshot = snapshot.copy(episodes = snapshot.episodes + sourceEpisode("audio-4", "$program 2026-09-21-1", "2026-09-20T15:00:00Z"))
+        val result = repo.refresh()
+        assertEquals(1, result.newEpisodes)
+        assertTrue(result.hasChanges)
+    }
+
+    /** 1 番組の同期も新しい回を数える。 */
+    @Test
+    fun syncProgramCountsNewEpisodes() = runTest {
+        signInAndSelect()
+        gateway.snapshot = snapshot
+        repo.refresh()
+        val programId = library.observePrograms().first().single().program.id
+
+        gateway.snapshot = snapshot.copy(episodes = snapshot.episodes + sourceEpisode("audio-4", "$program 2026-09-21-1", "2026-09-20T15:00:00Z"))
+        assertEquals(1, repo.syncProgram(programId)?.newEpisodes)
+        assertEquals(0, repo.syncProgram(programId)?.newEpisodes)
+
+        gateway.snapshot = snapshot.copy(episodes = snapshot.episodes + sourceEpisode("audio-5", "$program 2026-09-24-1", "2026-09-23T15:00:00Z"))
+        assertEquals(1, repo.syncProgram(programId)?.newEpisodes)
+    }
+
+    /** 番組ごとサーバの一覧から消えたら消失 = 判断保留（各回が消えた場合は RoomSyncTest）。 */
+    @Test
+    fun aProgramGoneFromTheServerIsLeftAlone() = runTest {
+        signInAndSelect()
+        gateway.snapshot = snapshot
+        repo.refresh()
+
+        gateway.snapshot = SourceSnapshot(emptyList(), emptyList())
+        repo.refresh()
+
+        assertEquals(3, library.observePrograms().first().single().episodeCount)
+    }
+
+    @Test
+    fun unauthorizedPropagatesAndLeavesDataUntouched() = runTest {
+        signInAndSelect()
+        gateway.snapshot = snapshot
+        repo.refresh()
+        gateway.failWith = SourceException.Unauthorized()
+
+        assertFailsWith<SourceException.Unauthorized> { repo.refresh() }
+        assertEquals(1, library.observePrograms().first().size)
+    }
+
+    /** 全走査を試みた時刻は、サーバに届かず失敗しても記録される。最終同期の時刻は成功したときだけ。 */
+    @Test
+    fun anUnreachableRefreshStillRecordsTheAttempt() = runTest {
+        signInAndSelect()
+        gateway.snapshot = snapshot
+        repo.refresh()
+        val fetchedAt = now
+        now += 90.minutes
+        gateway.failWith = SourceException.Unreachable()
+
+        assertFailsWith<SourceException.Unreachable> { repo.refresh() }
+
+        val ready = assertIs<SessionState.Ready>(session.state.first())
+        assertEquals(now, ready.lastAttemptedAt)
+        assertEquals(fetchedAt, ready.lastFetchedAt)
+    }
+
+    /** 1 番組の同期は試みとして記録しない（最終同期の時刻と同じ扱い）。 */
+    @Test
+    fun syncProgramDoesNotRecordAnAttempt() = runTest {
+        signInAndSelect()
+        gateway.snapshot = snapshot
+        repo.refresh()
+        val attemptedAt = now
+        now += 90.minutes
+        val programId = library.observePrograms().first().single().program.id
+
+        repo.syncProgram(programId)
+
+        assertEquals(attemptedAt, assertIs<SessionState.Ready>(session.state.first()).lastAttemptedAt)
+    }
+
+    /** 「取得元を変える」は行・セッションに加えて音声ファイルも消す（残しても到達する手段が無い）。 */
+    @Test
+    fun resetAllClearsRowsSessionAndFiles() = runTest {
+        signInAndSelect()
+        gateway.snapshot = snapshot
+        repo.refresh()
+        val directory = EpisodesDirectory(ApplicationProvider.getApplicationContext())
+        val file = directory.resolve("TBS/X/X 2026-06-12.m4a").apply { parentFile!!.mkdirs(); writeBytes(ByteArray(16)) }
+        assertTrue(file.isFile)
+        RoomLocalDataReset(db, store, directory, images).resetAll()
+        assertTrue(library.observePrograms().first().isEmpty())
+        assertIs<SessionState.SignedOut>(session.state.first())
+        assertFalse(file.exists())
+        assertTrue(directory.root!!.listFiles().isNullOrEmpty())
+    }
+}

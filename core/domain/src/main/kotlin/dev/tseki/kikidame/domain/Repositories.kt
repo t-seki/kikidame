@@ -1,0 +1,85 @@
+package dev.tseki.kikidame.domain
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlin.time.Duration
+import kotlin.time.Instant
+/** 番組一覧の 1 行。[LibraryRepository.observePrograms] は最新の各回の公開日順で返す（「よく聴く」タブはそのうちよく聴く番組だけを同じ順で出す）。 */
+data class ProgramSummary(
+    val program: Program,
+    /** 取得元にしか無い分も含めた各回の数。 */
+    val episodeCount: Int,
+    /** 手元にファイルがある各回の数。 */
+    val localEpisodeCount: Int,
+    /** 手元にファイルがあって再生済みでない各回の数。途中まで聴いた回・聴いている回も再生済みでなければ数える。取得元にしか無い回は数えない。 */
+    val unplayedLocalCount: Int,
+    val latestPublishedAt: Instant?,
+)
+/** 各回一覧・再生画面が使う、各回とその手元の状態。 */
+data class EpisodeWithState(
+    val episode: Episode,
+    val localFile: LocalFile?,
+    val playback: PlaybackState?,
+) {
+    val isPlayable: Boolean get() = localFile?.state == DownloadState.DONE && localFile.path != null
+    /**
+     * 次に開いたとき途中から再開する位置。先頭から始まる（未再生・末尾付近・記録なし）なら null。
+     * 一覧の進捗表示はこれに従い、再生済みかどうかは見ない。
+     */
+    val resumePosition: Duration?
+        get() = playback?.let { PlaybackRules.resumePosition(it.position, episode.runtime) }
+            ?.takeIf { it > Duration.ZERO }
+}
+/** 手元のファイルの合計。手元にある（DONE でパスがある）各回だけで、ダウンロード途中の分は入らない。 */
+data class LocalStorageUsage(val totalBytes: Long, val episodeCount: Int) {
+    companion object {
+        /** 一覧（番組の各回など）から数える。[LibraryRepository.observeLocalStorage] の全体の集計と同じ定義。 */
+        fun of(episodes: List<EpisodeWithState>): LocalStorageUsage {
+            val local = episodes.filter { it.isPlayable }
+            return LocalStorageUsage(local.sumOf { it.episode.sizeBytes }, local.size)
+        }
+    }
+}
+interface LibraryRepository {
+    /** 最新の各回の公開日が新しい順。 */
+    fun observePrograms(): Flow<List<ProgramSummary>>
+    /** 手元のファイルの合計。ダウンロード・削除で追従する。 */
+    fun observeLocalStorage(): Flow<LocalStorageUsage>
+    fun observeProgram(programId: ProgramId): Flow<Program?>
+    /** 番組を 1 回だけ読む。無ければ null。既定は [observeProgram] の最初の値（実装が DB に問い合わせを足さずに済むように）。 */
+    suspend fun getProgram(programId: ProgramId): Program? = observeProgram(programId).first()
+    /** [EpisodeOrder.newestFirst]（公開日の新しい順、同着はタイトルの辞書順）。 */
+    fun observeEpisodes(programId: ProgramId): Flow<List<EpisodeWithState>>
+    suspend fun getEpisode(episodeId: EpisodeId): EpisodeWithState?
+    /** 連続再生用。[EpisodeOrder] の順（古い順）で、手元にあるものだけ。 */
+    suspend fun getPlayableEpisodes(programId: ProgramId): List<EpisodeWithState>
+    /**
+     * 「続きから」の各回: 手元にあり（[EpisodeWithState.isPlayable]）、再生済みでなく、聴き始めている
+     * （[PlaybackRules.isNotStarted] が false）各回を、[PlaybackState.updatedAt] の新しい順に [limit] 件まで。
+     * Android Auto の「続きから」と、プレイヤーが空のときの再開（`onPlaybackResumption`）が使う。
+     */
+    suspend fun getContinueListening(limit: Int): List<EpisodeWithState>
+    /**
+     * [getContinueListening] と同じ条件・順で件数の上限なし。再生位置の保存・再生済みの切り替え・ファイルの削除や同期に追従する。
+     * 番組一覧の「続きから」タブが使う。
+     */
+    fun observeContinueListening(): Flow<List<EpisodeWithState>>
+
+    /** 同期対象と保持ルールを保存する。適用は次の同期（保存した瞬間には何も消えない）。 */
+    suspend fun updateSync(programId: ProgramId, syncEnabled: Boolean, rule: RetentionRule)
+
+    /** よく聴くの印を付ける／外す。表示にだけ効く。 */
+    suspend fun setStarred(programId: ProgramId, starred: Boolean)
+    /** 同期対象を OFF にしたら次の同期で消える回の数（固定でない手元のファイル）。確認ダイアログ用。 */
+    suspend fun countUnpinnedLocalFiles(programId: ProgramId): Int
+}
+interface PlaybackStateRepository {
+    suspend fun get(episodeId: EpisodeId): PlaybackState?
+    fun observe(episodeId: EpisodeId): Flow<PlaybackState?>
+    /**
+     * 行が無ければ [PlaybackState.initial] から始めて [transform] を適用し保存する。
+     * 読み取り・変換・書き込みは 1 トランザクション。ただし [PlaybackRules.isWorthRecording] が
+     * false（行が無く、結果も聴き始めていない）なら書かずに結果だけ返す。
+     * 位置か再生済みが変わったら、再生の共有の「未送信」の印を立てる（ADR 0010 の決定 5。送るのは共有する取得元のときだけ）。
+     */
+    suspend fun update(episodeId: EpisodeId, transform: (PlaybackState) -> PlaybackState): PlaybackState
+}

@@ -1,0 +1,62 @@
+name: Bug report
+description: Something does not work as expected
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. You can write in English or Japanese (日本語でも書けます).
+
+        This form is for bug reports only. Feature requests and questions go to [Discussions](https://github.com/t-seki/kikidame/discussions) (Ideas / Q&A).
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      description: Shown on the settings screen, or the tag of the Releases APK you installed.
+    validations:
+      required: true
+  - type: input
+    id: android
+    attributes:
+      label: Android version and device
+      placeholder: Android 15, Pixel 7a
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: Source type
+      options:
+        - Jellyfin book library
+        - Jellyfin music library
+        - Shared folder on a NAS (SMB)
+        - Folder on the device
+    validations:
+      required: true
+  - type: input
+    id: jellyfin-version
+    attributes:
+      label: Jellyfin version
+      description: Only if the source is Jellyfin.
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true

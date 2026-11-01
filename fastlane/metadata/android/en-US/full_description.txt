@@ -1,0 +1,22 @@
+Kikidame ("kiki-dame", from the Japanese for "listen to what you have saved up") is for people who keep recorded radio programs on a Jellyfin server, a NAS share or a folder on their phone. It downloads the episodes you want to your phone, program by program, and plays them without needing the source. Podcast files work too.
+
+What it does:
+
+- Retention rules per program: choose "Keep latest N" and "Delete after played", and sync (every 3 hours, Wi-Fi only if you like) downloads what is missing and removes what is no longer needed. Episodes you download by hand are pinned and never removed by the rules. If a file on the source is rewritten later (for example when chapters are added), sync replaces the copy on your device, keeping your playback position.
+- Offline first: playback always uses the files on your device. Playback position and played state are kept on the device, and playback does not stop when the server is unreachable (with a Jellyfin books library they are also shared with the server when it can be reached).
+- Player: background playback with notification and lock-screen controls, skip 10 seconds back and forward, speed 1.0x to 2.0x, sleep timer (by time or until the end of the episode), a chapter list (chapters embedded in the file), resume where you left off, and automatic advance to the next episode of the same program.
+- Android Auto: browse Continue / Starred / Programs on the car screen and play with the same rules as on the phone.
+- English and Japanese UI, switchable per app on Android 13 and later.
+- Open source under the MPL-2.0. No accounts, no ads, no tracking.
+
+Not for: music (episodes do not pile up) or audiobooks (you listen from the oldest chapter, so "keep the latest N" makes no sense).
+
+Requires one of these, depending on where your recordings are:
+
+- Jellyfin 10.10 or later, with your audio in a books library or a music library (album = program, album artist = publisher). A books library is recommended: the playback position and played state are shared with Jellyfin Web and other devices signed in as the same user
+- A NAS shared folder (SMB2/3), with a folder per publisher, a folder per program inside it, and the episode files inside that
+- A folder on your device, organized the same way
+
+And Android 12 or later.
+
+Kikidame assumes one source at a time (one Jellyfin server, user and library, or one NAS shared folder or folder on the device), and, except with a Jellyfin books library, that this app is the only place you listen. Source and issues: https://github.com/t-seki/kikidame

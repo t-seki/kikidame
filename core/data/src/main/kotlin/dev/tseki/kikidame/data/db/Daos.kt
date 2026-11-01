@@ -1,0 +1,451 @@
+package dev.tseki.kikidame.data.db
+import androidx.room.Dao
+import androidx.room.Embedded
+import androidx.room.Insert
+import androidx.room.Query
+import androidx.room.Relation
+import androidx.room.Transaction
+import androidx.room.Update
+import androidx.room.Upsert
+import dev.tseki.kikidame.domain.DownloadState
+import kotlinx.coroutines.flow.Flow
+import kotlin.time.Instant
+data class ProgramSummaryRow(
+    @Embedded val program: ProgramEntity,
+    val episodeCount: Int,
+    val localEpisodeCount: Int,
+    val unplayedLocalCount: Int,
+    val latestPublishedAt: Long?,
+)
+/** 取得元に見つからない番組（消失・取得元 ID 無し）の件数。手元の回は [LOCAL_FILE_PRESENT] と同じ定義。 */
+data class UnmatchedRow(val programCount: Int, val localEpisodeCount: Int, val pinnedEpisodeCount: Int)
+data class LocalUsageRow(val totalBytes: Long, val episodeCount: Int)
+/** 番組ごとの手元のファイル。内訳は重ならない 3 つ（固定・固定でない再生済み・固定でない未再生）。 */
+data class ProgramStorageRow(
+    val programId: Long,
+    val programName: String,
+    val totalBytes: Long,
+    val episodeCount: Int,
+    val pinnedCount: Int,
+    val playedUnpinnedCount: Int,
+    val unplayedUnpinnedCount: Int,
+)
+/** 手元の回 1 つ。 */
+data class LocalEpisodeRow(
+    val episodeId: Long,
+    val programId: Long,
+    val programName: String,
+    val title: String,
+    val publishedAt: Instant,
+    val sizeBytes: Long,
+    val pinned: Boolean,
+    val played: Boolean,
+    val hasSourceItemId: Boolean,
+    val programSyncEnabled: Boolean,
+)
+/** 突合に必要な列だけ。 */
+data class ProgramKeyRow(val id: Long, val sourceItemId: String?, val publisherName: String?, val name: String)
+data class EpisodeKeyRow(val id: Long, val sourceItemId: String?, val programId: Long, val title: String, val publishedAt: Instant, val runtimeTicks: Long)
+/** 共有フォルダで前に取り込んだ回の、タグ由来の値とファイルのサイズ・更新日時。 */
+data class ScannedFileRow(
+    val sourceItemId: String,
+    val title: String,
+    val publishedAt: Instant,
+    val runtimeTicks: Long,
+    val performers: List<String>,
+    val sourceFileSize: Long,
+    val sourceModifiedAt: Instant,
+)
+/** 差し替え（ADR 0011）を考える手元の回: 手元にあり（DONE でパスがある）、取得元 ID を持ち、まだ差し替えを予約していない回。 */
+data class ReplaceCandidateRow(
+    val episodeId: Long,
+    val sourceItemId: String,
+    val path: String,
+    /** 落としたときの版（`local_files.sourceVersion`）。 */
+    val sourceVersion: String?,
+)
+/** 同期の判断に必要な列だけ（`SyncPlanner` の入力）。`local_files` / `playback_states` が無ければ null。 */
+data class EpisodeSyncRow(
+    val id: Long,
+    val sourceItemId: String?,
+    val programId: Long,
+    val publishedAt: Instant,
+    val title: String,
+    val pinned: Boolean?,
+    val hasLocalFile: Boolean,
+    val played: Boolean?,
+)
+@Dao
+interface ProgramDao {
+    @Query(
+        """
+        SELECT p.*, COUNT(e.id) AS episodeCount,
+               SUM(CASE WHEN $LOCAL_FILE_PRESENT THEN 1 ELSE 0 END) AS localEpisodeCount,
+               SUM(CASE WHEN $LOCAL_FILE_PRESENT AND COALESCE(ps.played, 0) = 0 THEN 1 ELSE 0 END) AS unplayedLocalCount,
+               MAX(e.publishedAt) AS latestPublishedAt
+        FROM programs p
+          LEFT JOIN episodes e ON e.programId = p.id
+          LEFT JOIN local_files lf ON lf.episodeId = e.id
+          LEFT JOIN playback_states ps ON ps.episodeId = e.id
+        GROUP BY p.id
+        ORDER BY latestPublishedAt DESC, p.name ASC
+        """,
+    )
+    fun observeSummaries(): Flow<List<ProgramSummaryRow>>
+    @Query("SELECT * FROM programs WHERE id = :id")
+    fun observeById(id: Long): Flow<ProgramEntity?>
+    @Query("SELECT * FROM programs WHERE sourceItemId = :sourceItemId")
+    suspend fun findBySourceItemId(sourceItemId: String): ProgramEntity?
+    @Query("SELECT id, sourceItemId, publisherName, name FROM programs")
+    suspend fun listKeys(): List<ProgramKeyRow>
+    @Query("UPDATE programs SET sourceItemId = :sourceItemId WHERE id = :id")
+    suspend fun setSourceItemId(id: Long, sourceItemId: String)
+    @Query("UPDATE programs SET name = :name, publisherName = :publisherName WHERE id = :id")
+    suspend fun updateNames(id: Long, name: String, publisherName: String?)
+    @Query("UPDATE programs SET syncEnabled = :syncEnabled, keepLatest = :keepLatest, deleteAfterPlayed = :deleteAfterPlayed WHERE id = :id")
+    suspend fun updateSync(id: Long, syncEnabled: Boolean, keepLatest: Int?, deleteAfterPlayed: Boolean)
+    @Query("SELECT * FROM programs")
+    suspend fun listAll(): List<ProgramEntity>
+    @Query("UPDATE programs SET goneSince = :at WHERE id = :id")
+    suspend fun setGoneSince(id: Long, at: Instant?)
+    /** 番組の画像（ADR 0009）の版とファイルを書く。画像を持たなくなったらどちらも null。 */
+    @Query("UPDATE programs SET imageVersion = :version, imagePath = :path WHERE id = :id")
+    suspend fun setImage(id: Long, version: String?, path: String?)
+    /** 手元に持っている番組の画像のファイル（どの行からも指されていないファイルを消すのに使う）。 */
+    @Query("SELECT imagePath FROM programs WHERE imagePath IS NOT NULL")
+    suspend fun listImagePaths(): List<String>
+    @Query("UPDATE programs SET starred = :starred WHERE id = :id")
+    suspend fun setStarred(id: Long, starred: Boolean)
+    @Insert
+    suspend fun insert(program: ProgramEntity): Long
+    @Query("DELETE FROM programs")
+    suspend fun deleteAll()
+    @Query("DELETE FROM programs WHERE id = :id")
+    suspend fun deleteById(id: Long)
+    @Query("SELECT * FROM programs WHERE id = :id")
+    suspend fun findById(id: Long): ProgramEntity?
+
+    /** 取得元に見つからない番組（消失した番組と取得元 ID の無い番組）の id。 */
+    @Query("SELECT p.id FROM programs p WHERE " + UNMATCHED_CONDITION)
+    suspend fun listUnmatchedIds(): List<Long>
+
+    /** 取得元に見つからない番組全部の件数。変わるたびに流す。 */
+    @Query(UNMATCHED_COUNTS + " WHERE " + UNMATCHED_CONDITION)
+    fun observeUnmatched(): Flow<UnmatchedRow>
+
+    /** [ids] の番組の件数（確認に出す件数。[listUnmatchedIds] から聴いている番組を除いた id を渡す）。 */
+    @Query(UNMATCHED_COUNTS + " WHERE p.id IN (:ids)")
+    suspend fun countByIds(ids: List<Long>): UnmatchedRow
+}
+/** 各回とその手元の状態。`@Relation` の to-one は行が無ければ null。 */
+data class EpisodeRow(
+    @Embedded val episode: EpisodeEntity,
+    @Relation(parentColumn = "id", entityColumn = "episodeId") val localFile: LocalFileEntity?,
+    @Relation(parentColumn = "id", entityColumn = "episodeId") val playback: PlaybackStateEntity?,
+)
+/** 「手元にある」（ダウンロード完了でパスがある）の条件。`local_files` を `lf` で結合した問い合わせに埋め込む。domain の `EpisodeWithState.isPlayable` と同じ定義。 */
+private const val LOCAL_FILE_PRESENT = "lf.state = 'DONE' AND lf.path IS NOT NULL"
+
+/** 取得元に見つからない番組（消失した番組と取得元 ID の無い番組）の条件。`programs` を `p` で結合した問い合わせに埋め込む。 */
+private const val UNMATCHED_CONDITION = "(p.goneSince IS NOT NULL OR p.sourceItemId IS NULL)"
+
+/** [UnmatchedRow] を返す問い合わせの本体（WHERE は呼ぶ側が足す）。 */
+private const val UNMATCHED_COUNTS = """
+    SELECT COUNT(DISTINCT p.id) AS programCount,
+           COALESCE(SUM(CASE WHEN $LOCAL_FILE_PRESENT THEN 1 ELSE 0 END), 0) AS localEpisodeCount,
+           COALESCE(SUM(CASE WHEN $LOCAL_FILE_PRESENT AND lf.pinned = 1 THEN 1 ELSE 0 END), 0) AS pinnedEpisodeCount
+    FROM programs p
+      LEFT JOIN episodes e ON e.programId = p.id
+      LEFT JOIN local_files lf ON lf.episodeId = e.id
+    """
+
+/** 手元の回の行（[LocalEpisodeRow]）を返す問い合わせの本体。条件を足すときは AND で続け、並びは呼ぶ側が足す。 */
+private const val LOCAL_EPISODES = """
+    SELECT e.id AS episodeId, e.programId AS programId, p.name AS programName, e.title AS title,
+           e.publishedAt AS publishedAt, e.sizeBytes AS sizeBytes, lf.pinned AS pinned,
+           COALESCE(ps.played, 0) AS played, (e.sourceItemId IS NOT NULL) AS hasSourceItemId,
+           p.syncEnabled AS programSyncEnabled
+    FROM local_files lf
+      JOIN episodes e ON e.id = lf.episodeId
+      JOIN programs p ON p.id = e.programId
+      LEFT JOIN playback_states ps ON ps.episodeId = e.id
+    WHERE $LOCAL_FILE_PRESENT
+    """
+
+/** 「続きから」の条件と順。Auto・再開の上限付きの読み出しと、アプリの「続きから」タブの追従する読み出しで共有する。 */
+private const val CONTINUE_LISTENING = """
+    SELECT e.* FROM episodes e
+      JOIN local_files lf ON lf.episodeId = e.id
+      JOIN playback_states ps ON ps.episodeId = e.id
+    WHERE $LOCAL_FILE_PRESENT AND ps.played = 0 AND ps.positionTicks >= :notStartedTicks
+    ORDER BY ps.updatedAt DESC, e.id DESC
+    """
+@Dao
+interface EpisodeDao {
+    @Transaction
+    @Query("SELECT * FROM episodes WHERE programId = :programId")
+    fun observeByProgram(programId: Long): Flow<List<EpisodeRow>>
+    @Transaction
+    @Query("SELECT * FROM episodes WHERE programId = :programId")
+    suspend fun listByProgram(programId: Long): List<EpisodeRow>
+    @Transaction
+    @Query("SELECT * FROM episodes WHERE id = :id")
+    suspend fun findById(id: Long): EpisodeRow?
+    /**
+     * 「続きから」の各回: 手元にあり、再生済みでなく、聴き始めている（位置が [notStartedTicks] 以上）各回を
+     * 記録の新しい順に。閾値の値は [dev.tseki.kikidame.domain.PlaybackRules.NOT_STARTED_THRESHOLD] から呼び出し側が渡す
+     * （規則の由来は 1 箇所のまま、絞り込みは SQL で。LIMIT の前に絞らないと上位が未開始の回で埋まったとき空になる）。
+     */
+    @Transaction
+    @Query("$CONTINUE_LISTENING LIMIT :limit")
+    suspend fun listContinueListening(limit: Int, notStartedTicks: Long): List<EpisodeRow>
+    /** [listContinueListening] と同じ条件・順で、件数の上限なし。変化（再生位置の保存・再生済み・ファイルの削除）に追従する（「続きから」タブ）。 */
+    @Transaction
+    @Query(CONTINUE_LISTENING)
+    fun observeContinueListening(notStartedTicks: Long): Flow<List<EpisodeRow>>
+    @Query("SELECT * FROM episodes WHERE sourceItemId = :sourceItemId")
+    suspend fun findBySourceItemId(sourceItemId: String): EpisodeEntity?
+    @Query("SELECT id, sourceItemId, programId, title, publishedAt, runtimeTicks FROM episodes")
+    suspend fun listKeys(): List<EpisodeKeyRow>
+    /** 共有フォルダで取り込んだ回（ファイルのサイズと更新日時を持つ行）だけ。タグを読み直すかの判定に使う。 */
+    @Query(
+        """
+        SELECT sourceItemId, title, publishedAt, runtimeTicks, performers, sourceFileSize, sourceModifiedAt
+        FROM episodes
+        WHERE sourceItemId IS NOT NULL AND sourceFileSize IS NOT NULL AND sourceModifiedAt IS NOT NULL
+        """,
+    )
+    suspend fun listScannedFiles(): List<ScannedFileRow>
+    /** 全各回を 1 クエリで（番組ごとに @Relation を引かない）。 */
+    @Query(
+        """
+        SELECT e.id, e.sourceItemId, e.programId, e.publishedAt, e.title,
+               lf.pinned AS pinned, (lf.episodeId IS NOT NULL) AS hasLocalFile, ps.played AS played
+        FROM episodes e
+          LEFT JOIN local_files lf ON lf.episodeId = e.id
+          LEFT JOIN playback_states ps ON ps.episodeId = e.id
+        """,
+    )
+    suspend fun listSyncRows(): List<EpisodeSyncRow>
+    @Query("UPDATE episodes SET sourceItemId = :sourceItemId WHERE id = :id")
+    suspend fun setSourceItemId(id: Long, sourceItemId: String)
+    @Insert
+    suspend fun insert(episode: EpisodeEntity): Long
+    @Update
+    suspend fun update(episode: EpisodeEntity)
+    @Query("UPDATE episodes SET sizeBytes = :sizeBytes WHERE id = :id")
+    suspend fun updateSize(id: Long, sizeBytes: Long)
+    /** 一覧で最後に見たファイルの版（ADR 0011）。 */
+    @Query("SELECT sourceVersion FROM episodes WHERE id = :id")
+    suspend fun findSourceVersion(id: Long): String?
+    @Query("DELETE FROM episodes WHERE id = :id")
+    suspend fun deleteById(id: Long)
+    @Query("SELECT COUNT(*) FROM episodes WHERE programId = :programId")
+    suspend fun countByProgram(programId: Long): Int
+}
+@Dao
+interface LocalFileDao {
+    /**
+     * 手元のファイルの合計。sizeBytes はダウンロード完了時に実サイズで上書きされている
+     * （`SdkJellyfinGateway` はサイズを返さないので、同期の取り込みで上書きされることはない。返すようにするなら DONE の行は守ること。
+     * 差し替えのために問い合わせた大きさ（ADR 0011）は `SourceEpisode.sizeBytes` に載せない）。
+     */
+    @Query(
+        """
+        SELECT COALESCE(SUM(e.sizeBytes), 0) AS totalBytes, COUNT(lf.episodeId) AS episodeCount
+        FROM local_files lf JOIN episodes e ON e.id = lf.episodeId
+        WHERE $LOCAL_FILE_PRESENT
+        """,
+    )
+    fun observeUsage(): Flow<LocalUsageRow>
+    /**
+     * 番組ごとの手元のファイル。[observeUsage] と同じ定義の手元の回だけを数え、手元の回の無い番組は出さない。
+     * 容量の大きい順、同じなら番組名・id の順。再生済みの行が無い回は未再生。
+     */
+    @Query(
+        """
+        SELECT p.id AS programId, p.name AS programName,
+               COALESCE(SUM(e.sizeBytes), 0) AS totalBytes, COUNT(*) AS episodeCount,
+               SUM(CASE WHEN lf.pinned = 1 THEN 1 ELSE 0 END) AS pinnedCount,
+               SUM(CASE WHEN lf.pinned = 0 AND COALESCE(ps.played, 0) = 1 THEN 1 ELSE 0 END) AS playedUnpinnedCount,
+               SUM(CASE WHEN lf.pinned = 0 AND COALESCE(ps.played, 0) = 0 THEN 1 ELSE 0 END) AS unplayedUnpinnedCount
+        FROM local_files lf
+          JOIN episodes e ON e.id = lf.episodeId
+          JOIN programs p ON p.id = e.programId
+          LEFT JOIN playback_states ps ON ps.episodeId = e.id
+        WHERE $LOCAL_FILE_PRESENT
+        GROUP BY p.id
+        ORDER BY totalBytes DESC, p.name ASC, p.id ASC
+        """,
+    )
+    fun observeProgramStorage(): Flow<List<ProgramStorageRow>>
+    /** 全番組の手元の回。[observeUsage] と同じ定義。容量の大きい順、同じなら公開日の新しい順・id の順。 */
+    @Query("$LOCAL_EPISODES ORDER BY e.sizeBytes DESC, e.publishedAt DESC, e.id ASC")
+    fun observeLocalEpisodes(): Flow<List<LocalEpisodeRow>>
+    /** [programId] の番組の手元の回。並びは呼ぶ側が決める（公開日の新しい順。タイトルの比べ方を Kotlin 側に揃えるため）。 */
+    @Query("$LOCAL_EPISODES AND e.programId = :programId")
+    fun observeLocalEpisodesByProgram(programId: Long): Flow<List<LocalEpisodeRow>>
+    @Query("SELECT * FROM local_files WHERE path = :path")
+    suspend fun findByPath(path: String): LocalFileEntity?
+    @Query("SELECT * FROM local_files WHERE episodeId = :episodeId")
+    suspend fun findByEpisode(episodeId: Long): LocalFileEntity?
+    @Query("SELECT * FROM local_files WHERE state = :state")
+    suspend fun listByState(state: DownloadState): List<LocalFileEntity>
+    /**
+     * キューの先頭: 手動（固定）の予約が常に先、その中はキューに入れた順（FIFO）。
+     * 差し替えの予約（`replaceState = 'PENDING'`、ADR 0011）も同じ待ち行列に入る。差し替えは同期の予約なので、固定した回の差し替えでも手動の予約の後に並ぶ。
+     * `enqueuedAt` は v3 で足した nullable なので NULL を先頭に来させない。同時刻は公開日の新しい順で安定させる。
+     */
+    @Query(
+        """
+        SELECT lf.* FROM local_files lf JOIN episodes e ON e.id = lf.episodeId
+        WHERE lf.state = 'PENDING' OR lf.replaceState = 'PENDING'
+        ORDER BY (lf.state = 'PENDING' AND lf.pinned = 1) DESC, lf.enqueuedAt IS NULL, lf.enqueuedAt ASC,
+                 e.publishedAt DESC, e.title ASC, e.id ASC LIMIT 1
+        """,
+    )
+    suspend fun nextPending(): LocalFileEntity?
+    /** 差し替えを考える手元の回（[ReplaceCandidateRow]）。 */
+    @Query(
+        """
+        SELECT lf.episodeId AS episodeId, e.sourceItemId AS sourceItemId, lf.path AS path, lf.sourceVersion AS sourceVersion
+        FROM local_files lf JOIN episodes e ON e.id = lf.episodeId
+        WHERE $LOCAL_FILE_PRESENT AND e.sourceItemId IS NOT NULL AND lf.replaceState IS NULL
+        """,
+    )
+    suspend fun listReplaceCandidates(): List<ReplaceCandidateRow>
+    /** 番組の手元のファイルのパス（番組ごとの削除用）。 */
+    @Query("SELECT lf.path FROM local_files lf JOIN episodes e ON e.id = lf.episodeId WHERE e.programId = :programId AND lf.path IS NOT NULL")
+    suspend fun listPathsByProgram(programId: Long): List<String>
+    /** 固定でない手元の行の数（同期対象を OFF にしたら次の同期で消える回）。 */
+    @Query("SELECT COUNT(*) FROM local_files lf JOIN episodes e ON e.id = lf.episodeId WHERE e.programId = :programId AND lf.pinned = 0")
+    suspend fun countUnpinnedByProgram(programId: Long): Int
+    @Query("UPDATE local_files SET state = 'PENDING' WHERE state = 'FAILED' AND attemptCount < :maxAttempts")
+    suspend fun requeueFailed(maxAttempts: Int)
+    @Query("UPDATE local_files SET state = 'PENDING' WHERE state = 'RUNNING'")
+    suspend fun resetRunning()
+    @Upsert
+    suspend fun upsert(localFile: LocalFileEntity)
+    @Query("DELETE FROM local_files WHERE episodeId = :episodeId")
+    suspend fun delete(episodeId: Long)
+
+    // 以下は 1 回の状態の更新を 1 つの文で行う。行を読んでから upsert すると、間に別の経路が書いた列を古い値で戻し、
+    // 間に消された行を生き返らせる。1 つの文にすると読み書きの間が無くなり、行が無ければ何も書かず、変える列だけを書く。
+    // 状態を条件にするもの（deleteUnlessDone・retryFailed・resetToPending）は、条件を見ることと書くことも同じ文で行う。
+    // markRunning と markFailed は状態を条件にしない（WHERE episodeId だけ）。防ぐのは、消された行を生き返らせることと、
+    // ほかの列を巻き戻すことだけで、DONE の行を RUNNING / FAILED にすることは防がない。置き換え前の upsert も状態を見ておらず、
+    // 防ぐのは状態の遷移ではないので、そのままにしている
+    @Query("DELETE FROM local_files WHERE episodeId = :episodeId AND state != 'DONE'")
+    suspend fun deleteUnlessDone(episodeId: Long): Int
+    @Query("UPDATE local_files SET state = 'PENDING', enqueuedAt = :enqueuedAt WHERE episodeId = :episodeId AND state = 'FAILED'")
+    suspend fun retryFailed(episodeId: Long, enqueuedAt: Instant)
+    @Query("UPDATE local_files SET pinned = 1 WHERE episodeId = :episodeId AND state = 'DONE' AND pinned = 0")
+    suspend fun pin(episodeId: Long)
+    @Query("UPDATE local_files SET pinned = 0 WHERE episodeId = :episodeId AND pinned = 1")
+    suspend fun unpin(episodeId: Long)
+    @Query("UPDATE local_files SET state = 'PENDING' WHERE episodeId = :episodeId AND state = 'RUNNING'")
+    suspend fun resetToPending(episodeId: Long)
+    @Query("UPDATE local_files SET state = 'RUNNING', lastAttemptAt = :at WHERE episodeId = :episodeId")
+    suspend fun markRunning(episodeId: Long, at: Instant)
+    @Query("UPDATE local_files SET state = 'FAILED', attemptCount = attemptCount + 1, lastAttemptAt = :at WHERE episodeId = :episodeId")
+    suspend fun markFailed(episodeId: Long, at: Instant)
+
+    // 差し替え（ADR 0011）。どれも state（DONE）には触らない。上と同じく 1 回の更新を 1 つの文で行う
+    /** 落としたときの版を書く（差し替えずに、中身が同じと分かったとき）。手元にある行だけ。 */
+    @Query("UPDATE local_files SET sourceVersion = :version WHERE episodeId = :episodeId AND state = 'DONE'")
+    suspend fun setSourceVersion(episodeId: Long, version: String)
+    /** 差し替えを予約する。手元にあって、まだ予約していない行だけ。予約したら 1。 */
+    @Query(
+        """UPDATE local_files SET replaceState = 'PENDING', replaceVersion = :version, enqueuedAt = :enqueuedAt
+        WHERE episodeId = :episodeId AND state = 'DONE' AND path IS NOT NULL AND replaceState IS NULL""",
+    )
+    suspend fun reserveReplace(episodeId: Long, version: String?, enqueuedAt: Instant): Int
+    @Query("UPDATE local_files SET replaceState = 'RUNNING', lastAttemptAt = :at WHERE episodeId = :episodeId AND replaceState IS NOT NULL")
+    suspend fun markReplaceRunning(episodeId: Long, at: Instant)
+    /** 落とし終えた差し替えを確定する。落としている最中の行だけ。確定したら 1。 */
+    @Query(
+        """UPDATE local_files SET sourceVersion = replaceVersion, replaceState = NULL, replaceVersion = NULL, downloadedAt = :at
+        WHERE episodeId = :episodeId AND state = 'DONE' AND replaceState = 'RUNNING'""",
+    )
+    suspend fun markReplaced(episodeId: Long, at: Instant): Int
+    @Query("UPDATE local_files SET replaceState = NULL, replaceVersion = NULL WHERE episodeId = :episodeId")
+    suspend fun abandonReplace(episodeId: Long)
+    @Query("UPDATE local_files SET replaceState = 'PENDING' WHERE replaceState = 'RUNNING'")
+    suspend fun resetRunningReplacements()
+}
+/** 再生の共有（ADR 0010）の突き合わせに使う、各回の取得元 ID とその再生の状態の行（無ければ null）。 */
+data class SharedPlaybackRow(
+    val episodeId: Long,
+    val sourceItemId: String,
+    @Embedded(prefix = "ps_") val state: PlaybackStateEntity?,
+)
+
+@Dao
+interface PlaybackStateDao {
+    @Query("SELECT * FROM playback_states WHERE episodeId = :episodeId")
+    suspend fun findByEpisode(episodeId: Long): PlaybackStateEntity?
+    @Query("SELECT * FROM playback_states WHERE episodeId = :episodeId")
+    fun observeByEpisode(episodeId: Long): Flow<PlaybackStateEntity?>
+    @Upsert
+    suspend fun upsert(state: PlaybackStateEntity)
+
+    /** 取得元 ID を持つ各回すべてと、その再生の状態（再生の共有の突き合わせ）。 */
+    @Query(
+        """SELECT e.id AS episodeId, e.sourceItemId AS sourceItemId,
+            ps.episodeId AS ps_episodeId, ps.positionTicks AS ps_positionTicks, ps.played AS ps_played, ps.updatedAt AS ps_updatedAt,
+            ps.sharePending AS ps_sharePending, ps.sharedPositionTicks AS ps_sharedPositionTicks, ps.sharedPlayed AS ps_sharedPlayed,
+            ps.sharedLastPlayedAt AS ps_sharedLastPlayedAt
+        FROM episodes e LEFT JOIN playback_states ps ON ps.episodeId = e.id
+        WHERE e.sourceItemId IS NOT NULL""",
+    )
+    suspend fun listShared(): List<SharedPlaybackRow>
+
+    /** 1 つの各回の [listShared] の行。取得元 ID が無ければ null。 */
+    @Query(
+        """SELECT e.id AS episodeId, e.sourceItemId AS sourceItemId,
+            ps.episodeId AS ps_episodeId, ps.positionTicks AS ps_positionTicks, ps.played AS ps_played, ps.updatedAt AS ps_updatedAt,
+            ps.sharePending AS ps_sharePending, ps.sharedPositionTicks AS ps_sharedPositionTicks, ps.sharedPlayed AS ps_sharedPlayed,
+            ps.sharedLastPlayedAt AS ps_sharedLastPlayedAt
+        FROM episodes e LEFT JOIN playback_states ps ON ps.episodeId = e.id
+        WHERE e.id = :episodeId AND e.sourceItemId IS NOT NULL""",
+    )
+    suspend fun findShared(episodeId: Long): SharedPlaybackRow?
+
+    /** 未送信の各回（取得元 ID を持つものだけ）。再生の状態が書かれるたびに流れる。 */
+    @Query(
+        """SELECT e.id AS episodeId, e.sourceItemId AS sourceItemId,
+            ps.episodeId AS ps_episodeId, ps.positionTicks AS ps_positionTicks, ps.played AS ps_played, ps.updatedAt AS ps_updatedAt,
+            ps.sharePending AS ps_sharePending, ps.sharedPositionTicks AS ps_sharedPositionTicks, ps.sharedPlayed AS ps_sharedPlayed,
+            ps.sharedLastPlayedAt AS ps_sharedLastPlayedAt
+        FROM playback_states ps JOIN episodes e ON ps.episodeId = e.id
+        WHERE ps.sharePending = 1 AND e.sourceItemId IS NOT NULL
+        ORDER BY ps.updatedAt""",
+    )
+    fun observePending(): Flow<List<SharedPlaybackRow>>
+
+    /**
+     * 送った後。最後に見た取得元の値を [position]・[played]・[lastPlayedAt]（サーバが返した値）にし、送った後に手元が変わっていなければ
+     * （位置・再生済み・更新時刻が送ったときのまま）未送信の印を下ろす。変わっていれば印は残し、次に送る。
+     */
+    @Query(
+        """UPDATE playback_states SET sharedPositionTicks = :position, sharedPlayed = :played, sharedLastPlayedAt = :lastPlayedAt,
+            sharePending = CASE WHEN positionTicks = :sentPosition AND played = :sentPlayed AND updatedAt = :sentUpdatedAt THEN 0 ELSE sharePending END
+        WHERE episodeId = :episodeId""",
+    )
+    suspend fun markSent(
+        episodeId: Long,
+        position: Long,
+        played: Boolean,
+        lastPlayedAt: Instant?,
+        sentPosition: Long,
+        sentPlayed: Boolean,
+        sentUpdatedAt: Instant,
+    )
+
+    /** 突合で取得元 ID が変わった回（ADR 0010 の決定 7）。未送信にし、前の ID で見た値は忘れる。 */
+    @Query(
+        """UPDATE playback_states SET sharePending = 1, sharedPositionTicks = NULL, sharedPlayed = NULL, sharedLastPlayedAt = NULL
+        WHERE episodeId = :episodeId""",
+    )
+    suspend fun markRelinked(episodeId: Long)
+}

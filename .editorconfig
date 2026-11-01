@@ -1,0 +1,8 @@
+root = true
+
+[*.{kt,kts}]
+# ktlint は standard の規則を全部切り、使う規則だけを enabled にする。
+# 規則を広げるときは別の issue で扱う
+ktlint_standard = disabled
+ktlint_standard_no-unused-imports = enabled
+ktlint_standard_no-consecutive-blank-lines = enabled

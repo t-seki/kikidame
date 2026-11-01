@@ -1,0 +1,4 @@
+- Programs screen is now three tabs: Continue, Starred and All programs. It reopens the tab you used last
+- Sync messages now show only what changed (new episodes, downloads queued, files deleted); background sync shows them too when something changed
+- Background sync no longer shows the spinner; a thin "Syncing in background…" bar appears instead
+- While the server is unreachable, the app tries to sync at launch at most once an hour

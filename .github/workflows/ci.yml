@@ -1,0 +1,71 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # ADR を足したら docs/architecture.md の「参照」の一覧にも足す
+      - name: ADR index in architecture is complete
+        run: scripts/check-adr-index.sh
+      # repo が追跡している Markdown に自 repo の issue・PR の番号（#N）があると落とす。検査自体の落ちる例・通る例も流す
+      - name: No issue or PR numbers in Markdown
+        run: |
+          scripts/test-check-issue-refs.sh
+          scripts/check-issue-refs.sh
+      # docs と README のインラインコードの .sh が repo にもリンクにも無いと落とす。検査自体の落ちる例・通る例も流す
+      - name: Doc script references resolve
+        run: |
+          scripts/test-check-doc-script-refs.sh
+          scripts/check-doc-script-refs.sh
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+        with:
+          packages: platforms;android-37.0 build-tools;36.0.0 platform-tools
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
+      # 未使用 import と連続した空行だけを見る ktlint。規則は .editorconfig。自動ではコミットしない
+      - name: Kotlin style (ktlint)
+        run: ./gradlew lintKotlin --no-daemon
+      - name: Unit tests (JVM + Robolectric, no emulator)
+        run: ./gradlew test --no-daemon
+      # lint: MissingTranslation（values/ と values-ja/ の片方だけの追加）と UnsafeOptInUsageError を落とす
+      - name: Lint
+        run: ./gradlew :app:lintDebug --no-daemon
+      # core/domain は純 JVM で Android Lint の NewApi が効かないので、animal-sniffer で minSdk 31 の API シグネチャと照合する
+      - name: API level check (core/domain)
+        run: ./gradlew :core:domain:animalsnifferMain --no-daemon
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: failure()
+        with:
+          name: test-reports
+          path: |
+            **/build/reports/tests/
+            app/build/reports/lint-results-debug.*
+  # release ビルドと aboutlibraries.json の鮮度。署名なし（KIKIDAME_KEYSTORE を渡さない）で回し、Secrets は使わない
+  release-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+        with:
+          packages: platforms;android-37.0 build-tools;36.0.0 platform-tools
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
+      - name: Release build (unsigned, R8)
+        run: ./gradlew :app:assembleRelease --no-daemon
+      - name: aboutlibraries.json is up to date
+        run: |
+          ./gradlew :app:exportLibraryDefinitions --no-daemon
+          if ! git diff --exit-code -- app/src/main/res/raw/aboutlibraries.json; then
+            echo "::error::app/src/main/res/raw/aboutlibraries.json が古い。./gradlew :app:exportLibraryDefinitions を流して app/src/main/res/raw/aboutlibraries.json をコミットする"
+            exit 1
+          fi
