@@ -184,10 +184,10 @@ Auto はブラウズツリーを開き直すたびに `onGetChildren` を呼ぶ�
 - 初回はスマホに「この車で使う」許可画面（FRX）が出る。5 秒以内に進めないと `PROJECTION_NOT_STARTED` で切れる（logcat に `CarInfo authorization: UNKNOWN` → `Triggering FRX`）ので、スマホの画面を見ながら繋ぐ
 - DHU を途中で落とすとスマホのヘッドユニットサーバーが「Already connected」で固まる（`DeveloperHeadUnitNetworkService` の FATAL）。DHU 側は「Waiting for phone」のまま。Android Auto の ⋮ から「ヘッドユニット サーバーを停止」→「起動」で直る
 - portaudio の `Device unavailable` は無視してよい（DHU 側で音は出ないが再生は進む）
-- `installDebug` は applicationId が別なので release ビルドに触らない。release ビルドそのものをデータを残したまま手元のビルドで更新するなら、release 署名で上書きする:
+- `installDebug` は applicationId が別なので release ビルドに触らない。release ビルドそのものをデータを残したまま手元のビルドで更新するなら、release 署名で上書きする（署名鍵を持つ人向け）:
 
   ```bash
-  source ~/.android-keys/kikidame.env          # export KIKIDAME_KEYSTORE=… 等を書いた chmod 600 のファイル（git 管理外）
+  source <env ファイル>          # export KIKIDAME_KEYSTORE=… 等を書いた chmod 600 のファイル（git 管理外）
   ./gradlew :app:assembleRelease
   $ADB pull "$($ADB shell pm path dev.tseki.kikidame | cut -d: -f2)" installed.apk
   APKSIGNER=~/Android/Sdk/build-tools/36.0.0/apksigner   # バージョンは ls ~/Android/Sdk/build-tools/ で確かめる
@@ -214,9 +214,9 @@ Auto はブラウズツリーを開き直すたびに `onGetChildren` を呼ぶ�
 ### 準備
 
 - debug ビルドを実機に入れておく（[接続](#接続)）
-- 端末の内部ストレージに、試験用の 3 段のフォルダを `adb push` で置く。`SRC` は手元の m4a と mp3（タグの付いたものと無いもの）を置いたフォルダに読み替える。`@eaDir` のような無視する名前のフォルダと、音声でないファイルも混ぜる:
+- 端末の内部ストレージに、試験用の 3 段のフォルダを `adb push` で置く。`SRC` には、m4a と mp3（タグの付いたものと無いもの）を置いたフォルダを入れる（`tagged.m4a` と `untagged.mp3` の名前で置く）。`@eaDir` のような無視する名前のフォルダと、音声でないファイルも混ぜる:
   ```bash
-  SRC=~/kikidame-test-audio
+  SRC=<音声のフォルダ>
   $ADB shell mkdir -p /sdcard/KikidameTest/Radio/TBS/Junk /sdcard/KikidameTest/Radio/TBS/Empty /sdcard/KikidameTest/Radio/@eaDir
   $ADB push "$SRC/tagged.m4a" /sdcard/KikidameTest/Radio/TBS/Junk/2026-10-01.m4a
   $ADB push "$SRC/untagged.mp3" /sdcard/KikidameTest/Radio/TBS/Junk/2026-10-08.mp3
