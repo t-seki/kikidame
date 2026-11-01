@@ -23,8 +23,7 @@
 - 落とした後に取得元のファイルが書き換わったときの差し替え（[architecture/download.md](./architecture/download.md) の「差し替え」）は、サーバがライブラリを走査し直してから気づく。ファイルの大きさが変わらない書き換えには気づかない
 - **再生の共有**（ブックのライブラリだけ）: 各回の再生位置と再生済みを、Jellyfin の UserData（各回の再生位置・再生済み・最後に再生した日時）に書き、ほかで書かれた値を取り込む
   - **Kikidame と Jellyfin Web などのほかのクライアントで、同じ Jellyfin のユーザーでログインする。** UserData は Jellyfin のユーザーと各回の組ごとにサーバの DB に置かれ（音声ファイルには書かれない）、別のユーザーで聴いた分は分け合えない
-  - 送るのは、一時停止・停止・回の終わり・再生済みの手動切替のとき。読むのは、同期のたびと、回を鳴らし始める直前。同期のとき、聴いている回は手元のまま。送る・読む正確なタイミングと待つ長さは、[architecture/playback.md](./architecture/playback.md) の「再生位置と再生済み」
-  - 両方で変わっていたら、新しい方を採る（手元で変えた時刻と、サーバの最後に再生した日時を比べる）
+  - 送る・読む時機と、ほかで変わっていたときにどちらを採るかの規則は、[adr/0010-share-playback-state-via-jellyfin-book-library.md](./adr/0010-share-playback-state-via-jellyfin-book-library.md)。正確なタイミングと待つ長さは、[architecture/playback.md](./architecture/playback.md) の「再生位置と再生済み」
   - サーバに届かないときも手元の再生は止まらない。送れなかった分は次の同期で送る。設定の「最終同期」の下の「再生の共有」に、最後に共有できた時刻と、送れなかったことが出る（通知は出さない）
   - ほかで再生済みになった回も、同期で取り込んだ後は「再生済みなら削除」の対象になる
   - Jellyfin Web などは、サーバの規則で位置と再生済みを決めるので、閾値が Kikidame の再生済み（末尾から 2 分）と違う。これまでに確かめたサーバの規則は、[architecture/playback.md](./architecture/playback.md) の「再生位置と再生済み」

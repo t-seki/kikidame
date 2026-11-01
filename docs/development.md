@@ -65,13 +65,17 @@ Entity を変えたらスキーマの版を上げ、書き出された JSON も�
 ./gradlew :app:exportLibraryDefinitions
 ```
 
+### docs の検査
+
+CI の `test` job は、docs を次の 3 つで確かめる。どれも手元で repo 直下から流せる。後ろの 2 つは、落ちる例と通る例を流すテスト（`scripts/test-check-issue-refs.sh` と `scripts/test-check-doc-script-refs.sh`）も CI で流す。
+
+- `scripts/check-adr-index.sh`: `docs/adr/*.md` のファイル名（`README.md` を除く）が `docs/adr/README.md` に出ているかを確かめ、欠けていれば名前を出して落とす。一覧の文面が正しいかは確かめない
+- `scripts/check-issue-refs.sh`: repo が追跡している Markdown の全部に、自 repo の issue・PR の番号（`#` と 1〜5 桁の数字）があると落とす。他の repo の参照（`owner/repo` の後ろの番号）と URL のアンカーは通す。コード（`.kt` など）は見ない（色の 16 進と当たるため）
+- `scripts/check-doc-script-refs.sh`: `docs/**/*.md` と `README*.md` のインラインコードに書かれたシェルスクリプトのファイル名が、repo の中にもリンクの中にも無いと落とす（コードブロックの中は見ない）。見るのは空白で区切った語のうち末尾が拡張子 sh のもので、repo 直下、またはその Markdown のあるフォルダからの相対パスにファイルが無く、`[…](…)` の形のリンクの中にも無いものを落とす（`~/…`・`$HOME/…`・glob のようなパスの形でない語も、ファイルが無いとして落とす）。直し方は、repo の中のスクリプトは `scripts/check-adr-index.sh` のようにパス付きで書き、ほかの repo のものは `https://…` のリンクにする。リンク先の URL が実在するかは確かめない。バッククォートの範囲は前から順に拾うので、span の中にバッククォートがあるとずれることがある
+
 ## docs と ADR の決まり
 
-ADR（`docs/adr/`）を足したら、`docs/adr/README.md` の ADR の一覧にも足す。CI の `test` job の先頭で `scripts/check-adr-index.sh` が、`docs/adr/*.md` のファイル名（`README.md` を除く）が `docs/adr/README.md` に出ているかを確かめ、欠けていれば名前を出して落とす（手元でも repo 直下で流せる）。一覧の文面が正しいかは確かめない。
-
-同じく `test` job で `scripts/check-issue-refs.sh` が、repo が追跡している Markdown の全部（`git ls-files '*.md'`）に、自 repo の issue・PR の番号（`#` と 1〜5 桁の数字）があると落とす。他の repo の参照（`owner/repo` の後ろの番号）と URL のアンカーは通す。コード（`.kt` など）は見ない（色の 16 進と当たるため）。手元でも repo 直下で流せる。落ちる例と通る例は `scripts/test-check-issue-refs.sh` が流す（これも CI で流す）。
-
-同じく `test` job で `scripts/check-doc-script-refs.sh` が、`docs/**/*.md` と `README*.md` のインラインコード（バッククォートに挟まれた範囲を前から順に拾う。span の中にバッククォートがあるとずれることがある）に書かれたシェルスクリプトのファイル名が、repo の中にもリンクの中にも無いと落とす。見るのは空白で区切った語のうち末尾が拡張子 sh のもので、repo 直下、またはその Markdown のあるフォルダからの相対パスにファイルが無く、`[…](…)` の形のリンクの中にも無いものを落とす（`~/…`・`$HOME/…`・glob のようなパスの形でない語も、ファイルが無いとして落とす。コードブロックの中は見ない）。直し方は、repo の中のスクリプトは `scripts/check-adr-index.sh` のようにパス付きで書き、ほかの repo のものは `https://…` のリンクにする。手元でも repo 直下で流せる。落ちる例と通る例は `scripts/test-check-doc-script-refs.sh` が流す（これも CI で流す）。リンク先の URL が実在するかは確かめない。
+ADR（`docs/adr/`）を足したら、`docs/adr/README.md` の ADR の一覧にも足す（検査は「ビルド・テスト」の「docs の検査」）。
 
 ADR（`docs/adr/`）は、今の決定を書く文書にする。決定が変わったら、本文をそのまま書き換えて改める。経緯は git の履歴に任せ、末尾の注記・`superseded`・`status` は使わない。決定ごと取り消すときは、その ADR を消すか、別の ADR の「退けた案」に移す。
 - frontmatter は `date:` だけにする。`date:` は最初に決めた日のままにし、書き換えても動かさない（最後に書き換えた日は git で分かる）。ほかの ADR から分けて新しく作った ADR の `date:` は、分けた元の ADR の日付にする（番号は足した順の通し番号で、日付の順とずれてよい）
