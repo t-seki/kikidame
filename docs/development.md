@@ -86,7 +86,7 @@ docs・ADR・README・`CONTEXT.md`・コードのコメントには、自 repo �
 
 ## テスト用 Jellyfin サーバ
 
-対応範囲は Jellyfin **10.10 以上**。Jellyfin のバージョンごとの差（`MediaStream.IsOriginal` を返さない Jellyfin サーバがあり、SDK 1.9 はそれを必須と見なす、等。どのバージョンかは確かめていない）は
+対応範囲は Jellyfin **10.10 以上**。Jellyfin のバージョンごとの差（`MediaStream.IsOriginal` を返さない Jellyfin サーバがあり、SDK 1.9 はそれを必須と見なす、等。どのバージョンで返さないかは未確認）は
 本物のサーバに当てないと分からないので、コンテナで立てて `SdkJellyfinGateway` の統合テストを回す。docker と ffmpeg と curl と python3 が要る。
 
 ```bash
@@ -121,7 +121,7 @@ KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTe
   `fetchFileSize`（`Range: bytes=0-0` の 206 の `Content-Range` の全長）が落とした本文の長さと同じことを見る。Jellyfin 10.10.7 と 12.0 で通した
 - 認証は SDK が付ける `Authorization: MediaBrowser Client="Kikidame", Version="…", DeviceId="…", Device="…"` の 1 形式だけ
   （レガシーの `X-Emby-Authorization` は送らない）
-- 実機（Android）からコンテナに繋ぐには、実機から届く HTTPS の URL が要る。アプリは `http://` の URL を受け付けない（`normalizeServerUrl` が `plain http is not supported` で弾く）ので、`adb reverse` で `http://localhost` につなぐ形は使えない。開発機のコンテナのポート（Jellyfin 12 なら `http://localhost:8098`）を、実機から届く HTTPS で公開する（リバースプロキシや、VPN の HTTPS 公開機能など。手順は使う道具による）。アプリの接続画面では、その URL とユーザー `kikidame` / パスワード `kikidame-test` で入る。ただし「取得元を変える」は手元のデータを消すので、本番のサーバに繋いだ実機では試さない
+- 実機（Android）からコンテナに繋ぐには、実機から届く HTTPS の URL が要る。アプリは `http://` の URL を受け付けない（`normalizeServerUrl` が `plain http is not supported` で弾く）ので、`adb reverse` で `http://localhost` につなぐ形は使えない。開発機のコンテナのポート（Jellyfin 12 なら `http://localhost:8098`）を、実機から届く HTTPS で公開する（リバースプロキシなど。手順は使う道具による）。アプリの接続画面では、その URL とユーザー `kikidame` / パスワード `kikidame-test` で入る。ただし「取得元を変える」は手元のデータを消すので、本番のサーバに繋いだ実機では試さない
 
 確認した Jellyfin（統合テスト 5 件、番組 2 / 各回 6）:
 

@@ -33,28 +33,28 @@
 
 温かい黒（赤みのある黒）にアンバーのアクセント。状態を表す色は **`primary`（アンバー）と `error`（赤）の 2 系統だけ** にし、それ以外の意味を色に持たせない（聴いている回の行の背景だけ `secondaryContainer` で示す。タブの選択の表示は下の「共通の規則」）。
 
-| スロット | ダーク | ライト | 使いどころ |
-| --- | --- | --- | --- |
-| `primary` | `#F5A623` | `#9A5B00` | よく聴く ★・同期対象・聴いている回の印・節の見出し・進捗・選んでいるタブの文字と下線 |
-| `onPrimary` | `#3D2600` | `#FFFFFF` | 再生ボタンのアイコン |
-| `primaryContainer` | `#5A3A00` | `#FFDDB3` | 選択中のチップ |
-| `onPrimaryContainer` | `#FFE2B8` | `#2E1B00` | |
-| `secondaryContainer` | `#3A2D15` | `#F3E3C8` | 聴いている回の行の背景、ボトムシート内の選択 |
-| `onSecondaryContainer` | `#F2DDB8` | `#2E2312` | |
-| `surface` | `#141210` | `#FBF7F1` | 画面の地 |
-| `onSurface` | `#EDE5DA` | `#1F1A14` | 本文 |
-| `background` / `onBackground` | surface / onSurface と同じ | 同左 | Scaffold の地。既定のままだと Material3 の素の色が透ける |
-| `onSurfaceVariant` | `#B3A58F` | `#5E5347` | 補足行・ラベル・選んでいないタブの文字 |
-| `surfaceContainerLow` | `#1B1815` | `#F5F0E8` | |
-| `surfaceContainer` | `#211D18` | `#EFE9DF` | TopAppBar の地。ミニプレイヤーはこれに `primary` を 18% 混ぜた面 |
-| `surfaceContainerHigh` | `#2B261F` | `#E8E1D5` | ボトムシート |
-| `surfaceContainerHighest` | `#35302A` | `#E1D9CC` | 入力欄 |
-| `error` | `#FF7A68` | `#B3261E` | 消失（雲）・ダウンロード失敗・破壊的操作 |
-| `onError` | `#3B0906` | `#FFFFFF` | |
-| `outline` | `#7A6E5C` | `#8A7D6C` | チップの枠 |
-| `outlineVariant` | `#4A4136` | `#D6CCBC` | 区切り線 |
+| スロット | 使いどころ |
+|---|---|
+| `primary` | よく聴く ★・同期対象・聴いている回の印・節の見出し・進捗・選んでいるタブの文字と下線 |
+| `onPrimary` | 再生ボタンのアイコン |
+| `primaryContainer` | 選択中のチップ |
+| `onPrimaryContainer` | `primaryContainer` の上の文字 |
+| `secondaryContainer` | 聴いている回の行の背景、ボトムシート内の選択 |
+| `onSecondaryContainer` | `secondaryContainer` の上の文字 |
+| `surface` | 画面の地 |
+| `onSurface` | 本文 |
+| `background` / `onBackground` | Scaffold の地。既定のままだと Material3 の素の色が透ける |
+| `onSurfaceVariant` | 補足行・ラベル・選んでいないタブの文字 |
+| `surfaceContainerLow` | `surface` より少しだけ明るい面 |
+| `surfaceContainer` | TopAppBar の地。ミニプレイヤーはこれに `primary` を 18% 混ぜた面 |
+| `surfaceContainerHigh` | ボトムシート |
+| `surfaceContainerHighest` | 入力欄 |
+| `error` | 消失（雲）・ダウンロード失敗・破壊的操作 |
+| `onError` | `error` の上の文字 |
+| `outline` | チップの枠 |
+| `outlineVariant` | 区切り線 |
 
-上に無いスロットは Material3 の `darkColorScheme()` / `lightColorScheme()` の既定のまま。
+具体的な色の値は `app/src/main/kotlin/dev/tseki/kikidame/ui/theme/Theme.kt`（`DarkColors` / `LightColors`）を正とし、この表には書かない（二重に持つと食い違う）。上に無いスロットは Material3 の `darkColorScheme()` / `lightColorScheme()` の既定のまま。
 
 ## タイポグラフィ
 
