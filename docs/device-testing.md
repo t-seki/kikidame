@@ -38,6 +38,8 @@ LAN 上の端末には TCP で届くので、USB が見えない環境でもつ�
 
 `adb mdns services` は、adb サーバを起動した直後には何も出さず、少し待つと出る場合がある。空なら少し待って打ち直す。
 
+マシンごとに初回は `adb pair` が要る（ペア設定は端末とマシンの組ごと）。`adb mdns services` で端末が見つからない場合がある。そのときは、端末のワイヤレスデバッグ画面に出ている IP:ポートを見て、`adb connect` する。
+
 つないだ後は、同じ端末が「IP:ポート」と「mDNS の名前（`adb-…._adb-tls-connect._tcp`）」の 2 つで `adb devices` に出ることがある。`-s` も `ANDROID_SERIAL` も無いと `more than one device` で失敗するので、`ANDROID_SERIAL` に IP:ポートを入れて export する（手順 4 と同じ）。
 
 ```bash
@@ -60,6 +62,10 @@ $ADB shell getprop ro.product.model
   ```
 - 機内モードのテストで TCP のワイヤレス接続が切れることがある。`$ADB devices` の mDNS 側の名前
   （`adb-…_adb-tls-connect._tcp`）を `ANDROID_SERIAL` に使えばそのまま届く
+
+### 別の PC でビルドした debug ビルドが入っているとき
+
+debug の APK は PC ごとの `~/.android/debug.keystore` で署名される。別の PC でビルドした debug ビルドが端末に入っていると、この PC のビルドの上書きインストールが `INSTALL_FAILED_UPDATE_INCOMPATIBLE` で失敗する。`uninstall` すれば入れ直せるが、debug ビルドのデータは消える。
 
 ## ダウンロード
 

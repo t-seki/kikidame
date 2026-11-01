@@ -1,7 +1,7 @@
 # メンテナの手元の環境
 
 作者（メンテナ）の手元の環境と運用の記録。署名鍵の置き場、テスト用の音声の置き場、複数の PC で作業するときの注意をまとめる。
-ここに書いたパスと機器は作者のもので、コントリビューターは読まなくてよい。ビルド・テスト・リリースの手順そのものは [development.md](./development.md)、実機の手順は [device-testing.md](./device-testing.md) にあり、手元の環境によらない書き方をしている。
+ここに書いたパスと機器は作者のもので、コントリビューターは読まなくてよい。ビルド・テスト・リリースの手順そのものは [development.md](./development.md)、実機の手順は [device-testing.md](./device-testing.md) にあり、手元の環境によらない書き方をしている（複数の PC で作業するときに当たる `adb pair` と debug 署名の違いの説明も device-testing.md にある）。
 
 ## 署名鍵の置き場
 
@@ -30,5 +30,4 @@ SRC=~/kikidame-test-audio
 
 ## 複数の PC で作業するとき
 
-- マシンごとに初回は `adb pair` が要る（ペア設定は端末とマシンの組ごと）。`adb mdns services` で端末が見つからない場合がある。そのときは、端末のワイヤレスデバッグ画面に出ている IP:ポートを見て、`adb connect` する
-- 別の PC でビルドした debug ビルドが端末に入っていると、この PC のビルドの上書きインストールが `INSTALL_FAILED_UPDATE_INCOMPATIBLE` で失敗する。debug の APK は PC ごとの `~/.android/debug.keystore` で署名されるため。`uninstall` すれば入れ直せるが、debug ビルドのデータは消える
+作者は 1 台の端末を複数の PC から使う。そのため PC を替えるたびに、[device-testing.md](./device-testing.md) の「接続」にある `adb pair` のやり直しと、「別の PC でビルドした debug ビルドが入っているとき」の `uninstall` が要る。説明は device-testing.md にあり、ここには書かない。
