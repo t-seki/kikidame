@@ -45,7 +45,7 @@
 | `onSurface` | 本文 |
 | `background` / `onBackground` | Scaffold の地。既定のままだと Material3 の素の色が透ける |
 | `onSurfaceVariant` | 補足行・ラベル・選んでいないタブの文字 |
-| `surfaceContainerLow` | `surface` より少しだけ明るい面 |
+| `surfaceContainerLow` | `surface` と `surfaceContainer` の間の段の面 |
 | `surfaceContainer` | TopAppBar の地。ミニプレイヤーはこれに `primary` を 18% 混ぜた面 |
 | `surfaceContainerHigh` | ボトムシート |
 | `surfaceContainerHighest` | 入力欄 |
