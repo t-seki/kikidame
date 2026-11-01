@@ -33,6 +33,8 @@ The app uses one source at a time. Details and what has been tested are in [docs
 
 Tag the files with `album` = program, `albumartist` = publisher (the station, for radio), the date = published date, and `artist` = performers. A Jellyfin library groups episodes into programs by these tags. A NAS share or a folder on the device must be laid out exactly as `<publisher>/<program>/<episode files>`; the folder names give the publisher and program, and the tags give the title, date and performers. On a NAS with thousands of files, the first import can take ten minutes or more; keep the app open with the screen on until it finishes.
 
+To record radio programs (Japan's radiko) in this layout and with these tags, use [rajikura](https://github.com/t-seki/rajikura), a recording tool by the same author. Its Jellyfin preset saves `<station>/<program>/<program> YYYY-MM-DD.m4a` with `albumartist` = station and `album` = program, and puts a `folder.jpg` in each program folder. Kikidame reading its output as it is has not been verified yet. For other files, a general tag editor such as Mp3tag works.
+
 ## What it does
 
 - **Program list** — search by program or publisher name, and filter by publisher. Programs you mark with ☆ (**Starred**) get their own tab. A program that is no longer on the source is marked "Not found in the source"
