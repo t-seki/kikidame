@@ -67,7 +67,7 @@ Kikidame の今の設計を述べる文書。用語は `CONTEXT.md` の定義に
 - Media3 DownloadManager / SimpleCache によるダウンロード
 - `/Sessions/Playing/*` による「再生中」のサーバ通知
 - オーディオブック向けの並び（古い章から順に聴くので「最新 N 回」が合わない。番組に「向き」を足す設計が要る。`CONTEXT.md`「番組型の音声」）
-- Google Play での配布と課金（ADR 0005）
+- Google Play での課金（有料のアプリ、アプリ内課金。ADR 0014。Play での無料の配布は目標）
 
 ## 参照
 

@@ -17,7 +17,7 @@ Pull requests that change code are not accepted. The maintainer designs and revi
 
 ## Generative AI
 
-Most of the app's code is written with Claude Code (see [docs/adr/0005-open-source-distributed-outside-play.md](./docs/adr/0005-open-source-distributed-outside-play.md)). For translation pull requests, machine translation and generative AI are fine, but only if someone who reads that language has checked the result.
+Most of the app's code is written with Claude Code (see [docs/adr/0005-open-source-distributed-via-github-releases.md](./docs/adr/0005-open-source-distributed-via-github-releases.md)). For translation pull requests, machine translation and generative AI are fine, but only if someone who reads that language has checked the result.
 
 ## Documentation
 
