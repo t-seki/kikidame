@@ -1,2 +1,2 @@
-- Settings: "Remove battery optimization" now opens the battery optimization list; find Kikidame there and set it to not optimized
+- Settings: "Turn off battery optimization" now opens the battery optimization list; find Kikidame there and set it to not optimized
 - Settings: added a row that opens the privacy policy
