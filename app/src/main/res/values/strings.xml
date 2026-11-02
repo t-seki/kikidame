@@ -423,7 +423,7 @@
     <string name="settings_wifi_only">Wi-Fi only</string>
     <string name="settings_wifi_only_description">Turn off to download over mobile data too</string>
     <string name="settings_battery_optimization">Turn off battery optimization</string>
-    <string name="settings_battery_optimization_description">Background sync runs closer to schedule. May use a little more battery.</string>
+    <string name="settings_battery_optimization_description">Opens the battery optimization list. Find Kikidame there and set it to not optimized so background sync runs closer to schedule. May use a little more battery.</string>
     <string name="settings_section_display">Display</string>
     <string name="settings_theme">Theme</string>
     <string name="settings_theme_system">System</string>
@@ -441,6 +441,8 @@
     <string name="settings_version">Version</string>
     <string name="settings_license">License</string>
     <string name="settings_license_description">Unofficial client, not affiliated with the Jellyfin project. Tap for the source code</string>
+    <string name="settings_privacy_policy">Privacy policy</string>
+    <string name="settings_privacy_policy_description">What data the app handles. Tap to open</string>
     <string name="settings_open_source_licenses">Open source licenses</string>
     <string name="settings_open_source_licenses_description">Libraries in use and their licenses</string>
     <string name="settings_sign_out_title">Sign out?</string>

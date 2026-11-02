@@ -308,7 +308,7 @@
     <string name="settings_wifi_only">Wi-Fi のみ</string>
     <string name="settings_wifi_only_description">オフにするとモバイル回線でもダウンロードします</string>
     <string name="settings_battery_optimization">電池の最適化を外す</string>
-    <string name="settings_battery_optimization_description">外すとバックグラウンドの同期が遅れにくくなります。電池の減りが少し増えることがあります</string>
+    <string name="settings_battery_optimization_description">電池の最適化の一覧が開きます。一覧から Kikidame を探して最適化しない設定にすると、バックグラウンドの同期が遅れにくくなります。電池の減りが少し増えることがあります</string>
     <string name="settings_section_display">表示</string>
     <string name="settings_theme">テーマ</string>
     <string name="settings_theme_system">システム</string>
@@ -325,6 +325,8 @@
     <string name="settings_version">バージョン</string>
     <string name="settings_license">ライセンス</string>
     <string name="settings_license_description">Jellyfin プロジェクトとは無関係の非公式クライアント。タップでソースコードへ</string>
+    <string name="settings_privacy_policy">プライバシー ポリシー</string>
+    <string name="settings_privacy_policy_description">アプリが扱うデータについて。タップで開く</string>
     <string name="settings_open_source_licenses">オープンソースライセンス</string>
     <string name="settings_open_source_licenses_description">使っているライブラリとそのライセンス</string>
     <string name="settings_sign_out_title">ログアウトしますか？</string>

@@ -5,14 +5,15 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Test
 import org.junit.runner.RunWith
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
-/** 電池の最適化を外す OS の確認の Intent。action と `package:` の URI を見る（Robolectric）。 */
+/** 電池の最適化の一覧の画面を開く Intent。権限の要らない action で、URI を付けない（Robolectric）。 */
 @RunWith(AndroidJUnit4::class)
 class BatteryOptimizationTest {
     @Test
-    fun intentAsksTheOsToIgnoreOptimizationsForThePackage() {
-        val intent = ignoreBatteryOptimizationsIntent("dev.tseki.kikidame")
-        assertEquals(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, intent.action)
-        assertEquals("package:dev.tseki.kikidame", intent.data.toString())
+    fun intentOpensTheBatteryOptimizationList() {
+        val intent = batteryOptimizationSettingsIntent()
+        assertEquals(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS, intent.action)
+        assertNull(intent.data)
     }
 }
