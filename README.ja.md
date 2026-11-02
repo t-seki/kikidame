@@ -6,7 +6,7 @@ English: [README.md](./README.md)
 
 名前は「聴き溜め」から。放送された回を録り溜め、時間のあるときに手元で聴く、というアプリの用途そのものです。
 
-https://github.com/user-attachments/assets/32c5be2d-5aee-4df7-baac-68106685913f
+https://github.com/user-attachments/assets/57cfc319-f561-46e8-878b-c6f96fc64565
 
 <p>
 <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" width="180" alt="Continue"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" width="180" alt="Episodes"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" width="180" alt="Player"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/4.png" width="180" alt="Sync settings">
