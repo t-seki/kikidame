@@ -134,8 +134,9 @@ KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTe
 
 この節はメンテナ向け（署名鍵を持ち、リリースを出す人）。コントリビューターは読まなくてよい。
 
-配布は GitHub Releases の署名済み APK（ADR 0005）。`v*` のタグを push すると `.github/workflows/release.yml` が
-release APK をビルドし、`kikidame-<version>.apk` と R8 の `mapping-<version>.txt` を Release に添付する。
+配布は GitHub Releases の署名済み APK（ADR 0005）と Google Play（ADR 0014）。`v*` のタグを push すると `.github/workflows/release.yml` が
+release APK と AAB を同じ鍵で署名してビルドし、`kikidame-<version>.apk`、`kikidame-<version>.aab`、R8 の `mapping-<version>.txt` を Release に添付する。
+Play へは当面、Release の AAB を Play Console に手でアップロードする（CI から直接は上げない。ADR 0014）。
 
 ### 署名鍵
 
@@ -148,6 +149,7 @@ release APK をビルドし、`kikidame-<version>.apk` と R8 の `mapping-<vers
   export KIKIDAME_KEYSTORE_PASSWORD=…   # 鍵のパスワードが別なら KIKIDAME_KEY_PASSWORD も
   export KIKIDAME_KEY_ALIAS=kikidame
   ./gradlew :app:assembleRelease         # app/build/outputs/apk/release/app-release.apk
+  ./gradlew :app:bundleRelease           # app/build/outputs/bundle/release/app-release.aab（Play 用）
   ```
 
 - 上の `export` は、repo の外の chmod 600 のファイルに書いて `source` すると毎回打たずに済む。値を表示するコマンド（`cat` / `grep`）は打たない
@@ -164,7 +166,8 @@ release APK をビルドし、`kikidame-<version>.apk` と R8 の `mapping-<vers
      grep -rnE "リリースしたバージョン|リリース済み|released build|release build|debug ビルドだけ|debug ビルドのみ|debug build only|debug builds? only" README*.md docs
      ```
 2. `git tag vX.Y.Z && git push origin vX.Y.Z`。タグと `versionName` が食い違うと workflow が止まる
-3. Release が作られたら、Obtainium で更新が見えることと、実機で `adb install -r` して既存データが残ることを確認する
+3. Release が作られたら、その Release の `kikidame-<version>.aab` を Play Console に手でアップロードする（画面の操作はここでは書かない）。Release に `.aab` が並んでも Obtainium が APK を選べるかは未確認（最初のリリースの後に確かめる）
+4. Release が作られたら、Obtainium で更新が見えることと、実機で `adb install -r` して既存データが残ることを確認する
 
 release ビルドは R8 と resource shrinking を有効にしている（APK は debug より大きく縮む）。
 ライブラリの consumer rules で足りていて `app/proguard-rules.pro` は最小限。縮小で壊れたら、`mapping-<version>.txt` でスタックトレースを戻せる。
