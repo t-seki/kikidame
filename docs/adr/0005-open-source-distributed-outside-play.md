@@ -1,6 +1,9 @@
 ---
 date: 2026-09-20
 ---
+
+> **注記（2026-11-02）**: 「Google Play を通さず」は [ADR 0014](0014-also-distribute-free-on-google-play.md) で上書きされた。Play でも無料で配る（課金はしない）。Releases・Obtainium での配布は続き、IzzyOnDroid・F-Droid 本家に申請しない理由もこのまま。以下は決めた当時の記録として残す。
+
 アプリはオープンソースとして公開し（ライセンスは ADR 0012）、Google Play を通さず、**GitHub Releases** の署名済みの APK と、Releases を追って更新を知らせる **Obtainium** で無償で配る。IzzyOnDroid と F-Droid 本家には申請しない。
 
 ## Play を通さない理由
