@@ -6,7 +6,7 @@ An Android app for people who record **radio programs** and keep the recordings 
 
 The name comes from the Japanese 聴き溜め (*kiki-dame*, "listen to what you have saved up"): record the episodes as they air, then listen to them on your phone when you have time.
 
-https://github.com/user-attachments/assets/346c00bd-e9a7-4568-8849-70ac8e59ad58
+https://github.com/user-attachments/assets/079a473b-afb7-485f-b26c-9a99210cf2b6
 
 <p>
 <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" width="180" alt="Continue"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" width="180" alt="Episodes"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" width="180" alt="Player"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/4.png" width="180" alt="Sync settings">
