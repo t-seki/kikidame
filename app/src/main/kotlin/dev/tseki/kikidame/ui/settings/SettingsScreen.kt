@@ -103,9 +103,11 @@ internal fun SessionState.Ready.lastSyncNote(): LastSyncNote? {
     }
 }
 
-/** 電池の最適化の対象から外す OS の確認のダイアログを出す Intent。`package:` の URI 付き。 */
-internal fun ignoreBatteryOptimizationsIntent(packageName: String): Intent =
-    Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.fromParts("package", packageName, null))
+/**
+ * 電池の最適化の一覧の画面を開く Intent。権限は要らない（Play の方針で直接の除外は求められないため。ADR 0014）。
+ * 一覧からこのアプリを探して外すのは利用者。
+ */
+internal fun batteryOptimizationSettingsIntent(): Intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
 
 /** このアプリが電池の最適化の対象のとき true（対象外なら行ごと出さない）。 */
 internal fun isBatteryOptimized(context: Context): Boolean =
@@ -333,13 +335,13 @@ internal fun SettingsContent(
                 supportingContent = { Text(stringResource(R.string.settings_wifi_only_description)) },
                 trailingContent = { Switch(checked = wifiOnly, onCheckedChange = onSetWifiOnly) },
             )
-            // 電池の最適化の対象のときだけ出す。外すと裏の同期が遅れにくくなる。押すと OS の確認のダイアログ
+            // 電池の最適化の対象のときだけ出す。外すと裏の同期が遅れにくくなる。押すと電池の最適化の一覧の画面
             if (batteryOptimized) {
                 ListItem(
                     modifier = Modifier.clickable {
                         // その設定画面を持たない ROM では何も起きない（落とさない）
                         try {
-                            context.startActivity(ignoreBatteryOptimizationsIntent(context.packageName))
+                            context.startActivity(batteryOptimizationSettingsIntent())
                         } catch (_: ActivityNotFoundException) {
                         }
                     },
@@ -400,6 +402,11 @@ internal fun SettingsContent(
                 supporting = stringResource(R.string.settings_license_description),
             )
             ListItem(
+                modifier = Modifier.clickable { uriHandler.openUri(PRIVACY_POLICY_URL) },
+                headlineContent = { Text(stringResource(R.string.settings_privacy_policy)) },
+                supportingContent = { Text(stringResource(R.string.settings_privacy_policy_description)) },
+            )
+            ListItem(
                 modifier = Modifier.clickable(onClick = onOpenLicenses),
                 headlineContent = { Text(stringResource(R.string.settings_open_source_licenses)) },
                 supportingContent = { Text(stringResource(R.string.settings_open_source_licenses_description)) },
@@ -450,6 +457,7 @@ private fun ThemeMode.label(): Int = when (this) {
 }
 
 private const val SOURCE_URL = "https://github.com/t-seki/kikidame"
+private const val PRIVACY_POLICY_URL = "https://github.com/t-seki/kikidame/blob/main/PRIVACY.md"
 
 private val previewJellyfinSession = Session(serverUrl = "https://jellyfin.example.com", userName = "alice", userId = "u1", accessToken = "t")
 
