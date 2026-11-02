@@ -17,8 +17,9 @@ Kikidame is an open-source, unofficial client for listening to program-style aud
 - The access token and the SMB password are encrypted with a key held in the Android Keystore. Your Jellyfin password is not stored.
 - A local database of programs, episodes, and your playback positions, the downloaded audio files, and program images.
 - App settings (for example, Wi-Fi only and theme).
-- Signing out removes the credentials. "Change source" removes all of the above local data. Uninstalling the app removes the app's data from the device.
-- The app's manifest does not turn off Android's app data backup, so the system's default backup behavior applies to the app's data.
+- Signing out removes the access token and the SMB password. The server URL, user name, and SMB host, share, and folder stay on the device to prefill the next sign-in, and so do the downloaded files and the local database.
+- "Change source" removes the connection settings, the local database, the downloaded audio files, and program images, and releases the access to the device folder. App settings (Wi-Fi only, theme) stay. Uninstalling the app removes all of the app's data from the device.
+- With Android's automatic backup, the data the app stores on your device may be saved to your own Google account. The developer does not receive it.
 
 ### Network connections
 
@@ -58,8 +59,9 @@ Kikidame は、録り溜めたラジオなど番組型の音声をオフライ�
 - アクセス トークンと SMB のパスワードは、Android Keystore の鍵で暗号化して保存します。Jellyfin のパスワードは保存しません。
 - 番組・各回・再生位置の手元のデータベース、ダウンロードした音声ファイル、番組の画像。
 - アプリの設定（Wi-Fi のみ、テーマなど）。
-- ログアウトすると認証の情報が消えます。「取得元を変える」は、上のデータを全部消します。アンインストールすると、端末からアプリのデータが消えます。
-- アプリのマニフェストは Android のアプリデータのバックアップを止めていないので、システムの既定のバックアップの扱いがアプリのデータに当てはまります。
+- ログアウトすると、アクセス トークンと SMB のパスワードが消えます。サーバの URL・ユーザー名、SMB のホスト・共有名・フォルダは次のサインインの入力補助として残り、ダウンロードした音声ファイルと手元のデータベースも残ります。
+- 「取得元を変える」は、接続の設定・手元のデータベース・ダウンロードした音声ファイル・番組の画像を消し、端末のフォルダへのアクセスも手放します。アプリの設定（Wi-Fi のみ、テーマ）は残ります。アンインストールすると、端末からアプリのデータが全部消えます。
+- Android の自動バックアップにより、アプリが端末に保存したデータが、あなた自身の Google アカウントに保存されることがあります。作者はそれを受け取りません。
 
 ### 通信
 

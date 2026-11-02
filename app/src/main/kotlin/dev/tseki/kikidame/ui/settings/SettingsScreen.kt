@@ -187,7 +187,7 @@ fun SettingsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val context = LocalContext.current
-    // 電池の最適化の判定は、画面に戻るたびにやり直す（OS の確認のダイアログから戻ったとき、行を消すため）
+    // 電池の最適化の判定は、画面に戻るたびにやり直す（一覧の画面から戻ったとき、行を消すため）
     var batteryOptimized by remember { mutableStateOf(isBatteryOptimized(context)) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { batteryOptimized = isBatteryOptimized(context) }
     LaunchedEffect(message) {
