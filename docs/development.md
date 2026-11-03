@@ -178,6 +178,20 @@ release ビルドは R8 と resource shrinking を有効にしている（APK �
 ライブラリの consumer rules で足りていて `app/proguard-rules.pro` は最小限。縮小で壊れたら、`mapping-<version>.txt` でスタックトレースを戻せる。
 `res/raw/aboutlibraries.json` はコードから参照しているので shrinker に消されない（消えたら設定のライセンス一覧が空になる）。
 
+### Google Play の審査用の音声
+
+Play の審査は、端末の中のフォルダのソースで受ける（ADR 0014）。審査する人の端末に音声ファイルがあるとは限らないので、小さな音声の zip を repo に置き、ログイン不要の raw の URL で渡す。
+
+- 置き場: `review/kikidame-review-audio.zip`（約 11 KB）。URL は `https://raw.githubusercontent.com/t-seki/kikidame/main/review/kikidame-review-audio.zip`
+- 中身: 展開すると `Radio/<配信元>/<番組>/<各回のファイル>` の形になる。配信元は架空の 1 つ、番組は 2 つ、各 2 回の数秒のビープ音（WAV）。展開して `Radio` を "Folder on this device" で選ぶと読める
+- WAV にはタグが付かないので、題はファイル名、公開日は zip の中の更新日時（固定）になる
+- Play Console の「ログインの詳細」の手順の欄（英語）は、この URL を指している。置き場や名前を変えたら、そこも直す
+- 作り直し方（Python の標準ライブラリだけで動く。zip の中身は固定なので、同じスクリプトからは同じ zip ができる）:
+
+  ```bash
+  python3 scripts/make-review-audio.py
+  ```
+
 ## 実機の確認
 
 実機の手順（adb でのワイヤレスデバッグの接続、裏の同期をすぐ起こす、Android Auto（DHU）、共有フォルダ・端末のフォルダの準備、手元のファイルと DB の突き合わせなど）は [device-testing.md](device-testing.md)。
