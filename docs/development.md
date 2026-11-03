@@ -106,8 +106,10 @@ KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTe
   アイテムが使い回されてブックのライブラリでも Audio のまま見えるため。配信元のフォルダ（ニッポン放送）にも `folder.jpg` を置き、
   各回が 1 本だけの番組（各回の親が配信元のフォルダになる）の画像にならないことを見る
 - `KIKIDAME_JF_LIBRARY=showcase` を付けて `media` / `up` すると、ストア向けスクリーンショット用の英語の架空ライブラリ
-  （Example FM / Example Public Radio の 5 番組、45 回）になる。統合テストの期待値は日本語ライブラリ前提なので、
-  そのときは統合テストを回さない
+  （Example FM / Example Public Radio の 5 番組、45 回）になる。`KIKIDAME_JF_LIBRARY=showcase-ja` は、同じ構造で名前だけ日本語の
+  架空ライブラリ（サンプルFM / サンプル公共ラジオ）になる。統合テストの期待値は日本語ライブラリ前提なので、
+  どちらのときも統合テストを回さない。`media` で作った `$KIKIDAME_JF_DIR/media` は、
+  Jellyfin に載せるほか、そのまま端末のフォルダの取得元にもできる
 - 統合テストは `KIKIDAME_JELLYFIN_URL` が無ければ `Assume` でスキップするので、CI と普段の `./gradlew test` には出てこない。
   付いているときはキャッシュを使わず毎回走る（`core/data/build.gradle.kts`）
 - `JellyfinGateway` の全メソッド（ログイン・ライブラリ一覧・番組と各回の取得・1 番組の各回・番組の存在確認・ダウンロードと `Range`・

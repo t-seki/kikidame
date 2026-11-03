@@ -8,6 +8,8 @@
 #
 # KIKIDAME_JF_LIBRARY=showcase を付けると、統合テスト用の日本語ライブラリ（番組 2 × 各回 3）の代わりに、
 # スクリーンショット用の英語の架空ライブラリ（Example FM / Example Public Radio の 5 番組、45 回）を作る。
+# KIKIDAME_JF_LIBRARY=showcase-ja は、同じ構造で名前だけ日本語の架空ライブラリ（サンプルFM / サンプル公共ラジオ）を作る。
+# どちらも統合テストの期待値とは合わないので、統合テストは回さない。
 #
 # up は、ffmpeg で無音の m4a を作った合成ライブラリ（番組 2 × 各回 3。番組 A のフォルダにだけ folder.jpg を置く（番組の画像））をマウントし、
 # 初期セットアップ（言語・ユーザー・リモートアクセス・完了）と音楽ライブラリ「radio」の作成を REST で済ませ、
@@ -28,7 +30,7 @@ USER_NAME="kikidame"
 PASSWORD="kikidame-test"
 AUTH_HEADER='Authorization: MediaBrowser Client="kikidame-testserver", Device="script", DeviceId="kikidame-testserver", Version="1"'
 
-usage() { sed -n '2,20p' "$0"; exit 1; }
+usage() { sed -n '2,22p' "$0"; exit 1; }
 
 # 番組（album）・配信元（album_artist）・出演者（artist）・公開日（date）をタグに持つ無音の m4a を 1 本作る。
 # 引数: 出力パス タイトル 番組 配信元 公開日 出演者（空なら付けない）
@@ -84,12 +86,30 @@ make_showcase_media() {
   make_showcase_weekly "Example FM" "Local History" "Grace Whitfield" "2026-07-12" 8
 }
 
+# showcase の日本語版。構造は同じで、名前だけ日本語の架空のもの
+make_showcase_ja_media() {
+  make_showcase_weekly "サンプルFM" "深夜のトーク" "青木 遥" "2026-07-06" 11
+  make_showcase_weekly "サンプルFM" "朝の通勤ラジオ" "森田 健" "2026-07-01" 12
+  make_showcase_weekly "サンプル公共ラジオ" "週末サイエンスアワー" "陳 美雪" "2026-07-04" 10
+  # ブッククラブ: タイトルが日付でない回。第9回は出演者なし
+  make_showcase_track "$MEDIA/サンプル公共ラジオ/ブッククラブ/第12回 長い夏.m4a"           "第12回 長い夏"           "ブッククラブ" "サンプル公共ラジオ" "2026-09-10" "石川 涼"
+  make_showcase_track "$MEDIA/サンプル公共ラジオ/ブッククラブ/第11回 小さな町.m4a"         "第11回 小さな町"         "ブッククラブ" "サンプル公共ラジオ" "2026-08-27" "石川 涼"
+  make_showcase_track "$MEDIA/サンプル公共ラジオ/ブッククラブ/第10回 書き出し.m4a"         "第10回 書き出し"         "ブッククラブ" "サンプル公共ラジオ" "2026-08-13" "石川 涼"
+  make_showcase_track "$MEDIA/サンプル公共ラジオ/ブッククラブ/第9回 リスナーのおすすめ.m4a" "第9回 リスナーのおすすめ" "ブッククラブ" "サンプル公共ラジオ" "2026-07-30" ""
+  make_showcase_weekly "サンプルFM" "まちの歴史" "白石 恵" "2026-07-12" 8
+}
+
 make_media() {
   rm -rf "$MEDIA" "$BOOK_MEDIA"
   mkdir -p "$BOOK_MEDIA"
   if [ "${KIKIDAME_JF_LIBRARY:-}" = "showcase" ]; then
     make_showcase_media
     echo "media: $MEDIA ($(find "$MEDIA" -name '*.m4a' | wc -l) tracks, showcase)"
+    return
+  fi
+  if [ "${KIKIDAME_JF_LIBRARY:-}" = "showcase-ja" ]; then
+    make_showcase_ja_media
+    echo "media: $MEDIA ($(find "$MEDIA" -name '*.m4a' | wc -l) tracks, showcase-ja)"
     return
   fi
   # 番組 A: 同じ公開日に 2 本（"(1)" 付き）、タイトルが日付でない回、出演者が複数の回
