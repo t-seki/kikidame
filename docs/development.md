@@ -165,7 +165,12 @@ Play へは当面、Release の AAB を Play Console に手でアップロード
      ```bash
      grep -rnE "リリースしたバージョン|リリース済み|released build|release build|debug ビルドだけ|debug ビルドのみ|debug build only|debug builds? only" README*.md docs
      ```
-2. `git tag vX.Y.Z && git push origin vX.Y.Z`。タグと `versionName` が食い違うと workflow が止まる
+2. 注釈付きタグ（メッセージ付き）を作って push する。タグと `versionName` が食い違うと workflow が止まる
+   - `tag.gpgsign true` の設定では、メッセージの無い軽量タグ（`git tag vX.Y.Z`）は `fatal: no tag message?` で失敗する。`-a -m` を付ければこの設定の有無によらず作れる
+     ```bash
+     git tag -a vX.Y.Z -m vX.Y.Z
+     git push origin vX.Y.Z
+     ```
 3. Release が作られたら、その Release の `kikidame-<version>.aab` を Play Console に手でアップロードする（画面の操作はここでは書かない）。Release に `.aab` が並んでも Obtainium が APK を選べるかは未確認（最初のリリースの後に確かめる）
 4. Release が作られたら、Obtainium で更新が見えることと、実機で `adb install -r` して既存データが残ることを確認する
 
