@@ -139,13 +139,13 @@ Google Play のスマートフォン用のスクリーンショットは、ア�
 場面は 1 が続きから、2 が各回の一覧、3 がプレーヤー、4 が同期の設定。
 `$ADB` と、端末を指す `ANDROID_SERIAL` は [docs/device-testing.md](device-testing.md) の「接続」の節のとおりに用意する。
 
-1. 見本のライブラリを `media` で作り（英語は `showcase`、日本語は `showcase-ja`。上の「テスト用 Jellyfin サーバ」）、`$KIKIDAME_JF_DIR/media` を端末のフォルダに置く。
+1. 見本のライブラリを `media` で作り（英語は `showcase`、日本語は `showcase-ja`。上の「テスト用 Jellyfin サーバ」）、`${KIKIDAME_JF_DIR:-/tmp/kikidame-jf}/media` を端末のフォルダに置く。
    置いた後、debug アプリの取得元をそのフォルダに切り替えて同期する（手で行う）
 
    ```bash
    ADB=~/Android/Sdk/platform-tools/adb
    KIKIDAME_JF_LIBRARY=showcase scripts/jellyfin-testserver.sh media   # 日本語は showcase-ja
-   $ADB push "$KIKIDAME_JF_DIR/media/." /sdcard/KikidameShowcaseEn/   # 日本語は /sdcard/KikidameShowcaseJa/
+   $ADB push "${KIKIDAME_JF_DIR:-/tmp/kikidame-jf}/media/." /sdcard/KikidameShowcaseEn/   # 日本語は /sdcard/KikidameShowcaseJa/
    ```
 
 2. 画面を 9:16 にし、SystemUI のデモモードで状態表示の帯を整える（時計 12:00、電池 100、Wi-Fi 全本、モバイルの電波は非表示）。
