@@ -30,7 +30,7 @@ USER_NAME="kikidame"
 PASSWORD="kikidame-test"
 AUTH_HEADER='Authorization: MediaBrowser Client="kikidame-testserver", Device="script", DeviceId="kikidame-testserver", Version="1"'
 
-usage() { sed -n '2,20p' "$0"; exit 1; }
+usage() { sed -n '2,22p' "$0"; exit 1; }
 
 # 番組（album）・配信元（album_artist）・出演者（artist）・公開日（date）をタグに持つ無音の m4a を 1 本作る。
 # 引数: 出力パス タイトル 番組 配信元 公開日 出演者（空なら付けない）
