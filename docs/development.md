@@ -132,6 +132,55 @@ KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTe
 | Jellyfin 10.10.7 | 通る |
 | Jellyfin 12.0.0 | 通る |
 
+### ストア用のスクリーンショットの撮り方
+
+Google Play のスマートフォン用のスクリーンショットは、アスペクト比が 16:9 か 9:16 に限られる（Play Console のアップロード欄の説明による）。
+実機（Pixel 7a、debug アプリ）で 1080×1920 に撮り、`fastlane/metadata/android/{en-US,ja-JP}/images/phoneScreenshots/1〜4.png` に置く。
+場面は 1 が続きから、2 が各回の一覧、3 がプレーヤー、4 が同期の設定。
+
+1. 見本のライブラリを `media` で作り（英語は `showcase`、日本語は `showcase-ja`。上の「テスト用 Jellyfin サーバ」）、`$KIKIDAME_JF_DIR/media` を端末のフォルダに置く
+
+   ```bash
+   KIKIDAME_JF_LIBRARY=showcase scripts/jellyfin-testserver.sh media   # 日本語は showcase-ja
+   ```
+
+2. 画面を 9:16 にし、SystemUI のデモモードで状態表示の帯を整える（時計 12:00、電池 100、Wi-Fi 全本、モバイルの電波は非表示）。
+   デモモードの broadcast の引数は、撮ったときの記録を元にした書き方で、docs を書いたときには流し直していない
+
+   ```bash
+   $ADB shell wm size 1080x1920
+   $ADB shell settings put global sysui_demo_allowed 1
+   $ADB shell am broadcast -a com.android.systemui.demo -e command enter
+   $ADB shell am broadcast -a com.android.systemui.demo -e command clock -e hhmm 1200
+   $ADB shell am broadcast -a com.android.systemui.demo -e command battery -e level 100 -e plugged false
+   $ADB shell am broadcast -a com.android.systemui.demo -e command network -e wifi show -e level 4 -e fully true
+   $ADB shell am broadcast -a com.android.systemui.demo -e command network -e mobile hide
+   ```
+
+3. debug アプリの言語を切り替える（英語なら `en-US`）
+
+   ```bash
+   $ADB shell cmd locale set-app-locales dev.tseki.kikidame.debug --locales ja-JP
+   ```
+
+4. 4 場面を撮る
+
+   ```bash
+   $ADB exec-out screencap -p > <出力先>/ja-1.png
+   ```
+
+5. 通知のアイコンは、デモモードの `notifications -e visible false` を送っても消えなかった（Pixel 7a で確かめた）。
+   撮った画像の状態表示の帯の (165,10)〜(470,85) を、帯の背景色（(600,47) の画素）で塗って消す。
+   この範囲は Pixel 7a で 1080×1920 のときの値で、ほかの端末で同じかは未確認
+6. 撮り終えたら端末を戻す
+
+   ```bash
+   $ADB shell wm size reset
+   $ADB shell am broadcast -a com.android.systemui.demo -e command exit
+   $ADB shell settings put global sysui_demo_allowed 0
+   $ADB shell cmd locale set-app-locales dev.tseki.kikidame.debug --locales ""
+   ```
+
 ## リリース
 
 この節はメンテナ向け（署名鍵を持ち、リリースを出す人）。コントリビューターは読まなくてよい。

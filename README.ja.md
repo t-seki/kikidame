@@ -9,10 +9,10 @@ English: [README.md](./README.md)
 https://github.com/user-attachments/assets/57cfc319-f561-46e8-878b-c6f96fc64565
 
 <p>
-<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" width="180" alt="Continue"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" width="180" alt="Episodes"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" width="180" alt="Player"> <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/4.png" width="180" alt="Sync settings">
+<img src="fastlane/metadata/android/ja-JP/images/phoneScreenshots/1.png" width="180" alt="続きから"> <img src="fastlane/metadata/android/ja-JP/images/phoneScreenshots/2.png" width="180" alt="各回"> <img src="fastlane/metadata/android/ja-JP/images/phoneScreenshots/3.png" width="180" alt="プレーヤー"> <img src="fastlane/metadata/android/ja-JP/images/phoneScreenshots/4.png" width="180" alt="同期の設定">
 </p>
 
-スクリーンショット: 続きから・各回一覧・再生画面・同期設定（英語 UI）
+スクリーンショット: 続きから・各回一覧・再生画面・同期設定（日本語 UI）
 
 ## 入れ方
 
