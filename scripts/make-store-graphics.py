@@ -49,7 +49,8 @@ def feature():
     scale = mark / 108
     draw_mark(d, x0 - 30 * scale, (h - mark) / 2, scale)
     d.text((x0 + circle_w + gap - tb[0], (h - th) / 2 - tb[1]), text, font=font, fill=FG)
-    return im.resize((1024, 500), Image.LANCZOS)
+    # フィーチャー グラフィックはアルファの無い 24 ビット PNG にする（Play の規定。ヘルプの原文では未確認）
+    return im.resize((1024, 500), Image.LANCZOS).convert("RGB")
 
 
 if __name__ == "__main__":
