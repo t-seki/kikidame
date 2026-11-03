@@ -137,17 +137,22 @@ KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTe
 Google Play のスマートフォン用のスクリーンショットは、アスペクト比が 16:9 か 9:16 に限られる（Play Console のアップロード欄の説明による）。
 実機（Pixel 7a、debug アプリ）で 1080×1920 に撮り、`fastlane/metadata/android/{en-US,ja-JP}/images/phoneScreenshots/1〜4.png` に置く。
 場面は 1 が続きから、2 が各回の一覧、3 がプレーヤー、4 が同期の設定。
+`$ADB` と、端末を指す `ANDROID_SERIAL` は [docs/device-testing.md](device-testing.md) の「接続」の節のとおりに用意する。
 
-1. 見本のライブラリを `media` で作り（英語は `showcase`、日本語は `showcase-ja`。上の「テスト用 Jellyfin サーバ」）、`$KIKIDAME_JF_DIR/media` を端末のフォルダに置く
+1. 見本のライブラリを `media` で作り（英語は `showcase`、日本語は `showcase-ja`。上の「テスト用 Jellyfin サーバ」）、`$KIKIDAME_JF_DIR/media` を端末のフォルダに置く。
+   置いた後、debug アプリの取得元をそのフォルダに切り替えて同期する（手で行う）
 
    ```bash
+   ADB=~/Android/Sdk/platform-tools/adb
    KIKIDAME_JF_LIBRARY=showcase scripts/jellyfin-testserver.sh media   # 日本語は showcase-ja
+   $ADB push "$KIKIDAME_JF_DIR/media/." /sdcard/KikidameShowcaseEn/   # 日本語は /sdcard/KikidameShowcaseJa/
    ```
 
 2. 画面を 9:16 にし、SystemUI のデモモードで状態表示の帯を整える（時計 12:00、電池 100、Wi-Fi 全本、モバイルの電波は非表示）。
-   デモモードの broadcast の引数は、撮ったときの記録を元にした書き方で、docs を書いたときには流し直していない
+   下の 7 行は、このスクリーンショットの撮影のとき Pixel 7a で同じ引数で流して確かめた（時計・電池・Wi-Fi・モバイルの電波がそのとおりの表示になった）。ほかの端末は未確認
 
    ```bash
+   ADB=~/Android/Sdk/platform-tools/adb
    $ADB shell wm size 1080x1920
    $ADB shell settings put global sysui_demo_allowed 1
    $ADB shell am broadcast -a com.android.systemui.demo -e command enter
@@ -157,7 +162,7 @@ Google Play のスマートフォン用のスクリーンショットは、ア�
    $ADB shell am broadcast -a com.android.systemui.demo -e command network -e mobile hide
    ```
 
-3. debug アプリの言語を切り替える（英語なら `en-US`）
+3. debug アプリの言語を切り替える（英語なら `en-US`。手順 6 の戻し方の 4 行とともに、Pixel 7a で同じ引数で流した）
 
    ```bash
    $ADB shell cmd locale set-app-locales dev.tseki.kikidame.debug --locales ja-JP
