@@ -43,7 +43,21 @@ The app uses one source at a time. Details and what has been tested are in [docs
 - **Shared folder on a NAS (SMB)** — SMB2/3, with a user and password or as a guest. The app only reads the share
 - **Folder on this device** — a folder in internal storage or on an SD card, picked with Android's folder picker. The app only reads the folder. Each copied episode takes space twice (the file in the folder and the copy in the app). If you delete a file from the folder, the app deletes its copy at the next sync, so keep the files there
 
-Tag the files with `album` = program, `albumartist` = publisher (the station, for radio), the date = published date, and `artist` = performers. A Jellyfin library groups episodes into programs by these tags. A NAS share or a folder on the device must be laid out exactly as `<publisher>/<program>/<episode files>`; the folder names give the publisher and program, and the tags give the title, date and performers. On a NAS with thousands of files, the first import can take ten minutes or more; keep the app open with the screen on until it finishes.
+Tag the files with `album` = program, `albumartist` = publisher (the station, for radio), the date = published date, and `artist` = performers. A Jellyfin library groups episodes into programs by these tags.
+
+A NAS share or a folder on the device must be laid out in exactly three levels: publisher, program, episode files. The folder names give the publisher and program; the tags are not used for them.
+
+```text
+Radio                    <- the folder you pick in the app
+└─ Station name          <- publisher
+   └─ Program name       <- program
+      └─ 2026-11-05.m4a  <- episode
+```
+
+- In the app, pick the parent folder that holds the publisher folders (`Radio` above), not a publisher folder
+- Tags on an episode are optional. Without them the title is the file name without its extension and the date is the file's modified time. The tags give the title, date and performers
+
+On a NAS with thousands of files, the first import can take ten minutes or more; keep the app open with the screen on until it finishes.
 
 To record radio programs (Japan's radiko) in this layout and with these tags, use [rajikura](https://github.com/t-seki/rajikura), a recording tool by the same author. Its Jellyfin preset saves `<station>/<program>/<program> YYYY-MM-DD.m4a` with `albumartist` = station and `album` = program, and puts a `folder.jpg` in each program folder. Kikidame reading its output as it is has not been verified yet. For other files, a general tag editor such as Mp3tag works.
 
