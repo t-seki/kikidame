@@ -16,12 +16,24 @@ https://github.com/user-attachments/assets/57cfc319-f561-46e8-878b-c6f96fc64565
 
 ## 入れ方
 
-端末は Android 12 以上。Google Play では配布しない。
+端末は Android 12 以上。Google Play ではクローズドテスト中で、テスターを募集している（[参加の仕方](#google-play-のクローズドテストに参加する)）。
 
 1. **GitHub Releases** — [Releases](https://github.com/t-seki/kikidame/releases) から `kikidame-<バージョン>.apk` を入れる
 2. **Obtainium** — 自動更新したい人は [Obtainium](https://github.com/ImranR98/Obtainium) に `https://github.com/t-seki/kikidame` を登録する。更新は上書きで入り、手元の各回と再生位置は残る
 
 IzzyOnDroid と F-Droid 本家には出していない。コードの大半を生成 AI（Claude Code）で書いていて、どちらもそれを受け付けないため。このプロジェクトでの生成 AI の扱いは [CONTRIBUTING.md](./CONTRIBUTING.md#日本語の要約)。
+
+### Google Play のクローズドテストに参加する
+
+Google Play での公開の前に、クローズドテストを行っていて、テスターを募集している。公開には 12 人以上が参加して 14 日以上続けることが Google の条件なので、14 日は抜けずにいてほしい。
+
+1. Google グループ [kikidame-testers](https://groups.google.com/g/kikidame-testers) に入る（ウェブ上の誰でも入れる）
+2. グループに入った後、[テストの参加ページ](https://play.google.com/apps/testing/dev.tseki.kikidame)を開いてオプトインする
+3. [Google Play](https://play.google.com/store/apps/details?id=dev.tseki.kikidame) からインストールする
+
+Jellyfin や NAS が無くても試せる。端末のフォルダに音声ファイルを置き、取得元に「端末のフォルダ」を選ぶ（構成は[取得元](#取得元)）。
+
+フィードバックは [GitHub の issues](https://github.com/t-seki/kikidame/issues) へ。Play の版と Releases の APK が互いに上書きできるかは確かめていないので、この README では切り替えを勧めも否定もしない。
 
 ## 取得元
 
@@ -61,7 +73,7 @@ IzzyOnDroid と F-Droid 本家には出していない。コードの大半を�
 - 複数のサーバ・ユーザー・ライブラリを同時に使うこと
 - サーバ管理
 - オーディオブック（古い章から順に聴くので「最新 N 回まで保持」が合わない）
-- Google Play での配布
+- Google Play での課金（有料化・アプリ内課金。Play での無料の配布は目標）
 
 全体は [docs/architecture.md](./docs/architecture.md) の「やらないこと」。
 
