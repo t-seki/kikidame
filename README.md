@@ -16,12 +16,24 @@ Screenshots: continue, episodes, player, sync settings (English UI).
 
 ## Install
 
-Requires Android 12 or later. Not distributed on Google Play.
+Requires Android 12 or later. On Google Play, Kikidame is in a closed test and looking for testers ([how to join](#join-the-closed-test-on-google-play)).
 
 1. **GitHub Releases** — download `kikidame-<version>.apk` from [Releases](https://github.com/t-seki/kikidame/releases)
 2. **Obtainium** — for automatic updates, add `https://github.com/t-seki/kikidame` to [Obtainium](https://github.com/ImranR98/Obtainium). Updates install over the existing app and keep your episodes and playback positions
 
 Kikidame is not on IzzyOnDroid or the main F-Droid repository, because most of its code is written with generative AI (Claude Code), which those repositories do not accept. How generative AI is used in this project is in [CONTRIBUTING.md](./CONTRIBUTING.md#generative-ai).
+
+### Join the closed test on Google Play
+
+Kikidame is in a closed test on Google Play before its public release, and testers are wanted. Google requires at least 12 testers to opt in and stay for at least 14 days before a public release, so please stay in the test for the full 14 days.
+
+1. Join the Google group [kikidame-testers](https://groups.google.com/g/kikidame-testers) (anyone on the web can join)
+2. After joining the group, open the [test page](https://play.google.com/apps/testing/dev.tseki.kikidame) and opt in
+3. Install Kikidame from [Google Play](https://play.google.com/store/apps/details?id=dev.tseki.kikidame)
+
+You do not need Jellyfin or a NAS to try it: put some audio files in a folder on the phone and choose "Folder on this device" as the source (the layout is in [Sources](#sources)).
+
+Send feedback to [GitHub issues](https://github.com/t-seki/kikidame/issues). Whether the Play version and the APK from Releases can be installed over each other has not been checked, so this README neither recommends nor rules out switching.
 
 ## Sources
 
@@ -61,7 +73,7 @@ Changing the source in Settings deletes the programs, episodes, playback positio
 - Multiple servers, users, or libraries at once
 - Server administration
 - Audiobooks (you listen from the oldest chapter, so "Keep latest N" does not fit)
-- Google Play
+- Paid features or in-app purchases on Google Play (free distribution there is a goal)
 
 The full list is in [docs/architecture.md](./docs/architecture.md).
 
