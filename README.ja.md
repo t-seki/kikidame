@@ -21,6 +21,8 @@ https://github.com/user-attachments/assets/57cfc319-f561-46e8-878b-c6f96fc64565
 1. **GitHub Releases** — [Releases](https://github.com/t-seki/kikidame/releases) から `kikidame-<バージョン>.apk` を入れる
 2. **Obtainium** — 自動更新したい人は [Obtainium](https://github.com/ImranR98/Obtainium) に `https://github.com/t-seki/kikidame` を登録する。更新は上書きで入り、手元の各回と再生位置は残る
 
+Releases の APK の署名鍵は Android の開発者認証に登録済みで、認証が施行された後（2027 年の予定。[FAQ](https://developer.android.com/developer-verification/guides/faq)）も今までどおり入れられる。
+
 IzzyOnDroid と F-Droid 本家には出していない。コードの大半を生成 AI（Claude Code）で書いていて、どちらもそれを受け付けないため。このプロジェクトでの生成 AI の扱いは [CONTRIBUTING.md](./CONTRIBUTING.md#日本語の要約)。
 
 ### Google Play のクローズドテストに参加する
