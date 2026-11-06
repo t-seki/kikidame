@@ -15,7 +15,7 @@ Google Play でも無料で配る。GitHub Releases・Obtainium での配布（A
 8. **テスター（12 人以上、14 日以上続けて）は、Google グループで、今の利用者や宣伝の先から募る。** 足りなければ知り合いで補う。実際に使う人のほうが途中で抜けにくく、グループなら 1 つのリンクで募れて、作者がメール アドレスを預からずに済むため
 9. **掲載は日本語（既定）と英語。** 文は `fastlane/metadata/android/ja-JP/` と `en-US/` を元にする。説明文では、対応するサーバとして Jellyfin の名前を出す（検索で見つけてもらうため）。Jellyfin のロゴは使わない（ADR 0005 の「そのほかの決定」）。掲載の文に Jellyfin の名前を出してよいかは未確認
 10. **GitHub Releases・Obtainium での配布は続ける。** Play が軌道に乗ったら、Releases をやめるかを改めて決める。続ける手間は今の CI でほとんどかからず、Play を使えない端末や Google のアカウントを持たない人にも届くため。開発者の認証を済ませれば、Releases の APK も今までどおり入れられる（[FAQ](https://developer.android.com/developer-verification/guides/faq) の "As long as your apps are registered, your users' install experience will stay the same"）
-11. **開発者の認証は、Android Developer Console ではなく Play Console で行う。** Play Console で Play の外で配るアプリも登録できるため（[Play Console のガイド](https://developer.android.com/developer-verification/guides/google-play-console)）。Android Developer Console と二重に払わずに済むかは、資料に明記が無く未確認
+11. **開発者の認証は、Android Developer Console ではなく Play Console で行う。** Play Console で Play の外で配るアプリも登録できるため（[Play Console のガイド](https://developer.android.com/developer-verification/guides/google-play-console)）。Android Developer Console には別に登録しない（FAQ に、Play Console のアカウントを持つ開発者は、Play の外で配るアプリを含め、認証の手続きをそこにまとめられるとある）。Android Developer Console の Full Distribution の登録料は US$25 で、払わなくてよいと明記した文は見つかっていない
 
 ## 退けた案
 

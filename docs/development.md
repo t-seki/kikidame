@@ -212,6 +212,15 @@ Play へは当面、Release の AAB を Play Console に手でアップロード
 - GitHub Actions 用の Secrets: `KEYSTORE_BASE64`（`base64 -w0 kikidame-upload.jks`）、`KEYSTORE_PASSWORD`、`KEY_ALIAS`、`KEY_PASSWORD`
 - 署名を確かめる: `apksigner verify --print-certs app-release.apk`（`build-tools/<バージョン>/apksigner`）。Releases の APK と手元のビルドで証明書の SHA-256 が一致すること
 
+### Android の開発者認証
+
+Android の開発者認証は、2027 年に施行される予定（時期は [FAQ](https://developer.android.com/developer-verification/guides/faq) による。施行後の挙動の細部は未確認）。この認証は Play Console の個人のアカウントで行っていて、Android Developer Console には登録していない（ADR 0014）。Play Console だけで足りる根拠は、Play Console のガイドの "For most Play developers, no new action is required for identity verification." と、FAQ の "developers with a Play Console account can use it as the single place to manage all their verification requirements, including for their apps distributed outside of Play." である（どちらも 2026-11-06 に原文を読んだ）。
+
+- 登録の状態は、Play Console の「アカウントの管理」→「Android デベロッパーの確認」→「パッケージ名」タブで見る。`dev.tseki.kikidame` が「登録済み」で、詳細の画面に並ぶ鍵のうち、Releases の APK の鍵（SHA-256 は「署名を確かめる」の `apksigner` の出力と突き合わせる）が「確認済み」になっていること（2026-11-06 の時点で確かめた）。詳細には鍵が 4 つ並び、ほかの 3 つが何の鍵かは確かめていない
+- 登録すると公開される情報は、[Google の説明](https://support.google.com/googleplay/android-developer/answer/13628312?hl=en)（ページに最終更新日は無い。2026-11-06 に読んだ）によると、法的な氏名・法的な住所の国・開発者のメールのアドレス（"Google will display your legal name, your country (as per your legal address), and developer email address on Google Play."）。Google Play で収益化すると住所の全部も出る（"If you decide to monetize on Google Play then Google will display your full address."）。地域によっては電話番号や住所の全部が出ることがあると書かれているが、日本がその地域に当たるかは確かめていない。このアカウントは個人で、収益化はしておらず、公開プロフィールのメールには個人のアドレスではなく専用のアドレスを使っている
+- 署名鍵を失うと、パッケージ名を登録できなくなる（FAQ の "If you lose your signing key you won't be able to register your packages."）。「署名鍵」の節のとおり、鍵は 2 箇所に控える
+- アカウント ID・メールのアドレス・keystore のパスのような作者の手元の値は、この docs に書かない
+
 ### バージョンを上げて出す
 
 1. `app/build.gradle.kts` の `versionCode`（単調増加の整数。F-Droid はこれを見る）と `versionName`（`X.Y.Z`）を上げる PR をマージする

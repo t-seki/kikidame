@@ -21,6 +21,8 @@ Requires Android 12 or later. On Google Play, Kikidame is in a closed test and l
 1. **GitHub Releases** — download `kikidame-<version>.apk` from [Releases](https://github.com/t-seki/kikidame/releases)
 2. **Obtainium** — for automatic updates, add `https://github.com/t-seki/kikidame` to [Obtainium](https://github.com/ImranR98/Obtainium). Updates install over the existing app and keep your episodes and playback positions
 
+The signing key of the APKs on Releases is registered with Android developer verification, so installing them keeps working the same way after Android starts enforcing verification (planned for 2027, see the [FAQ](https://developer.android.com/developer-verification/guides/faq)).
+
 Kikidame is not on IzzyOnDroid or the main F-Droid repository, because most of its code is written with generative AI (Claude Code), which those repositories do not accept. How generative AI is used in this project is in [CONTRIBUTING.md](./CONTRIBUTING.md#generative-ai).
 
 ### Join the closed test on Google Play
