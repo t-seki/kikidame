@@ -8,7 +8,7 @@ fail=0
 expect() {
   rm -f "$tmp"/*.md
   printf '%s\n' "$3" > "$tmp/0001-x.md"
-  printf '注記 status: superseded\n' > "$tmp/README.md"
+  printf '> 注記: x\n' > "$tmp/README.md"
   if scripts/check-adr-notes.sh "$tmp" > "$tmp/out" 2>&1; then got=通る; else got=落ちる; fi
   if [ "$got" != "$1" ]; then
     echo "NG: $2（期待 $1、実際 $got）"
@@ -25,6 +25,8 @@ expect 通る "引用ブロック" "${fm}> 引用の文"
 expect 落ちる "行頭の注記" "${fm}本文
 > 注記: 古い決定を残す"
 expect 落ちる "行頭の注記（> の後ろに空白なし）" "${fm}>注記: x"
+expect 落ちる "太字の注記" "${fm}> **注記**: x"
+expect 落ちる "字下げした注記" "${fm}   > 注記: x"
 expect 落ちる "frontmatter の status" $'---\ndate: 2026-10-01\nstatus: accepted\n---\n本文'
 expect 落ちる "frontmatter の superseded" $'---\ndate: 2026-10-01\nsuperseded-by: 0015\n---\n本文'
 expect 落ちる "ADR NNNN で改めた" "${fm}配布は Play だけ（ADR 0015 で改めた）。"
