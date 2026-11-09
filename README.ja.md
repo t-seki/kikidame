@@ -18,10 +18,9 @@ https://github.com/user-attachments/assets/57cfc319-f561-46e8-878b-c6f96fc64565
 
 端末は Android 12 以上。Google Play ではクローズドテスト中で、テスターを募集している（[参加の仕方](#google-play-のクローズドテストに参加する)）。
 
-1. **GitHub Releases** — [Releases](https://github.com/t-seki/kikidame/releases) から `kikidame-<バージョン>.apk` を入れる
-2. **Obtainium** — 自動更新したい人は [Obtainium](https://github.com/ImranR98/Obtainium) に `https://github.com/t-seki/kikidame` を登録する。更新は上書きで入り、手元の各回と再生位置は残る
+入れるのは Google Play からだけ。
 
-Releases の APK の署名鍵は Android の開発者認証に登録済みで、認証が施行された後（2027 年の予定。[FAQ](https://developer.android.com/developer-verification/guides/faq)）も今までどおり入れられる。
+GitHub Releases と Obtainium での配布は v0.10.0 で終わった。Releases の APK は Play の版と署名が違うので、Android の署名の仕組みからは、Play の版で上書きして更新できない（試していない）。切り替えるときは、Releases の版を一度アンインストールしてから Play で入れる。手元の各回と再生位置は消える。
 
 IzzyOnDroid と F-Droid 本家には出していない。コードの大半を生成 AI（Claude Code）で書いていて、どちらもそれを受け付けないため。このプロジェクトでの生成 AI の扱いは [CONTRIBUTING.md](./CONTRIBUTING.md#日本語の要約)。
 
@@ -35,7 +34,7 @@ Google Play での公開の前に、クローズドテストを行っていて�
 
 Jellyfin や NAS が無くても試せる。端末のフォルダに音声ファイルを置き、取得元に「端末のフォルダ」を選ぶ（構成は[取得元](#取得元)）。
 
-フィードバックは [GitHub の issues](https://github.com/t-seki/kikidame/issues) へ。Play の版と Releases の APK が互いに上書きできるかは確かめていないので、この README では切り替えを勧めも否定もしない。
+フィードバックは [GitHub の issues](https://github.com/t-seki/kikidame/issues) へ。
 
 ## 取得元
 

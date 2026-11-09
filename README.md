@@ -18,10 +18,9 @@ Screenshots: continue, episodes, player, sync settings (English UI).
 
 Requires Android 12 or later. On Google Play, Kikidame is in a closed test and looking for testers ([how to join](#join-the-closed-test-on-google-play)).
 
-1. **GitHub Releases** — download `kikidame-<version>.apk` from [Releases](https://github.com/t-seki/kikidame/releases)
-2. **Obtainium** — for automatic updates, add `https://github.com/t-seki/kikidame` to [Obtainium](https://github.com/ImranR98/Obtainium). Updates install over the existing app and keep your episodes and playback positions
+Install from Google Play only.
 
-The signing key of the APKs on Releases is registered with Android developer verification, so installing them keeps working the same way after Android starts enforcing verification (planned for 2027, see the [FAQ](https://developer.android.com/developer-verification/guides/faq)).
+Distribution through GitHub Releases and Obtainium ended with v0.10.0. The APKs on Releases are signed with a different key from the Play version, so by the way Android's signature check works they cannot be installed over the Play version to update it (not tried). To switch, uninstall the Releases version first and then install from Play; your downloaded episodes and playback positions on the phone are deleted.
 
 Kikidame is not on IzzyOnDroid or the main F-Droid repository, because most of its code is written with generative AI (Claude Code), which those repositories do not accept. How generative AI is used in this project is in [CONTRIBUTING.md](./CONTRIBUTING.md#generative-ai).
 
@@ -35,7 +34,7 @@ Kikidame is in a closed test on Google Play before its public release, and teste
 
 You do not need Jellyfin or a NAS to try it: put some audio files in a folder on the phone and choose "Folder on this device" as the source (the layout is in [Sources](#sources)).
 
-Send feedback to [GitHub issues](https://github.com/t-seki/kikidame/issues). Whether the Play version and the APK from Releases can be installed over each other has not been checked, so this README neither recommends nor rules out switching.
+Send feedback to [GitHub issues](https://github.com/t-seki/kikidame/issues).
 
 ## Sources
 

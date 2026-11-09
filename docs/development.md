@@ -190,41 +190,44 @@ Google Play のスマートフォン用のスクリーンショットは、ア�
 
 この節はメンテナ向け（署名鍵を持ち、リリースを出す人）。コントリビューターは読まなくてよい。
 
-配布は GitHub Releases の署名済み APK（ADR 0005）と Google Play（ADR 0014）。`v*` のタグを push すると `.github/workflows/release.yml` が
-release APK と AAB を同じ鍵で署名してビルドし、`kikidame-<version>.apk`、`kikidame-<version>.aab`、R8 の `mapping-<version>.txt` を Release に添付する。
-Play へは当面、Release の AAB を Play Console に手でアップロードする（CI から直接は上げない。ADR 0014）。
+配布は Google Play だけ（ADR 0015。GitHub Releases・Obtainium での配布は v0.10.0 で終えた）。`v*` のタグを push すると `.github/workflows/release.yml` が
+AAB をアップロード鍵で署名してビルドし、クローズド テストのトラックに上げる（changelog をリリースノートに、R8 の `mapping.txt` も一緒に）。GitHub Release は作らない。
+
+CI が Play に上げるには、サービス アカウントの JSON 鍵を GitHub Actions の secret `PLAY_SERVICE_ACCOUNT_JSON` に置く。サービス アカウントの作り方は書き写さず、[upload-google-play の README](https://github.com/r0adkll/upload-google-play) の該当の節に従う。Play Console で付ける権限は、このアプリのテスト トラックへのリリースに要るものだけに絞る。`release.yml` の `tracks` に書いたクローズド テストのトラックの API での名前（`alpha`）は未確認で、最初のタグの前に Play Console で確かめ、違えば直す。
+
+Play アプリ署名の鍵を Google が作る鍵に替える作業（人が行う）は、最初のタグを打つ前に済ませる。Play Console の「Play アプリ署名」の画面の「鍵を変更」で「Google が鍵を生成する」を選ぶ。オープンテストか製品版にリリースを出した後は替えられない（ADR 0015）。替えた後、端末に入っているクローズド テストの版を Play の新しい版で上書きできるかは未確認（できなければアンインストールして入れ直す）。
 
 ### 署名鍵
 
-- upload 鍵は repo の外に置く（alias `kikidame`）。**失うと以後の更新を配れない**ので、
-  keystore ファイルとパスフレーズをパスワードマネージャとオフラインの 2 箇所に控える
+- 鍵は 2 つある。**アプリ署名鍵**は、利用者の端末に入るアプリの署名で、Google が持つ（Play アプリ署名で Google が作る鍵。ADR 0015）。**アップロード鍵**は、CI が AAB に署名して Play に上げるときの鍵で、これが repo の外の keystore（alias `kikidame`）。アップロード鍵を失っても、Play Console の「アップロード鍵のリセット」で戻れる（[Play アプリ署名のヘルプ](https://support.google.com/googleplay/android-developer/answer/9842756?hl=en)の "If you lose your upload key or suspect that it was compromised, you are not locked out of your app."。2026-11-09 に原文を読んだ）。それでも、keystore ファイルとパスフレーズはパスワードマネージャとオフラインの 2 箇所に控える
 - ビルドは環境変数から読む。無ければ署名無しでビルドする（CI の `test`、CI の `release-build`（署名なしで `assembleRelease`）、鍵を持たない人の `assembleRelease` を通すため）
 
   ```bash
   export KIKIDAME_KEYSTORE=<keystore のパス>
   export KIKIDAME_KEYSTORE_PASSWORD=…   # 鍵のパスワードが別なら KIKIDAME_KEY_PASSWORD も
   export KIKIDAME_KEY_ALIAS=kikidame
-  ./gradlew :app:assembleRelease         # app/build/outputs/apk/release/app-release.apk
+  ./gradlew :app:assembleRelease         # app/build/outputs/apk/release/app-release.apk（手元の確かめ用。配布には使わない）
   ./gradlew :app:bundleRelease           # app/build/outputs/bundle/release/app-release.aab（Play 用）
   ```
 
 - 上の `export` は、repo の外の chmod 600 のファイルに書いて `source` すると毎回打たずに済む。値を表示するコマンド（`cat` / `grep`）は打たない
 - GitHub Actions 用の Secrets: `KEYSTORE_BASE64`（`base64 -w0 kikidame-upload.jks`）、`KEYSTORE_PASSWORD`、`KEY_ALIAS`、`KEY_PASSWORD`
-- 署名を確かめる: `apksigner verify --print-certs app-release.apk`（`build-tools/<バージョン>/apksigner`）。Releases の APK と手元のビルドで証明書の SHA-256 が一致すること
+- 署名を確かめる: `apksigner verify --print-certs app-release.apk`（`build-tools/<バージョン>/apksigner`）で手元のビルドの証明書の SHA-256 を見る。これはアップロード鍵の証明書で、Play から入れた版の証明書（Play Console の「Play アプリ署名」の画面のアプリ署名鍵）とは別のはず（鍵を替えた後の値は未確認）
 
 ### Android の開発者認証
 
 Android の開発者認証は、2027 年に施行される予定（時期は [FAQ](https://developer.android.com/developer-verification/guides/faq) による。施行後の挙動の細部は未確認）。この認証は Play Console の個人のアカウントで行っていて、Android Developer Console には登録していない（ADR 0014）。Play Console だけで足りる根拠は、Play Console のガイドの "For most Play developers, no new action is required for identity verification." と、FAQ の "developers with a Play Console account can use it as the single place to manage all their verification requirements, including for their apps distributed outside of Play." である（どちらも 2026-11-06 に原文を読んだ）。
 
-- 登録の状態は、Play Console の「アカウントの管理」→「Android デベロッパーの確認」→「パッケージ名」タブで見る。`dev.tseki.kikidame` が「登録済み」で、詳細の画面に並ぶ鍵のうち、Releases の APK の鍵（SHA-256 は「署名を確かめる」の `apksigner` の出力と突き合わせる）が「確認済み」になっていること（2026-11-06 の時点で確かめた）。詳細には鍵が 4 つ並び、ほかの 3 つが何の鍵かは確かめていない
+- Play アプリ署名の鍵は、自動で登録の対象になる。[FAQ](https://developer.android.com/developer-verification/guides/faq)に "I use Play App Signing, are my apps claimed automatically? Yes. If you use Play App Signing, we have the necessary information to securely identify your ownership. Your eligible apps will be part of the automatic registration process." とある（2026-11-09 に原文を読んだ）
+- 登録の状態は、Play Console の「アカウントの管理」→「Android デベロッパーの確認」→「パッケージ名」タブで見る。`dev.tseki.kikidame` が「登録済み」であること。2026-11-06 の時点では、Releases の APK の鍵（アプリ署名鍵を Google が作る鍵に替える前の鍵）が「確認済み」で、詳細には鍵が 4 つ並び、ほかの 3 つが何の鍵かは確かめていなかった。鍵を替えた後の状態は未確認（人が見る）
 - 登録すると公開される情報は、[Google の説明](https://support.google.com/googleplay/android-developer/answer/13628312?hl=en)（ページに最終更新日は無い。2026-11-06 に読んだ）によると、法的な氏名・法的な住所の国・開発者のメールのアドレス（"Google will display your legal name, your country (as per your legal address), and developer email address on Google Play."）。Google Play で収益化すると住所の全部も出る（"If you decide to monetize on Google Play then Google will display your full address."）。地域によっては電話番号や住所の全部が出ることがあると書かれているが、日本がその地域に当たるかは確かめていない。このアカウントは個人で、収益化はしておらず、公開プロフィールのメールには個人のアドレスではなく専用のアドレスを使っている
-- 署名鍵を失うと、パッケージ名を登録できなくなる（FAQ の "If you lose your signing key you won't be able to register your packages."）。「署名鍵」の節のとおり、鍵は 2 箇所に控える
+- 署名鍵を失うと、パッケージ名を登録できなくなる（FAQ の "If you lose your signing key you won't be able to register your packages."）。アプリ署名鍵は Google が持つので、この条件は Google 側の管理に預けている。アップロード鍵は「署名鍵」の節のとおり 2 箇所に控える
 - アカウント ID・メールのアドレス・keystore のパスのような作者の手元の値は、この docs に書かない
 
 ### バージョンを上げて出す
 
-1. `app/build.gradle.kts` の `versionCode`（単調増加の整数。F-Droid はこれを見る）と `versionName`（`X.Y.Z`）を上げる PR をマージする
-   - バージョンを上げる PR では、`fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` と `ja-JP` の同名のファイルを足す。書き方は既存のファイルに合わせ、前のリリースからマージされた利用者から見える変更を箇条書きにする
+1. `app/build.gradle.kts` の `versionCode`（単調増加の整数。Play は同じ `versionCode` の AAB を受け付けず、`release.yml` が前のタグの `versionCode` と比べて、増えていなければ止まる）と `versionName`（`X.Y.Z`）を上げる PR をマージする
+   - バージョンを上げる PR では、`fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` と `ja-JP` の同名のファイルを足す。書き方は既存のファイルに合わせ、前のリリースからマージされた利用者から見える変更を箇条書きにする。このファイルは、CI が Play のリリースノート（`whatsnew-en-US`・`whatsnew-ja-JP`）として上げる。ファイルが無いと `release.yml` が止まる
    - changelog は 1 ファイル 500 文字までにし、`wc -m` で数える
    - バージョンを上げる PR では、リリースしたバージョンに何が入っているかを述べた記述（例:「まだリリースしたバージョンには入っていない」「debug ビルドだけ」「not in the released builds」「debug build only」）を README（英日）と `docs/` で探し、出すバージョンに合わせて直す。当たった行は人が読み、出すバージョンと食い違う記述だけを直す（この項自身、直った後の文にも当たる）
      ```bash
@@ -236,11 +239,11 @@ Android の開発者認証は、2027 年に施行される予定（時期は [FA
      git tag -a vX.Y.Z -m vX.Y.Z
      git push origin vX.Y.Z
      ```
-3. Release が作られたら、その Release の `kikidame-<version>.aab` を Play Console に手でアップロードする（画面の操作はここでは書かない）。Release に `.aab` が並んでも Obtainium が APK を選べるかは未確認（最初のリリースの後に確かめる）
-4. Release が作られたら、Obtainium で更新が見えることと、実機で `adb install -r` して既存データが残ることを確認する
+3. workflow が通ったら、Play Console で、リリースがクローズド テストのトラックに上がり、審査に出たことを確かめる（画面の操作はここでは書かない）
+4. 審査が通ったら、実機で Play から更新して、既存のデータが残ることを確かめる
 
 release ビルドは R8 と resource shrinking を有効にしている（APK は debug より大きく縮む）。
-ライブラリの consumer rules で足りていて `app/proguard-rules.pro` は最小限。縮小で壊れたら、`mapping-<version>.txt` でスタックトレースを戻せる。
+ライブラリの consumer rules で足りていて `app/proguard-rules.pro` は最小限。縮小で壊れたら、Play Console に上げた `mapping.txt`（Play が受け取ったもの）でスタックトレースを戻せる。
 `res/raw/aboutlibraries.json` はコードから参照しているので shrinker に消されない（消えたら設定のライセンス一覧が空になる）。
 
 ### Google Play の審査用の音声
