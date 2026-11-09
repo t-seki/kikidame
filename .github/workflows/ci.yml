@@ -11,6 +11,11 @@ jobs:
       # ADR を足したら docs/adr/README.md の一覧にも足す
       - name: ADR index is complete
         run: scripts/check-adr-index.sh
+      # ADR に注記の形の行（> 注記、frontmatter の status・superseded、「ADR NNNN で改めた」）があると落とす。検査自体の落ちる例・通る例も流す
+      - name: No annotations in ADRs
+        run: |
+          scripts/test-check-adr-notes.sh
+          scripts/check-adr-notes.sh
       # repo が追跡している Markdown に自 repo の issue・PR の番号（#N）があると落とす。検査自体の落ちる例・通る例も流す
       - name: No issue or PR numbers in Markdown
         run: |

@@ -67,9 +67,10 @@ Entity を変えたらスキーマの版を上げ、書き出された JSON も�
 
 ### docs の検査
 
-CI の `test` job は、docs を次の 3 つで確かめる。どれも手元で repo 直下から流せる。後ろの 2 つは、落ちる例と通る例を流すテスト（`scripts/test-check-issue-refs.sh` と `scripts/test-check-doc-script-refs.sh`）も CI で流す。
+CI の `test` job は、docs を次の 4 つで確かめる。どれも手元で repo 直下から流せる。`scripts/check-adr-index.sh` 以外の 3 つは、落ちる例と通る例を流すテスト（`scripts/test-check-adr-notes.sh`・`scripts/test-check-issue-refs.sh`・`scripts/test-check-doc-script-refs.sh`）も CI で流す。
 
 - `scripts/check-adr-index.sh`: `docs/adr/*.md` のファイル名（`README.md` を除く）が `docs/adr/README.md` に出ているかを確かめ、欠けていれば名前を出して落とす。一覧の文面が正しいかは確かめない
+- `scripts/check-adr-notes.sh`: `docs/adr/*.md`（`README.md` を除く）に注記の形の行があると、行番号と行を出して落とす。見る形は、行頭の `> 注記`、frontmatter（先頭の `---` の間）の `status:` と `superseded` を含むキー、「ADR NNNN で改めた」「ADR NNNN で終えた」の経緯の書き方。直し方は、本文を今の決定に書き換えて経緯は git の履歴に任せる（下の「docs と ADR の決まり」）。字面で見分けられない中身（手順の細部が入っていないか、など）は見ない。フォルダを引数に渡すと、そこを見る（テスト用）
 - `scripts/check-issue-refs.sh`: repo が追跡している Markdown の全部に、自 repo の issue・PR の番号（`#` と 1〜5 桁の数字）があると落とす。他の repo の参照（`owner/repo` の後ろの番号）と URL のアンカーは通す。コード（`.kt` など）は見ない（色の 16 進と当たるため）
 - `scripts/check-doc-script-refs.sh`: `docs/**/*.md` と `README*.md` のインラインコードに書かれたシェルスクリプトのファイル名が、repo の中にもリンクの中にも無いと落とす（コードブロックの中は見ない）。見るのは空白で区切った語のうち末尾が拡張子 sh のもので、repo 直下、またはその Markdown のあるフォルダからの相対パスにファイルが無く、`[…](…)` の形のリンクの中にも無いものを落とす（`~/…`・`$HOME/…`・glob のようなパスの形でない語も、ファイルが無いとして落とす）。直し方は、repo の中のスクリプトは `scripts/check-adr-index.sh` のようにパス付きで書き、ほかの repo のものは `https://…` のリンクにする。リンク先の URL が実在するかは確かめない。バッククォートの範囲は前から順に拾うので、span の中にバッククォートがあるとずれることがある
 
