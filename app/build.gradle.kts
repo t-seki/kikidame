@@ -32,7 +32,7 @@ android {
         }
     }
     buildTypes {
-        // 端末に Releases の release 版と並べて入れる。開発中のビルドやスキーマを上げたビルドを
+        // 端末に Play の release 版と並べて入れる。開発中のビルドやスキーマを上げたビルドを
         // 入れても release 版のデータに触れない。アプリ名は src/debug/res で「Kikidame (debug)」
         debug {
             applicationIdSuffix = ".debug"

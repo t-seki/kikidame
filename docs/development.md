@@ -195,6 +195,8 @@ AAB をアップロード鍵で署名してビルドし、クローズド テス
 
 CI が Play に上げるには、サービス アカウントの JSON 鍵を GitHub Actions の secret `PLAY_SERVICE_ACCOUNT_JSON` に置く。サービス アカウントの作り方は書き写さず、[upload-google-play の README](https://github.com/r0adkll/upload-google-play) の該当の節に従う。Play Console で付ける権限は、このアプリのテスト トラックへのリリースに要るものだけに絞る。`release.yml` の `tracks` に書いたクローズド テストのトラックの API での名前（`alpha`）は未確認で、最初のタグの前に Play Console で確かめ、違えば直す。
 
+Play アプリ署名の鍵を Google が作る鍵に替える作業（人が行う）は、最初のタグを打つ前に済ませる。Play Console の「Play アプリ署名」の画面の「鍵を変更」で「Google が鍵を生成する」を選ぶ。オープンテストか製品版にリリースを出した後は替えられない（ADR 0015）。替えた後、端末に入っているクローズド テストの版を Play の新しい版で上書きできるかは未確認（できなければアンインストールして入れ直す）。
+
 ### 署名鍵
 
 - 鍵は 2 つある。**アプリ署名鍵**は、利用者の端末に入るアプリの署名で、Google が持つ（Play アプリ署名で Google が作る鍵。ADR 0015）。**アップロード鍵**は、CI が AAB に署名して Play に上げるときの鍵で、これが repo の外の keystore（alias `kikidame`）。アップロード鍵を失っても、Play Console の「アップロード鍵のリセット」で戻れる（[Play アプリ署名のヘルプ](https://support.google.com/googleplay/android-developer/answer/9842756?hl=en)の "If you lose your upload key or suspect that it was compromised, you are not locked out of your app."。2026-11-09 に原文を読んだ）。それでも、keystore ファイルとパスフレーズはパスワードマネージャとオフラインの 2 箇所に控える
@@ -224,7 +226,7 @@ Android の開発者認証は、2027 年に施行される予定（時期は [FA
 
 ### バージョンを上げて出す
 
-1. `app/build.gradle.kts` の `versionCode`（単調増加の整数。F-Droid はこれを見る）と `versionName`（`X.Y.Z`）を上げる PR をマージする
+1. `app/build.gradle.kts` の `versionCode`（単調増加の整数。Play は同じ `versionCode` の AAB を受け付けず、`release.yml` が前のタグの `versionCode` と比べて、増えていなければ止まる）と `versionName`（`X.Y.Z`）を上げる PR をマージする
    - バージョンを上げる PR では、`fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` と `ja-JP` の同名のファイルを足す。書き方は既存のファイルに合わせ、前のリリースからマージされた利用者から見える変更を箇条書きにする。このファイルは、CI が Play のリリースノート（`whatsnew-en-US`・`whatsnew-ja-JP`）として上げる。ファイルが無いと `release.yml` が止まる
    - changelog は 1 ファイル 500 文字までにし、`wc -m` で数える
    - バージョンを上げる PR では、リリースしたバージョンに何が入っているかを述べた記述（例:「まだリリースしたバージョンには入っていない」「debug ビルドだけ」「not in the released builds」「debug build only」）を README（英日）と `docs/` で探し、出すバージョンに合わせて直す。当たった行は人が読み、出すバージョンと食い違う記述だけを直す（この項自身、直った後の文にも当たる）
