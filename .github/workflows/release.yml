@@ -1,7 +1,8 @@
 name: Release
 # v1.2.3 のタグを push すると署名した AAB をビルドし、Google Play のクローズド テストのトラックに上げる（ADR 0015）。GitHub Release は作らない。
-# 署名はアップロード鍵（Play アプリ署名の鍵は Google が持つ）。Secrets: KEYSTORE_BASE64（.jks を base64 にしたもの）、KEYSTORE_PASSWORD、KEY_ALIAS、KEY_PASSWORD。
-# Play への upload は Secrets: PLAY_SERVICE_ACCOUNT_JSON（サービス アカウントの JSON 鍵）。
+# 署名はアップロード鍵（Play アプリ署名の鍵は Google が持つ）。release job は environment `play`（デプロイのルールで v* のタグだけを許す）で動き、
+# 署名の secret はその environment secrets: KEYSTORE_BASE64（.jks を base64 にしたもの）、KEYSTORE_PASSWORD、KEY_ALIAS、KEY_PASSWORD。
+# Play への upload は Workload Identity 連携で認証する（JSON 鍵は置かない）。成り代われるのは environment `play` の job だけ。
 # リリースノートは fastlane/metadata/android/<locale>/changelogs/<versionCode>.txt を whatsnew-<locale> に写して渡す。R8 の mapping.txt も一緒に上げる。
 on:
   push:
@@ -11,6 +12,10 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    environment: play
+    permissions:
+      contents: read
+      id-token: write   # Workload Identity 連携の OIDC トークンを取るため
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -65,13 +70,20 @@ jobs:
           for locale in en-US ja-JP; do
             cp "fastlane/metadata/android/$locale/changelogs/$code.txt" "$RUNNER_TEMP/whatsnew/whatsnew-$locale"
           done
+      - name: Authenticate to Google Cloud
+        # provider の名前とサービス アカウントのメールは秘密ではないので、secret にせず直に書く
+        id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: projects/258802590449/locations/global/workloadIdentityPools/github/providers/github-actions
+          service_account: kikidame-ci@tseki-play-publishing.iam.gserviceaccount.com
       - name: Upload to Google Play
         uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
         with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          serviceAccountJson: ${{ steps.auth.outputs.credentials_file_path }}
           packageName: dev.tseki.kikidame
           releaseFiles: app/build/outputs/bundle/release/app-release.aab
-          # クローズド テストのトラックの API での名前は未確認（既定のクローズド トラックなら alpha の見込み）。最初のタグの前に Play Console で確かめる
+          # クローズド テストのトラックの API での名前。v0.10.1 の run で通った（ログに Validating tracks: 'alpha' → Successfully committed …。https://github.com/t-seki/kikidame/actions/runs/42595099326）
           tracks: alpha
           status: completed
           whatsNewDirectory: ${{ runner.temp }}/whatsnew
