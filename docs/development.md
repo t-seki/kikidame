@@ -204,12 +204,12 @@ CI が Play に上げるときの認証は、JSON 鍵を置かず、Workload Ide
 - pool `github` と、その中の OIDC の provider `github-actions`（issuer は `https://token.actions.githubusercontent.com`）
 - attribute mapping: `google.subject=assertion.sub`、`attribute.repository=assertion.repository`、`attribute.repository_owner_id=assertion.repository_owner_id`
 - provider の条件: `assertion.repository_owner_id == '12137574'`（名前を取り直されても通らないよう、名前ではなく id で絞る）
-- サービス アカウントに `roles/iam.workloadIdentityUser` を付ける相手（principal）は、subject `repo:t-seki/kikidame:environment:play` だけ。environment `play` のデプロイのルールと合わさって、`v*` のタグの job だけが成り代われる
+- サービス アカウントに `roles/iam.workloadIdentityUser` を付ける相手（principal）は、subject `repo:t-seki@12137574/kikidame@1441370038:environment:play` だけ。environment `play` のデプロイのルールと合わさって、`v*` のタグの job だけが成り代われる。この repo の OIDC の subject は immutable subject（owner と repo の id が入る形）で、`repo:<owner>/<repo>:…` の形ではない。形は、`gh api repos/<owner>/<repo>/actions/oidc/customization/sub` が返す `sub_claim_prefix` に `:environment:<名前>` を足したもの（この repo は `use_immutable_subject: true`、`sub_claim_prefix` は `repo:t-seki@12137574/kikidame@1441370038`。2026-11-09 に確かめた）。id が入るので、同じ名前で取り直された別の owner・repo では subject が合わない（名前を変えたときの扱いは確かめていない）。`repo:t-seki/kikidame:environment:play` の形で principal を付けると、upload が `Permission 'iam.serviceAccounts.getAccessToken' denied` で落ちた（v0.10.2 のタグの run の attempt 1）
 - 有効にする API: IAM Service Account Credentials API（`iamcredentials.googleapis.com`）と Security Token Service API（`sts.googleapis.com`）
 
 サービス アカウントに Play Console で付ける権限は、このアプリのテスト トラックへのリリースに要るものだけに絞る。`release.yml` の `tracks` に書いたクローズド テストのトラックの API での名前は `alpha`（v0.10.1 の [run](https://github.com/t-seki/kikidame/actions/runs/42595099326) のログに `Validating tracks: 'alpha'` → `Successfully committed` と出た。2026-11-09）。
 
-Workload Identity 連携で Play に上げられるかは、最初のタグの run で確かめる（未確認）。通った後に、サービス アカウントの JSON 鍵（GCP 側）と repository secrets の `PLAY_SERVICE_ACCOUNT_JSON`・署名の 4 つの secret を消す（人が行う）。落ちたら、`release.yml` の `Authenticate to Google Cloud` の step を外し、upload の入力を `serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}` に戻せば元のとおりに出せる（auth の step には `if` も `continue-on-error` も無く、auth で落ちると upload まで進まないため）。
+Workload Identity 連携での Play への upload は、v0.10.2 のタグの [run](https://github.com/t-seki/kikidame/actions/runs/42634993002) の attempt 2 で通った（principal を上の immutable subject の形に付け替えた後。attempt 1 は上のとおり落ちた）。通ったので、サービス アカウントの JSON 鍵（GCP 側）と repository secrets の `PLAY_SERVICE_ACCOUNT_JSON`・署名の 4 つの secret は消してよい（消すのは人が行う）。
 
 Play アプリ署名の鍵を Google が作る鍵に替える作業（人が行う）は、最初のタグを打つ前に済ませる。Play Console の「Play アプリ署名」の画面の「鍵を変更」で「Google が鍵を生成する」を選ぶ。オープンテストか製品版にリリースを出した後は替えられない（ADR 0015）。替えた後、端末に入っているクローズド テストの版を Play の新しい版で上書きできるかは未確認（できなければアンインストールして入れ直す）。
 
