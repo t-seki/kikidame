@@ -2,7 +2,7 @@
 
 実機（debug ビルド）で確かめるときに使う手順。ビルド・テスト・リリースの手順は [development.md](development.md)。
 
-debug ビルドは applicationId が `dev.tseki.kikidame.debug`、アプリ名が「Kikidame (debug)」で、release ビルド（`dev.tseki.kikidame`、Releases の APK）とは別のアプリとして並ぶ。以下の `$ADB` は adb のパス、`$PKG` は debug ビルドの applicationId を指す。
+debug ビルドは applicationId が `dev.tseki.kikidame.debug`、アプリ名が「Kikidame (debug)」で、release ビルド（`dev.tseki.kikidame`、Play から入れた版）とは別のアプリとして並ぶ。以下の `$ADB` は adb のパス、`$PKG` は debug ビルドの applicationId を指す。
 
 ## 接続
 
@@ -186,7 +186,7 @@ Auto はブラウズツリーを開き直すたびに `onGetChildren` を呼ぶ�
 - 初回はスマホに「この車で使う」許可画面（FRX）が出る。5 秒以内に進めないと `PROJECTION_NOT_STARTED` で切れる（logcat に `CarInfo authorization: UNKNOWN` → `Triggering FRX`）ので、スマホの画面を見ながら繋ぐ
 - DHU を途中で落とすとスマホのヘッドユニットサーバーが「Already connected」で固まる（`DeveloperHeadUnitNetworkService` の FATAL）。DHU 側は「Waiting for phone」のまま。Android Auto の ⋮ から「ヘッドユニット サーバーを停止」→「起動」で直る
 - portaudio の `Device unavailable` は無視してよい（DHU 側で音は出ないが再生は進む）
-- `installDebug` は applicationId が別なので release ビルドに触らない。release ビルドそのものをデータを残したまま手元のビルドで更新するなら、release 署名で上書きする（署名鍵を持つ人向け）:
+- `installDebug` は applicationId が別なので release ビルドに触らない。release ビルドそのものをデータを残したまま手元のビルドで更新するなら、release 署名で上書きする（署名鍵を持つ人向け）。ただし、Play から入れた版には使えない見込み（Play の版は Google の鍵で署名され、手元のビルドはアップロード鍵で署名されるので、証明書が合わない。仕組みからの見込みで、試していない）。使えるのは、手元のビルドを入れた端末だけ:
 
   ```bash
   source <env ファイル>          # export KIKIDAME_KEYSTORE=… 等を書いた chmod 600 のファイル（git 管理外）

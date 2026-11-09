@@ -3,6 +3,8 @@ date: 2026-09-20
 ---
 アプリはオープンソースとして公開し（ライセンスは ADR 0012）、**GitHub Releases** の署名済みの APK と、Releases を追って更新を知らせる **Obtainium** で無償で配る。IzzyOnDroid と F-Droid 本家には申請しない。Google Play でも無料で配る（ADR 0014）。
 
+> 注記: GitHub Releases・Obtainium での配布は、ADR 0015 で終えた（v0.10.0 まで）。配布は Google Play だけになった。以下の決定の本文は書き換えない。
+
 ## IzzyOnDroid と F-Droid 本家に申請しない理由
 
 理由は 2 つ。
