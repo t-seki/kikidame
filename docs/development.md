@@ -193,7 +193,7 @@ Google Play のスマートフォン用のスクリーンショットは、ア�
 配布は Google Play だけ（ADR 0015。GitHub Releases・Obtainium での配布は v0.10.0 で終えた）。`v*` のタグを push すると `.github/workflows/release.yml` が
 AAB をアップロード鍵で署名してビルドし、クローズド テストのトラックに上げる（changelog をリリースノートに、R8 の `mapping.txt` も一緒に）。GitHub Release は作らない。
 
-`release.yml` の `release` job は、GitHub Actions の environment `play` で動く。repository secrets はどのブランチの workflow からも読めて、workflow を書き換えたブランチから鍵を抜かれうるので、署名の secret は environment secrets に置き、`v*` のタグの job だけが読めるようにする。environment の作り方は書き写さず、GitHub の [Managing environments for deployment](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-deployments/managing-environments-for-deployment) に従う。設定する値は次のとおり（人が行う）。Required reviewers は付けない（タグを打つこと自体が人の操作で、承認のクリックを毎回増やす得が薄い。ADR 0015）。
+`release.yml` の `release` job は、GitHub Actions の environment `play` で動く。repository secrets はどのブランチの workflow からも読めて、依存の更新のブランチなど、タグを打たずにブランチへ push した workflow から鍵を抜かれうるので、署名の secret は environment secrets に置き、`v*` のタグの job だけが読めるようにする。デプロイのルールが見るのは ref だけなので、タグを打てるトークンが漏れた場合（細工した workflow のコミットに `v*` のタグを付けて push できる）は防げない。environment の作り方は書き写さず、GitHub の [Managing environments for deployment](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-deployments/managing-environments-for-deployment) に従う。設定する値は次のとおり（人が行う）。Required reviewers は付けない（タグを打つこと自体が人の操作で、承認のクリックを毎回増やす得が薄い。ADR 0015）。
 
 - environment の名前: `play`
 - デプロイのルール: `v*` のタグだけを許す
@@ -203,13 +203,13 @@ CI が Play に上げるときの認証は、JSON 鍵を置かず、Workload Ide
 
 - pool `github` と、その中の OIDC の provider `github-actions`（issuer は `https://token.actions.githubusercontent.com`）
 - attribute mapping: `google.subject=assertion.sub`、`attribute.repository=assertion.repository`、`attribute.repository_owner_id=assertion.repository_owner_id`
-- provider の条件: `assertion.repository_owner_id == '<owner の GitHub の id>'`（名前を取り直されても通らないよう、名前ではなく id で絞る）
+- provider の条件: `assertion.repository_owner_id == '12137574'`（名前を取り直されても通らないよう、名前ではなく id で絞る）
 - サービス アカウントに `roles/iam.workloadIdentityUser` を付ける相手（principal）は、subject `repo:t-seki/kikidame:environment:play` だけ。environment `play` のデプロイのルールと合わさって、`v*` のタグの job だけが成り代われる
 - 有効にする API: IAM Service Account Credentials API（`iamcredentials.googleapis.com`）と Security Token Service API（`sts.googleapis.com`）
 
 サービス アカウントに Play Console で付ける権限は、このアプリのテスト トラックへのリリースに要るものだけに絞る。`release.yml` の `tracks` に書いたクローズド テストのトラックの API での名前は `alpha`（v0.10.1 の [run](https://github.com/t-seki/kikidame/actions/runs/42595099326) のログに `Validating tracks: 'alpha'` → `Successfully committed` と出た。2026-11-09）。
 
-Workload Identity 連携で Play に上げられるかは、最初のタグの run で確かめる（未確認）。通った後に、サービス アカウントの JSON 鍵（GCP 側）と repository secrets の `PLAY_SERVICE_ACCOUNT_JSON`・署名の 4 つの secret を消す（人が行う）。落ちたら、`release.yml` の upload の入力を `serviceAccountJsonPlainText`（JSON 鍵の secret）に戻せば元のとおりに出せる。
+Workload Identity 連携で Play に上げられるかは、最初のタグの run で確かめる（未確認）。通った後に、サービス アカウントの JSON 鍵（GCP 側）と repository secrets の `PLAY_SERVICE_ACCOUNT_JSON`・署名の 4 つの secret を消す（人が行う）。落ちたら、`release.yml` の `Authenticate to Google Cloud` の step を外し、upload の入力を `serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}` に戻せば元のとおりに出せる（auth の step には `if` も `continue-on-error` も無く、auth で落ちると upload まで進まないため）。
 
 Play アプリ署名の鍵を Google が作る鍵に替える作業（人が行う）は、最初のタグを打つ前に済ませる。Play Console の「Play アプリ署名」の画面の「鍵を変更」で「Google が鍵を生成する」を選ぶ。オープンテストか製品版にリリースを出した後は替えられない（ADR 0015）。替えた後、端末に入っているクローズド テストの版を Play の新しい版で上書きできるかは未確認（できなければアンインストールして入れ直す）。
 
