@@ -1,0 +1,2 @@
+- No app changes in this release
+- Kikidame is now distributed through Google Play only
