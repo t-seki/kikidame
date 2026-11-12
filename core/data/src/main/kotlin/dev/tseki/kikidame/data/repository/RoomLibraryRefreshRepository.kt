@@ -167,16 +167,10 @@ class RoomLibraryRefreshRepository @Inject constructor(
         val local = db.programDao().findById(programId.value) ?: return null
         val sourceId = local.sourceItemId?.let(::SourceItemId) ?: return null
         // `ParentId` での各回取得は番組が無くても空を返すので、先に番組そのものを確かめて消失を立てる／戻す
-        val program = source.fetchProgram(sourceId)
-        markGone(local, gone = program == null)
-        if (program == null) return ProgramFetch.Gone
-        return ProgramFetch.Found(
-            SourceSnapshot(
-                programs = listOf(program),
-                episodes = source.fetchProgramEpisodes(sourceId),
-                scope = SnapshotScope.Program(sourceId),
-            ),
-        )
+        val snapshot = source.fetchProgramSnapshot(sourceId)
+        markGone(local, gone = snapshot == null)
+        if (snapshot == null) return ProgramFetch.Gone
+        return ProgramFetch.Found(snapshot)
     }
 
     /**

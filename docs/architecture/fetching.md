@@ -5,7 +5,7 @@
 
 ## 取得元の境界とセッション
 
-- 同期とダウンロードは、取得元の境界 `SourceGateway`（`fetchAll` / `fetchProgram` / `fetchProgramEpisodes` / `fetchProgramImage` / `fetchFileSize` / `openDownload`、`:core:data` の `data.source`）だけを通す（ADR 0007）。実装は Jellyfin の `JellyfinSource` と共有フォルダの `SharedFolderSource`。入口は `SessionSourceGateway`（`SourceGateway` の bind）で、今の接続の種類で振り分ける
+- 同期とダウンロードは、取得元の境界 `SourceGateway`（`fetchAll` / `fetchProgram` / `fetchProgramEpisodes` / `fetchProgramSnapshot` / `fetchProgramImage` / `fetchFileSize` / `openDownload`、`:core:data` の `data.source`）だけを通す（ADR 0007）。実装は Jellyfin の `JellyfinSource` と共有フォルダの `SharedFolderSource`。入口は `SessionSourceGateway`（`SourceGateway` の bind）で、今の接続の種類で振り分ける
 - `:core:domain` に取得元のスナップショット型（`SourceProgram` / `SourceEpisode` / `SourceSnapshot`）と突合の純粋関数 `LibraryMatching.match` を置く。`:core:data` に `JellyfinGateway`（`signIn` / `listLibraries` / `fetchLibrary` ほか）と jellyfin-sdk-kotlin 実装、`SessionStore` を置く。Repository が突合結果を 1 トランザクションで Room に適用する。テストはフェイクのゲートウェイで行う
 - `SessionState` は `SignedOut`（直前の取得元の入力補助として `lastServerUrl`・`lastUserName`・`lastSmb`・`lastDeviceFolder` を持つ）／`NeedsLibrary`（Jellyfin だけ）／`Ready`。`Ready` は `source: ConnectedSource`（`Jellyfin(session, library)`・`Smb(connection)`・`Device(folder)`）と `lastFetchedAt`・`lastAttemptedAt` を持つ
 - DataStore（`SessionStore`）は、`smb_host` があれば SMB、`device_tree_uri` があれば端末のフォルダ、どちらも無ければ Jellyfin とみなす。SMB は `smb_host`・`smb_share`・`smb_path`・`smb_user`・`smb_password`（暗号化）・`smb_guest`、端末のフォルダは `device_tree_uri`・`device_name`・`device_signed_out` のキーで持つ
@@ -54,7 +54,7 @@
 - ライブラリ一覧: `/UserViews`。`CollectionType = music` と `books` のものだけ選択できる
 - ブックのライブラリ: `/Items?ParentId={libraryId}&IncludeItemTypes=Folder&Recursive=true&Fields=ParentId` で番組のフォルダを、
   `/Items?ParentId={libraryId}&IncludeItemTypes=AudioBook&Recursive=true&Fields=DateCreated,ParentId,Path,Etag&SortBy=DateCreated&SortOrder=Descending`（500 件ずつ）で各回を取り、タグでまとめる（`Etag` はファイルの版。ADR 0011）。
-  `albums=` の絞り込みは使わない（Jellyfin 10.10.7 では効き、Jellyfin 12.0 では 0 件、Jellyfin 10.11.11 では全件が返った）。1 番組の各回・番組の存在確認もライブラリ全体を取ってまとめた中から選ぶ。
+  `albums=` の絞り込みは使わない（Jellyfin 10.10.7 では効き、Jellyfin 12.0 では 0 件、Jellyfin 10.11.11 では全件が返った）。1 番組の各回・番組の存在確認もライブラリ全体を取ってまとめた中から選ぶ。1 番組の同期は `fetchProgramSnapshot` で番組と各回を 1 度に取り、この全体の取得は 1 回で済ませる（番組の存在確認と各回の取得で 2 回回さない、#58）。
   AudioBook は `Container` を返さない（Jellyfin 10.10.7 と 12.0）ので、保存先の拡張子は `Path` から取る。番組の画像の中身は、番組のフォルダの `/Items/{folderId}/Images/Primary`
 - 番組一覧: `/Items?ParentId={libraryId}&IncludeItemTypes=MusicAlbum&Recursive=true`（1 回。`Fields` は付けない）。
   番組の画像の版は、返る `ImageTags.Primary`（`SourceProgram.image`）。`Fields` を付けなくても返ることを、Jellyfin 10.10.7 のテストサーバ（`scripts/jellyfin-testserver.sh up 1010`）で確かめた（`folder.jpg` のあるアルバムだけ `ImageTags` に `Primary` が出た）。Jellyfin 12 では未確認

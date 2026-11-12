@@ -8,6 +8,7 @@ import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SourceProgram
+import dev.tseki.kikidame.domain.SnapshotScope
 import dev.tseki.kikidame.domain.SourceSnapshot
 import dev.tseki.kikidame.domain.Session
 import kotlin.time.Duration
@@ -45,6 +46,15 @@ interface JellyfinGateway {
      * 音楽のライブラリでは `ParentId` での各回取得は番組が無くても空の一覧を返すので、1 番組の同期はこれで存在を確かめてから行う。
      */
     suspend fun fetchProgram(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId): SourceProgram?
+
+    /**
+     * 1 番組の同期の入力（番組と各回）を 1 度に取る。番組がサーバに無ければ null（消失）。
+     * 既定は [fetchProgram] の後に [fetchProgramEpisodes]。ブックのライブラリはどちらもライブラリ全体の取得になるので、実装が 1 回にまとめて上書きする。
+     */
+    suspend fun fetchProgramSnapshot(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId): SourceSnapshot? {
+        val program = fetchProgram(credentials, library, programSourceId) ?: return null
+        return SourceSnapshot(listOf(program), fetchProgramEpisodes(credentials, library, programSourceId), SnapshotScope.Program(programSourceId))
+    }
 
     /**
      * 番組の画像の中身を取る（ADR 0009）。音楽のライブラリは MusicAlbum の Primary、ブックのライブラリは番組のフォルダ（Folder）の

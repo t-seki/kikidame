@@ -3,6 +3,7 @@ package dev.tseki.kikidame.data.source
 import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceItemId
+import dev.tseki.kikidame.domain.SnapshotScope
 import dev.tseki.kikidame.domain.SourceProgram
 import dev.tseki.kikidame.domain.SourceSnapshot
 import java.io.InputStream
@@ -10,7 +11,7 @@ import java.io.InputStream
 /**
  * 取得元（CONTEXT.md）との境界（ADR 0007）。同期とダウンロードは、これだけを通して取得元に触る。
  * 取得元の種類（Jellyfin など）に依存しない。認証などの接続の情報は実装の側で持つ。
- * 口は 6 つ: 全走査（[fetchAll]）、1 番組の各回（[fetchProgramEpisodes]）、番組そのもの（[fetchProgram]）、
+ * 口は 7 つ: 全走査（[fetchAll]）、1 番組の各回（[fetchProgramEpisodes]）、番組そのもの（[fetchProgram]）、1 番組の同期の入力（[fetchProgramSnapshot]）、
  * 番組の画像の中身（[fetchProgramImage]、ADR 0009）、各回の原本のストリーム（[openDownload]）、各回のファイルの大きさ（[fetchFileSize]、ADR 0011）。
  * 失敗はすべて [SourceException] に正規化する。接続していなければ [SourceException.Unauthorized]。認証の失敗（Jellyfin の 401/403、
  * SMB の認証の失敗）と、端末のフォルダの永続権限が無い・取り消された・選んだフォルダが無いと分かったときも [SourceException.Unauthorized]
@@ -33,6 +34,16 @@ interface SourceGateway {
      * 1 番組の各回の取得は番組が無くても空の一覧を返しうるので、1 番組の同期はこれで存在を確かめてから行う。
      */
     suspend fun fetchProgram(programId: SourceItemId): SourceProgram?
+
+    /**
+     * 1 番組の同期の入力（番組と各回）を 1 度に取る。番組が取得元に無ければ null（消失）。
+     * 既定は [fetchProgram] で存在を確かめてから [fetchProgramEpisodes] で各回を取る。
+     * 1 度の取得で両方が分かる取得元（Jellyfin のブックのライブラリ、ADR 0010）は、取得を 1 回にするために上書きする。
+     */
+    suspend fun fetchProgramSnapshot(programId: SourceItemId): SourceSnapshot? {
+        val program = fetchProgram(programId) ?: return null
+        return SourceSnapshot(listOf(program), fetchProgramEpisodes(programId), SnapshotScope.Program(programId))
+    }
 
     /**
      * 番組の画像（CONTEXT.md）の中身を取る（ADR 0009）。取得元に画像が無い、または画像として扱わない（大きすぎるなど）なら null。
