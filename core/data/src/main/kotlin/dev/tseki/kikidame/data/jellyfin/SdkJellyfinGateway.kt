@@ -13,6 +13,7 @@ import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SourceItemId
 import dev.tseki.kikidame.domain.SourceImage
 import dev.tseki.kikidame.domain.SourceProgram
+import dev.tseki.kikidame.domain.SnapshotScope
 import dev.tseki.kikidame.domain.SourceSnapshot
 import dev.tseki.kikidame.domain.Session
 import dev.tseki.kikidame.domain.PublishedAt
@@ -179,6 +180,26 @@ class SdkJellyfinGateway @Inject constructor(
             LibraryKind.BOOKS -> fetchBooks(api, credentials, library).programs.firstOrNull { it.sourceId == programSourceId }
         }
     }
+
+    /**
+     * ブックのライブラリは [fetchBooks] を 1 回だけ回し、その結果から番組と各回を選ぶ（[fetchProgram] と [fetchProgramEpisodes] を続けると 2 回回る）。
+     * 音楽のライブラリは既定どおり（番組の存在確認の後に、番組の下だけを検索）。
+     */
+    override suspend fun fetchProgramSnapshot(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId): SourceSnapshot? =
+        when (library.kind) {
+            LibraryKind.MUSIC -> super.fetchProgramSnapshot(credentials, library, programSourceId)
+            LibraryKind.BOOKS -> call {
+                val listing = fetchBooks(api(credentials.serverUrl, credentials.accessToken), credentials, library)
+                val program = listing.programs.firstOrNull { it.sourceId == programSourceId }
+                program?.let {
+                    SourceSnapshot(
+                        programs = listOf(it),
+                        episodes = listing.episodes.filter { e -> e.programSourceId == programSourceId },
+                        scope = SnapshotScope.Program(programSourceId),
+                    )
+                }
+            }
+        }
 
     private fun BaseItemDto.toSourceProgram() = SourceProgram(
         sourceId = SourceItemId(id.toString()),

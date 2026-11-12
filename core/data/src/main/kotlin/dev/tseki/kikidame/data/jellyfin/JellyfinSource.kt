@@ -42,6 +42,11 @@ class JellyfinSource @Inject constructor(
         return gateway.fetchProgram(credentials, library, programId)
     }
 
+    override suspend fun fetchProgramSnapshot(programId: SourceItemId): SourceSnapshot? {
+        val (credentials, library) = withLibrary()
+        return gateway.fetchProgramSnapshot(credentials, library, programId)
+    }
+
     override suspend fun fetchProgramImage(programId: SourceItemId): ByteArray? {
         val (credentials, library) = withLibrary()
         return gateway.fetchProgramImage(credentials, library, programId)

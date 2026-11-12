@@ -55,6 +55,14 @@ class FakeJellyfinGateway : JellyfinGateway {
         return snapshot.programs.firstOrNull { it.sourceId == programSourceId }
     }
 
+    /** 1 番組の同期が 1 度に取りに来た回数（ブックのライブラリでライブラリ全体の取得を 1 回にするための口）。 */
+    var programSnapshotFetches = 0
+
+    override suspend fun fetchProgramSnapshot(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId): SourceSnapshot? {
+        programSnapshotFetches++
+        return super.fetchProgramSnapshot(credentials, library, programSourceId)
+    }
+
     /** [snapshot] のうちその番組に属する各回。 */
     override suspend fun fetchProgramEpisodes(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId): List<SourceEpisode> {
         failWith?.let { throw it }

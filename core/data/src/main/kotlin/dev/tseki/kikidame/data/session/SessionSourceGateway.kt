@@ -60,6 +60,9 @@ class SessionSourceGateway internal constructor(
     override suspend fun fetchProgram(programId: SourceItemId): SourceProgram? =
         withSource { it.fetchProgram(programId) }
 
+    override suspend fun fetchProgramSnapshot(programId: SourceItemId): SourceSnapshot? =
+        withSource { it.fetchProgramSnapshot(programId) }
+
     /** 番組の画像。共有フォルダは呼び出しごとに木を開く（全走査の途中で呼ばれると、走査の接続とは別にもう 1 本張る）。 */
     override suspend fun fetchProgramImage(programId: SourceItemId): ByteArray? =
         withSource { it.fetchProgramImage(programId) }

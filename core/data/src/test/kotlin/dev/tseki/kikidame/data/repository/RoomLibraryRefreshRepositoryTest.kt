@@ -174,6 +174,18 @@ class RoomLibraryRefreshRepositoryTest : JellyfinRefreshTestBase() {
         assertEquals(1, repo.syncProgram(programId)?.newEpisodes)
     }
 
+    /** 1 番組の同期は、番組と各回を 1 度の取得（`fetchProgramSnapshot`）で取る（ブックのライブラリで全件取得を 2 回回さない、#58）。 */
+    @Test
+    fun syncProgramFetchesTheProgramSnapshotOnce() = runTest {
+        signInAndSelect()
+        gateway.snapshot = snapshot
+        repo.refresh()
+        val programId = library.observePrograms().first().single().program.id
+
+        repo.syncProgram(programId)
+        assertEquals(1, gateway.programSnapshotFetches)
+    }
+
     /** 番組ごとサーバの一覧から消えたら消失 = 判断保留（各回が消えた場合は RoomSyncTest）。 */
     @Test
     fun aProgramGoneFromTheServerIsLeftAlone() = runTest {
