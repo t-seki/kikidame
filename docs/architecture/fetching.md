@@ -54,7 +54,7 @@
 - ライブラリ一覧: `/UserViews`。`CollectionType = music` と `books` のものだけ選択できる
 - ブックのライブラリ: `/Items?ParentId={libraryId}&IncludeItemTypes=Folder&Recursive=true&Fields=ParentId` で番組のフォルダを、
   `/Items?ParentId={libraryId}&IncludeItemTypes=AudioBook&Recursive=true&Fields=DateCreated,ParentId,Path,Etag&SortBy=DateCreated&SortOrder=Descending`（500 件ずつ）で各回を取り、タグでまとめる（`Etag` はファイルの版。ADR 0011）。
-  `albums=` の絞り込みは使わない（Jellyfin 10.10.7 では効き、Jellyfin 12.0 では 0 件、Jellyfin 10.11.11 では全件が返った）。1 番組の各回・番組の存在確認もライブラリ全体を取ってまとめた中から選ぶ。1 番組の同期は `fetchProgramSnapshot` で番組と各回を 1 度に取り、この全体の取得は 1 回で済ませる（番組の存在確認と各回の取得で 2 回回さない、#58）。
+  `albums=` の絞り込みは使わない（Jellyfin 10.10.7 では効き、Jellyfin 12.0 では 0 件、Jellyfin 10.11.11 では全件が返った）。1 番組の各回・番組の存在確認もライブラリ全体を取ってまとめた中から選ぶ。1 番組の同期は `fetchProgramSnapshot` で番組と各回を 1 度に取り、この全体の取得は 1 回で済ませる（番組の存在確認と各回の取得で 2 回回さない）。
   AudioBook は `Container` を返さない（Jellyfin 10.10.7 と 12.0）ので、保存先の拡張子は `Path` から取る。番組の画像の中身は、番組のフォルダの `/Items/{folderId}/Images/Primary`
 - 番組一覧: `/Items?ParentId={libraryId}&IncludeItemTypes=MusicAlbum&Recursive=true`（1 回。`Fields` は付けない）。
   番組の画像の版は、返る `ImageTags.Primary`（`SourceProgram.image`）。`Fields` を付けなくても返ることを、Jellyfin 10.10.7 のテストサーバ（`scripts/jellyfin-testserver.sh up 1010`）で確かめた（`folder.jpg` のあるアルバムだけ `ImageTags` に `Primary` が出た）。Jellyfin 12 では未確認
