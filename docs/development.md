@@ -92,8 +92,9 @@ docs・ADR・README・`CONTEXT.md`・コードのコメントには、自 repo �
 
 ```bash
 scripts/jellyfin-testserver.sh up 1010   # Jellyfin 10.10.x → http://localhost:8097
+scripts/jellyfin-testserver.sh up 1011   # Jellyfin 10.11.x → http://localhost:8099
 scripts/jellyfin-testserver.sh up 12     # Jellyfin 12.x    → http://localhost:8098
-scripts/jellyfin-testserver.sh down      # 両方止めて消す
+scripts/jellyfin-testserver.sh down      # 全部止めて消す
 
 KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTest \
   --tests dev.tseki.kikidame.data.jellyfin.SdkJellyfinGatewayIntegrationTest
@@ -131,6 +132,7 @@ KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTe
 | Jellyfin | 結果 |
 | --- | --- |
 | Jellyfin 10.10.7 | 通る |
+| Jellyfin 10.11.11 | 通る |
 | Jellyfin 12.0.0 | 通る |
 
 ### ストア用のスクリーンショットの撮り方

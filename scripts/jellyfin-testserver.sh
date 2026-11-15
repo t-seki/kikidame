@@ -2,6 +2,7 @@
 # テスト用の Jellyfin をコンテナで立てる。
 #
 #   scripts/jellyfin-testserver.sh up 1010     # Jellyfin 10.10.x を http://localhost:8097 に
+#   scripts/jellyfin-testserver.sh up 1011     # Jellyfin 10.11.x を http://localhost:8099 に
 #   scripts/jellyfin-testserver.sh up 12       # Jellyfin 12.x    を http://localhost:8098 に
 #   scripts/jellyfin-testserver.sh down        # 両方止めて消す（メディアと設定のディレクトリは残る）
 #   scripts/jellyfin-testserver.sh media       # 合成ライブラリだけ作り直す
@@ -30,7 +31,7 @@ USER_NAME="kikidame"
 PASSWORD="kikidame-test"
 AUTH_HEADER='Authorization: MediaBrowser Client="kikidame-testserver", Device="script", DeviceId="kikidame-testserver", Version="1"'
 
-usage() { sed -n '2,22p' "$0"; exit 1; }
+usage() { sed -n '2,24p' "$0"; exit 1; }
 
 # 番組（album）・配信元（album_artist）・出演者（artist）・公開日（date）をタグに持つ無音の m4a を 1 本作る。
 # 引数: 出力パス タイトル 番組 配信元 公開日 出演者（空なら付けない）
@@ -135,8 +136,9 @@ make_media() {
 resolve() {
   case "$1" in
     1010) NAME=kikidame-jf-1010; PORT=8097; IMAGE=jellyfin/jellyfin:10.10.7 ;;
+    1011) NAME=kikidame-jf-1011; PORT=8099; IMAGE=jellyfin/jellyfin:10.11.11 ;;
     12)   NAME=kikidame-jf-12;   PORT=8098; IMAGE=jellyfin/jellyfin:12.0 ;;
-    *) echo "unknown version: $1 (1010 | 12)"; exit 1 ;;
+    *) echo "unknown version: $1 (1010 | 1011 | 12)"; exit 1 ;;
   esac
   URL="http://localhost:$PORT"
   CONFIG="$DIR/config-$1"
@@ -214,7 +216,7 @@ up() {
 
 down() {
   local n
-  for n in kikidame-jf-1010 kikidame-jf-12; do
+  for n in kikidame-jf-1010 kikidame-jf-1011 kikidame-jf-12; do
     if docker ps -a --format '{{.Names}}' | grep -qx "$n"; then
       docker rm -f "$n" >/dev/null && echo "removed $n"
     fi

@@ -186,6 +186,47 @@ class RoomLibraryRefreshRepositoryTest : JellyfinRefreshTestBase() {
         assertEquals(1, gateway.programSnapshotFetches)
     }
 
+    /** 1 番組の同期は、手元のその番組の各回の取得元 ID を取得元に渡す。 */
+    @Test
+    fun syncProgramPassesTheKnownEpisodeIds() = runTest {
+        signInAndSelect()
+        gateway.snapshot = snapshot
+        repo.refresh()
+        val programId = library.observePrograms().first().single().program.id
+
+        repo.syncProgram(programId)
+        assertEquals(setOf(SourceItemId("audio-1"), SourceItemId("audio-2"), SourceItemId("audio-3")), gateway.knownEpisodeIdsPassed.single())
+    }
+
+    /** 別の番組の各回は、渡す ID に混ざらない。 */
+    @Test
+    fun syncProgramDoesNotPassEpisodesOfOtherPrograms() = runTest {
+        signInAndSelect()
+        val other = SourceProgram(SourceItemId("album-2"), "別の番組", publisher)
+        gateway.snapshot = SourceSnapshot(
+            programs = snapshot.programs + other,
+            episodes = snapshot.episodes + sourceEpisode("audio-9", "別の番組 2026-09-14-1", "2026-09-13T15:00:00Z", program = "album-2"),
+        )
+        repo.refresh()
+        val programId = library.observePrograms().first().first { it.program.name == program }.program.id
+
+        repo.syncProgram(programId)
+        assertEquals(setOf(SourceItemId("audio-1"), SourceItemId("audio-2"), SourceItemId("audio-3")), gateway.knownEpisodeIdsPassed.single())
+    }
+
+    /** 手元に各回が 0 本の番組でも、空の ID の一覧を渡して今と同じに動く。 */
+    @Test
+    fun syncProgramWithNoLocalEpisodesPassesEmptyIds() = runTest {
+        signInAndSelect()
+        gateway.snapshot = SourceSnapshot(snapshot.programs, emptyList())
+        repo.refresh()
+        val programId = library.observePrograms().first().single().program.id
+
+        gateway.snapshot = snapshot
+        assertEquals(3, repo.syncProgram(programId)?.newEpisodes)
+        assertEquals(emptySet<SourceItemId>(), gateway.knownEpisodeIdsPassed.first())
+    }
+
     /** 番組ごとサーバの一覧から消えたら消失 = 判断保留（各回が消えた場合は RoomSyncTest）。 */
     @Test
     fun aProgramGoneFromTheServerIsLeftAlone() = runTest {
