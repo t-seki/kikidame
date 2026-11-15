@@ -4,7 +4,7 @@
 #   scripts/jellyfin-testserver.sh up 1010     # Jellyfin 10.10.x を http://localhost:8097 に
 #   scripts/jellyfin-testserver.sh up 1011     # Jellyfin 10.11.x を http://localhost:8099 に
 #   scripts/jellyfin-testserver.sh up 12       # Jellyfin 12.x    を http://localhost:8098 に
-#   scripts/jellyfin-testserver.sh down        # 両方止めて消す（メディアと設定のディレクトリは残る）
+#   scripts/jellyfin-testserver.sh down        # 全部止めて消す（メディアと設定のディレクトリは残る）
 #   scripts/jellyfin-testserver.sh media       # 合成ライブラリだけ作り直す
 #
 # KIKIDAME_JF_LIBRARY=showcase を付けると、統合テスト用の日本語ライブラリ（番組 2 × 各回 3）の代わりに、
