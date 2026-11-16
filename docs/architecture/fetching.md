@@ -20,7 +20,7 @@
 
 ## Jellyfin サーバの前提
 
-- Jellyfin **12.0** を対象にする。Jellyfin 10.10.7 と Jellyfin 10.11 系でも動かす（認証形式は同じ）
+- Jellyfin **10.10 以上**を対象にする（README と同じ）。テストサーバで確かめるのは Jellyfin 10.10.7・10.11.11・12.0 で、認証形式はどれも同じ
 - **レガシー認証は使用不可**。`?api_key=`、`X-Emby-Token`、`X-Emby-Authorization` は 12.0 で廃止された。
   `Authorization: MediaBrowser Client="...", Device="...", DeviceId="...", Version="...", Token="..."`
   形式のみを使う
@@ -54,7 +54,11 @@
 - ライブラリ一覧: `/UserViews`。`CollectionType = music` と `books` のものだけ選択できる
 - ブックのライブラリ: `/Items?ParentId={libraryId}&IncludeItemTypes=Folder&Recursive=true&Fields=ParentId` で番組のフォルダを、
   `/Items?ParentId={libraryId}&IncludeItemTypes=AudioBook&Recursive=true&Fields=DateCreated,ParentId,Path,Etag&SortBy=DateCreated&SortOrder=Descending`（500 件ずつ）で各回を取り、タグでまとめる（`Etag` はファイルの版。ADR 0011）。
-  `albums=` の絞り込みは使わない（Jellyfin 10.10.7 では効き、Jellyfin 12.0 では 0 件、Jellyfin 10.11.11 では全件が返った）。1 番組の各回・番組の存在確認もライブラリ全体を取ってまとめた中から選ぶ。1 番組の同期は `fetchProgramSnapshot` で番組と各回を 1 度に取り、この全体の取得は 1 回で済ませる（番組の存在確認と各回の取得で 2 回回さない）。
+  `albums=` の絞り込みは使わない（Jellyfin 10.10.7 では効き、Jellyfin 12.0 では 0 件、Jellyfin 10.11.11 では全件が返った）。番組の一覧・全走査・番組の存在確認（`fetchProgram`）・1 番組の各回（`fetchProgramEpisodes`）は、ライブラリ全体を取ってまとめた中から選ぶ。
+  1 番組の同期（`fetchProgramSnapshot`）は、ライブラリ全体を取らずに、既知の各回の親フォルダの直下だけを取る（ADR 0016）: 手元が渡す既知の各回（新しい順）の先頭の 3 本を `/Items?Ids=…&IncludeItemTypes=AudioBook&Fields=ParentId` で引いて親を得て、
+  `/Items?ParentId={親}&Recursive=false&IncludeItemTypes=AudioBook&Fields=DateCreated,ParentId,Path,Etag&UserId=…&EnableUserData=true&SortBy=DateCreated&SortOrder=Descending` で直下の各回を取り、Album と AlbumArtist のタグでその番組に選び直す（各回が 1 本だけの番組も同じ手順）。
+  番組の画像は、親を `/Items?Ids={親}` で引き、名前が Album と同じときだけその `ImageTags.Primary`。
+  安全網: 既知の各回が 0 本・`ids=` で引いた既知の各回がサーバに無い・既知の各回が直下の結果に 1 本でも載らない（引いた各回の親が分かれているときを含む）ときは、ライブラリ全体の取得に切り替えて（理由はログに出す）、その中から番組と各回を選ぶ。削除と番組の消失は、この全件の一覧で判断する（ADR 0003）。
   AudioBook は `Container` を返さない（Jellyfin 10.10.7 と 12.0）ので、保存先の拡張子は `Path` から取る。番組の画像の中身は、番組のフォルダの `/Items/{folderId}/Images/Primary`
 - 番組一覧: `/Items?ParentId={libraryId}&IncludeItemTypes=MusicAlbum&Recursive=true`（1 回。`Fields` は付けない）。
   番組の画像の版は、返る `ImageTags.Primary`（`SourceProgram.image`）。`Fields` を付けなくても返ることを、Jellyfin 10.10.7 のテストサーバ（`scripts/jellyfin-testserver.sh up 1010`）で確かめた（`folder.jpg` のあるアルバムだけ `ImageTags` に `Primary` が出た）。Jellyfin 12 では未確認

@@ -182,24 +182,108 @@ class SdkJellyfinGateway @Inject constructor(
     }
 
     /**
-     * ブックのライブラリは [fetchBooks] を 1 回だけ回し、その結果から番組と各回を選ぶ（[fetchProgram] と [fetchProgramEpisodes] を続けると 2 回回る）。
+     * ブックのライブラリは、既知の各回の親の直下だけを取る（[fetchBookProgramNarrowed]、ADR 0016）。安全網に当たれば [fetchBooks]（ライブラリ全体）を
+     * 1 回だけ回し、その結果から番組と各回を選ぶ（[fetchProgram] と [fetchProgramEpisodes] を続けると 2 回回る）。
      * 音楽のライブラリは既定どおり（番組の存在確認の後に、番組の下だけを検索）。
      */
     override suspend fun fetchProgramSnapshot(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId, knownEpisodeIds: Set<SourceItemId>): SourceSnapshot? =
         when (library.kind) {
             LibraryKind.MUSIC -> super.fetchProgramSnapshot(credentials, library, programSourceId, knownEpisodeIds)
             LibraryKind.BOOKS -> call {
-                val listing = fetchBooks(api(credentials.serverUrl, credentials.accessToken), credentials, library)
-                val program = listing.programs.firstOrNull { it.sourceId == programSourceId }
-                program?.let {
-                    SourceSnapshot(
-                        programs = listOf(it),
-                        episodes = listing.episodes.filter { e -> e.programSourceId == programSourceId },
-                        scope = SnapshotScope.Program(programSourceId),
-                    )
+                val api = api(credentials.serverUrl, credentials.accessToken)
+                when (val narrowed = fetchBookProgramNarrowed(api, credentials, library, programSourceId, knownEpisodeIds)) {
+                    is NarrowedBookProgram.Found -> narrowed.snapshot
+                    is NarrowedBookProgram.Fallback -> {
+                        Log.i(TAG, "book program sync: full listing instead of the parent folder (${narrowed.reason})")
+                        fetchBookProgramFromFullListing(api, credentials, library, programSourceId)
+                    }
                 }
             }
         }
+
+    /** ライブラリ全体（[fetchBooks]）から 1 番組を選ぶ。番組が無ければ null（消失）。 */
+    private suspend fun fetchBookProgramFromFullListing(
+        api: ApiClient,
+        credentials: ServerCredentials,
+        library: SelectedLibrary,
+        programSourceId: SourceItemId,
+    ): SourceSnapshot? {
+        val listing = fetchBooks(api, credentials, library)
+        val program = listing.programs.firstOrNull { it.sourceId == programSourceId } ?: return null
+        return SourceSnapshot(
+            programs = listOf(program),
+            episodes = listing.episodes.filter { e -> e.programSourceId == programSourceId },
+            scope = SnapshotScope.Program(programSourceId),
+        )
+    }
+
+    private sealed interface NarrowedBookProgram {
+        data class Found(val snapshot: SourceSnapshot) : NarrowedBookProgram
+        data class Fallback(val reason: FullListingReason) : NarrowedBookProgram
+    }
+
+    /**
+     * ブックのライブラリの 1 番組を、既知の各回の親の直下だけから取る（ADR 0016）。番組のフォルダが有る番組も、各回が 1 本だけの番組も同じ手順:
+     *
+     * 1. 既知の各回の新しい側の数本（[BookProgramNarrowing.sample]）を `ids=` で引いて、今の `ParentId` を得る
+     * 2. `parentId=<親>&recursive=false` で AudioBook を取る（UserData も [fetchBooks] と同じに読む）
+     * 3. 返った各回を、Album と AlbumArtist のタグで番組に選び直す（[fetchBooks] と同じ判定）
+     *
+     * 安全網の判定は [BookProgramNarrowing]。当たれば [NarrowedBookProgram.Fallback] を返し、呼び出し側がライブラリ全体を取る。
+     * 番組の画像は、親を `ids=<親>` で引き、名前が Album と同じときだけその Primary（[fetchBooks] と同じ。違えば画像なし）。
+     * 番組のフォルダは [bookFolders] に、ほかの番組の覚えを残したまま足す。
+     */
+    private suspend fun fetchBookProgramNarrowed(
+        api: ApiClient,
+        credentials: ServerCredentials,
+        library: SelectedLibrary,
+        programSourceId: SourceItemId,
+        known: Set<SourceItemId>,
+    ): NarrowedBookProgram {
+        val queried = BookProgramNarrowing.sample(known).mapNotNull { id -> id.toUuidOrNull() }
+        val lookedUp: Map<SourceItemId, UUID?> = if (queried.isEmpty()) {
+            emptyMap()
+        } else {
+            val result by api.libraryApi.getItems(
+                GetItemsRequest(ids = queried, includeItemTypes = listOf(BaseItemKind.AUDIO_BOOK), fields = listOf(ItemFields.PARENT_ID)),
+            )
+            result.items.filter { it.type == BaseItemKind.AUDIO_BOOK }.associate { SourceItemId(it.id.toString()) to it.parentId }
+        }
+        val parent = when (val choice = BookProgramNarrowing.chooseParent(known, lookedUp)) {
+            is BookNarrowing.FullListing -> return NarrowedBookProgram.Fallback(choice.reason)
+            is BookNarrowing.Narrow -> choice.parentId
+        }
+        val books = fetchAll(
+            api,
+            GetItemsRequest(
+                parentId = parent,
+                recursive = false,
+                includeItemTypes = listOf(BaseItemKind.AUDIO_BOOK),
+                // [fetchBooks] と同じ欄と UserData（再生の共有、ADR 0010）
+                fields = listOf(ItemFields.DATE_CREATED, ItemFields.PARENT_ID, ItemFields.PATH, ItemFields.ETAG),
+                userId = UUID.fromString(credentials.userId),
+                enableUserData = true,
+                sortBy = listOf(ItemSortBy.DATE_CREATED),
+                sortOrder = listOf(SortOrder.DESCENDING),
+            ),
+        ).filter { it.bookProgramId() == programSourceId }
+        val episodes = books.mapNotNull { it.toBookEpisode(programSourceId) }
+        when (val judged = BookProgramNarrowing.judge(known, lookedUp, episodes.map { it.sourceId })) {
+            is BookNarrowing.FullListing -> return NarrowedBookProgram.Fallback(judged.reason)
+            is BookNarrowing.Narrow -> Unit
+        }
+        // 既知の各回が載っているので books は空でない
+        val first = books.first()
+        val album = first.album.orEmpty()
+        val folderResult by api.libraryApi.getItems(GetItemsRequest(ids = listOf(parent)))
+        val folder = folderResult.items.firstOrNull { it.id == parent }?.takeIf { it.name == album }
+        bookFolders.compute(BookLibraryKey(credentials.serverUrl, credentials.userId, library.id)) { _, old ->
+            val others = old.orEmpty() - programSourceId
+            if (folder != null) others + (programSourceId to folder.id) else others
+        }
+        val program = SourceProgram(sourceId = programSourceId, name = album, publisherName = first.publisher(), image = folder?.primaryImage())
+        return NarrowedBookProgram.Found(SourceSnapshot(listOf(program), episodes, SnapshotScope.Program(programSourceId)))
+    }
 
     private fun BaseItemDto.toSourceProgram() = SourceProgram(
         sourceId = SourceItemId(id.toString()),
@@ -289,9 +373,7 @@ class SdkJellyfinGateway @Inject constructor(
             if (folder != null) programFolders[programId] = folder.id
             SourceProgram(sourceId = programId, name = album, publisherName = first.publisher(), image = folder?.primaryImage())
         }
-        val episodes = books.mapNotNull { book ->
-            book.bookProgramId()?.let { book.toSourceEpisode(it)?.copy(shared = book.userData?.toSharedPlayState()) }
-        }
+        val episodes = books.mapNotNull { book -> book.bookProgramId()?.let { book.toBookEpisode(it) } }
         bookFolders[BookLibraryKey(credentials.serverUrl, credentials.userId, library.id)] = programFolders
         return BookListing(programs, episodes, programFolders)
     }
@@ -301,6 +383,10 @@ class SdkJellyfinGateway @Inject constructor(
         val album = album?.takeIf { it.isNotBlank() } ?: return null
         return SourceItemId("${publisher().orEmpty()}/$album")
     }
+
+    /** ブックの各回。UserData を [SourceEpisode.shared] に載せる（再生の共有、ADR 0010）。取り込まれた日時が無ければ null。 */
+    private fun BaseItemDto.toBookEpisode(programSourceId: SourceItemId): SourceEpisode? =
+        toSourceEpisode(programSourceId)?.copy(shared = userData?.toSharedPlayState())
 
     private data class BookLibraryKey(val serverUrl: String, val userId: String, val libraryId: SourceItemId)
 

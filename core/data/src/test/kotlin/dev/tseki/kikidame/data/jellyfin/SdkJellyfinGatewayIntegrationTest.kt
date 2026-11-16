@@ -10,14 +10,21 @@ import dev.tseki.kikidame.domain.SelectedLibrary
 import dev.tseki.kikidame.domain.SharedPlayState
 import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceException
+import dev.tseki.kikidame.domain.SnapshotScope
 import dev.tseki.kikidame.domain.SourceItemId
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.atStartOfDayIn
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
+import org.jellyfin.sdk.api.client.extensions.libraryApi
+import org.jellyfin.sdk.createJellyfin
+import org.jellyfin.sdk.model.ClientInfo
 import org.junit.runner.RunWith
+import java.io.File
 import java.util.UUID
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -26,6 +33,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
@@ -296,6 +304,135 @@ class SdkJellyfinGatewayIntegrationTest {
         assertContentEquals(bytes, fresh.fetchProgramImage(credentials, book, SourceItemId("ニッポン放送/テスト番組A")))
     }
 
+    /** ブックのライブラリの [programId] の既知の各回の取得元 ID（新しい順。手元の 1 番組の同期が渡すのと同じ並び）。 */
+    private suspend fun knownEpisodes(credentials: ServerCredentials, book: SelectedLibrary, programId: SourceItemId): Set<SourceItemId> =
+        gateway.fetchLibrary(credentials, book).episodes
+            .filter { it.programSourceId == programId }
+            .sortedByDescending { it.addedAt }
+            .map { it.sourceId }
+            .toCollection(LinkedHashSet())
+
+    /**
+     * 1 番組の同期（ADR 0016）: 既知の各回の親の直下だけを取り、タグで番組に選び直す。各回が 1 本だけの番組 C は、親が配信元のフォルダ
+     * （番組 A のフォルダと番組 C のフォルダが並ぶ）になるが、結果に番組 A の各回は混ざらない。
+     */
+    @Test
+    fun bookProgramSnapshotTakesOnlyThatProgramUnderTheParentOfTheKnownEpisodes() = runTest {
+        val credentials = signIn()
+        val book = radioBook(credentials)
+        val programA = SourceItemId("ニッポン放送/テスト番組A")
+        val programB = SourceItemId("TBSラジオ/テスト番組B")
+        val programC = SourceItemId("ニッポン放送/テスト番組C")
+
+        val c = assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programC, knownEpisodes(credentials, book, programC)))
+        assertEquals(listOf(programC), c.programs.map { it.sourceId })
+        assertEquals("テスト番組C", c.programs.single().name)
+        assertEquals("ニッポン放送", c.programs.single().publisherName)
+        assertEquals(listOf("2026-09-01"), c.episodes.map { it.title })
+        assertTrue(c.episodes.all { it.programSourceId == programC })
+        assertEquals(SnapshotScope.Program(programC), c.scope)
+
+        val a = assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programA, knownEpisodes(credentials, book, programA)))
+        assertEquals(setOf("2026-09-14", "2026-09-14 (1)", "夏休みスペシャル"), a.episodes.map { it.title }.toSet())
+        assertTrue(a.episodes.all { it.programSourceId == programA })
+        val b = assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programB, knownEpisodes(credentials, book, programB)))
+        assertEquals(setOf("2026-09-07", "2026-08-31", "2026-08-24"), b.episodes.map { it.title }.toSet())
+
+        // 全件の一覧と同じ各回（タイトル・公開日・版・コンテナ・出演者）
+        val full = gateway.fetchLibrary(credentials, book).episodes.associateBy { it.sourceId }
+        for (e in a.episodes + b.episodes + c.episodes) assertEquals(full.getValue(e.sourceId), e, "全件の一覧と同じ: ${e.title}")
+
+        // 安全網: 既知の各回が無い・サーバに無いときは全件に切り替え、結果は同じ
+        assertEquals(listOf("2026-09-01"), gateway.fetchProgramSnapshot(credentials, book, programC, emptySet())?.episodes?.map { it.title })
+        val missing = SourceItemId(UUID.randomUUID().toString())
+        assertEquals(listOf("2026-09-01"), gateway.fetchProgramSnapshot(credentials, book, programC, setOf(missing))?.episodes?.map { it.title })
+        // 無い番組は、全件に切り替えて null（消失）
+        assertNull(gateway.fetchProgramSnapshot(credentials, book, SourceItemId("ニッポン放送/無い番組"), setOf(missing)))
+        // 番組 A の既知の各回を番組 C として渡しても（タグが替わった回）、番組 A の各回は混ざらない
+        val cWithA = assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programC, knownEpisodes(credentials, book, programA)))
+        assertEquals(listOf("2026-09-01"), cWithA.episodes.map { it.title })
+    }
+
+    /** 1 番組の同期の画像（ADR 0016）: 番組のフォルダの名前が Album と同じ番組 A だけ、全件の一覧と同じ版。番組 B・C は画像なし。 */
+    @Test
+    fun bookProgramSnapshotKeepsTheProgramFolderImage() = runTest {
+        val credentials = signIn()
+        val book = radioBook(credentials)
+        val programA = SourceItemId("ニッポン放送/テスト番組A")
+        val programB = SourceItemId("TBSラジオ/テスト番組B")
+        val programC = SourceItemId("ニッポン放送/テスト番組C")
+        val listed = gateway.fetchLibrary(credentials, book).programs.associateBy { it.sourceId }
+        val tag = assertNotNull(listed.getValue(programA).image).version
+
+        val knownA = knownEpisodes(credentials, book, programA)
+        val knownB = knownEpisodes(credentials, book, programB)
+        val knownC = knownEpisodes(credentials, book, programC)
+        assertEquals(tag, gateway.fetchProgramSnapshot(credentials, book, programA, knownA)?.programs?.single()?.image?.version)
+        assertNull(assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programB, knownB)).programs.single().image)
+        assertNull(assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programC, knownC)).programs.single().image, "配信元のフォルダの画像を番組の画像にしない")
+
+        // 一覧を取っていないゲートウェイで、1 番組の同期の直後に画像の中身が取れる
+        val fresh = SdkJellyfinGateway(ApplicationProvider.getApplicationContext())
+        assertEquals(tag, fresh.fetchProgramSnapshot(credentials, book, programA, knownA)?.programs?.single()?.image?.version)
+        val bytes = assertNotNull(fresh.fetchProgramImage(credentials, book, programA))
+        assertTrue(bytes.isJpeg(), "JPEG の先頭ではない: ${bytes.size} bytes")
+        // ほかの番組の 1 番組の同期の後も、番組 A の覚えは残る
+        fresh.fetchProgramSnapshot(credentials, book, programB, knownB)
+        fresh.fetchProgramSnapshot(credentials, book, programC, knownC)
+        assertContentEquals(bytes, fresh.fetchProgramImage(credentials, book, programA))
+        assertNull(fresh.fetchProgramImage(credentials, book, programC))
+    }
+
+    /**
+     * 各回が 1 本だけの番組 C に 2 本目を足し、走査させながら 1 番組の同期をする（親フォルダの付け替わりの途中）。どの時点でも、
+     * 既知の 1 本目は結果に載る（誤って削除しない）。メディアのディレクトリ（`KIKIDAME_JF_DIR`、既定はスクリプトと同じ
+     * `/tmp/kikidame-jf`）の `media-book` に書けなければスキップする。終わったら 2 本目を消して走査させ、元に戻す。
+     */
+    @Test
+    fun bookProgramSnapshotKeepsTheKnownEpisodeWhileASecondEpisodeIsScanned() = runTest(timeout = 10.minutes) {
+        val mediaDir = File(System.getenv("KIKIDAME_JF_DIR") ?: "/tmp/kikidame-jf", "media-book")
+        val original = File(mediaDir, "ニッポン放送/テスト番組C/2026-09-01.m4a")
+        assumeTrue("ブックのメディアに書けないのでスキップ: $mediaDir", original.isFile && original.parentFile!!.canWrite())
+        val credentials = signIn()
+        val book = radioBook(credentials)
+        val programC = SourceItemId("ニッポン放送/テスト番組C")
+        val known = knownEpisodes(credentials, book, programC)
+        val first = known.single()
+        val second = File(original.parentFile, "2026-09-08.m4a")
+        val api = createJellyfin {
+            context = ApplicationProvider.getApplicationContext()
+            clientInfo = ClientInfo(name = "kikidame-integration-test", version = "1")
+        }.createApi(baseUrl = url!!, accessToken = credentials.accessToken)
+
+        suspend fun cEpisodeCount() = gateway.fetchLibrary(credentials, book).episodes.count { it.programSourceId == programC }
+        suspend fun waitUntil(what: String, check: suspend () -> Boolean) {
+            repeat(120) {
+                if (check()) return
+                withContext(Dispatchers.IO) { Thread.sleep(1_000) }
+            }
+            throw AssertionError("待ちきれなかった: $what")
+        }
+
+        try {
+            original.copyTo(second, overwrite = true)
+            api.libraryApi.refreshLibrary()
+            waitUntil("番組 C の 2 本目が載る") {
+                val snapshot = assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programC, known), "番組 C が消失した")
+                assertTrue(snapshot.episodes.any { it.sourceId == first }, "既知の 1 本目が載らない: ${snapshot.episodes.map { it.title }}")
+                assertTrue(snapshot.episodes.all { it.programSourceId == programC })
+                snapshot.episodes.size == 2
+            }
+            // 走査の後、2 本とも知っている状態でも同じ
+            val both = knownEpisodes(credentials, book, programC)
+            assertEquals(2, both.size)
+            assertEquals(both, assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programC, both)).episodes.map { it.sourceId }.toSet())
+        } finally {
+            second.delete()
+            api.libraryApi.refreshLibrary()
+            waitUntil("番組 C が 1 本に戻る") { cEpisodeCount() == 1 }
+        }
+    }
+
     @Test
     fun bookDownloadStreamsTheOriginalAndHonoursRange() = runTest {
         val credentials = signIn()
@@ -321,6 +458,7 @@ class SdkJellyfinGatewayIntegrationTest {
             assertEquals(written, gateway.fetchPlayState(credentials, episode.sourceId), "1 件の読み込み")
             assertEquals(written, gateway.fetchPlayState(credentials, episode.sourceId, timeout = 5.seconds), "時間の上限つきの読み込み")
             assertEquals(written, gateway.fetchLibrary(credentials, book).episodes.first { it.sourceId == episode.sourceId }.shared, "一覧")
+            assertEquals(written, programSnapshotShared(credentials, book, episode), "1 番組の同期の一覧（親の直下）")
 
             // 再生済みにする（位置はそのまま送る）。未再生に戻すのも同じ書き方
             val later = Instant.parse("2026-10-27T02:00:00Z")
@@ -330,9 +468,20 @@ class SdkJellyfinGatewayIntegrationTest {
             val unplayed = gateway.writePlayState(credentials, episode.sourceId, SharedPlayState(3.seconds, played = false, lastPlayedAt = later + 1.seconds))
             assertEquals(SharedPlayState(3.seconds, played = false, lastPlayedAt = later + 1.seconds), unplayed)
             assertEquals(unplayed, gateway.fetchLibrary(credentials, book).episodes.first { it.sourceId == episode.sourceId }.shared)
+            assertEquals(unplayed, programSnapshotShared(credentials, book, episode))
         } finally {
             gateway.writePlayState(credentials, episode.sourceId, SharedPlayState(Duration.ZERO, played = false, lastPlayedAt = null))
         }
+    }
+
+    /** 1 番組の同期（既知の各回を渡す。親の直下だけを取る）で読んだ [episode] の UserData。その番組のほかの回も、全件の一覧と同じ UserData。 */
+    private suspend fun programSnapshotShared(credentials: ServerCredentials, book: SelectedLibrary, episode: SourceEpisode): SharedPlayState? {
+        val snapshot = assertNotNull(
+            gateway.fetchProgramSnapshot(credentials, book, episode.programSourceId, knownEpisodes(credentials, book, episode.programSourceId)),
+        )
+        val full = gateway.fetchLibrary(credentials, book).episodes.associateBy { it.sourceId }
+        for (e in snapshot.episodes) assertEquals(full.getValue(e.sourceId).shared, e.shared, "全件の一覧と同じ UserData: ${e.title}")
+        return snapshot.episodes.first { it.sourceId == episode.sourceId }.shared
     }
 
     /** 再生の共有は音楽のライブラリではしない（ADR 0010 の決定 1）。一覧は UserData を読まない。 */

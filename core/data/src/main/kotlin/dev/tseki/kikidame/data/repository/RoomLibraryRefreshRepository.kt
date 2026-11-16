@@ -167,7 +167,12 @@ class RoomLibraryRefreshRepository @Inject constructor(
         val local = db.programDao().findById(programId.value) ?: return null
         val sourceId = local.sourceItemId?.let(::SourceItemId) ?: return null
         // `ParentId` での各回取得は番組が無くても空を返すので、先に番組そのものを確かめて消失を立てる／戻す
-        val known = db.episodeDao().listByProgram(local.id).mapNotNull { it.episode.sourceItemId?.let(::SourceItemId) }.toSet()
+        // 既知の各回は新しい順（取り込み日時、同じなら公開日の降順）で渡す。取得元は先頭の数本で親を引く（ADR 0016）
+        val known = db.episodeDao().listByProgram(local.id)
+            .map { it.episode }
+            .sortedWith(compareByDescending<EpisodeEntity> { it.addedAt }.thenByDescending { it.publishedAt })
+            .mapNotNull { it.sourceItemId?.let(::SourceItemId) }
+            .toSet()
         val snapshot = source.fetchProgramSnapshot(sourceId, known)
         markGone(local, gone = snapshot == null)
         if (snapshot == null) return ProgramFetch.Gone

@@ -198,6 +198,23 @@ class RoomLibraryRefreshRepositoryTest : JellyfinRefreshTestBase() {
         assertEquals(setOf(SourceItemId("audio-1"), SourceItemId("audio-2"), SourceItemId("audio-3")), gateway.knownEpisodeIdsPassed.single())
     }
 
+    /** 渡す ID は新しい順（取り込み日時、同じなら公開日の降順）。取得元は先頭の数本で各回の親を引く（ADR 0016）。 */
+    @Test
+    fun syncProgramPassesTheKnownEpisodeIdsNewestFirst() = runTest {
+        signInAndSelect()
+        gateway.snapshot = snapshot.copy(
+            episodes = snapshot.episodes + sourceEpisode("audio-4", "$program 2026-09-21-1", "2026-09-20T15:00:00Z")
+                .copy(addedAt = Instant.parse("2026-09-21T02:00:00Z")),
+        )
+        repo.refresh()
+        val programId = library.observePrograms().first().single().program.id
+
+        repo.syncProgram(programId)
+        val passed = gateway.knownEpisodeIdsPassed.single().toList()
+        assertEquals(listOf(SourceItemId("audio-4"), SourceItemId("audio-3")), passed.take(2))
+        assertEquals(setOf(SourceItemId("audio-1"), SourceItemId("audio-2")), passed.drop(2).toSet())
+    }
+
     /** 別の番組の各回は、渡す ID に混ざらない。 */
     @Test
     fun syncProgramDoesNotPassEpisodesOfOtherPrograms() = runTest {
