@@ -34,6 +34,9 @@ class FetchPagesConcurrentlyTest {
         val expectedStarts = if (total == 0) listOf(0) else (0 until total step pageSize).toList()
         assertEquals(expectedStarts, starts.sorted())
         assertTrue(peak.get() <= concurrency, "peak ${peak.get()} > $concurrency")
+        // 最初の頁の後の残りの頁は、上限まで実際に並べて投げる（順に 1 本ずつ取る形に戻ると、peak が 1 になって落ちる）
+        val rest = expectedStarts.size - 1
+        if (rest > 0) assertEquals(minOf(concurrency, rest), peak.get(), "pages were not fetched concurrently")
     }
 
     @Test
@@ -45,8 +48,12 @@ class FetchPagesConcurrentlyTest {
     @Test
     fun exactMultipleOfThePageSize() = check(total = 1000, pageSize = 500, concurrency = 4)
 
+    /** 1 番組の同期の親の直下の取得は、頁を並べて投げる。上限は実機で 4 と 2 を比べて 4 にした（#69）。 */
     @Test
-    fun singlePage() = check(total = 7, pageSize = 500, concurrency = 4)
+    fun theParentListingFetchesFourPagesAtOnce() = assertEquals(4, SdkJellyfinGateway.PAGE_CONCURRENCY)
+
+    @Test
+    fun singlePage()= check(total = 7, pageSize = 500, concurrency = 4)
 
     @Test
     fun empty() = check(total = 0, pageSize = 500, concurrency = 4)
