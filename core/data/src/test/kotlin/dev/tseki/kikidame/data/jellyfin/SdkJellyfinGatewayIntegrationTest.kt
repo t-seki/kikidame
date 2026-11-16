@@ -497,11 +497,11 @@ class SdkJellyfinGatewayIntegrationTest {
     /**
      * 各回が 1 本だけの番組 C に 2 本目を足し、走査させながら 1 番組の同期をする（親フォルダの付け替わりの途中）。どの時点でも、
      * 既知の 1 本目は結果に載る（誤って削除しない）。メディアのディレクトリ（`KIKIDAME_JF_DIR`、既定はスクリプトと同じ
-     * `/tmp/kikidame-jf`）の `media-book` に書けなければスキップする。終わったら 2 本目を消して走査させ、元に戻す。
+     * `${XDG_CACHE_HOME:-$HOME/.cache}/kikidame-jf`）の `media-book` に書けなければスキップする。終わったら 2 本目を消して走査させ、元に戻す。
      */
     @Test
     fun bookProgramSnapshotKeepsTheKnownEpisodeWhileASecondEpisodeIsScanned() = runTest(timeout = 10.minutes) {
-        val mediaDir = File(System.getenv("KIKIDAME_JF_DIR") ?: "/tmp/kikidame-jf", "media-book")
+        val mediaDir = File(System.getenv("KIKIDAME_JF_DIR") ?: defaultJfDir(), "media-book")
         val original = File(mediaDir, "ニッポン放送/テスト番組C/2026-09-01.m4a")
         assumeTrue("ブックのメディアに書けないのでスキップ: $mediaDir", original.isFile && original.parentFile!!.canWrite())
         val credentials = signIn()
@@ -612,6 +612,13 @@ class SdkJellyfinGatewayIntegrationTest {
     }
 
     private fun ByteArray.isJpeg(): Boolean = size > 2 && this[0] == 0xFF.toByte() && this[1] == 0xD8.toByte()
+
+    /** スクリプトと同じ既定の置き場: `${XDG_CACHE_HOME:-$HOME/.cache}/kikidame-jf`。 */
+    private fun defaultJfDir(): String {
+        val cache = System.getenv("XDG_CACHE_HOME")?.takeIf { it.isNotEmpty() }
+            ?: "${System.getenv("HOME")?.takeIf { it.isNotEmpty() } ?: System.getProperty("user.home")}/.cache"
+        return "$cache/kikidame-jf"
+    }
 
     @Test
     fun badCredentialsAreUnauthorized() = runTest {
