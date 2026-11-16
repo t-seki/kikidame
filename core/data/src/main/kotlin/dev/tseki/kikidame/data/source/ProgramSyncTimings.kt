@@ -39,16 +39,6 @@ class ProgramSyncTimings : AbstractCoroutineContextElement(Key) {
     /** 親の直下からその番組に選び直した本数。 */
     @Volatile var programListed = 0
 
-    /** `ids=` での引き直しの時間と、要求の回数・返った本数。 */
-    @Volatile var refetchMs = 0L
-
-    @Volatile var refetchCalls = 0
-
-    @Volatile var refetched = 0
-
-    /** `ids=` の引き直しを並べて投げる数の上限。 */
-    @Volatile var refetchConcurrency = 0
-
     /** 親のフォルダの取得の時間。 */
     @Volatile var folderMs = 0L
 
@@ -84,8 +74,6 @@ class ProgramSyncTimings : AbstractCoroutineContextElement(Key) {
         append(" parentList=").append(parentListMs).append(" parentListed=").append(parentListed).append(" parentPages=").append(parentPages)
         append(" parentConcurrency=").append(parentConcurrency)
         append(" programListed=").append(programListed)
-        append(" refetch=").append(refetchMs).append(" refetchCalls=").append(refetchCalls).append(" refetched=").append(refetched)
-        append(" refetchConcurrency=").append(refetchConcurrency)
         append(" folder=").append(folderMs)
         append(" fullListing=").append(fullListing).append(" fullListingMs=").append(fullListingMs)
         append(" apply=").append(applyMs)

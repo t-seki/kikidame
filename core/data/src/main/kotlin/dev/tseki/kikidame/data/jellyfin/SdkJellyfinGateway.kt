@@ -249,15 +249,17 @@ class SdkJellyfinGateway @Inject constructor(
      * ブックのライブラリの 1 番組を、既知の各回の親の直下だけから取る（ADR 0016）。番組のフォルダが有る番組も、各回が 1 本だけの番組も同じ手順:
      *
      * 1. 既知の各回の新しい側の数本（[BookProgramNarrowing.sample]）を `ids=` で引いて、今の `ParentId` を得る
-     * 2. `parentId=<親>&recursive=false` で AudioBook を取る
-     * 3. 返った各回を、Album と AlbumArtist のタグで番組に選び直す（[fetchBooks] と同じ判定）
-     * 4. 選んだ各回を `ids=` で引き直し、その応答から各回を作る（版と UserData を [fetchBooks] と同じに読む。[fetchBooksByIds]）
+     * 2. `parentId=<親>&recursive=false` で AudioBook を取る。欄と UserData は [fetchBooks] と同じ（[BOOK_EPISODE_FIELDS]、`userId`・`enableUserData`）
+     * 3. 返った各回を、Album と AlbumArtist のタグで番組に選び直し（[fetchBooks] と同じ判定）、その応答から各回（版・UserData）を作る（[fetchBooks] と同じ変換）
      *
      * 安全網の判定は [BookProgramNarrowing]。当たれば [NarrowedBookProgram.Fallback] を返し、呼び出し側がライブラリ全体を取る。
      * 番組の画像は、親を `ids=<親>` で引き、名前が Album と同じときだけその Primary（[fetchBooks] と同じ。違えば画像なし）。
      * 番組のフォルダは [bookFolders] に、ほかの番組の覚えを残したまま足す。
      *
-     * 2 の頁は [PAGE_CONCURRENCY] 本まで、4 の引き直しは [ID_CHUNK_CONCURRENCY] 本まで並べて投げる。親のフォルダの取得（画像）も、引き直しと並べて投げる
+     * 欄に `DateLastSaved` を入れるので、親の直下の取得も、ライブラリ全体の取得や `ids=` と同じ版（Etag）を返す（Jellyfin 10.10.7 で入れないと違った。ADR 0016）。
+     * そのため `ids=` での引き直しはしない。
+     *
+     * 2 の頁は [PAGE_CONCURRENCY] 本まで並べて投げる。親のフォルダの取得（画像）も、親の直下の取得と並べて投げる
      * （安全網に当たれば使わずに取り消す）。各段の時間と本数は [timings] に書く（1 番組の同期の外では null）。
      */
     private suspend fun fetchBookProgramNarrowed(
@@ -284,14 +286,14 @@ class SdkJellyfinGateway @Inject constructor(
             is BookNarrowing.FullListing -> return@coroutineScope NarrowedBookProgram.Fallback(choice.reason)
             is BookNarrowing.Narrow -> choice.parentId
         }
-        // 親のフォルダ（番組の画像）は親が決まれば引けるので、親の直下の取得・引き直しと並べて投げる
+        // 親のフォルダ（番組の画像）は親が決まれば引けるので、親の直下の取得と並べて投げる
         val folderFetch = async {
             timed({ timings?.folderMs = it }) {
                 val folderResult by api.libraryApi.getItems(GetItemsRequest(ids = listOf(parent)))
                 folderResult.items.firstOrNull { it.id == parent }
             }
         }
-        // 親の直下は、その番組の各回の id を選ぶためだけに取る（Album と AlbumArtist は Fields 無しで返る）
+        // 親の直下の各回から、その番組の各回（版・UserData）をそのまま作る（Album と AlbumArtist は Fields 無しで返る）
         // 頁は、最初の頁の totalRecordCount から残りの頁の startIndex を決めて、[PAGE_CONCURRENCY] 本まで並べて投げる
         timings?.parentConcurrency = PAGE_CONCURRENCY
         val listed = timed({ timings?.parentListMs = it }) {
@@ -299,7 +301,10 @@ class SdkJellyfinGateway @Inject constructor(
                 parentId = parent,
                 recursive = false,
                 includeItemTypes = listOf(BaseItemKind.AUDIO_BOOK),
-                fields = listOf(ItemFields.PARENT_ID),
+                // ライブラリ全体の取得（[fetchBooks]）と同じ欄と UserData（版と再生の共有を同じに読む。ADR 0010・0011・0016）
+                fields = BOOK_EPISODE_FIELDS,
+                userId = UUID.fromString(credentials.userId),
+                enableUserData = true,
                 sortBy = listOf(ItemSortBy.DATE_CREATED),
                 sortOrder = listOf(SortOrder.DESCENDING),
             )
@@ -309,15 +314,9 @@ class SdkJellyfinGateway @Inject constructor(
                 ItemPage(page.items, page.totalRecordCount)
             }
         }
-        val listedIds = listed.filter { it.bookProgramId() == programSourceId }.map { it.id }
+        val books = listed.filter { it.bookProgramId() == programSourceId }
         timings?.parentListed = listed.size
-        timings?.programListed = listedIds.size
-        // 各回そのもの（版・UserData）は `ids=` で引き直して作る。Jellyfin 10.10.7 では、親の直下の取得（`parentId=&recursive=false`）だけが
-        // ライブラリ全体の取得や `ids=` と違う Etag を返し、1 番組の同期のたびに各回が変わったと見なされうるため（ADR 0016）。
-        // `ids=` の取得は、ライブラリ全体の取得と同じ Etag を返す
-        val refetched = timed({ timings?.refetchMs = it }) { fetchBooksByIds(api, credentials, listedIds, timings) }
-        timings?.refetched = refetched.size
-        val books = refetched.filter { it.bookProgramId() == programSourceId }
+        timings?.programListed = books.size
         val episodes = books.mapNotNull { it.toBookEpisode(programSourceId) }
         when (val judged = BookProgramNarrowing.judge(known, lookedUp, episodes.map { it.sourceId })) {
             is BookNarrowing.FullListing -> {
@@ -336,44 +335,6 @@ class SdkJellyfinGateway @Inject constructor(
         }
         val program = SourceProgram(sourceId = programSourceId, name = album, publisherName = first.publisher(), image = folder?.primaryImage())
         NarrowedBookProgram.Found(SourceSnapshot(listOf(program), episodes, SnapshotScope.Program(programSourceId)))
-    }
-
-    /**
-     * ブックの各回を `ids=` で引く（[ID_CHUNK] 件ずつ。URL が長くなりすぎないように）。欄と UserData は [fetchBooks] と同じ
-     * （再生の共有、ADR 0010）。サーバに無い各回は返らない。並びは [ids] の順（親の直下の取得の、取り込み日時の新しい順）。
-     * 分けた要求は [ID_CHUNK_CONCURRENCY] 本まで並べて投げる（どの要求も同じ欄・同じ応答なので、並べても結果は順に投げたときと同じ）。
-     * 投げた回数は [timings] に書く。
-     */
-    private suspend fun fetchBooksByIds(
-        api: ApiClient,
-        credentials: ServerCredentials,
-        ids: List<UUID>,
-        timings: ProgramSyncTimings?,
-    ): List<BaseItemDto> = coroutineScope {
-        val chunks = ids.distinct().chunked(ID_CHUNK)
-        timings?.refetchCalls = chunks.size
-        timings?.refetchConcurrency = ID_CHUNK_CONCURRENCY
-        val permits = Semaphore(ID_CHUNK_CONCURRENCY)
-        val byId = HashMap<UUID, BaseItemDto>()
-        chunks.map { chunk ->
-            async {
-                permits.withPermit {
-                    val result by api.libraryApi.getItems(
-                        GetItemsRequest(
-                            ids = chunk,
-                            includeItemTypes = listOf(BaseItemKind.AUDIO_BOOK),
-                            fields = listOf(ItemFields.DATE_CREATED, ItemFields.PARENT_ID, ItemFields.PATH, ItemFields.ETAG),
-                            userId = UUID.fromString(credentials.userId),
-                            enableUserData = true,
-                            sortBy = listOf(ItemSortBy.DATE_CREATED),
-                            sortOrder = listOf(SortOrder.DESCENDING),
-                        ),
-                    )
-                    result.items
-                }
-            }
-        }.awaitAll().forEach { items -> for (item in items) if (item.type == BaseItemKind.AUDIO_BOOK) byId[item.id] = item }
-        ids.distinct().mapNotNull { byId[it] }
     }
 
     private fun BaseItemDto.toSourceProgram() = SourceProgram(
@@ -447,9 +408,7 @@ class SdkJellyfinGateway @Inject constructor(
                 parentId = parent,
                 recursive = true,
                 includeItemTypes = listOf(BaseItemKind.AUDIO_BOOK),
-                // AudioBook は Container を返さない（Jellyfin 10.10.7 と 12.0 で確かめた）ので、拡張子を Path から取る
-                // Etag はファイルの版（ADR 0011）
-                fields = listOf(ItemFields.DATE_CREATED, ItemFields.PARENT_ID, ItemFields.PATH, ItemFields.ETAG),
+                fields = BOOK_EPISODE_FIELDS,
                 // 再生の共有（ADR 0010）: 各回の UserData を一覧と一緒に読む（回ごとに問い合わせない）
                 userId = UUID.fromString(credentials.userId),
                 enableUserData = true,
@@ -665,7 +624,8 @@ class SdkJellyfinGateway @Inject constructor(
             container = container ?: path?.substringAfterLast('/')?.substringAfterLast('.', missingDelimiterValue = "")?.lowercase() ?: "",
             // 出演者。`Artists` は基本フィールドで返る（`ItemFields` に無く、要求の有無に依らない）。名前だけの一覧が無い・空なら `ArtistItems` から拾う
             performers = (artists?.takeIf { it.isNotEmpty() } ?: artistItems?.mapNotNull { it.name }).orEmpty().filter { it.isNotBlank() },
-            // ファイルの版（ADR 0011）。`ItemFields.ETAG` を求めたときだけ返る。中身は DateLastSaved の MD5 で、メタデータの保存だけでも変わる
+            // ファイルの版（ADR 0011）。`ItemFields.ETAG` を求めたときだけ返る。中身は DateLastSaved の MD5 で、メタデータの保存だけでも変わる。
+            // Jellyfin 10.10.7 では、`ItemFields.DATE_LAST_SAVED` も求めないと取り方（親の直下）で値が違う。ブックでは両方を求める（[BOOK_EPISODE_FIELDS]、ADR 0016）
             version = etag?.takeIf { it.isNotBlank() },
         )
     }
@@ -700,11 +660,13 @@ class SdkJellyfinGateway @Inject constructor(
         const val CLIENT_NAME = "Kikidame"
         const val PAGE_SIZE = 500
 
-        /** `ids=` で 1 度に引く件数。UUID を並べた URL が、サーバの要求行の上限（Kestrel の既定 8 KB）を超えないように。 */
-        const val ID_CHUNK = 100
-
-        /** `ids=` の引き直しで、並べて投げる要求の数の上限。 */
-        const val ID_CHUNK_CONCURRENCY = 4
+        /**
+         * ブックの各回を取る欄（ライブラリ全体の取得と、1 番組の同期の親の直下の取得で同じ）。
+         * AudioBook は Container を返さない（Jellyfin 10.10.7 と 12.0 で確かめた）ので、拡張子を Path から取る。Etag はファイルの版（ADR 0011）。
+         * DateLastSaved は、取り方（ライブラリ全体・親の直下・`ids=`）で Etag をそろえるために頼む（Jellyfin 10.10.7 では、入れないと親の直下だけ
+         * 違う Etag を返した。値そのものは応答に入らない。ADR 0016）。
+         */
+        val BOOK_EPISODE_FIELDS = listOf(ItemFields.DATE_CREATED, ItemFields.PARENT_ID, ItemFields.PATH, ItemFields.ETAG, ItemFields.DATE_LAST_SAVED)
 
         /** 1 番組の同期の親の直下の取得で、並べて投げる頁の数の上限。 */
         const val PAGE_CONCURRENCY = 4

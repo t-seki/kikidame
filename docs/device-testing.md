@@ -113,11 +113,11 @@ $ADB logcat -d | grep -E "SyncWorker|LibraryRefresher"   # "sync: programs=N epi
 ```bash
 $ADB logcat -d | grep "program sync timings"
 # program sync timings: total=… fetch=… lookup=… lookupItems=… parentList=… parentListed=… parentPages=… parentConcurrency=… programListed=…
-#   refetch=… refetchCalls=… refetched=… refetchConcurrency=… folder=… fullListing=0|1 fullListingMs=… apply=… reconcile=… synchronize=… images=… known=… episodes=…
+#   folder=… fullListing=0|1 fullListingMs=… apply=… reconcile=… synchronize=… images=… known=… episodes=…
 ```
 
-`fetch` は取得元からの取得の全体、`lookup`〜`folder` はブックのライブラリの絞り込みの各段（`folder` は直下の取得・引き直しと並べて投げるので、足し合わせると `fetch` を超えることがある）、
-`parentConcurrency`・`refetchConcurrency` は、親の直下の頁と `ids=` の引き直しを並べて投げる数の上限。`fullListing=1` はライブラリ全体の取得に切り替えた回（その時間が `fullListingMs`）。`apply` は手元の取り込み、`reconcile`・`synchronize`・`images` は同期（再生の共有の突き合わせ・削除と予約・番組の画像）。
+`fetch` は取得元からの取得の全体、`lookup`〜`folder` はブックのライブラリの絞り込みの各段（`folder` は直下の取得と並べて投げるので、足し合わせると `fetch` を超えることがある）、
+`parentConcurrency` は、親の直下の頁を並べて投げる数の上限（`SdkJellyfinGateway.PAGE_CONCURRENCY`）。`fullListing=1` はライブラリ全体の取得に切り替えた回（その時間が `fullListingMs`）。`apply` は手元の取り込み、`reconcile`・`synchronize`・`images` は同期（再生の共有の突き合わせ・削除と予約・番組の画像）。
 
 ### 裏の同期をすぐ起こす
 
