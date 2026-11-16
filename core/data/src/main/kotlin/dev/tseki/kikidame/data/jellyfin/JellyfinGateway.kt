@@ -49,9 +49,10 @@ interface JellyfinGateway {
 
     /**
      * 1 番組の同期の入力（番組と各回）を 1 度に取る。番組がサーバに無ければ null（消失）。
+     * [knownEpisodeIds] は手元が知っているその番組の各回の取得元 ID（呼び出しごとの引数。状態に持たない）。
      * 既定は [fetchProgram] の後に [fetchProgramEpisodes]。ブックのライブラリはどちらもライブラリ全体の取得になるので、実装が 1 回にまとめて上書きする。
      */
-    suspend fun fetchProgramSnapshot(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId): SourceSnapshot? {
+    suspend fun fetchProgramSnapshot(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId, knownEpisodeIds: Set<SourceItemId>): SourceSnapshot? {
         val program = fetchProgram(credentials, library, programSourceId) ?: return null
         return SourceSnapshot(listOf(program), fetchProgramEpisodes(credentials, library, programSourceId), SnapshotScope.Program(programSourceId))
     }

@@ -185,9 +185,9 @@ class SdkJellyfinGateway @Inject constructor(
      * ブックのライブラリは [fetchBooks] を 1 回だけ回し、その結果から番組と各回を選ぶ（[fetchProgram] と [fetchProgramEpisodes] を続けると 2 回回る）。
      * 音楽のライブラリは既定どおり（番組の存在確認の後に、番組の下だけを検索）。
      */
-    override suspend fun fetchProgramSnapshot(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId): SourceSnapshot? =
+    override suspend fun fetchProgramSnapshot(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId, knownEpisodeIds: Set<SourceItemId>): SourceSnapshot? =
         when (library.kind) {
-            LibraryKind.MUSIC -> super.fetchProgramSnapshot(credentials, library, programSourceId)
+            LibraryKind.MUSIC -> super.fetchProgramSnapshot(credentials, library, programSourceId, knownEpisodeIds)
             LibraryKind.BOOKS -> call {
                 val listing = fetchBooks(api(credentials.serverUrl, credentials.accessToken), credentials, library)
                 val program = listing.programs.firstOrNull { it.sourceId == programSourceId }

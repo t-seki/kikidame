@@ -39,8 +39,10 @@ interface SourceGateway {
      * 1 番組の同期の入力（番組と各回）を 1 度に取る。番組が取得元に無ければ null（消失）。
      * 既定は [fetchProgram] で存在を確かめてから [fetchProgramEpisodes] で各回を取る。
      * 1 度の取得で両方が分かる取得元（Jellyfin のブックのライブラリ、ADR 0010）は、取得を 1 回にするために上書きする。
+     * [knownEpisodeIds] は、手元が知っているその番組の各回の取得元 ID。取得元が取り方を絞るための入力で、呼び出しごとの引数としてだけ使う（状態に持たない）。
+     * 手元に各回が無ければ空。使わない取得元は無視してよい。
      */
-    suspend fun fetchProgramSnapshot(programId: SourceItemId): SourceSnapshot? {
+    suspend fun fetchProgramSnapshot(programId: SourceItemId, knownEpisodeIds: Set<SourceItemId>): SourceSnapshot? {
         val program = fetchProgram(programId) ?: return null
         return SourceSnapshot(listOf(program), fetchProgramEpisodes(programId), SnapshotScope.Program(programId))
     }

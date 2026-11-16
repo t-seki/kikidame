@@ -58,9 +58,13 @@ class FakeJellyfinGateway : JellyfinGateway {
     /** 1 番組の同期が 1 度に取りに来た回数（ブックのライブラリでライブラリ全体の取得を 1 回にするための口）。 */
     var programSnapshotFetches = 0
 
-    override suspend fun fetchProgramSnapshot(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId): SourceSnapshot? {
+    /** 1 番組の同期が渡してきた、手元の既知の各回の取得元 ID（呼ばれた順）。 */
+    val knownEpisodeIdsPassed = ArrayList<Set<SourceItemId>>()
+
+    override suspend fun fetchProgramSnapshot(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId, knownEpisodeIds: Set<SourceItemId>): SourceSnapshot? {
         programSnapshotFetches++
-        return super.fetchProgramSnapshot(credentials, library, programSourceId)
+        knownEpisodeIdsPassed += knownEpisodeIds
+        return super.fetchProgramSnapshot(credentials, library, programSourceId, knownEpisodeIds)
     }
 
     /** [snapshot] のうちその番組に属する各回。 */
