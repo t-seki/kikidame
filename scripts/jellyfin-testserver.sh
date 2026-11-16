@@ -21,10 +21,10 @@
 #   KIKIDAME_JELLYFIN_URL=http://localhost:8097 KIKIDAME_JELLYFIN_USER=kikidame KIKIDAME_JELLYFIN_PASSWORD=kikidame-test \
 #     ./gradlew :core:data:testDebugUnitTest --tests dev.tseki.kikidame.data.jellyfin.SdkJellyfinGatewayIntegrationTest
 #
-# 置き場は $KIKIDAME_JF_DIR（既定 /tmp/kikidame-jf）。docker と ffmpeg と curl と python3 が要る。
+# 置き場は $KIKIDAME_JF_DIR（既定 ${XDG_CACHE_HOME:-$HOME/.cache}/kikidame-jf）。空きが 2GiB より少ないと up は止まる。docker と ffmpeg と curl と python3 が要る。
 set -euo pipefail
 
-DIR="${KIKIDAME_JF_DIR:-/tmp/kikidame-jf}"
+DIR="${KIKIDAME_JF_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/kikidame-jf}"
 MEDIA="$DIR/media"
 BOOK_MEDIA="$DIR/media-book"
 USER_NAME="kikidame"
@@ -167,10 +167,24 @@ wait_scan() {
   echo "scan: $kind $count / $expected tracks"
 }
 
+# Jellyfin 10.11 は起動のときにデータの置き場に 2GiB の空きを求め、足りないと起動しない。起動を待つ前に置き場の空きを見て、足りなければ止める
+REQUIRED_FREE_BYTES=2147483648
+check_free_space() {
+  mkdir -p "$DIR"
+  local avail
+  avail=$(df -B1 --output=avail "$DIR" | tail -n 1 | tr -d ' ')
+  if [ "$avail" -lt "$REQUIRED_FREE_BYTES" ]; then
+    echo "not enough free space in $DIR: $avail bytes available, $REQUIRED_FREE_BYTES bytes (2GiB) required (Jellyfin 10.11 does not start with less)" >&2
+    echo "set KIKIDAME_JF_DIR to a directory with at least 2GiB free, e.g. KIKIDAME_JF_DIR=/path/to/dir $0 up <version>" >&2
+    exit 1
+  fi
+}
+
 post_json() { curl -sf --show-error -X POST -H 'Content-Type: application/json' -H "$AUTH_HEADER" "$@"; }
 
 up() {
   resolve "$1"
+  check_free_space
   { [ -d "$MEDIA" ] && [ -d "$BOOK_MEDIA" ]; } || make_media
   mkdir -p "$CONFIG"
   if docker ps -a --format '{{.Names}}' | grep -qx "$NAME"; then

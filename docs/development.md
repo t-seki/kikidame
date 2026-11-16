@@ -102,7 +102,8 @@ KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTe
 
 - `up` は ffmpeg で無音の m4a を作った合成ライブラリ（番組 2 × 各回 3。同じ公開日の 2 本、タイトルが日付でない回、出演者の無い回を含む。番組 A のフォルダにだけ `folder.jpg` を置く）を
   `/media` にマウントし、初期セットアップと音楽ライブラリ `radio` の作成を REST で済ませ、スキャンが終わるまで待つ。
-  置き場は `$KIKIDAME_JF_DIR`（既定 `/tmp/kikidame-jf`）。ユーザーは `kikidame` / `kikidame-test`
+  置き場は `$KIKIDAME_JF_DIR`（既定 `${XDG_CACHE_HOME:-$HOME/.cache}/kikidame-jf`。統合テストも同じ既定を使う）。Jellyfin 10.11 は起動のときにデータの置き場に 2GiB の空きを求めるので、
+  置き場の空きが 2GiB より少ないと `up` は Jellyfin を起動せずに止まる（`KIKIDAME_JF_DIR` で空きのある置き場に変える）。ユーザーは `kikidame` / `kikidame-test`
 - ブックのライブラリ `radio-book` も作る。中身は音楽と同じ 6 本と `folder.jpg` に、各回が 1 本だけの番組 C を足したもので、
   別のディレクトリ（`$KIKIDAME_JF_DIR/media-book` を `/media-book` にマウント）に置く。同じパスを 2 つのライブラリに入れると、
   アイテムが使い回されてブックのライブラリでも Audio のまま見えるため。配信元のフォルダ（ニッポン放送）にも `folder.jpg` を置き、
@@ -142,13 +143,13 @@ Google Play のスマートフォン用のスクリーンショットは、ア�
 場面は 1 が続きから、2 が各回の一覧、3 がプレーヤー、4 が同期の設定。
 `$ADB` と、端末を指す `ANDROID_SERIAL` は [docs/device-testing.md](device-testing.md) の「接続」の節のとおりに用意する。
 
-1. 見本のライブラリを `media` で作り（英語は `showcase`、日本語は `showcase-ja`。上の「テスト用 Jellyfin サーバ」）、`${KIKIDAME_JF_DIR:-/tmp/kikidame-jf}/media` を端末のフォルダに置く。
+1. 見本のライブラリを `media` で作り（英語は `showcase`、日本語は `showcase-ja`。上の「テスト用 Jellyfin サーバ」）、`${KIKIDAME_JF_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/kikidame-jf}/media` を端末のフォルダに置く。
    置いた後、debug アプリの取得元をそのフォルダに切り替えて同期する（手で行う）
 
    ```bash
    ADB=~/Android/Sdk/platform-tools/adb
    KIKIDAME_JF_LIBRARY=showcase scripts/jellyfin-testserver.sh media   # 日本語は showcase-ja
-   $ADB push "${KIKIDAME_JF_DIR:-/tmp/kikidame-jf}/media/." /sdcard/KikidameShowcaseEn/   # 日本語は /sdcard/KikidameShowcaseJa/
+   $ADB push "${KIKIDAME_JF_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/kikidame-jf}/media/." /sdcard/KikidameShowcaseEn/   # 日本語は /sdcard/KikidameShowcaseJa/
    ```
 
 2. 画面を 9:16 にし、SystemUI のデモモードで状態表示の帯を整える（時計 12:00、電池 100、Wi-Fi 全本、モバイルの電波は非表示）。
