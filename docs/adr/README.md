@@ -17,3 +17,4 @@
 - [0013-shared-folder-three-level-layout.md](0013-shared-folder-three-level-layout.md) — 共有フォルダの中はちょうど 3 段で、番組と配信元はタグでなくフォルダの名前で決める
 - [0014-also-distribute-free-on-google-play.md](0014-also-distribute-free-on-google-play.md) — Google Play で無料で配る。課金はしない
 - [0015-distribute-only-on-google-play-with-google-managed-key.md](0015-distribute-only-on-google-play-with-google-managed-key.md) — 配布は Google Play だけにし、アプリ署名は Google が作る鍵に替える。タグを打つと CI が AAB を Play に上げる
+- [0016-book-library-program-sync-reads-only-the-parent-folder.md](0016-book-library-program-sync-reads-only-the-parent-folder.md) — ブックのライブラリの 1 番組の同期は、既知の各回の親フォルダの直下だけを取ってタグで選び直す。既知の各回が載らなければライブラリ全体に切り替えて削除を判断する

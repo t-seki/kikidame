@@ -198,6 +198,23 @@ class RoomLibraryRefreshRepositoryTest : JellyfinRefreshTestBase() {
         assertEquals(setOf(SourceItemId("audio-1"), SourceItemId("audio-2"), SourceItemId("audio-3")), gateway.knownEpisodeIdsPassed.single())
     }
 
+    /** 渡す ID は新しい順（取り込み日時、同じなら公開日の降順）。取得元は先頭の数本で各回の親を引く（ADR 0016）。 */
+    @Test
+    fun syncProgramPassesTheKnownEpisodeIdsNewestFirst() = runTest {
+        signInAndSelect()
+        gateway.snapshot = snapshot.copy(
+            episodes = snapshot.episodes + sourceEpisode("audio-4", "$program 2026-09-21-1", "2026-09-20T15:00:00Z")
+                .copy(addedAt = Instant.parse("2026-09-21T02:00:00Z")),
+        )
+        repo.refresh()
+        val programId = library.observePrograms().first().single().program.id
+
+        repo.syncProgram(programId)
+        val passed = gateway.knownEpisodeIdsPassed.single().toList()
+        assertEquals(listOf(SourceItemId("audio-4"), SourceItemId("audio-3")), passed.take(2))
+        assertEquals(setOf(SourceItemId("audio-1"), SourceItemId("audio-2")), passed.drop(2).toSet())
+    }
+
     /** 別の番組の各回は、渡す ID に混ざらない。 */
     @Test
     fun syncProgramDoesNotPassEpisodesOfOtherPrograms() = runTest {
@@ -225,6 +242,25 @@ class RoomLibraryRefreshRepositoryTest : JellyfinRefreshTestBase() {
         gateway.snapshot = snapshot
         assertEquals(3, repo.syncProgram(programId)?.newEpisodes)
         assertEquals(emptySet<SourceItemId>(), gateway.knownEpisodeIdsPassed.first())
+    }
+
+    /**
+     * 1 番組の同期の取得が失敗したら（ブックのライブラリで、既知の各回を渡したのに全件の一覧に番組が無いとき、ADR 0016）、例外が上がり、
+     * 消失を立てず、各回も消さない。
+     */
+    @Test
+    fun aFailedProgramSnapshotNeitherMarksGoneNorDeletes() = runTest {
+        signInAndSelect()
+        gateway.snapshot = snapshot
+        repo.refresh()
+        val programId = library.observePrograms().first().single().program.id
+
+        gateway.snapshot = SourceSnapshot(emptyList(), emptyList())
+        gateway.programSnapshotFailure = SourceException.Failed("book program not in the full listing although its episodes are known")
+        assertFailsWith<SourceException.Failed> { repo.syncProgram(programId) }
+
+        assertNull(library.observeProgram(programId).first()?.goneSince)
+        assertEquals(3, library.observePrograms().first().single().episodeCount)
     }
 
     /** 番組ごとサーバの一覧から消えたら消失 = 判断保留（各回が消えた場合は RoomSyncTest）。 */
