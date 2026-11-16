@@ -1,5 +1,6 @@
 package dev.tseki.kikidame.data.repository
 
+import android.util.Log
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.tseki.kikidame.data.files.EpisodesDirectory
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.shadows.ShadowLog
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
@@ -184,6 +186,36 @@ class RoomLibraryRefreshRepositoryTest : JellyfinRefreshTestBase() {
 
         repo.syncProgram(programId)
         assertEquals(1, gateway.programSnapshotFetches)
+    }
+
+    /**
+     * 1 番組の同期は、区間ごとの時間と本数を logcat に 1 行だけ出す（#69）。中身は数字と名札だけで、番組名・配信元・各回のタイトル・
+     * 取得元 ID を入れない。計測は同期の結果を変えない。
+     */
+    @Test
+    fun syncProgramLogsOneTimingLineWithNumbersOnly() = runTest {
+        signInAndSelect()
+        gateway.snapshot = snapshot
+        repo.refresh()
+        val programId = library.observePrograms().first().single().program.id
+
+        ShadowLog.clear()
+        val result = repo.syncProgram(programId)
+        assertEquals(3, result?.episodes)
+        assertEquals(1, result?.programs)
+
+        val lines = ShadowLog.getLogsForTag("LibraryRefresh").filter { it.msg.startsWith("program sync timings:") }
+        val line = lines.single()
+        assertEquals(Log.INFO, line.type)
+        val fields = line.msg.removePrefix("program sync timings:").trim().split(' ')
+        for (field in fields) assertTrue(Regex("[A-Za-z]+=\\d+").matches(field), "only numbers: $field")
+        val byName = fields.associate { it.substringBefore('=') to it.substringAfter('=').toLong() }
+        for (name in listOf("total", "fetch", "lookup", "parentList", "parentConcurrency", "folder", "fullListing", "apply", "reconcile", "synchronize", "images", "known", "episodes")) {
+            assertTrue(name in byName, "missing $name")
+        }
+        assertEquals(3, byName["known"])
+        assertEquals(3, byName["episodes"])
+        for (secret in listOf(program, publisher, "audio-1", "album-1")) assertFalse(secret in line.msg)
     }
 
     /** 1 番組の同期は、手元のその番組の各回の取得元 ID を取得元に渡す。 */

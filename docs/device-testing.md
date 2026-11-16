@@ -108,6 +108,17 @@ $ADB logcat -d | grep -E "SyncWorker|LibraryRefresher"   # "sync: programs=N epi
 手動・定期の全走査も試みとして数える。「Wi-Fi のみ」で打ち切った回と 1 番組の同期は数えない。
 ログイン直後の初回取得も同期なので、ログインし直しでは試せない。
 
+1 番組の同期は、1 回につき区間ごとの時間（ミリ秒）と各回の本数を `LibraryRefresh` タグに 1 行だけ出す（リリース版でも出る。数字だけで、番組名・タイトル・取得元 ID は出さない）:
+
+```bash
+$ADB logcat -d | grep "program sync timings"
+# program sync timings: total=… fetch=… lookup=… lookupItems=… parentList=… parentListed=… parentPages=… parentConcurrency=… programListed=…
+#   folder=… fullListing=0|1 fullListingMs=… apply=… reconcile=… synchronize=… images=… known=… episodes=…
+```
+
+`fetch` は取得元からの取得の全体、`lookup`〜`folder` はブックのライブラリの絞り込みの各段（`folder` は直下の取得と並べて投げるので、足し合わせると `fetch` を超えることがある）、
+`parentConcurrency` は、親の直下の頁を並べて投げる数の上限（`SdkJellyfinGateway.PAGE_CONCURRENCY`）。`fullListing=1` はライブラリ全体の取得に切り替えた回（その時間が `fullListingMs`）。`apply` は手元の取り込み、`reconcile`・`synchronize`・`images` は同期（再生の共有の突き合わせ・削除と予約・番組の画像）。
+
 ### 裏の同期をすぐ起こす
 
 確実なのは、セッションの Preferences DataStore から前回の全走査の時刻（`last_fetched_at` / `last_attempted_at`）を消してから開く方法。

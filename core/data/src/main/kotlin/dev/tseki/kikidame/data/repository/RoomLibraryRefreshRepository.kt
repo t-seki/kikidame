@@ -8,8 +8,10 @@ import dev.tseki.kikidame.data.db.ProgramEntity
 import dev.tseki.kikidame.data.db.toDomain
 import dev.tseki.kikidame.data.files.ProgramImageFiles
 import dev.tseki.kikidame.data.session.SessionStore
+import dev.tseki.kikidame.data.source.ProgramSyncTimings
 import dev.tseki.kikidame.data.source.ScanListener
 import dev.tseki.kikidame.data.source.SourceGateway
+import dev.tseki.kikidame.data.source.timed
 import dev.tseki.kikidame.domain.DownloadRepository
 import dev.tseki.kikidame.domain.EpisodeId
 import dev.tseki.kikidame.domain.LibraryMatching
@@ -138,20 +140,32 @@ class RoomLibraryRefreshRepository @Inject constructor(
         }
     }
 
+    /**
+     * 区間ごとの時間と各回の本数（[ProgramSyncTimings]）を、同期 1 回につき logcat に 1 行だけ出す（数字だけ。リリース版でも出す）。
+     * 取得元は、文脈に載せた計測へ取得の各段を書く。
+     */
     override suspend fun syncProgram(programId: ProgramId, excluded: Set<EpisodeId>): RefreshResult? {
         requireReady()
-        return when (val fetched = fetchProgramSnapshot(programId) ?: return null) {
+        val timings = ProgramSyncTimings()
+        val result = withContext(timings) {
+            timed({ timings.totalMs = it }) { syncProgramTimed(programId, excluded, timings) }
+        }
+        if (result != null) Log.i(TAG, timings.summary())
+        return result
+    }
+
+    private suspend fun syncProgramTimed(programId: ProgramId, excluded: Set<EpisodeId>, timings: ProgramSyncTimings): RefreshResult? =
+        when (val fetched = fetchProgramSnapshot(programId, timings) ?: return null) {
             // 消失。何も落とさず何も消さない。番組一覧が無いので結び直しは全体同期に任せる
             ProgramFetch.Gone -> goneProgramResult()
             is ProgramFetch.Found -> {
-                val result = apply(fetched.snapshot)
-                sharing.reconcile(fetched.snapshot.episodes, excluded)
-                val outcome = synchronize(fetched.snapshot, excluded)
-                updateImages(fetched.snapshot.programs)
+                val result = timed({ timings.applyMs = it }) { apply(fetched.snapshot) }
+                timed({ timings.reconcileMs = it }) { sharing.reconcile(fetched.snapshot.episodes, excluded) }
+                val outcome = timed({ timings.synchronizeMs = it }) { synchronize(fetched.snapshot, excluded) }
+                timed({ timings.imagesMs = it }) { updateImages(fetched.snapshot.programs) }
                 result.copy(enqueued = outcome.enqueued, deleted = outcome.deleted, removed = outcome.removed, onHold = outcome.onHold)
             }
         }
-    }
 
     /** 1 番組の取得の結果。[Found] の snapshot は [SnapshotScope.Program]。 */
     private sealed interface ProgramFetch {
@@ -163,7 +177,7 @@ class RoomLibraryRefreshRepository @Inject constructor(
      * [syncProgram] の前段。番組を取得元から取り、消失を立てる／戻す。
      * 番組が手元に無いか、取得元 ID を持たなければ null。
      */
-    private suspend fun fetchProgramSnapshot(programId: ProgramId): ProgramFetch? {
+    private suspend fun fetchProgramSnapshot(programId: ProgramId, timings: ProgramSyncTimings): ProgramFetch? {
         val local = db.programDao().findById(programId.value) ?: return null
         val sourceId = local.sourceItemId?.let(::SourceItemId) ?: return null
         // `ParentId` での各回取得は番組が無くても空を返すので、先に番組そのものを確かめて消失を立てる／戻す
@@ -173,7 +187,9 @@ class RoomLibraryRefreshRepository @Inject constructor(
             .sortedWith(compareByDescending<EpisodeEntity> { it.addedAt }.thenByDescending { it.publishedAt })
             .mapNotNull { it.sourceItemId?.let(::SourceItemId) }
             .toSet()
-        val snapshot = source.fetchProgramSnapshot(sourceId, known)
+        timings.knownEpisodes = known.size
+        val snapshot = timed({ timings.fetchMs = it }) { source.fetchProgramSnapshot(sourceId, known) }
+        timings.episodes = snapshot?.episodes?.size ?: 0
         markGone(local, gone = snapshot == null)
         if (snapshot == null) return ProgramFetch.Gone
         return ProgramFetch.Found(snapshot)
