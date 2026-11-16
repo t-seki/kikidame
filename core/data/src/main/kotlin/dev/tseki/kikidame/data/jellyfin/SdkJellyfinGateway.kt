@@ -257,7 +257,7 @@ class SdkJellyfinGateway @Inject constructor(
      * 番組の画像は、親を `ids=<親>` で引き、名前が Album と同じときだけその Primary（[fetchBooks] と同じ。違えば画像なし）。
      * 番組のフォルダは [bookFolders] に、ほかの番組の覚えを残したまま足す。
      *
-     * 4 の引き直しは数回に分かれるので、[ID_CHUNK_CONCURRENCY] 本まで並べて投げる。親のフォルダの取得（画像）も、引き直しと並べて投げる
+     * 2 の頁は [PAGE_CONCURRENCY] 本まで、4 の引き直しは [ID_CHUNK_CONCURRENCY] 本まで並べて投げる。親のフォルダの取得（画像）も、引き直しと並べて投げる
      * （安全網に当たれば使わずに取り消す）。各段の時間と本数は [timings] に書く（1 番組の同期の外では null）。
      */
     private suspend fun fetchBookProgramNarrowed(
@@ -292,19 +292,22 @@ class SdkJellyfinGateway @Inject constructor(
             }
         }
         // 親の直下は、その番組の各回の id を選ぶためだけに取る（Album と AlbumArtist は Fields 無しで返る）
+        // 頁は、最初の頁の totalRecordCount から残りの頁の startIndex を決めて、[PAGE_CONCURRENCY] 本まで並べて投げる
+        timings?.parentConcurrency = PAGE_CONCURRENCY
         val listed = timed({ timings?.parentListMs = it }) {
-            fetchAll(
-                api,
-                GetItemsRequest(
-                    parentId = parent,
-                    recursive = false,
-                    includeItemTypes = listOf(BaseItemKind.AUDIO_BOOK),
-                    fields = listOf(ItemFields.PARENT_ID),
-                    sortBy = listOf(ItemSortBy.DATE_CREATED),
-                    sortOrder = listOf(SortOrder.DESCENDING),
-                ),
-                onPage = { timings?.let { it.parentPages++ } },
+            val request = GetItemsRequest(
+                parentId = parent,
+                recursive = false,
+                includeItemTypes = listOf(BaseItemKind.AUDIO_BOOK),
+                fields = listOf(ItemFields.PARENT_ID),
+                sortBy = listOf(ItemSortBy.DATE_CREATED),
+                sortOrder = listOf(SortOrder.DESCENDING),
             )
+            fetchPagesConcurrently(PAGE_CONCURRENCY) { start ->
+                val page by api.libraryApi.getItems(request.copy(startIndex = start, limit = PAGE_SIZE))
+                timings?.let { synchronized(it) { it.parentPages++ } }
+                ItemPage(page.items, page.totalRecordCount)
+            }
         }
         val listedIds = listed.filter { it.bookProgramId() == programSourceId }.map { it.id }
         timings?.parentListed = listed.size
@@ -349,6 +352,7 @@ class SdkJellyfinGateway @Inject constructor(
     ): List<BaseItemDto> = coroutineScope {
         val chunks = ids.distinct().chunked(ID_CHUNK)
         timings?.refetchCalls = chunks.size
+        timings?.refetchConcurrency = ID_CHUNK_CONCURRENCY
         val permits = Semaphore(ID_CHUNK_CONCURRENCY)
         val byId = HashMap<UUID, BaseItemDto>()
         chunks.map { chunk ->
@@ -402,19 +406,21 @@ class SdkJellyfinGateway @Inject constructor(
             ),
         ).mapNotNull { item -> item.albumId?.let { item.toSourceEpisode(SourceItemId(it.toString())) } }
 
-    /** [request] の一覧を [PAGE_SIZE] 件ずつ全部。頁を 1 つ取るたびに [onPage] を呼ぶ。 */
-    private suspend fun fetchAll(api: ApiClient, request: GetItemsRequest, onPage: () -> Unit = {}): List<BaseItemDto> {
+    /** [request] の一覧を [PAGE_SIZE] 件ずつ全部。 */
+    private suspend fun fetchAll(api: ApiClient, request: GetItemsRequest): List<BaseItemDto> {
         val items = ArrayList<BaseItemDto>()
         var start = 0
         while (true) {
             val page by api.libraryApi.getItems(request.copy(startIndex = start, limit = PAGE_SIZE))
-            onPage()
             items += page.items
             start += page.items.size
             if (page.items.isEmpty() || start >= page.totalRecordCount) break
         }
         return items
     }
+
+    /** 一覧の 1 頁。[total] はサーバの totalRecordCount。 */
+    internal class ItemPage<T>(val items: List<T>, val total: Int)
 
     /** ブックのライブラリを番組・各回にまとめたもの。[folders] は番組 ID → 番組のフォルダ（画像を持つ Folder）の id。 */
     private class BookListing(val programs: List<SourceProgram>, val episodes: List<SourceEpisode>, val folders: Map<SourceItemId, UUID>)
@@ -699,6 +705,35 @@ class SdkJellyfinGateway @Inject constructor(
 
         /** `ids=` の引き直しで、並べて投げる要求の数の上限。 */
         const val ID_CHUNK_CONCURRENCY = 4
+
+        /** 1 番組の同期の親の直下の取得で、並べて投げる頁の数の上限。 */
+        const val PAGE_CONCURRENCY = 4
+
+        /**
+         * 頁に分かれた一覧を全部取る。最初の頁（startIndex 0）を取り、その totalRecordCount と頁の件数から残りの頁の startIndex を決めて、
+         * [concurrency] 本まで並べて取り、startIndex の順に並べる（順に取ったときと同じ並び）。
+         * 並べて取った後も、最後の頁が満ちていて totalRecordCount に届いていなければ（取る間に増えたなど）、順に取り足す。
+         */
+        internal suspend fun <T> fetchPagesConcurrently(concurrency: Int, fetchPage: suspend (startIndex: Int) -> ItemPage<T>): List<T> =
+            coroutineScope {
+                val first = fetchPage(0)
+                val step = first.items.size
+                if (step == 0 || step >= first.total) return@coroutineScope first.items
+                val permits = Semaphore(concurrency)
+                val starts = (step until first.total step step).toList()
+                val rest = starts.map { start -> async { permits.withPermit { fetchPage(start) } } }.awaitAll()
+                val items = ArrayList<T>(first.total)
+                items += first.items
+                for (page in rest) items += page.items
+                var last = rest.last()
+                var next = starts.last() + last.items.size
+                while (last.items.isNotEmpty() && next < last.total) {
+                    last = fetchPage(next)
+                    items += last.items
+                    next += last.items.size
+                }
+                items
+            }
 
         /** 画像の API の応答コード → 本文を読むか。200 は true、404（Primary が無い）は false、401/403 は [SourceException.Unauthorized]、ほかは [SourceException.Failed]。 */
         internal fun imageStatusHasBody(code: Int): Boolean = when (code) {

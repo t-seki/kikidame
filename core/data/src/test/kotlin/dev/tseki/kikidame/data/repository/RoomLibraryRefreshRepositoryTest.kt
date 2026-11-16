@@ -210,7 +210,7 @@ class RoomLibraryRefreshRepositoryTest : JellyfinRefreshTestBase() {
         val fields = line.msg.removePrefix("program sync timings:").trim().split(' ')
         for (field in fields) assertTrue(Regex("[A-Za-z]+=\\d+").matches(field), "only numbers: $field")
         val byName = fields.associate { it.substringBefore('=') to it.substringAfter('=').toLong() }
-        for (name in listOf("total", "fetch", "lookup", "parentList", "refetch", "refetchCalls", "folder", "fullListing", "apply", "reconcile", "synchronize", "images", "known", "episodes")) {
+        for (name in listOf("total", "fetch", "lookup", "parentList", "parentConcurrency", "refetch", "refetchCalls", "refetchConcurrency", "folder", "fullListing", "apply", "reconcile", "synchronize", "images", "known", "episodes")) {
             assertTrue(name in byName, "missing $name")
         }
         assertEquals(3, byName["known"])

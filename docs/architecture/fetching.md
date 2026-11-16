@@ -56,7 +56,7 @@
   `/Items?ParentId={libraryId}&IncludeItemTypes=AudioBook&Recursive=true&Fields=DateCreated,ParentId,Path,Etag&SortBy=DateCreated&SortOrder=Descending`（500 件ずつ）で各回を取り、タグでまとめる（`Etag` はファイルの版。ADR 0011）。
   `albums=` の絞り込みは使わない（Jellyfin 10.10.7 では効き、Jellyfin 12.0 では 0 件、Jellyfin 10.11.11 では全件が返った）。番組の一覧・全走査・番組の存在確認（`fetchProgram`）・1 番組の各回（`fetchProgramEpisodes`）は、ライブラリ全体を取ってまとめた中から選ぶ。
   1 番組の同期（`fetchProgramSnapshot`）は、ライブラリ全体を取らずに、既知の各回の親フォルダの直下だけを取る（ADR 0016）: 手元が渡す既知の各回（新しい順）の先頭の 3 本を `/Items?Ids=…&IncludeItemTypes=AudioBook&Fields=ParentId` で引いて親を得て、
-  `/Items?ParentId={親}&Recursive=false&IncludeItemTypes=AudioBook&Fields=ParentId&SortBy=DateCreated&SortOrder=Descending` で直下の各回を取り、Album と AlbumArtist のタグでその番組に選び直す（各回が 1 本だけの番組も同じ手順）。
+  `/Items?ParentId={親}&Recursive=false&IncludeItemTypes=AudioBook&Fields=ParentId&SortBy=DateCreated&SortOrder=Descending` で直下の各回を取り（最初の頁の `TotalRecordCount` から残りの頁の `StartIndex` を決め、4 頁まで並べて投げる）、Album と AlbumArtist のタグでその番組に選び直す（各回が 1 本だけの番組も同じ手順）。
   選び直した各回は `/Items?Ids=…&IncludeItemTypes=AudioBook&Fields=DateCreated,ParentId,Path,Etag&UserId=…&EnableUserData=true`（100 件ずつ。4 本まで並べて投げる）で引き直し、その応答から各回（版・UserData）を作る。
   Jellyfin 10.10.7 では、親の直下の取得だけが、ライブラリ全体の取得や `Ids=` の取得と違う `Etag` を返すため（全件の一覧と同じ版を読む）。
   番組の画像は、親を `/Items?Ids={親}` で引き（直下の取得・引き直しと並べて投げる）、名前が Album と同じときだけその `ImageTags.Primary`。
