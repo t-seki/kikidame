@@ -12,7 +12,12 @@ import dev.tseki.kikidame.domain.SourceEpisode
 import dev.tseki.kikidame.domain.SourceException
 import dev.tseki.kikidame.domain.SnapshotScope
 import dev.tseki.kikidame.domain.SourceItemId
+import dev.tseki.kikidame.domain.SourceSnapshot
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
@@ -348,6 +353,15 @@ class SdkJellyfinGatewayIntegrationTest {
      * 走っている間は各回の保存の日時（Etag の元）が変わりうるので、版を比べる前に待つ（ほかのテストが始めた走査の影響を除く）。
      */
     private suspend fun awaitServerIdle(credentials: ServerCredentials) {
+        repeat(300) {
+            if (!serverBusy(credentials)) return
+            pause()
+        }
+        throw AssertionError("サーバのタスクが終わらない")
+    }
+
+    /** サーバのスケジュールされたタスクのどれかが走っている（State が Idle でない）か。 */
+    private suspend fun serverBusy(credentials: ServerCredentials): Boolean {
         val api = serverApi(credentials)
         // SDK（1.9）に ScheduledTasks の口が無いので、`/ScheduledTasks` を OkHttp で直に引き、State が Idle でないタスクが無いのを見る
         val request = Request.Builder()
@@ -363,20 +377,17 @@ class SdkJellyfinGatewayIntegrationTest {
                 ),
             )
             .build()
-        val busy = Regex(""""State"\s*:\s*"(?!Idle")""")
-        val client = OkHttpClient()
-        repeat(300) {
-            val body = withContext(Dispatchers.IO) {
-                client.newCall(request).execute().use { response ->
-                    check(response.isSuccessful) { "ScheduledTasks: ${response.code}" }
-                    response.body.string()
-                }
+        val body = withContext(Dispatchers.IO) {
+            httpClient.newCall(request).execute().use { response ->
+                check(response.isSuccessful) { "ScheduledTasks: ${response.code}" }
+                response.body.string()
             }
-            if (!busy.containsMatchIn(body)) return
-            pause()
         }
-        throw AssertionError("サーバのタスクが終わらない")
+        return busyTask.containsMatchIn(body)
     }
+
+    private val httpClient by lazy { OkHttpClient() }
+    private val busyTask = Regex(""""State"\s*:\s*"(?!Idle")""")
 
     /**
      * [block] を、その前と後でライブラリ全体の一覧が変わらない区間で流し、その一覧（取得元 ID → 各回）と一緒に返す。
@@ -552,6 +563,183 @@ class SdkJellyfinGatewayIntegrationTest {
         }
     }
 
+    /** 走査の間に取った全件の一覧の数え（[observeFullListingsDuringScan]）。 */
+    private data class ScanObservation(
+        val listings: Int,
+        /** 取れなかった（例外になった）取得の数。ライブラリ全体の同期では、同期の失敗（何も消さない）になる。 */
+        val failedListings: Int,
+        /** 待つ間に、サーバのタスク（走査など）が走っていると見た数（100 ms ごとに見る）。0 なら走査を見逃した見込みがある。 */
+        val busyChecks: Int,
+        /** 見ている各回の番組が、番組ごと一覧から消えた（ライブラリ全体の同期では判断保留の `Gone`）取得の数。 */
+        val programGone: Int,
+        /** 番組は載っているのに、見ている既存の各回が載らなかった取得の数。 */
+        val episodeMissing: Int,
+        /** [episodeMissing] の中身（何回目の取得の、どの番組のどの回か）。 */
+        val missing: List<String>,
+    )
+
+    /**
+     * [change]（ファイルを変えて走査を始める）の前から、[done] が満ちてサーバのタスクがどれも走っていない状態が 2 秒続くまで、
+     * ライブラリ全体の一覧を、間を空けずに並べて（[LISTING_POLLERS] 本）取り続ける（走査は 1 秒足らずで終わることがあるので、
+     * 走査を始める前から、途切れずに取る）。取るたびに、[watched]（走査の前から在り、走査の後も在るはずの各回）について、
+     * 番組が `programs` に載っているのに各回が `episodes` に無いかを数える。番組ごと消えた取得は、各回の欠けとしては数えない
+     * （[ScanObservation.programGone] に数える）。
+     */
+    private suspend fun observeFullListingsDuringScan(
+        credentials: ServerCredentials,
+        book: SelectedLibrary,
+        watched: Collection<SourceEpisode>,
+        change: suspend () -> Unit,
+        done: (SourceSnapshot) -> Boolean,
+    ): Pair<ScanObservation, SourceSnapshot> = coroutineScope {
+        val lock = Any()
+        var listings = 0
+        var failedListings = 0
+        var programGone = 0
+        var episodeMissing = 0
+        val missing = mutableListOf<String>()
+        var latest: SourceSnapshot? = null
+        fun record(snapshot: SourceSnapshot) = synchronized(lock) {
+            listings++
+            val programs = snapshot.programs.map { it.sourceId }.toSet()
+            val episodes = snapshot.episodes.map { it.sourceId }.toSet()
+            if (watched.any { it.programSourceId !in programs }) programGone++
+            val lost = watched.filter { it.programSourceId in programs && it.sourceId !in episodes }
+            if (lost.isNotEmpty()) {
+                episodeMissing++
+                missing += "#$listings: " + lost.joinToString { "${it.programSourceId.value}/${it.title}" }
+            }
+            latest = snapshot
+        }
+        val pollers = List(LISTING_POLLERS) {
+            launch(Dispatchers.IO) {
+                while (isActive) {
+                    val snapshot = try {
+                        gateway.fetchLibrary(credentials, book)
+                    } catch (e: Exception) {
+                        if (!isActive) break
+                        synchronized(lock) { failedListings++ }
+                        continue
+                    }
+                    record(snapshot)
+                }
+            }
+        }
+        var busyChecks = 0
+        var settled = 0
+        try {
+            change()
+            for (check in 1..1_200) {
+                val busy = serverBusy(credentials)
+                if (busy) busyChecks++
+                val snapshot = synchronized(lock) { latest }
+                settled = if (!busy && snapshot != null && done(snapshot)) settled + 1 else 0
+                if (settled >= 20) break
+                withContext(Dispatchers.IO) { Thread.sleep(100) }
+            }
+        } finally {
+            pollers.forEach { it.cancelAndJoin() }
+        }
+        if (settled < 20) throw AssertionError("走査が終わらない")
+        synchronized(lock) {
+            ScanObservation(listings, failedListings, busyChecks, programGone, episodeMissing, missing.toList()) to latest!!
+        }
+    }
+
+    /**
+     * ライブラリ全体の同期で、走査の途中に、番組は一覧に載っているのに既存の各回の一部だけが一時的に消えることがあるかを確かめる。
+     * 10.10.7 / 10.11.11 / 12.0.0 では、そうした瞬間は見ていない（番組ごと消えることも、この変え方では見ていない）。
+     * 番組 B に各回を足し、既存の 1 本を別名に置き換え（ファイルを消して別名で置く）、別の 1 本の中身を書き直して走査させ、
+     * 走査が終わるまで全件の一覧を取り続ける。元に戻す走査（足した回を消し、別名を元の名前に戻す）でも同じく取り続ける。これを 3 回繰り返す。
+     * 見るのは、走査の前から在って走査の後も在るはずの各回（どの番組も。消した・別名にした回は除く）。
+     * 結果（取得の数、番組ごと消えた取得の数、番組は載るのに既存の各回が欠けた取得の数）は標準出力に書く。
+     * 欠けた取得は、ライブラリ全体の同期（`SyncPlanner`）なら、その各回を手元から除いてしまう。
+     * メディアのディレクトリ（`KIKIDAME_JF_DIR`）の `media-book` に書けなければスキップする。終わったら元に戻して走査させる。
+     */
+    @Test
+    fun fullListingKeepsExistingEpisodesOfAListedProgramWhileEpisodesAreAddedAndReplaced() = runTest(timeout = 20.minutes) {
+        val mediaDir = File(System.getenv("KIKIDAME_JF_DIR") ?: defaultJfDir(), "media-book")
+        val programDir = File(mediaDir, "TBSラジオ/テスト番組B")
+        val renamedFrom = File(programDir, "2026-08-24.m4a")
+        val rewritten = File(programDir, "2026-08-31.m4a")
+        val addedFrom = File(programDir, "2026-09-07.m4a")
+        assumeTrue(
+            "ブックのメディアに書けないのでスキップ: $mediaDir",
+            renamedFrom.isFile && rewritten.isFile && addedFrom.isFile && programDir.canWrite(),
+        )
+        val renamedTo = File(programDir, "2026-08-24 (replaced).m4a")
+        val added = File(programDir, "2026-09-07 (added).m4a")
+        val credentials = signIn()
+        val book = radioBook(credentials)
+        val programB = SourceItemId("TBSラジオ/テスト番組B")
+        val api = serverApi(credentials)
+
+        fun SourceSnapshot.idsOfB() = episodes.filter { it.programSourceId == programB }.map { it.sourceId }.toSet()
+        fun restoreFiles() {
+            added.delete()
+            if (renamedTo.isFile && !renamedFrom.exists()) check(renamedTo.renameTo(renamedFrom)) { "元の名前に戻せない: $renamedTo" }
+        }
+
+        awaitServerIdle(credentials)
+        val initial = gateway.fetchLibrary(credentials, book)
+        val originalB = initial.idsOfB()
+        assertEquals(3, originalB.size, "番組 B は 3 本のはず: ${initial.episodes.map { it.title }}")
+        val observations = mutableListOf<Pair<String, ScanObservation>>()
+        try {
+            var before = initial
+            repeat(3) { round ->
+                // 足す・入れ替える（別名に置き換え、中身を書き直す）
+                val removed = before.episodes.single { it.programSourceId == programB && it.title == "2026-08-24" }.sourceId
+                val (changed, afterChange) = observeFullListingsDuringScan(
+                    credentials,
+                    book,
+                    before.episodes.filter { it.sourceId != removed },
+                    change = {
+                        addedFrom.copyTo(added, overwrite = true)
+                        check(renamedFrom.renameTo(renamedTo)) { "別名にできない: $renamedFrom" }
+                        rewritten.writeBytes(rewritten.readBytes())
+                        api.libraryApi.refreshLibrary()
+                    },
+                ) { snapshot -> snapshot.idsOfB().let { it.size == 4 && removed !in it } }
+                observations += "round ${round + 1}: 足す・入れ替える" to changed
+                val newIds = afterChange.idsOfB() - before.idsOfB()
+
+                // 元に戻す（足した回を消し、別名を元の名前に戻す）
+                val (restored, afterRestore) = observeFullListingsDuringScan(
+                    credentials,
+                    book,
+                    afterChange.episodes.filter { it.sourceId !in newIds },
+                    change = {
+                        restoreFiles()
+                        api.libraryApi.refreshLibrary()
+                    },
+                ) { snapshot -> snapshot.idsOfB().let { it.size == 3 && it.none { id -> id in newIds } } }
+                observations += "round ${round + 1}: 元に戻す" to restored
+                before = afterRestore
+            }
+        } finally {
+            restoreFiles()
+            if (gateway.fetchLibrary(credentials, book).idsOfB().size != 3 || serverBusy(credentials)) {
+                api.libraryApi.refreshLibrary()
+                for (attempt in 1..120) {
+                    if (gateway.fetchLibrary(credentials, book).idsOfB().size == 3 && !serverBusy(credentials)) break
+                    pause()
+                }
+            }
+            // 後のテストに走査の影響を残さない
+            awaitServerIdle(credentials)
+            for ((label, o) in observations) {
+                println(
+                    "[走査の途中の全件の一覧] $url $label: 一覧の取得 ${o.listings} 回（取れなかった ${o.failedListings} 回、" +
+                        "タスクが走っていると見た ${o.busyChecks} 回）、番組ごと消えた ${o.programGone} 回、" +
+                        "番組は載るのに既存の各回が欠けた ${o.episodeMissing} 回 ${o.missing}",
+                )
+            }
+        }
+        val missing = observations.filter { it.second.episodeMissing > 0 }
+        assertTrue(missing.isEmpty(), "番組は載るのに既存の各回が載らない瞬間があった: $missing")
+    }
+
     @Test
     fun bookDownloadStreamsTheOriginalAndHonoursRange() = runTest {
         val credentials = signIn()
@@ -634,5 +822,10 @@ class SdkJellyfinGatewayIntegrationTest {
     @Test
     fun closedPortIsUnreachable() = runTest {
         assertFailsWith<SourceException.Unreachable> { gateway.signIn("http://127.0.0.1:1", user, password) }
+    }
+
+    private companion object {
+        /** [observeFullListingsDuringScan] で、ライブラリ全体の一覧を並べて取る数。 */
+        const val LISTING_POLLERS = 3
     }
 }
