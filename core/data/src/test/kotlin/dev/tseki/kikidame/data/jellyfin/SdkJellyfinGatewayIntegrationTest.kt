@@ -21,10 +21,11 @@ import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.jellyfin.sdk.api.client.extensions.libraryApi
-import org.jellyfin.sdk.api.client.extensions.scheduledTasksApi
 import org.jellyfin.sdk.createJellyfin
 import org.jellyfin.sdk.model.ClientInfo
-import org.jellyfin.sdk.model.api.TaskState
+import org.jellyfin.sdk.api.client.util.AuthorizationHeaderBuilder
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.junit.runner.RunWith
 import java.io.File
 import java.util.UUID
@@ -328,9 +329,30 @@ class SdkJellyfinGatewayIntegrationTest {
      */
     private suspend fun awaitServerIdle(credentials: ServerCredentials) {
         val api = serverApi(credentials)
+        // SDK（1.9）に ScheduledTasks の口が無いので、`/ScheduledTasks` を OkHttp で直に引き、State が Idle でないタスクが無いのを見る
+        val request = Request.Builder()
+            .url("${url!!.trimEnd('/')}/ScheduledTasks")
+            .header(
+                "Authorization",
+                AuthorizationHeaderBuilder.buildHeader(
+                    clientName = api.clientInfo.name,
+                    clientVersion = api.clientInfo.version,
+                    deviceId = api.deviceInfo.id,
+                    deviceName = api.deviceInfo.name,
+                    accessToken = credentials.accessToken,
+                ),
+            )
+            .build()
+        val busy = Regex(""""State"\s*:\s*"(?!Idle")""")
+        val client = OkHttpClient()
         repeat(300) {
-            val tasks = api.scheduledTasksApi.getTasks().content
-            if (tasks.all { it.state == TaskState.IDLE }) return
+            val body = withContext(Dispatchers.IO) {
+                client.newCall(request).execute().use { response ->
+                    check(response.isSuccessful) { "ScheduledTasks: ${response.code}" }
+                    response.body.string()
+                }
+            }
+            if (!busy.containsMatchIn(body)) return
             pause()
         }
         throw AssertionError("サーバのタスクが終わらない")
