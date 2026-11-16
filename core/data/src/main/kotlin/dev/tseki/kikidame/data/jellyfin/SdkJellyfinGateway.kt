@@ -55,6 +55,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Duration
@@ -378,6 +379,7 @@ class SdkJellyfinGateway @Inject constructor(
      * 番組のフォルダは [bookFolders] に覚え、[fetchProgramImage] で使う。
      */
     private suspend fun fetchBooks(api: ApiClient, credentials: ServerCredentials, library: SelectedLibrary): BookListing {
+        fullBookListings.incrementAndGet()
         val parent = UUID.fromString(library.id.value)
         val folders = fetchAll(
             api,
@@ -432,6 +434,12 @@ class SdkJellyfinGateway @Inject constructor(
      * 番組ごとに呼ばれるので、番組ごとにライブラリ全体を取り直さないために覚える。覚えていない番組だけ一覧を取り直す。
      */
     private val bookFolders = ConcurrentHashMap<BookLibraryKey, Map<SourceItemId, UUID>>()
+
+    /**
+     * ブックのライブラリ全体の取得（[fetchBooks]）を回した回数。1 番組の同期が絞り込み（親の直下、ADR 0016）を通り、
+     * ライブラリ全体を取っていないことを、実サーバの統合テストで確かめるために数える（安全網に当たったときだけ増える）。
+     */
+    internal val fullBookListings = AtomicInteger()
 
     /**
      * SDK にはストリーミング取得の API が無い（`getDownload` は本文を `byte[]` に全部読む）ので、

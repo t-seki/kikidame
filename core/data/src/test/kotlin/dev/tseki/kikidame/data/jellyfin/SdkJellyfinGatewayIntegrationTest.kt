@@ -315,6 +315,26 @@ class SdkJellyfinGatewayIntegrationTest {
             .map { it.sourceId }
             .toCollection(LinkedHashSet())
 
+    /**
+     * [block] の中の 1 番組の同期が、絞り込み（既知の各回の親の直下、ADR 0016）を通り、ライブラリ全体を 1 度も取らないことを確かめる。
+     * 安全網に当たってライブラリ全体に切り替えると、結果は全件の一覧と同じになり見分けが付かないので、[SdkJellyfinGateway.fullBookListings] で数える。
+     * [block] の中では、ライブラリ全体を取るもの（[knownEpisodes]・`fetchLibrary` など）を呼ばない。
+     */
+    private suspend fun <T> narrowedOnly(target: SdkJellyfinGateway, what: String, block: suspend () -> T): T {
+        val before = target.fullBookListings.get()
+        val result = block()
+        assertEquals(before, target.fullBookListings.get(), "ライブラリ全体を取った（絞り込みを通らなかった）: $what")
+        return result
+    }
+
+    /** [block] の中の 1 番組の同期が、安全網でライブラリ全体の取得に切り替わったことを確かめる。 */
+    private suspend fun <T> fellBackToFullListing(what: String, block: suspend () -> T): T {
+        val before = gateway.fullBookListings.get()
+        val result = block()
+        assertTrue(gateway.fullBookListings.get() > before, "ライブラリ全体に切り替わらなかった: $what")
+        return result
+    }
+
     /** テストからサーバを直に操作する（走査の開始・スケジュールされたタスクの状態）ための API。 */
     private fun serverApi(credentials: ServerCredentials) = createJellyfin {
         context = ApplicationProvider.getApplicationContext()
@@ -390,9 +410,13 @@ class SdkJellyfinGatewayIntegrationTest {
         val programB = SourceItemId("TBSラジオ/テスト番組B")
         val programC = SourceItemId("ニッポン放送/テスト番組C")
 
+        val programs = listOf(programC, programA, programB)
         val (snapshots, full) = withStableFullListing(credentials, book) {
-            listOf(programC, programA, programB).map { program ->
-                assertNotNull(gateway.fetchProgramSnapshot(credentials, book, program, knownEpisodes(credentials, book, program)))
+            val known = programs.associateWith { knownEpisodes(credentials, book, it) }
+            programs.map { program ->
+                narrowedOnly(gateway, program.value) {
+                    assertNotNull(gateway.fetchProgramSnapshot(credentials, book, program, known.getValue(program)))
+                }
             }
         }
         val (c, a, b) = snapshots
@@ -411,9 +435,15 @@ class SdkJellyfinGatewayIntegrationTest {
         for (e in a.episodes + b.episodes + c.episodes) assertEquals(full.getValue(e.sourceId), e, "全件の一覧と同じ: ${e.title}")
 
         // 安全網: 既知の各回が無い・サーバに無いときは全件に切り替え、結果は同じ
-        assertEquals(listOf("2026-09-01"), gateway.fetchProgramSnapshot(credentials, book, programC, emptySet())?.episodes?.map { it.title })
+        assertEquals(
+            listOf("2026-09-01"),
+            fellBackToFullListing("既知の各回が 0 本") { gateway.fetchProgramSnapshot(credentials, book, programC, emptySet()) }?.episodes?.map { it.title },
+        )
         val missing = SourceItemId(UUID.randomUUID().toString())
-        assertEquals(listOf("2026-09-01"), gateway.fetchProgramSnapshot(credentials, book, programC, setOf(missing))?.episodes?.map { it.title })
+        assertEquals(
+            listOf("2026-09-01"),
+            fellBackToFullListing("既知の各回がサーバに無い") { gateway.fetchProgramSnapshot(credentials, book, programC, setOf(missing)) }?.episodes?.map { it.title },
+        )
         // 無い番組: 既知の各回を渡していれば、全件に切り替えて番組が無いのは同期の失敗（消失を返さない。何も消さない）
         assertFailsWith<SourceException.Failed> {
             gateway.fetchProgramSnapshot(credentials, book, SourceItemId("ニッポン放送/無い番組"), setOf(missing))
@@ -421,7 +451,10 @@ class SdkJellyfinGatewayIntegrationTest {
         // 既知の各回が無ければ、今までどおり消失（null）
         assertNull(gateway.fetchProgramSnapshot(credentials, book, SourceItemId("ニッポン放送/無い番組"), emptySet()))
         // 番組 A の既知の各回を番組 C として渡しても（タグが替わった回）、番組 A の各回は混ざらない
-        val cWithA = assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programC, knownEpisodes(credentials, book, programA)))
+        val knownA = knownEpisodes(credentials, book, programA)
+        val cWithA = assertNotNull(
+            fellBackToFullListing("既知の各回が絞り込みに載らない") { gateway.fetchProgramSnapshot(credentials, book, programC, knownA) },
+        )
         assertEquals(listOf("2026-09-01"), cWithA.episodes.map { it.title })
     }
 
@@ -439,19 +472,25 @@ class SdkJellyfinGatewayIntegrationTest {
         val knownA = knownEpisodes(credentials, book, programA)
         val knownB = knownEpisodes(credentials, book, programB)
         val knownC = knownEpisodes(credentials, book, programC)
-        assertEquals(tag, gateway.fetchProgramSnapshot(credentials, book, programA, knownA)?.programs?.single()?.image?.version)
-        assertNull(assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programB, knownB)).programs.single().image)
-        assertNull(assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programC, knownC)).programs.single().image, "配信元のフォルダの画像を番組の画像にしない")
+        narrowedOnly(gateway, "画像") {
+            assertEquals(tag, gateway.fetchProgramSnapshot(credentials, book, programA, knownA)?.programs?.single()?.image?.version)
+            assertNull(assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programB, knownB)).programs.single().image)
+            assertNull(assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programC, knownC)).programs.single().image, "配信元のフォルダの画像を番組の画像にしない")
+        }
 
-        // 一覧を取っていないゲートウェイで、1 番組の同期の直後に画像の中身が取れる
+        // 一覧を取っていないゲートウェイで、1 番組の同期の直後に画像の中身が取れる（画像の中身も、ライブラリ全体を取らずに）
         val fresh = SdkJellyfinGateway(ApplicationProvider.getApplicationContext())
-        assertEquals(tag, fresh.fetchProgramSnapshot(credentials, book, programA, knownA)?.programs?.single()?.image?.version)
-        val bytes = assertNotNull(fresh.fetchProgramImage(credentials, book, programA))
+        val bytes = narrowedOnly(fresh, "番組 A の画像の中身") {
+            assertEquals(tag, fresh.fetchProgramSnapshot(credentials, book, programA, knownA)?.programs?.single()?.image?.version)
+            assertNotNull(fresh.fetchProgramImage(credentials, book, programA))
+        }
         assertTrue(bytes.isJpeg(), "JPEG の先頭ではない: ${bytes.size} bytes")
         // ほかの番組の 1 番組の同期の後も、番組 A の覚えは残る
-        fresh.fetchProgramSnapshot(credentials, book, programB, knownB)
-        fresh.fetchProgramSnapshot(credentials, book, programC, knownC)
-        assertContentEquals(bytes, fresh.fetchProgramImage(credentials, book, programA))
+        narrowedOnly(fresh, "番組 B・C の後の番組 A の画像の中身") {
+            fresh.fetchProgramSnapshot(credentials, book, programB, knownB)
+            fresh.fetchProgramSnapshot(credentials, book, programC, knownC)
+            assertContentEquals(bytes, fresh.fetchProgramImage(credentials, book, programA))
+        }
         assertNull(fresh.fetchProgramImage(credentials, book, programC))
     }
 
@@ -502,7 +541,8 @@ class SdkJellyfinGatewayIntegrationTest {
             awaitServerIdle(credentials)
             val both = knownEpisodes(credentials, book, programC)
             assertEquals(2, both.size)
-            assertEquals(both, assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programC, both)).episodes.map { it.sourceId }.toSet())
+            val settled = narrowedOnly(gateway, "走査の後の番組 C") { assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programC, both)) }
+            assertEquals(both, settled.episodes.map { it.sourceId }.toSet())
         } finally {
             second.delete()
             api.libraryApi.refreshLibrary()
@@ -555,9 +595,10 @@ class SdkJellyfinGatewayIntegrationTest {
 
     /** 1 番組の同期（既知の各回を渡す。親の直下だけを取る）で読んだ [episode] の UserData。その番組のほかの回も、全件の一覧と同じ UserData。 */
     private suspend fun programSnapshotShared(credentials: ServerCredentials, book: SelectedLibrary, episode: SourceEpisode): SharedPlayState? {
-        val snapshot = assertNotNull(
-            gateway.fetchProgramSnapshot(credentials, book, episode.programSourceId, knownEpisodes(credentials, book, episode.programSourceId)),
-        )
+        val known = knownEpisodes(credentials, book, episode.programSourceId)
+        val snapshot = narrowedOnly(gateway, "UserData") {
+            assertNotNull(gateway.fetchProgramSnapshot(credentials, book, episode.programSourceId, known))
+        }
         val full = gateway.fetchLibrary(credentials, book).episodes.associateBy { it.sourceId }
         for (e in snapshot.episodes) assertEquals(full.getValue(e.sourceId).shared, e.shared, "全件の一覧と同じ UserData: ${e.title}")
         return snapshot.episodes.first { it.sourceId == episode.sourceId }.shared
