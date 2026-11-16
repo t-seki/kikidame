@@ -244,6 +244,25 @@ class RoomLibraryRefreshRepositoryTest : JellyfinRefreshTestBase() {
         assertEquals(emptySet<SourceItemId>(), gateway.knownEpisodeIdsPassed.first())
     }
 
+    /**
+     * 1 番組の同期の取得が失敗したら（ブックのライブラリで、既知の各回を渡したのに全件の一覧に番組が無いとき、ADR 0016）、例外が上がり、
+     * 消失を立てず、各回も消さない。
+     */
+    @Test
+    fun aFailedProgramSnapshotNeitherMarksGoneNorDeletes() = runTest {
+        signInAndSelect()
+        gateway.snapshot = snapshot
+        repo.refresh()
+        val programId = library.observePrograms().first().single().program.id
+
+        gateway.snapshot = SourceSnapshot(emptyList(), emptyList())
+        gateway.programSnapshotFailure = SourceException.Failed("book program not in the full listing although its episodes are known")
+        assertFailsWith<SourceException.Failed> { repo.syncProgram(programId) }
+
+        assertNull(library.observeProgram(programId).first()?.goneSince)
+        assertEquals(3, library.observePrograms().first().single().episodeCount)
+    }
+
     /** 番組ごとサーバの一覧から消えたら消失 = 判断保留（各回が消えた場合は RoomSyncTest）。 */
     @Test
     fun aProgramGoneFromTheServerIsLeftAlone() = runTest {

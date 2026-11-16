@@ -21,8 +21,10 @@ import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.jellyfin.sdk.api.client.extensions.libraryApi
+import org.jellyfin.sdk.api.client.extensions.scheduledTasksApi
 import org.jellyfin.sdk.createJellyfin
 import org.jellyfin.sdk.model.ClientInfo
+import org.jellyfin.sdk.model.api.TaskState
 import org.junit.runner.RunWith
 import java.io.File
 import java.util.UUID
@@ -312,19 +314,66 @@ class SdkJellyfinGatewayIntegrationTest {
             .map { it.sourceId }
             .toCollection(LinkedHashSet())
 
+    /** テストからサーバを直に操作する（走査の開始・スケジュールされたタスクの状態）ための API。 */
+    private fun serverApi(credentials: ServerCredentials) = createJellyfin {
+        context = ApplicationProvider.getApplicationContext()
+        clientInfo = ClientInfo(name = "kikidame-integration-test", version = "1")
+    }.createApi(baseUrl = url!!, accessToken = credentials.accessToken)
+
+    private suspend fun pause() = withContext(Dispatchers.IO) { Thread.sleep(1_000) }
+
+    /**
+     * サーバのスケジュールされたタスク（ライブラリの走査と、その後に各回を保存し直すタスク）がどれも走っていないのを待つ。
+     * 走っている間は各回の保存の日時（Etag の元）が変わりうるので、版を比べる前に待つ（ほかのテストが始めた走査の影響を除く）。
+     */
+    private suspend fun awaitServerIdle(credentials: ServerCredentials) {
+        val api = serverApi(credentials)
+        repeat(300) {
+            val tasks = api.scheduledTasksApi.getTasks().content
+            if (tasks.all { it.state == TaskState.IDLE }) return
+            pause()
+        }
+        throw AssertionError("サーバのタスクが終わらない")
+    }
+
+    /**
+     * [block] を、その前と後でライブラリ全体の一覧が変わらない区間で流し、その一覧（取得元 ID → 各回）と一緒に返す。
+     * 区間の途中でサーバが各回を保存し直したら（版が変わったら）、待ってからやり直す。比べ方（各回の全体、版を含む）は変えない。
+     */
+    private suspend fun <T> withStableFullListing(
+        credentials: ServerCredentials,
+        book: SelectedLibrary,
+        block: suspend () -> T,
+    ): Pair<T, Map<SourceItemId, SourceEpisode>> {
+        repeat(10) {
+            awaitServerIdle(credentials)
+            val before = gateway.fetchLibrary(credentials, book).episodes.associateBy { it.sourceId }
+            val result = block()
+            val after = gateway.fetchLibrary(credentials, book).episodes.associateBy { it.sourceId }
+            if (before == after) return result to after
+            pause()
+        }
+        throw AssertionError("ライブラリ全体の一覧が落ち着かない")
+    }
+
     /**
      * 1 番組の同期（ADR 0016）: 既知の各回の親の直下だけを取り、タグで番組に選び直す。各回が 1 本だけの番組 C は、親が配信元のフォルダ
      * （番組 A のフォルダと番組 C のフォルダが並ぶ）になるが、結果に番組 A の各回は混ざらない。
      */
     @Test
-    fun bookProgramSnapshotTakesOnlyThatProgramUnderTheParentOfTheKnownEpisodes() = runTest {
+    fun bookProgramSnapshotTakesOnlyThatProgramUnderTheParentOfTheKnownEpisodes() = runTest(timeout = 10.minutes) {
         val credentials = signIn()
         val book = radioBook(credentials)
         val programA = SourceItemId("ニッポン放送/テスト番組A")
         val programB = SourceItemId("TBSラジオ/テスト番組B")
         val programC = SourceItemId("ニッポン放送/テスト番組C")
 
-        val c = assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programC, knownEpisodes(credentials, book, programC)))
+        val (snapshots, full) = withStableFullListing(credentials, book) {
+            listOf(programC, programA, programB).map { program ->
+                assertNotNull(gateway.fetchProgramSnapshot(credentials, book, program, knownEpisodes(credentials, book, program)))
+            }
+        }
+        val (c, a, b) = snapshots
         assertEquals(listOf(programC), c.programs.map { it.sourceId })
         assertEquals("テスト番組C", c.programs.single().name)
         assertEquals("ニッポン放送", c.programs.single().publisherName)
@@ -332,22 +381,23 @@ class SdkJellyfinGatewayIntegrationTest {
         assertTrue(c.episodes.all { it.programSourceId == programC })
         assertEquals(SnapshotScope.Program(programC), c.scope)
 
-        val a = assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programA, knownEpisodes(credentials, book, programA)))
         assertEquals(setOf("2026-09-14", "2026-09-14 (1)", "夏休みスペシャル"), a.episodes.map { it.title }.toSet())
         assertTrue(a.episodes.all { it.programSourceId == programA })
-        val b = assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programB, knownEpisodes(credentials, book, programB)))
         assertEquals(setOf("2026-09-07", "2026-08-31", "2026-08-24"), b.episodes.map { it.title }.toSet())
 
         // 全件の一覧と同じ各回（タイトル・公開日・版・コンテナ・出演者）
-        val full = gateway.fetchLibrary(credentials, book).episodes.associateBy { it.sourceId }
         for (e in a.episodes + b.episodes + c.episodes) assertEquals(full.getValue(e.sourceId), e, "全件の一覧と同じ: ${e.title}")
 
         // 安全網: 既知の各回が無い・サーバに無いときは全件に切り替え、結果は同じ
         assertEquals(listOf("2026-09-01"), gateway.fetchProgramSnapshot(credentials, book, programC, emptySet())?.episodes?.map { it.title })
         val missing = SourceItemId(UUID.randomUUID().toString())
         assertEquals(listOf("2026-09-01"), gateway.fetchProgramSnapshot(credentials, book, programC, setOf(missing))?.episodes?.map { it.title })
-        // 無い番組は、全件に切り替えて null（消失）
-        assertNull(gateway.fetchProgramSnapshot(credentials, book, SourceItemId("ニッポン放送/無い番組"), setOf(missing)))
+        // 無い番組: 既知の各回を渡していれば、全件に切り替えて番組が無いのは同期の失敗（消失を返さない。何も消さない）
+        assertFailsWith<SourceException.Failed> {
+            gateway.fetchProgramSnapshot(credentials, book, SourceItemId("ニッポン放送/無い番組"), setOf(missing))
+        }
+        // 既知の各回が無ければ、今までどおり消失（null）
+        assertNull(gateway.fetchProgramSnapshot(credentials, book, SourceItemId("ニッポン放送/無い番組"), emptySet()))
         // 番組 A の既知の各回を番組 C として渡しても（タグが替わった回）、番組 A の各回は混ざらない
         val cWithA = assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programC, knownEpisodes(credentials, book, programA)))
         assertEquals(listOf("2026-09-01"), cWithA.episodes.map { it.title })
@@ -399,30 +449,35 @@ class SdkJellyfinGatewayIntegrationTest {
         val known = knownEpisodes(credentials, book, programC)
         val first = known.single()
         val second = File(original.parentFile, "2026-09-08.m4a")
-        val api = createJellyfin {
-            context = ApplicationProvider.getApplicationContext()
-            clientInfo = ClientInfo(name = "kikidame-integration-test", version = "1")
-        }.createApi(baseUrl = url!!, accessToken = credentials.accessToken)
+        val api = serverApi(credentials)
 
         suspend fun cEpisodeCount() = gateway.fetchLibrary(credentials, book).episodes.count { it.programSourceId == programC }
         suspend fun waitUntil(what: String, check: suspend () -> Boolean) {
             repeat(120) {
                 if (check()) return
-                withContext(Dispatchers.IO) { Thread.sleep(1_000) }
+                pause()
             }
             throw AssertionError("待ちきれなかった: $what")
         }
 
+        awaitServerIdle(credentials)
         try {
             original.copyTo(second, overwrite = true)
             api.libraryApi.refreshLibrary()
             waitUntil("番組 C の 2 本目が載る") {
-                val snapshot = assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programC, known), "番組 C が消失した")
+                // 走査の途中で全件の一覧からも番組が外れたときは、同期の失敗（例外。何も消さない）でよい。消失（null）は返さない
+                val fetched = try {
+                    gateway.fetchProgramSnapshot(credentials, book, programC, known)
+                } catch (e: SourceException.Failed) {
+                    return@waitUntil false
+                }
+                val snapshot = assertNotNull(fetched, "番組 C が消失した")
                 assertTrue(snapshot.episodes.any { it.sourceId == first }, "既知の 1 本目が載らない: ${snapshot.episodes.map { it.title }}")
                 assertTrue(snapshot.episodes.all { it.programSourceId == programC })
                 snapshot.episodes.size == 2
             }
             // 走査の後、2 本とも知っている状態でも同じ
+            awaitServerIdle(credentials)
             val both = knownEpisodes(credentials, book, programC)
             assertEquals(2, both.size)
             assertEquals(both, assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programC, both)).episodes.map { it.sourceId }.toSet())
@@ -430,6 +485,8 @@ class SdkJellyfinGatewayIntegrationTest {
             second.delete()
             api.libraryApi.refreshLibrary()
             waitUntil("番組 C が 1 本に戻る") { cEpisodeCount() == 1 }
+            // 後のテストに走査の影響を残さない
+            awaitServerIdle(credentials)
         }
     }
 

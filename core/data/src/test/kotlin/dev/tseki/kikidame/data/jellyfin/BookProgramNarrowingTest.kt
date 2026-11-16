@@ -70,4 +70,17 @@ class BookProgramNarrowingTest {
         // 親が無い各回も同じ
         assertEquals(expected, BookProgramNarrowing.chooseParent(setOf(e1), mapOf(e1 to null)))
     }
+
+    /** 既知の各回を渡しているのに全件の一覧に番組が無ければ、消失ではなく同期の失敗（何も消さない）。 */
+    @Test
+    fun programMissingFromTheFullListingWithKnownEpisodesIsAFailure() {
+        assertEquals(MissingProgram.FAILED, BookProgramNarrowing.missingFromFullListing(setOf(e1)))
+        assertEquals(MissingProgram.FAILED, BookProgramNarrowing.missingFromFullListing(linkedSetOf(e1, e2, e3, e4)))
+    }
+
+    /** 既知の各回が無ければ、全件の一覧に番組が無いのは今までどおり消失。 */
+    @Test
+    fun programMissingFromTheFullListingWithoutKnownEpisodesIsGone() {
+        assertEquals(MissingProgram.GONE, BookProgramNarrowing.missingFromFullListing(emptySet()))
+    }
 }

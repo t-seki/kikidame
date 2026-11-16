@@ -62,4 +62,21 @@ internal object BookProgramNarrowing {
         if (known.any { it !in listed }) return BookNarrowing.FullListing(FullListingReason.KNOWN_EPISODE_NOT_IN_NARROWED)
         return choice
     }
+
+    /**
+     * 安全網で切り替えたライブラリ全体の一覧に番組が無いときの扱い。手元から既知の各回を渡しているなら、走査の途中（親フォルダの付け替わり）
+     * などでたまたま一覧から外れただけかもしれないので、同期の失敗（[MissingProgram.FAILED]。今回は何も消さず、次の同期で取り直す）。
+     * 既知の各回が無ければ、今までどおり番組の消失（[MissingProgram.GONE]）。本当に消えた番組の手元からの削除は、ライブラリ全体の同期で扱う。
+     */
+    fun missingFromFullListing(known: Set<SourceItemId>): MissingProgram =
+        if (known.isEmpty()) MissingProgram.GONE else MissingProgram.FAILED
+}
+
+/** ライブラリ全体の一覧に番組が無いときの扱い（[BookProgramNarrowing.missingFromFullListing]）。 */
+internal enum class MissingProgram {
+    /** 番組の消失（null を返す） */
+    GONE,
+
+    /** 同期の失敗（例外を投げる。何も消さない） */
+    FAILED,
 }

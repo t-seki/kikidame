@@ -58,7 +58,7 @@
   1 番組の同期（`fetchProgramSnapshot`）は、ライブラリ全体を取らずに、既知の各回の親フォルダの直下だけを取る（ADR 0016）: 手元が渡す既知の各回（新しい順）の先頭の 3 本を `/Items?Ids=…&IncludeItemTypes=AudioBook&Fields=ParentId` で引いて親を得て、
   `/Items?ParentId={親}&Recursive=false&IncludeItemTypes=AudioBook&Fields=DateCreated,ParentId,Path,Etag&UserId=…&EnableUserData=true&SortBy=DateCreated&SortOrder=Descending` で直下の各回を取り、Album と AlbumArtist のタグでその番組に選び直す（各回が 1 本だけの番組も同じ手順）。
   番組の画像は、親を `/Items?Ids={親}` で引き、名前が Album と同じときだけその `ImageTags.Primary`。
-  安全網: 既知の各回が 0 本・`ids=` で引いた既知の各回がサーバに無い・既知の各回が直下の結果に 1 本でも載らない（引いた各回の親が分かれているときを含む）ときは、ライブラリ全体の取得に切り替えて（理由はログに出す）、その中から番組と各回を選ぶ。削除と番組の消失は、この全件の一覧で判断する（ADR 0003）。
+  安全網: 既知の各回が 0 本・`ids=` で引いた既知の各回がサーバに無い・既知の各回が直下の結果に 1 本でも載らない（引いた各回の親が分かれているときを含む）ときは、ライブラリ全体の取得に切り替えて（理由はログに出す）、その中から番組と各回を選ぶ。削除は、この全件の一覧で判断する（ADR 0003）。全件の一覧にその番組が無いとき、既知の各回を渡していれば同期の失敗（`SourceException.Failed`。何も消さず、次の同期で取り直す）とし、消失は返さない（本当の消失はライブラリ全体の同期で扱う）。既知の各回が無ければ消失（null）。
   AudioBook は `Container` を返さない（Jellyfin 10.10.7 と 12.0）ので、保存先の拡張子は `Path` から取る。番組の画像の中身は、番組のフォルダの `/Items/{folderId}/Images/Primary`
 - 番組一覧: `/Items?ParentId={libraryId}&IncludeItemTypes=MusicAlbum&Recursive=true`（1 回。`Fields` は付けない）。
   番組の画像の版は、返る `ImageTags.Primary`（`SourceProgram.image`）。`Fields` を付けなくても返ることを、Jellyfin 10.10.7 のテストサーバ（`scripts/jellyfin-testserver.sh up 1010`）で確かめた（`folder.jpg` のあるアルバムだけ `ImageTags` に `Primary` が出た）。Jellyfin 12 では未確認

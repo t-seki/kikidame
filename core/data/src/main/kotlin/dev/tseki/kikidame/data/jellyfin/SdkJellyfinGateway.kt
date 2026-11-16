@@ -195,21 +195,32 @@ class SdkJellyfinGateway @Inject constructor(
                     is NarrowedBookProgram.Found -> narrowed.snapshot
                     is NarrowedBookProgram.Fallback -> {
                         Log.i(TAG, "book program sync: full listing instead of the parent folder (${narrowed.reason})")
-                        fetchBookProgramFromFullListing(api, credentials, library, programSourceId)
+                        fetchBookProgramFromFullListing(api, credentials, library, programSourceId, knownEpisodeIds)
                     }
                 }
             }
         }
 
-    /** ライブラリ全体（[fetchBooks]）から 1 番組を選ぶ。番組が無ければ null（消失）。 */
+    /**
+     * ライブラリ全体（[fetchBooks]）から 1 番組を選ぶ。番組が無ければ、既知の各回が無いときだけ null（消失）。既知の各回を渡しているのに
+     * 番組が無ければ同期の失敗として [SourceException.Failed] を投げる（[BookProgramNarrowing.missingFromFullListing]、ADR 0016）。
+     */
     private suspend fun fetchBookProgramFromFullListing(
         api: ApiClient,
         credentials: ServerCredentials,
         library: SelectedLibrary,
         programSourceId: SourceItemId,
+        known: Set<SourceItemId>,
     ): SourceSnapshot? {
         val listing = fetchBooks(api, credentials, library)
-        val program = listing.programs.firstOrNull { it.sourceId == programSourceId } ?: return null
+        val program = listing.programs.firstOrNull { it.sourceId == programSourceId }
+            ?: return when (BookProgramNarrowing.missingFromFullListing(known)) {
+                MissingProgram.GONE -> null
+                MissingProgram.FAILED -> {
+                    Log.w(TAG, "book program sync: the program is not in the full listing although its episodes are known; failing this sync")
+                    throw SourceException.Failed("book program not in the full listing although its episodes are known")
+                }
+            }
         return SourceSnapshot(
             programs = listOf(program),
             episodes = listing.episodes.filter { e -> e.programSourceId == programSourceId },
