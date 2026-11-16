@@ -56,7 +56,9 @@
   `/Items?ParentId={libraryId}&IncludeItemTypes=AudioBook&Recursive=true&Fields=DateCreated,ParentId,Path,Etag&SortBy=DateCreated&SortOrder=Descending`（500 件ずつ）で各回を取り、タグでまとめる（`Etag` はファイルの版。ADR 0011）。
   `albums=` の絞り込みは使わない（Jellyfin 10.10.7 では効き、Jellyfin 12.0 では 0 件、Jellyfin 10.11.11 では全件が返った）。番組の一覧・全走査・番組の存在確認（`fetchProgram`）・1 番組の各回（`fetchProgramEpisodes`）は、ライブラリ全体を取ってまとめた中から選ぶ。
   1 番組の同期（`fetchProgramSnapshot`）は、ライブラリ全体を取らずに、既知の各回の親フォルダの直下だけを取る（ADR 0016）: 手元が渡す既知の各回（新しい順）の先頭の 3 本を `/Items?Ids=…&IncludeItemTypes=AudioBook&Fields=ParentId` で引いて親を得て、
-  `/Items?ParentId={親}&Recursive=false&IncludeItemTypes=AudioBook&Fields=DateCreated,ParentId,Path,Etag&UserId=…&EnableUserData=true&SortBy=DateCreated&SortOrder=Descending` で直下の各回を取り、Album と AlbumArtist のタグでその番組に選び直す（各回が 1 本だけの番組も同じ手順）。
+  `/Items?ParentId={親}&Recursive=false&IncludeItemTypes=AudioBook&Fields=ParentId&SortBy=DateCreated&SortOrder=Descending` で直下の各回を取り、Album と AlbumArtist のタグでその番組に選び直す（各回が 1 本だけの番組も同じ手順）。
+  選び直した各回は `/Items?Ids=…&IncludeItemTypes=AudioBook&Fields=DateCreated,ParentId,Path,Etag&UserId=…&EnableUserData=true`（100 件ずつ）で引き直し、その応答から各回（版・UserData）を作る。
+  Jellyfin 10.10.7 では、親の直下の取得だけが、ライブラリ全体の取得や `Ids=` の取得と違う `Etag` を返すため（全件の一覧と同じ版を読む）。
   番組の画像は、親を `/Items?Ids={親}` で引き、名前が Album と同じときだけその `ImageTags.Primary`。
   安全網: 既知の各回が 0 本・`ids=` で引いた既知の各回がサーバに無い・既知の各回が直下の結果に 1 本でも載らない（引いた各回の親が分かれているときを含む）ときは、ライブラリ全体の取得に切り替えて（理由はログに出す）、その中から番組と各回を選ぶ。削除は、この全件の一覧で判断する（ADR 0003）。全件の一覧にその番組が無いとき、既知の各回を渡していれば同期の失敗（`SourceException.Failed`。何も消さず、次の同期で取り直す）とし、消失は返さない（本当の消失はライブラリ全体の同期で扱う）。既知の各回が無ければ消失（null）。
   AudioBook は `Container` を返さない（Jellyfin 10.10.7 と 12.0）ので、保存先の拡張子は `Path` から取る。番組の画像の中身は、番組のフォルダの `/Items/{folderId}/Images/Primary`

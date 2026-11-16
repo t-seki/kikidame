@@ -237,8 +237,9 @@ class SdkJellyfinGateway @Inject constructor(
      * ブックのライブラリの 1 番組を、既知の各回の親の直下だけから取る（ADR 0016）。番組のフォルダが有る番組も、各回が 1 本だけの番組も同じ手順:
      *
      * 1. 既知の各回の新しい側の数本（[BookProgramNarrowing.sample]）を `ids=` で引いて、今の `ParentId` を得る
-     * 2. `parentId=<親>&recursive=false` で AudioBook を取る（UserData も [fetchBooks] と同じに読む）
+     * 2. `parentId=<親>&recursive=false` で AudioBook を取る
      * 3. 返った各回を、Album と AlbumArtist のタグで番組に選び直す（[fetchBooks] と同じ判定）
+     * 4. 選んだ各回を `ids=` で引き直し、その応答から各回を作る（版と UserData を [fetchBooks] と同じに読む。[fetchBooksByIds]）
      *
      * 安全網の判定は [BookProgramNarrowing]。当たれば [NarrowedBookProgram.Fallback] を返し、呼び出し側がライブラリ全体を取る。
      * 番組の画像は、親を `ids=<親>` で引き、名前が Album と同じときだけその Primary（[fetchBooks] と同じ。違えば画像なし）。
@@ -264,20 +265,22 @@ class SdkJellyfinGateway @Inject constructor(
             is BookNarrowing.FullListing -> return NarrowedBookProgram.Fallback(choice.reason)
             is BookNarrowing.Narrow -> choice.parentId
         }
-        val books = fetchAll(
+        // 親の直下は、その番組の各回の id を選ぶためだけに取る（Album と AlbumArtist は Fields 無しで返る）
+        val listedIds = fetchAll(
             api,
             GetItemsRequest(
                 parentId = parent,
                 recursive = false,
                 includeItemTypes = listOf(BaseItemKind.AUDIO_BOOK),
-                // [fetchBooks] と同じ欄と UserData（再生の共有、ADR 0010）
-                fields = listOf(ItemFields.DATE_CREATED, ItemFields.PARENT_ID, ItemFields.PATH, ItemFields.ETAG),
-                userId = UUID.fromString(credentials.userId),
-                enableUserData = true,
+                fields = listOf(ItemFields.PARENT_ID),
                 sortBy = listOf(ItemSortBy.DATE_CREATED),
                 sortOrder = listOf(SortOrder.DESCENDING),
             ),
-        ).filter { it.bookProgramId() == programSourceId }
+        ).filter { it.bookProgramId() == programSourceId }.map { it.id }
+        // 各回そのもの（版・UserData）は `ids=` で引き直して作る。Jellyfin 10.10.7 では、親の直下の取得（`parentId=&recursive=false`）だけが
+        // ライブラリ全体の取得や `ids=` と違う Etag を返し、1 番組の同期のたびに各回が変わったと見なされうるため（ADR 0016）。
+        // `ids=` の取得は、ライブラリ全体の取得と同じ Etag を返す
+        val books = fetchBooksByIds(api, credentials, listedIds).filter { it.bookProgramId() == programSourceId }
         val episodes = books.mapNotNull { it.toBookEpisode(programSourceId) }
         when (val judged = BookProgramNarrowing.judge(known, lookedUp, episodes.map { it.sourceId })) {
             is BookNarrowing.FullListing -> return NarrowedBookProgram.Fallback(judged.reason)
@@ -294,6 +297,29 @@ class SdkJellyfinGateway @Inject constructor(
         }
         val program = SourceProgram(sourceId = programSourceId, name = album, publisherName = first.publisher(), image = folder?.primaryImage())
         return NarrowedBookProgram.Found(SourceSnapshot(listOf(program), episodes, SnapshotScope.Program(programSourceId)))
+    }
+
+    /**
+     * ブックの各回を `ids=` で引く（[ID_CHUNK] 件ずつ。URL が長くなりすぎないように）。欄と UserData は [fetchBooks] と同じ
+     * （再生の共有、ADR 0010）。サーバに無い各回は返らない。並びは [ids] の順（親の直下の取得の、取り込み日時の新しい順）。
+     */
+    private suspend fun fetchBooksByIds(api: ApiClient, credentials: ServerCredentials, ids: List<UUID>): List<BaseItemDto> {
+        val byId = HashMap<UUID, BaseItemDto>()
+        for (chunk in ids.distinct().chunked(ID_CHUNK)) {
+            val result by api.libraryApi.getItems(
+                GetItemsRequest(
+                    ids = chunk,
+                    includeItemTypes = listOf(BaseItemKind.AUDIO_BOOK),
+                    fields = listOf(ItemFields.DATE_CREATED, ItemFields.PARENT_ID, ItemFields.PATH, ItemFields.ETAG),
+                    userId = UUID.fromString(credentials.userId),
+                    enableUserData = true,
+                    sortBy = listOf(ItemSortBy.DATE_CREATED),
+                    sortOrder = listOf(SortOrder.DESCENDING),
+                ),
+            )
+            for (item in result.items) if (item.type == BaseItemKind.AUDIO_BOOK) byId[item.id] = item
+        }
+        return ids.distinct().mapNotNull { byId[it] }
     }
 
     private fun BaseItemDto.toSourceProgram() = SourceProgram(
@@ -609,6 +635,9 @@ class SdkJellyfinGateway @Inject constructor(
     companion object {
         const val CLIENT_NAME = "Kikidame"
         const val PAGE_SIZE = 500
+
+        /** `ids=` で 1 度に引く件数。UUID を並べた URL が、サーバの要求行の上限（Kestrel の既定 8 KB）を超えないように。 */
+        const val ID_CHUNK = 100
 
         /** 画像の API の応答コード → 本文を読むか。200 は true、404（Primary が無い）は false、401/403 は [SourceException.Unauthorized]、ほかは [SourceException.Failed]。 */
         internal fun imageStatusHasBody(code: Int): Boolean = when (code) {
