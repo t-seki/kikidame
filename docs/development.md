@@ -104,10 +104,11 @@ KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTe
   `/media` にマウントし、初期セットアップと音楽ライブラリ `radio` の作成を REST で済ませ、スキャンが終わるまで待つ。
   置き場は `$KIKIDAME_JF_DIR`（既定 `${XDG_CACHE_HOME:-$HOME/.cache}/kikidame-jf`。統合テストも同じ既定を使う）。Jellyfin 10.11 は起動のときにデータの置き場に 2GiB の空きを求めるので、
   置き場の空きが 2GiB より少ないと `up` は Jellyfin を起動せずに止まる（`KIKIDAME_JF_DIR` で空きのある置き場に変える）。ユーザーは `kikidame` / `kikidame-test`
-- ブックのライブラリ `radio-book` も作る。中身は音楽と同じ 6 本と `folder.jpg` に、各回が 1 本だけの番組 C を足したもので、
+- ブックのライブラリ `radio-book` も作る。中身は音楽と同じ 6 本と `folder.jpg` に、各回が 1 本だけの番組 C（回の画像なし）と番組 D（回に画像を埋め込む）を足したもので、
   別のディレクトリ（`$KIKIDAME_JF_DIR/media-book` を `/media-book` にマウント）に置く。同じパスを 2 つのライブラリに入れると、
   アイテムが使い回されてブックのライブラリでも Audio のまま見えるため。配信元のフォルダ（ニッポン放送）にも `folder.jpg` を置き、
-  各回が 1 本だけの番組（各回の親が配信元のフォルダになる）の画像にならないことを見る
+  各回が 1 本だけの番組（各回の親が配信元のフォルダになる）の画像にならないことを見る。`radio-book` の AudioBook の `ImageFetchers` には
+  `Image Extractor` を入れ、番組 D の回に埋め込んだ画像を AudioBook の Primary として読ませる（入れないと番組 D の画像が出ない）
 - `KIKIDAME_JF_LIBRARY=showcase` を付けて `media` / `up` すると、ストア向けスクリーンショット用の英語の架空ライブラリ
   （Example FM / Example Public Radio の 5 番組、45 回）になる。`KIKIDAME_JF_LIBRARY=showcase-ja` は、同じ構造で名前だけ日本語の
   架空ライブラリ（サンプルFM / サンプル公共ラジオ）になる。統合テストの期待値は日本語ライブラリ前提なので、
@@ -117,8 +118,8 @@ KIKIDAME_JELLYFIN_URL=http://localhost:8097 ./gradlew :core:data:testDebugUnitTe
   付いているときはキャッシュを使わず毎回走る（`core/data/build.gradle.kts`）
 - `JellyfinGateway` の全メソッド（ログイン・ライブラリ一覧・番組と各回の取得・1 番組の各回・番組の存在確認・ダウンロードと `Range`・
   認証切れ・到達不能）を 1 回ずつ呼ぶ。`fetchProgramImage` も呼び、番組 A は `ImageTags.Primary` と JPEG の中身、番組 B は画像なし（null）を見る。新しい Jellyfin が出たら `resolve()` にタグを足して同じテストを当てる
-- ブックのライブラリ（`radio-book`）でも、一覧（AudioBook が `Album`・`AlbumArtist` のタグで 3 番組・7 本にまとまること）・1 番組の各回・番組の存在確認・
-  番組の画像（番組 A は番組のフォルダの画像、番組 B と番組 C は画像なし）・ダウンロードと `Range` を呼ぶ
+- ブックのライブラリ（`radio-book`）でも、一覧（AudioBook が `Album`・`AlbumArtist` のタグで 4 番組・8 本にまとまること）・1 番組の各回・番組の存在確認・
+  番組の画像（番組 A は番組のフォルダの画像、各回が 1 本だけの番組 D は回の画像で配信元のフォルダの画像と違うこと、番組 B と番組 C は画像なし。一覧・`fetchProgram`・1 番組の同期の `fetchProgramSnapshot` のどれでも同じ）・ダウンロードと `Range` を呼ぶ
 - ブックの各回の UserData（再生の共有）: `writePlayState` で位置（尺の中の 7 秒）・再生済み・`LastPlayedDate` を書き、書き込みの応答・`fetchPlayState`（時間の上限なしと上限つき）・
   一覧（`fetchLibrary` の各回の `shared`）のどれでも同じ値で読み戻せること、再生済みにする・未再生に戻すのも同じことを見る。音楽のライブラリの一覧は UserData を載せない（`shared` が null）ことも見る。
   書いた回は最後に位置 0・未再生に書き戻す

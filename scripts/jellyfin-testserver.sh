@@ -14,7 +14,8 @@
 #
 # up は、ffmpeg で無音の m4a を作った合成ライブラリ（番組 2 × 各回 3。番組 A のフォルダにだけ folder.jpg を置く（番組の画像））をマウントし、
 # 初期セットアップ（言語・ユーザー・リモートアクセス・完了）と音楽ライブラリ「radio」の作成を REST で済ませ、
-# スキャンが終わるまで待つ。ブックのライブラリ「radio-book」も作る。中身は音楽と同じ 6 本と folder.jpg に、各回が 1 本だけの番組 C を足したもので、
+# スキャンが終わるまで待つ。ブックのライブラリ「radio-book」も作る。中身は音楽と同じ 6 本と folder.jpg に、各回が 1 本だけの番組 C（回の画像なし）と
+# 番組 D（回に画像を埋め込む）を足したもので、
 # 音楽とは別のディレクトリ（/media-book）に置く（同じパスを 2 つのライブラリに入れると、アイテムが使い回されて Audio のまま見えるため）。
 # 終わると統合テスト用の環境変数を表示する:
 #
@@ -31,7 +32,7 @@ USER_NAME="kikidame"
 PASSWORD="kikidame-test"
 AUTH_HEADER='Authorization: MediaBrowser Client="kikidame-testserver", Device="script", DeviceId="kikidame-testserver", Version="1"'
 
-usage() { sed -n '2,24p' "$0"; exit 1; }
+usage() { sed -n '2,25p' "$0"; exit 1; }
 
 # 番組（album）・配信元（album_artist）・出演者（artist）・公開日（date）をタグに持つ無音の m4a を 1 本作る。
 # 引数: 出力パス タイトル 番組 配信元 公開日 出演者（空なら付けない）
@@ -124,11 +125,19 @@ make_media() {
   make_track "$MEDIA/TBSラジオ/テスト番組B/2026-08-31.m4a" "2026-08-31" "テスト番組B" "TBSラジオ" "2026-08-31" ""
   make_track "$MEDIA/TBSラジオ/テスト番組B/2026-08-24.m4a" "2026-08-24" "テスト番組B" "TBSラジオ" "2026-08-24" "出演者丙"
   echo "media: $MEDIA ($(find "$MEDIA" -name '*.m4a' | wc -l) tracks)"
-  # ブックのライブラリ: 音楽と同じ 6 本と folder.jpg に、各回が 1 本だけの番組 C（ニッポン放送）を足す。
-  # 各回が 1 本だけの番組は、各回の親が配信元のフォルダになる。配信元のフォルダにも folder.jpg を置き、それが番組 C の画像にならないことを見る
+  # ブックのライブラリ: 音楽と同じ 6 本と folder.jpg に、各回が 1 本だけの番組 C・D（ニッポン放送）を足す。
+  # 各回が 1 本だけの番組は、各回の親が配信元のフォルダになる。配信元のフォルダにも folder.jpg（青）を置き、それが番組 C・D の画像にならないことを見る
   cp -R "$MEDIA/." "$BOOK_MEDIA/"
   make_track "$BOOK_MEDIA/ニッポン放送/テスト番組C/2026-09-01.m4a" "2026-09-01" "テスト番組C" "ニッポン放送" "2026-09-01" "出演者丁"
   ffmpeg -loglevel error -y -f lavfi -i color=c=blue:s=64x64 -frames:v 1 "$BOOK_MEDIA/ニッポン放送/folder.jpg"
+  # 番組 D: 各回が 1 本だけで、その回に画像（緑）を埋め込む（回の画像。AudioBook の Primary になり、それが番組 D の画像になる）
+  local cover="$DIR/cover-d.jpg" plain="$DIR/plain-d.m4a"
+  ffmpeg -loglevel error -y -f lavfi -i color=c=green:s=64x64 -frames:v 1 "$cover"
+  make_track "$plain" "2026-08-25" "テスト番組D" "ニッポン放送" "2026-08-25" "出演者戊"
+  mkdir -p "$BOOK_MEDIA/ニッポン放送/テスト番組D"
+  ffmpeg -loglevel error -y -i "$plain" -i "$cover" -map 0:a -map 1:v -c copy -disposition:v:0 attached_pic \
+    "$BOOK_MEDIA/ニッポン放送/テスト番組D/2026-08-25.m4a"
+  rm -f "$cover" "$plain"
   echo "media: $BOOK_MEDIA ($(find "$BOOK_MEDIA" -name '*.m4a' | wc -l) tracks, books)"
 }
 
@@ -215,11 +224,11 @@ up() {
       -d '{"LibraryOptions":{"PathInfos":[{"Path":"/media"}],"EnableEmbeddedTitles":true,"SaveLocalMetadata":false,"MetadataSavers":[],"TypeOptions":[{"Type":"MusicAlbum","MetadataFetchers":[],"ImageFetchers":[]},{"Type":"MusicArtist","MetadataFetchers":[],"ImageFetchers":[]},{"Type":"Audio","MetadataFetchers":[],"ImageFetchers":[]}]}}'
     echo "library: radio created, scanning"
   fi
-  # ブックのライブラリ radio-book。メタデータ取得は同じく全部切る
+  # ブックのライブラリ radio-book。メタデータ取得は同じく全部切る。画像は、各回に埋め込んだ画像（回の画像）だけを読む（Image Extractor）
   if ! curl -sf -H "$token_header" "$URL/Library/VirtualFolders" | grep -q '"Name":"radio-book"'; then
     curl -sf -X POST -H 'Content-Type: application/json' -H "$token_header" \
       "$URL/Library/VirtualFolders?name=radio-book&collectionType=books&refreshLibrary=true" \
-      -d '{"LibraryOptions":{"PathInfos":[{"Path":"/media-book"}],"EnableEmbeddedTitles":true,"SaveLocalMetadata":false,"MetadataSavers":[],"TypeOptions":[{"Type":"AudioBook","MetadataFetchers":[],"ImageFetchers":[]},{"Type":"Book","MetadataFetchers":[],"ImageFetchers":[]}]}}'
+      -d '{"LibraryOptions":{"PathInfos":[{"Path":"/media-book"}],"EnableEmbeddedTitles":true,"SaveLocalMetadata":false,"MetadataSavers":[],"TypeOptions":[{"Type":"AudioBook","MetadataFetchers":[],"ImageFetchers":["Image Extractor"]},{"Type":"Book","MetadataFetchers":[],"ImageFetchers":[]}]}}'
     echo "library: radio-book created, scanning"
   fi
   wait_scan Audio "$MEDIA" "$token_header" "$user_id"

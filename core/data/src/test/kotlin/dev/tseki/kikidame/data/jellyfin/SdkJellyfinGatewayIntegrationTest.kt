@@ -25,7 +25,11 @@ import kotlinx.datetime.atStartOfDayIn
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
+import org.jellyfin.sdk.api.client.extensions.imageApi
 import org.jellyfin.sdk.api.client.extensions.libraryApi
+import org.jellyfin.sdk.model.api.BaseItemKind
+import org.jellyfin.sdk.model.api.ImageType
+import org.jellyfin.sdk.model.api.request.GetItemsRequest
 import org.jellyfin.sdk.createJellyfin
 import org.jellyfin.sdk.model.ClientInfo
 import org.jellyfin.sdk.api.client.util.AuthorizationHeaderBuilder
@@ -37,6 +41,7 @@ import java.util.UUID
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -47,7 +52,7 @@ import kotlin.time.Instant
 
 /**
  * 実サーバに対する [SdkJellyfinGateway] の統合テスト。`scripts/jellyfin-testserver.sh up 1010|12` で立てた
- * 合成ライブラリ（音楽の `radio` は番組 2 × 各回 3、ブックの `radio-book` はそれに各回が 1 本だけの番組 C を足したもの）を前提に、
+ * 合成ライブラリ（音楽の `radio` は番組 2 × 各回 3、ブックの `radio-book` はそれに各回が 1 本だけの番組 C（回の画像なし）と D（回の画像あり）を足したもの）を前提に、
  * [JellyfinGateway] の全メソッドを、音楽とブックのライブラリでそれぞれ 1 回ずつ呼ぶ。
  * ブックの各回の UserData の書き込みと読み戻し（再生の共有）も見る。
  *
@@ -222,7 +227,7 @@ class SdkJellyfinGatewayIntegrationTest {
 
     /**
      * ブックのライブラリ（ADR 0010 の決定 2）: 各回は AudioBook で、番組は Album と AlbumArtist のタグでまとまる。
-     * 番組の取得元 ID は `<AlbumArtist>/<Album>`。各回が 1 本だけの番組 C もまとまる。
+     * 番組の取得元 ID は `<AlbumArtist>/<Album>`。各回が 1 本だけの番組 C・D もまとまる。
      */
     @Test
     fun bookLibraryGroupsAudioBooksIntoProgramsByTheirTags() = runTest {
@@ -230,23 +235,25 @@ class SdkJellyfinGatewayIntegrationTest {
         val snapshot = gateway.fetchLibrary(credentials, radioBook(credentials))
 
         assertEquals(
-            setOf("ニッポン放送/テスト番組A", "TBSラジオ/テスト番組B", "ニッポン放送/テスト番組C"),
+            setOf("ニッポン放送/テスト番組A", "TBSラジオ/テスト番組B", "ニッポン放送/テスト番組C", "ニッポン放送/テスト番組D"),
             snapshot.programs.map { it.sourceId.value }.toSet(),
         )
         val programs = snapshot.programs.associateBy { it.name }
         assertEquals("ニッポン放送", programs.getValue("テスト番組A").publisherName)
         assertEquals("TBSラジオ", programs.getValue("テスト番組B").publisherName)
         assertEquals("ニッポン放送", programs.getValue("テスト番組C").publisherName)
+        assertEquals("ニッポン放送", programs.getValue("テスト番組D").publisherName)
 
-        assertEquals(7, snapshot.episodes.size)
+        assertEquals(8, snapshot.episodes.size)
         val byTitle = snapshot.episodes.associateBy { it.title }
         assertEquals(
-            setOf("2026-09-14", "2026-09-14 (1)", "夏休みスペシャル", "2026-09-07", "2026-08-31", "2026-08-24", "2026-09-01"),
+            setOf("2026-09-14", "2026-09-14 (1)", "夏休みスペシャル", "2026-09-07", "2026-08-31", "2026-08-24", "2026-09-01", "2026-08-25"),
             byTitle.keys,
         )
         assertEquals(SourceItemId("ニッポン放送/テスト番組A"), byTitle.getValue("夏休みスペシャル").programSourceId)
         assertEquals(SourceItemId("TBSラジオ/テスト番組B"), byTitle.getValue("2026-08-31").programSourceId)
         assertEquals(SourceItemId("ニッポン放送/テスト番組C"), byTitle.getValue("2026-09-01").programSourceId)
+        assertEquals(SourceItemId("ニッポン放送/テスト番組D"), byTitle.getValue("2026-08-25").programSourceId)
 
         fun day(y: Int, m: Int, d: Int) = LocalDate(y, m, d).atStartOfDayIn(PublishedAt.ZONE)
         assertEquals(day(2026, 8, 1), byTitle.getValue("夏休みスペシャル").publishedAt)
@@ -288,8 +295,9 @@ class SdkJellyfinGatewayIntegrationTest {
     }
 
     /**
-     * ブックのライブラリの番組の画像は、番組のフォルダ（Folder）の Primary。`folder.jpg` のある番組 A だけ画像を持つ。
-     * 各回が 1 本だけの番組 C は、各回の親が配信元のフォルダ（`folder.jpg` を置いてある）になるが、それを番組 C の画像にしない。
+     * ブックのライブラリの番組の画像は、番組のフォルダ（Folder）の Primary。`folder.jpg` のある番組 A は画像を持ち、番組 B は画像なし。
+     * 各回が 1 本だけの番組 C・D は、各回の親が配信元のフォルダ（`folder.jpg` を置いてある）になるが、それを番組の画像にしない。
+     * 番組のフォルダの無い C・D は、その回の画像（AudioBook の Primary）を番組の画像にする。回に画像を埋め込んだ D だけが画像を持つ。
      */
     @Test
     fun bookProgramImageComesFromTheProgramFolder() = runTest {
@@ -299,17 +307,58 @@ class SdkJellyfinGatewayIntegrationTest {
 
         val tag = assertNotNull(programs.getValue("テスト番組A").image, "番組のフォルダの ImageTag が返らない").version
         assertNull(programs.getValue("テスト番組B").image)
-        assertNull(programs.getValue("テスト番組C").image, "配信元のフォルダの画像を番組の画像にしない")
+        assertNull(programs.getValue("テスト番組C").image, "回の画像の無い 1 本だけの番組は画像なし（配信元のフォルダの画像を番組の画像にしない）")
+        val tagD = assertNotNull(programs.getValue("テスト番組D").image, "1 本だけの番組 D の回の画像の ImageTag が返らない").version
         assertEquals(tag, gateway.fetchProgram(credentials, book, SourceItemId("ニッポン放送/テスト番組A"))?.image?.version)
+        assertEquals(tagD, gateway.fetchProgram(credentials, book, programD)?.image?.version)
 
         val bytes = assertNotNull(gateway.fetchProgramImage(credentials, book, SourceItemId("ニッポン放送/テスト番組A")))
         assertTrue(bytes.isJpeg(), "JPEG の先頭ではない: ${bytes.size} bytes")
         assertNull(gateway.fetchProgramImage(credentials, book, SourceItemId("TBSラジオ/テスト番組B")))
         assertNull(gateway.fetchProgramImage(credentials, book, SourceItemId("ニッポン放送/テスト番組C")))
+        val bytesD = assertNotNull(gateway.fetchProgramImage(credentials, book, programD), "番組 D の画像（回の画像）の中身が取れない")
+        assertNotPublisherFolderImage(credentials, bytesD)
 
-        // 一覧を取っていない（番組のフォルダを覚えていない）ゲートウェイでも取れる
+        // 一覧を取っていない（番組の画像の取得先を覚えていない）ゲートウェイでも取れる
         val fresh = SdkJellyfinGateway(ApplicationProvider.getApplicationContext())
         assertContentEquals(bytes, fresh.fetchProgramImage(credentials, book, SourceItemId("ニッポン放送/テスト番組A")))
+        assertContentEquals(bytesD, fresh.fetchProgramImage(credentials, book, programD))
+    }
+
+    /** 各回が 1 本だけで、その回に画像を埋め込んだ番組。 */
+    private val programD = SourceItemId("ニッポン放送/テスト番組D")
+
+    /**
+     * [bytes] が、配信元のフォルダ（ニッポン放送）の Primary（`folder.jpg`、青の画像）と違うことを確かめる。
+     * 配信元のフォルダの Primary は、サーバの画像の API で直に引く。
+     */
+    private suspend fun assertNotPublisherFolderImage(credentials: ServerCredentials, bytes: ByteArray) {
+        val api = serverApi(credentials)
+        val library = radioBook(credentials)
+        val folders by api.libraryApi.getItems(
+            GetItemsRequest(parentId = UUID.fromString(library.id.value), recursive = true, includeItemTypes = listOf(BaseItemKind.FOLDER)),
+        )
+        val publisher = assertNotNull(folders.items.firstOrNull { it.name == "ニッポン放送" }, "配信元のフォルダが無い")
+        val request = Request.Builder()
+            .url(api.imageApi.getItemImageUrl(publisher.id, ImageType.PRIMARY))
+            .header(
+                "Authorization",
+                AuthorizationHeaderBuilder.buildHeader(
+                    clientName = api.clientInfo.name,
+                    clientVersion = api.clientInfo.version,
+                    deviceId = api.deviceInfo.id,
+                    deviceName = api.deviceInfo.name,
+                    accessToken = credentials.accessToken,
+                ),
+            )
+            .build()
+        val publisherImage = withContext(Dispatchers.IO) {
+            httpClient.newCall(request).execute().use { response ->
+                assertEquals(200, response.code, "配信元のフォルダの画像が取れない（folder.jpg を置いてあるはず）")
+                response.body.bytes()
+            }
+        }
+        assertFalse(bytes.contentEquals(publisherImage), "配信元のフォルダの画像を番組の画像にしている")
     }
 
     /** ブックのライブラリの [programId] の既知の各回の取得元 ID（新しい順。手元の 1 番組の同期が渡すのと同じ並び）。 */
@@ -469,7 +518,10 @@ class SdkJellyfinGatewayIntegrationTest {
         assertEquals(listOf("2026-09-01"), cWithA.episodes.map { it.title })
     }
 
-    /** 1 番組の同期の画像（ADR 0016）: 番組のフォルダの名前が Album と同じ番組 A だけ、全件の一覧と同じ版。番組 B・C は画像なし。 */
+    /**
+     * 1 番組の同期の画像（ADR 0016）: 全件の一覧と同じ規則・同じ版。番組のフォルダの名前が Album と同じ番組 A はそのフォルダの画像、
+     * 各回が 1 本だけの番組 D はその回の画像。番組 B と、回の画像の無い 1 本だけの番組 C は画像なし（配信元のフォルダの画像は使わない）。
+     */
     @Test
     fun bookProgramSnapshotKeepsTheProgramFolderImage() = runTest {
         val credentials = signIn()
@@ -479,14 +531,17 @@ class SdkJellyfinGatewayIntegrationTest {
         val programC = SourceItemId("ニッポン放送/テスト番組C")
         val listed = gateway.fetchLibrary(credentials, book).programs.associateBy { it.sourceId }
         val tag = assertNotNull(listed.getValue(programA).image).version
+        val tagD = assertNotNull(listed.getValue(programD).image, "一覧で番組 D の回の画像の ImageTag が返らない").version
 
         val knownA = knownEpisodes(credentials, book, programA)
         val knownB = knownEpisodes(credentials, book, programB)
         val knownC = knownEpisodes(credentials, book, programC)
+        val knownD = knownEpisodes(credentials, book, programD)
         narrowedOnly(gateway, "画像") {
             assertEquals(tag, gateway.fetchProgramSnapshot(credentials, book, programA, knownA)?.programs?.single()?.image?.version)
             assertNull(assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programB, knownB)).programs.single().image)
             assertNull(assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programC, knownC)).programs.single().image, "配信元のフォルダの画像を番組の画像にしない")
+            assertEquals(tagD, assertNotNull(gateway.fetchProgramSnapshot(credentials, book, programD, knownD)).programs.single().image?.version, "1 本だけの番組 D は回の画像")
         }
 
         // 一覧を取っていないゲートウェイで、1 番組の同期の直後に画像の中身が取れる（画像の中身も、ライブラリ全体を取らずに）
@@ -503,6 +558,12 @@ class SdkJellyfinGatewayIntegrationTest {
             assertContentEquals(bytes, fresh.fetchProgramImage(credentials, book, programA))
         }
         assertNull(fresh.fetchProgramImage(credentials, book, programC))
+        // 1 本だけの番組 D: 1 番組の同期の直後に、回の画像の中身が取れる（ライブラリ全体を取らずに）
+        val bytesD = narrowedOnly(fresh, "番組 D の画像の中身") {
+            assertEquals(tagD, fresh.fetchProgramSnapshot(credentials, book, programD, knownD)?.programs?.single()?.image?.version)
+            assertNotNull(fresh.fetchProgramImage(credentials, book, programD), "番組 D の画像（回の画像）の中身が取れない")
+        }
+        assertNotPublisherFolderImage(credentials, bytesD)
     }
 
     /**

@@ -253,8 +253,9 @@ class SdkJellyfinGateway @Inject constructor(
      * 3. 返った各回を、Album と AlbumArtist のタグで番組に選び直し（[fetchBooks] と同じ判定）、その応答から各回（版・UserData）を作る（[fetchBooks] と同じ変換）
      *
      * 安全網の判定は [BookProgramNarrowing]。当たれば [NarrowedBookProgram.Fallback] を返し、呼び出し側がライブラリ全体を取る。
-     * 番組の画像は、親を `ids=<親>` で引き、名前が Album と同じときだけその Primary（[fetchBooks] と同じ。違えば画像なし）。
-     * 番組のフォルダは [bookFolders] に、ほかの番組の覚えを残したまま足す。
+     * 番組の画像は、親を `ids=<親>` で引き、[fetchBooks] と同じ規則（[BookProgramImage.choose]）で選ぶ。名前が Album と同じ親は番組のフォルダで
+     * その Primary、番組のフォルダが無く各回が 1 本だけならその回の Primary、ほかは画像なし（配信元のフォルダの画像は使わない）。
+     * 画像の取得先は [bookImageSources] に、ほかの番組の覚えを残したまま足す。
      *
      * 欄に `DateLastSaved` を入れるので、親の直下の取得も、ライブラリ全体の取得や `ids=` と同じ版（Etag）を返す（Jellyfin 10.10.7 で入れないと違った。ADR 0016）。
      * そのため `ids=` での引き直しはしない。
@@ -328,12 +329,13 @@ class SdkJellyfinGateway @Inject constructor(
         // 既知の各回が載っているので books は空でない
         val first = books.first()
         val album = first.album.orEmpty()
-        val folder = folderFetch.await()?.takeIf { it.name == album }
-        bookFolders.compute(BookLibraryKey(credentials.serverUrl, credentials.userId, library.id)) { _, old ->
+        val parentFolder = folderFetch.await()?.takeIf { it.id == parent }?.toImageItem()
+        val image = BookProgramImage.forNarrowed(album, books.map { it.toImageEpisode() }, parentFolder)
+        bookImageSources.compute(BookLibraryKey(credentials.serverUrl, credentials.userId, library.id)) { _, old ->
             val others = old.orEmpty() - programSourceId
-            if (folder != null) others + (programSourceId to folder.id) else others
+            if (image.source != null) others + (programSourceId to image.source) else others
         }
-        val program = SourceProgram(sourceId = programSourceId, name = album, publisherName = first.publisher(), image = folder?.primaryImage())
+        val program = SourceProgram(sourceId = programSourceId, name = album, publisherName = first.publisher(), image = image.image)
         NarrowedBookProgram.Found(SourceSnapshot(listOf(program), episodes, SnapshotScope.Program(programSourceId)))
     }
 
@@ -383,17 +385,17 @@ class SdkJellyfinGateway @Inject constructor(
     /** 一覧の 1 頁。[total] はサーバの totalRecordCount。 */
     internal class ItemPage<T>(val items: List<T>, val total: Int)
 
-    /** ブックのライブラリを番組・各回にまとめたもの。[folders] は番組 ID → 番組のフォルダ（画像を持つ Folder）の id。 */
-    private class BookListing(val programs: List<SourceProgram>, val episodes: List<SourceEpisode>, val folders: Map<SourceItemId, UUID>)
+    /** ブックのライブラリを番組・各回にまとめたもの。[imageSources] は番組 ID → 番組の画像の取得先（番組のフォルダか、各回が 1 本だけの番組のその回）の id。 */
+    private class BookListing(val programs: List<SourceProgram>, val episodes: List<SourceEpisode>, val imageSources: Map<SourceItemId, UUID>)
 
     /**
      * ブックのライブラリ全体を取り、各回（AudioBook）を Album と AlbumArtist のタグで番組にまとめる（ADR 0010 の決定 2）。
      * Album の無い各回は、どの番組にも属さないので取り込まない。番組の取得元 ID は `<AlbumArtist>/<Album>`（AlbumArtist が無ければ `/<Album>`）。
      *
-     * 番組の画像は番組のフォルダ（Folder）の Primary。番組のフォルダとみなすのは、その番組の各回の親がどれも同じ Folder で、
-     * そのフォルダの名前が Album と同じときだけ。各回が 1 本だけの番組は、各回の親が配信元のフォルダになる（Jellyfin で確かめた）ので、
-     * 名前で外し、配信元の画像を番組の画像にしない。見分けられなければ画像なし（ADR 0009）。
-     * 番組のフォルダは [bookFolders] に覚え、[fetchProgramImage] で使う。
+     * 番組の画像は [BookProgramImage.choose] で選ぶ（ADR 0009）。番組のフォルダ（各回の親がどれも同じ Folder で、名前が Album と同じ）が
+     * あればその Primary。各回が 1 本だけの番組は、各回の親が配信元のフォルダになる（Jellyfin で確かめた）ので、名前で外し、
+     * その回の画像（AudioBook の Primary）を番組の画像にする。配信元のフォルダの画像は使わない。ほかは画像なし。
+     * 画像の取得先は [bookImageSources] に覚え、[fetchProgramImage] で使う。
      */
     private suspend fun fetchBooks(api: ApiClient, credentials: ServerCredentials, library: SelectedLibrary): BookListing {
         fullBookListings.incrementAndGet()
@@ -419,18 +421,25 @@ class SdkJellyfinGateway @Inject constructor(
         val byProgram = LinkedHashMap<SourceItemId, MutableList<BaseItemDto>>()
         for (book in books) byProgram.getOrPut(book.bookProgramId() ?: continue) { ArrayList() } += book
 
-        val programFolders = HashMap<SourceItemId, UUID>()
+        val folderItems = folders.mapValues { (_, folder) -> folder.toImageItem() }
+        val imageSources = HashMap<SourceItemId, UUID>()
         val programs = byProgram.map { (programId, items) ->
             val first = items.first()
             val album = first.album.orEmpty()
-            val folder = items.map { it.parentId }.distinct().singleOrNull()?.let(folders::get)?.takeIf { it.name == album }
-            if (folder != null) programFolders[programId] = folder.id
-            SourceProgram(sourceId = programId, name = album, publisherName = first.publisher(), image = folder?.primaryImage())
+            val image = BookProgramImage.forFullListing(album, items.map { it.toImageEpisode() }, folderItems)
+            if (image.source != null) imageSources[programId] = image.source
+            SourceProgram(sourceId = programId, name = album, publisherName = first.publisher(), image = image.image)
         }
         val episodes = books.mapNotNull { book -> book.bookProgramId()?.let { book.toBookEpisode(it) } }
-        bookFolders[BookLibraryKey(credentials.serverUrl, credentials.userId, library.id)] = programFolders
-        return BookListing(programs, episodes, programFolders)
+        bookImageSources[BookLibraryKey(credentials.serverUrl, credentials.userId, library.id)] = imageSources
+        return BookListing(programs, episodes, imageSources)
     }
+
+    /** 番組の画像の候補（[BookProgramImage]）としての、このアイテム（Folder か AudioBook）。 */
+    private fun BaseItemDto.toImageItem() = BookProgramImage.Item(id = id, name = name, primaryTag = imageTags?.get(ImageType.PRIMARY))
+
+    /** 番組の画像の選び方（[BookProgramImage]）に渡す、この各回（AudioBook）と親。 */
+    private fun BaseItemDto.toImageEpisode() = BookProgramImage.Episode(item = toImageItem(), parentId = parentId)
 
     /** ブックのライブラリの番組 ID（`<AlbumArtist>/<Album>`）。Album が無ければ null。分けて読み戻すことはしない（AlbumArtist に `/` が入りうる）。 */
     private fun BaseItemDto.bookProgramId(): SourceItemId? {
@@ -445,10 +454,10 @@ class SdkJellyfinGateway @Inject constructor(
     private data class BookLibraryKey(val serverUrl: String, val userId: String, val libraryId: SourceItemId)
 
     /**
-     * ブックのライブラリごとの、最後に取った一覧の番組 ID → 番組のフォルダの id。画像の取得（[fetchProgramImage]）は、同期の一覧の直後に
+     * ブックのライブラリごとの、最後に取った一覧の番組 ID → 番組の画像の取得先（番組のフォルダか、各回が 1 本だけの番組のその回）の id。画像の取得（[fetchProgramImage]）は、同期の一覧の直後に
      * 番組ごとに呼ばれるので、番組ごとにライブラリ全体を取り直さないために覚える。覚えていない番組だけ一覧を取り直す。
      */
-    private val bookFolders = ConcurrentHashMap<BookLibraryKey, Map<SourceItemId, UUID>>()
+    private val bookImageSources = ConcurrentHashMap<BookLibraryKey, Map<SourceItemId, UUID>>()
 
     /**
      * ブックのライブラリ全体の取得（[fetchBooks]）を回した回数。1 番組の同期が絞り込み（親の直下、ADR 0016）を通り、
@@ -529,16 +538,17 @@ class SdkJellyfinGateway @Inject constructor(
     }
 
     /**
-     * 番組の Primary の画像を全部読む。音楽のライブラリは MusicAlbum、ブックのライブラリは番組のフォルダ（[fetchBooks]）の画像。
+     * 番組の Primary の画像を全部読む。音楽のライブラリは MusicAlbum、ブックのライブラリは番組の画像の取得先（[BookProgramImage.choose]。
+     * 番組のフォルダか、番組のフォルダが無く各回が 1 本だけの番組のその回の AudioBook）の画像。
      * URL と認証ヘッダは SDK に作らせ、転送は OkHttp で行う（[openDownload] と同じ）。
-     * 画像が無い（404）・番組のフォルダが無い・[MAX_PROGRAM_IMAGE_BYTES] を超えるときは null。
+     * 画像が無い（404）・取得先が無い・[MAX_PROGRAM_IMAGE_BYTES] を超えるときは null。
      */
     override suspend fun fetchProgramImage(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId): ByteArray? = call {
         val api = api(credentials.serverUrl, credentials.accessToken)
         val item = when (library.kind) {
             LibraryKind.MUSIC -> programSourceId.toUuidOrNull()
-            LibraryKind.BOOKS -> bookFolders[BookLibraryKey(credentials.serverUrl, credentials.userId, library.id)]?.get(programSourceId)
-                ?: fetchBooks(api, credentials, library).folders[programSourceId]
+            LibraryKind.BOOKS -> bookImageSources[BookLibraryKey(credentials.serverUrl, credentials.userId, library.id)]?.get(programSourceId)
+                ?: fetchBooks(api, credentials, library).imageSources[programSourceId]
         } ?: return@call null
         val url = api.imageApi.getItemImageUrl(item, ImageType.PRIMARY)
         val request = Request.Builder().url(url).header("Authorization", authorizationHeader(api, credentials)).build()

@@ -60,7 +60,7 @@ interface JellyfinGateway {
 
     /**
      * 番組の画像の中身を取る（ADR 0009）。音楽のライブラリは MusicAlbum の Primary、ブックのライブラリは番組のフォルダ（Folder）の
-     * Primary。画像が無い・大きすぎるときは null。版は [SourceProgram.image]（Primary の ImageTag）で、取り直すかは呼び出し側が決める。
+     * Primary（番組のフォルダが無く各回が 1 本だけの番組は、その回の AudioBook の Primary）。画像が無い・大きすぎるときは null。版は [SourceProgram.image]（Primary の ImageTag）で、取り直すかは呼び出し側が決める。
      */
     suspend fun fetchProgramImage(credentials: ServerCredentials, library: SelectedLibrary, programSourceId: SourceItemId): ByteArray?
 
