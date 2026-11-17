@@ -14,7 +14,7 @@
   | 各回の AlbumArtist のタグ | MusicAlbum の AlbumArtist | 配信元 |
   | AudioBook の Artists | Audio の Artists | 出演者（表示のみ） |
   | PremiereDate（無ければ DateCreated） | PremiereDate（無ければ DateCreated） | 公開日（並び順・「最新 N 回」の基準） |
-  | 番組のフォルダの画像（各回が 1 本だけの番組には無い） | MusicAlbum の画像 | 番組の画像 |
+  | 番組のフォルダの画像（各回が 1 本だけの番組は、その回に埋め込んだ画像。配信元のフォルダの画像は使わない） | MusicAlbum の画像 | 番組の画像 |
 
 - つまりファイルのタグが `album` = 番組、`albumartist` = 配信元、日付（M4A の `©day`）= 公開日、`artist` = 出演者 になっていればよい。ブックのライブラリでは、アプリが `album` と `albumartist` のタグで各回を番組にまとめ、音楽ライブラリでは Jellyfin が上の構造を組む。MP3 の日付タグで公開日が取れるかは未確認
   - ラジオ録音なら、`album` = 番組、`albumartist` = 放送局、日付（M4A の `©day`）= 放送日、のタグを付ければよい。録音ツール [rajikura](https://github.com/t-seki/rajikura)（radiko。同じ作者）の Jellyfin 向けプリセットは `{放送局}/{番組}/{番組} YYYY-MM-DD.m4a` に保存し、albumartist = 放送局、album = 番組のタグを付ける（rajikura の `docs/adr/0002-jellyfin-preset-layout.md` と `docs/requirements.md` を 2026-11-01 に main で読んだもの。そのときの最新のリリースは v0.37.0。rajikura を実際に動かした出力は見ていない）。使わない場合は Mp3tag などの汎用のタグ編集ツールで付ける。rajikura の出力を Jellyfin のライブラリがそのまま読めるかは未確認

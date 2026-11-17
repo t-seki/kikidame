@@ -15,7 +15,7 @@ data class SourceProgram(
 
 /**
  * 取得元にある番組の画像の目印（ADR 0009）。[version] が前の同期と同じなら、画像を取り直さない。
- * 共有フォルダでは `folder.jpg` の大きさと更新日時から作る。Jellyfin ではアルバム（ブックのライブラリでは番組のフォルダ）の Primary の ImageTag を使う。
+ * 共有フォルダでは `folder.jpg` の大きさと更新日時から作る。Jellyfin ではアルバム（ブックのライブラリでは番組のフォルダ。番組のフォルダが無く各回が 1 本だけの番組はその回の AudioBook）の Primary の ImageTag を使う。
  */
 data class SourceImage(val version: String)
 
